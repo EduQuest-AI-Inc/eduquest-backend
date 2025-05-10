@@ -6,7 +6,7 @@ from routes.conversation import conversation_bp
 app = Flask(__name__)
 
 # Enable CORS
-CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
+CORS(app, resources={r"/*": {"origins": "http://eduquest-frontend.s3-website.us-east-2.amazonaws.com"}})
 
 # Register Blueprints
 app.register_blueprint(conversation_bp)

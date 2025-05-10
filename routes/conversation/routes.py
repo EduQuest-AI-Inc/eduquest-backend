@@ -1,14 +1,15 @@
-from flask import request, jsonify
+# routes/conversation.py
+from flask import Blueprint, request, jsonify
+from flask_cors import CORS
 import json
-import openai
-from . import conversation_bp
 from data_access.conversation_dao import add_conversation, append_conversation, get_all_conversations
 from assistants import ini_conv, summarize_conversation
 from models.student_profile import student_profile
 
-# Set up OpenAI API key
-openai.api_key = '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'
+conversation_bp = Blueprint('conversation', __name__)
+CORS(conversation_bp, resources={r"/*": {"origins": "http://eduquest-frontend.s3-website.us-east-2.amazonaws.com"}})
 
+# Routes
 @conversation_bp.route('/start-conversation', methods=['POST'])
 def start_conversation():
     data = request.json
@@ -24,6 +25,9 @@ def start_conversation():
         "message": parsed_response["response"],
         "thread_id": conversation.thread_id
     })
+
+# (Continue defining other routes: /continue-conversation, /get-summary ...)
+
 
 @conversation_bp.route('/continue-conversation', methods=['POST'])
 def continue_conversation():
