@@ -2,5 +2,6 @@ python-dotenv==1.0.1
 openai==1.61.0
 firebase_admin==6.6.0
 pandas
-flask_cors==5.0.1
 flask==3.0.3
+flask_cors==5.0.1
+flask_jwt_extended==4.7.1

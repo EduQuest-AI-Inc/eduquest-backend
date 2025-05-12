@@ -1,18 +1,37 @@
 from flask import Flask
 from flask_cors import CORS
-from routes.conversation import conversation_bp
+from flask_jwt_extended import JWTManager
+from dotenv import load_dotenv
+import os
+
+from routes.conversation.routes import conversation_bp
+from routes.auth.routes import auth_bp
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
 
-# Enable CORS
-CORS(app, resources={r"/*": {"origins": "http://eduquest-frontend.s3-website.us-east-2.amazonaws.com"}})
+# Config
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'fallback-secret')  # Set secret securely
+
+# Initialize JWT
+jwt = JWTManager(app)
+
+# Enable CORS for your frontend (add localhost for dev if needed)
+CORS(app, resources={r"/*": 
+                {"origins": [
+                    "http://eduquest-frontend.s3-website.us-east-2.amazonaws.com",
+                    "http://localhost:5173"
+                    ]
+                }
+            }
+    )
 
 # Register Blueprints
 app.register_blueprint(conversation_bp)
+app.register_blueprint(auth_bp, url_prefix='/auth')
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
-
-
-# Test For Auto Deployment
