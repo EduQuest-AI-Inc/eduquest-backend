@@ -4,3 +4,5 @@ firebase_admin==6.6.0
 pandas
 flask_cors==5.0.1
 flask==3.0.3
+canvasapi
+bs4
