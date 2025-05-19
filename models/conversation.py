@@ -7,7 +7,6 @@ class Conversation(BaseModel):
     last_updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     student_id: str
     conversation_type: str
-    conversation_logs: List[str]
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_item(self):

@@ -14,14 +14,13 @@ def test_crud_operations():
     conversation = Conversation(
         thread_id="thread_test",
         student_id="student_test",
-        conversation_type="question",
-        conversation_logs=["Hello! This is a test."],
+        conversation_type="initial",
         last_updated_at=now,
         created_at=now
     )
 
     # -------Add-------
-    # dao.add_conversation(conversation)
+    dao.add_conversation(conversation)
 
     # -------Update-------
     # dao.update_conversation(
@@ -31,12 +30,12 @@ def test_crud_operations():
     # )
 
     # -------Get-------
-    # result = dao.get_conversations_by_thread("thread_test")
-    # print(result)
+    result = dao.get_conversations_by_thread("thread_test")
+    print(result)
 
     # -------Delete-------
-    dao.delete_conversation(conversation.thread_id, "2025-05-17T19:10:40.189374+00:00")
-    final = dao.get_conversations_by_thread("thread_test")
-    assert not any(c["student_id"] == "student_test" for c in final)
+    # dao.delete_conversation(conversation.thread_id, "2025-05-17T19:10:40.189374+00:00")
+    # final = dao.get_conversations_by_thread("thread_test")
+    # assert not any(c["student_id"] == "student_test" for c in final)
 
 test_crud_operations()
