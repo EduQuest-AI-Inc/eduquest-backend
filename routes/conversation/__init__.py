@@ -1,5 +1,2 @@
-from flask import Blueprint
+from .routes import conversation_bp
 
-conversation_bp = Blueprint('conversation_bp', __name__)
-
-from .routes import *
