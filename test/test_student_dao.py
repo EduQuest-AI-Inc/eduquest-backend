@@ -12,21 +12,21 @@ def test_crud_operations():
 
     student = Student(
         student_id="stu123",
-        first_name="Alice",
-        last_name="Watanabe",
+        first_name="Rai",
+        last_name="Katsuragawa",
         enrollments=["CS101", "MATH200"],
         grade=3,
         strenth="Logic",
         weakness="Theory",
         interest="AI",
         learning_style="Hands-on",
-        long_term_goal="ML Researcher",
+        long_term_goal="Become a Data Scientist",
         last_login=datetime.now(timezone.utc).isoformat(),
         password="password"
     )
 
     # -------Add-------
-    # dao.add_student(student)
+    dao.add_student(student)
 
     # -------Update-------
     # dao.update_student("stu123", "2025-05-19T15:33:15.671818+00:00", {"grade": 5, "interest": "AI & Robotics"})
