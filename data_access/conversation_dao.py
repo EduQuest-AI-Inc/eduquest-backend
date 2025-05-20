@@ -1,91 +1,83 @@
-from data_access.config import db  # Import Firestore instance
+from data_access.base_dao import BaseDAO
+from models.conversation import Conversation
+from data_access.config import DynamoDBConfig
+from boto3.dynamodb.conditions import Key
+from typing import List, Dict, Any
+from datetime import datetime, timezone
 
-def add_conversation(student_id: str, thread_id: str, assistant: str, conversation_log: list):
-    try:
-        # Reference to the Firestore 'conversations' collection
-        conversations_ref = db.collection("conversations")
+class ConversationDAO(BaseDAO):
+    def __init__(self):
+        """
+        Initialize the DAO with the DynamoDB 'conversation' table.
+        """
+        config = DynamoDBConfig()
+        self.table = config.get_table("conversation")
 
-        # Add a new conversation document
-        conversations_ref.add({
-            "student_id": student_id,
+    def add_conversation(self, conversation: Conversation) -> None:
+        """
+        Add a new conversation record to the table.
+
+        :param conversation: A Conversation model instance.
+        :return: None
+        """
+        self.table.put_item(Item=conversation.to_item())
+
+    def get_conversations_by_thread(self, thread_id: str) -> List[Conversation]:
+        """
+        Retrieve all conversation records for a specific thread ID.
+
+        :param thread_id: The partition key.
+        :return: A list of conversation records (as dictionaries).
+        """
+        response = self.table.query(
+            KeyConditionExpression=Key("thread_id").eq(thread_id)
+        )
+        return response["Items"]
+
+    def update_conversation(self, thread_id: str, last_updated_at: str, updates: Dict[str, Any]) -> str:
+        """
+        Update a conversation record, including changing the last_updated_at (sort key).
+        Since primary and sort keys are immutable, this creates a new item and deletes the old one.
+
+        :param thread_id: The original thread_id (partition key).
+        :param last_updated_at: The original last_updated_at (sort key).
+        :param updates: Dictionary of attributes to update.
+        :return: The new last_updated_at timestamp as a string.
+        """
+        # Step 1: Get existing item
+        response = self.table.get_item(Key={
             "thread_id": thread_id,
-            "assistant": assistant,
-            "conversation_log": conversation_log
+            "last_updated_at": last_updated_at
         })
 
-    except Exception as e:
-        print("Error adding conversation:", e)
+        item = response.get("Item")
+        if not item:
+            raise ValueError("Conversation not found.")
 
-def get_conversation(student_id: str, thread_id: str):
-    try:
-        # Reference to the Firestore 'conversations' collection
-        conversations_ref = db.collection("conversations")
+        # Step 2: Apply updates
+        item.update(updates)
 
-        # Query by student_id and thread_id
-        query = conversations_ref.where("student_id", "==", student_id).where("thread_id", "==", thread_id).stream()
+        # Step 3: Update last_updated_at to now
+        new_timestamp = datetime.now(timezone.utc).isoformat()
+        item["last_updated_at"] = new_timestamp
 
-        # Retrieve and return the conversation data
-        for doc in query:
-            return doc.to_dict()  # Convert Firestore document to dictionary
+        # Step 4: Add new item
+        self.table.put_item(Item=item)
 
-        return None  # No conversation found
-    except Exception as e:
-        print("Error fetching conversation:", e)
-        return None
-    
-def append_conversation(student_id: str, thread_id: str, new_message: dict):
-    try:
-        # Reference to the Firestore 'conversations' collection
-        conversations_ref = db.collection("conversations")
+        # Step 5: Delete old item
+        self.table.delete_item(Key={
+            "thread_id": thread_id,
+            "last_updated_at": last_updated_at
+        })
 
-        # Query the document with matching student_id and thread_id
-        query = conversations_ref.where("student_id", "==", student_id).where("thread_id", "==", thread_id).stream()
+        return new_timestamp
 
-        # Iterate through query results (should ideally be one document)
-        for doc in query:
-            doc_ref = conversations_ref.document(doc.id)  # Get document reference
-            
-            # Get existing conversation log
-            conversation_data = doc.to_dict()
-            conversation_log = conversation_data.get("conversation_log", [])
+    def delete_conversation(self, thread_id: str, last_updated_at: str) -> None:
+        """
+        Delete a conversation record using thread_id and last_updated_at as key.
 
-            # Append new message
-            conversation_log.append(new_message)
-
-            # Update Firestore document
-            doc_ref.update({"conversation_log": conversation_log})
-
-            print("Conversation updated successfully!")
-            return True  # Success
-
-        print("No matching conversation found.")
-        return False  # No document matched
-    except Exception as e:
-        print("Error updating conversation:", e)
-        return False  # Error occurred
-    
-
-
-'''
-This function gets all conversation history for a student id and thread id to pass them to summary assistant.
-'''
-def get_all_conversations(student_id: str, thread_id: str):
-    try:
-        # Reference to the Firestore 'conversations' collection
-        conversations_ref = db.collection("conversations")
-
-        # Query all documents that match the student_id
-        query = conversations_ref.where("student_id", "==", student_id).where("thread_id", "==", thread_id).stream()
-
-        # Collect all conversation histories
-        conversations = []
-        for doc in query:
-            conversations.append(doc.to_dict())
-
-        return conversations  # Return list of all conversations
-    except Exception as e:
-        print("Error fetching all conversations:", e)
-        return []  # Return empty list on error
-    
-    
-    # thread_F1RAcknoubUuFssgliWJB2Vw
+        :param thread_id: The partition key.
+        :param last_updated_at: The sort key.
+        :return: None
+        """
+        self.table.delete_item(Key={"thread_id": thread_id, "last_updated_at": last_updated_at})
