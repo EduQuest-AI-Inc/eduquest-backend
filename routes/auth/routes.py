@@ -17,11 +17,12 @@ def signup():
     role = data.get('role')
     first_name = data.get('first_name')
     last_name = data.get('last_name')
+    email = data.get('email')
 
-    if not username or not password or not role or not first_name or not last_name:
-        return jsonify({'message': 'Username, password, role, first_name, and last_name required'}), 400
+    if not username or not password or not role or not first_name or not last_name or not email:
+        return jsonify({'message': 'Username, password, role, first_name, last_name, and email required'}), 400
 
-    if register_user(username, password, role, first_name, last_name):
+    if register_user(username, password, role, first_name, last_name, email):
         return jsonify({'message': 'User registered successfully'}), 201
     else:
         return jsonify({'message': 'Username already exists'}), 409
