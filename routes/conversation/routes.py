@@ -3,17 +3,34 @@ from flask import Blueprint, request, jsonify
 from flask_cors import CORS
 import json
 # from data_access.conversation_dao import add_conversation, append_conversation, get_all_conversations
+
 from assistants import ini_conv, summarize_conversation
 from models.student_profile import student_profile
+from openai import OpenAI
+# import time
+import os
+from dotenv import load_dotenv
+# from data_access
+
+load_dotenv()
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+sec_math_2 = {'initiate': 'asst_bmsuvfNCaHJYmqTlnT52AzXE',
+    'update': 'asst_oQlKvMpoDPp80zEabjvUiflj'}
 
 conversation_bp = Blueprint('conversation', __name__)
 CORS(conversation_bp, resources={r"/*": {"origins": "http://eduquest-frontend.s3-website.us-east-2.amazonaws.com"}})
 
-# # Routes
+
+# Routes
 # @conversation_bp.route('/start-conversation', methods=['POST'])
 # def start_conversation():
-#     data = request.json
-#     student = student_profile(data['name'], data['age'], data['gender'], data['grade'])
+    # data = request.json
+    # aws_data = get user data from AWS
+    # period = aws_data.period
+    # student = student_profile(data['name'], data['age'], data['gender'], data['grade'])
+
 
 #     conversation = ini_conv(student)
 #     response = conversation.initiate()
