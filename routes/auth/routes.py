@@ -2,14 +2,29 @@
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token
+from .auth_service import register_user, authenticate_user
 
 auth_bp = Blueprint('auth', __name__)
 
-# Dummy user store — replace with real user database or service
-users = {
-    'admin': 'password123',
-    'user1': 'securepass'
-}
+@auth_bp.route('/signup', methods=['POST'])
+def signup():
+    data = request.get_json()
+    if not data:
+        return jsonify({'message': 'Missing JSON body'}), 400
+
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role')
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+
+    if not username or not password or not role or not first_name or not last_name:
+        return jsonify({'message': 'Username, password, role, first_name, and last_name required'}), 400
+
+    if register_user(username, password, role, first_name, last_name):
+        return jsonify({'message': 'User registered successfully'}), 201
+    else:
+        return jsonify({'message': 'Username already exists'}), 409
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
@@ -19,11 +34,12 @@ def login():
 
     username = data.get('username')
     password = data.get('password')
+    role = data.get('role')
 
-    if not username or not password:
-        return jsonify({'message': 'Username and password required'}), 400
+    if not username or not password or not role:
+        return jsonify({'message': 'Username, password, and role required'}), 400
 
-    if users.get(username) == password:
+    if authenticate_user(username, password, role):
         access_token = create_access_token(identity=username)
         return jsonify({'token': access_token}), 200
     else:
