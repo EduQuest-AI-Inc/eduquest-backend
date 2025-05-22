@@ -4,7 +4,8 @@ class Teacher(BaseModel):
     teacher_id: str  # Partition Key
     first_name: str
     last_name: str
-    last_login: str
+    email: str
+    last_login: str = None
     password: str
 
     def to_item(self):

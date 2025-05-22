@@ -6,7 +6,8 @@ class Student(BaseModel):
     first_name: str
     last_name: str
     password: str
-    last_login: str
+    email: str
+    last_login: str = None
 
     enrollments: Optional[List[str]] = []
     strength: Optional[str] = None
@@ -14,7 +15,6 @@ class Student(BaseModel):
     interest: Optional[str] = None
     learning_style: Optional[str] = None
     long_term_goal: Optional[str] = None
-    last_login: Optional[str] = None
 
 
     def to_item(self):
