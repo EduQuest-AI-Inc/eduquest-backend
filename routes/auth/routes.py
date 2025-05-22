@@ -3,8 +3,11 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token
 from .auth_service import register_user, authenticate_user
+from data_access.session_dao import SessionDAO
+from models.session import Session
 
 auth_bp = Blueprint('auth', __name__)
+session_dao = SessionDAO()
 
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
@@ -42,6 +45,9 @@ def login():
 
     if authenticate_user(username, password, role):
         access_token = create_access_token(identity=username)
+        # Store session in DB
+        session = Session(auth_token=access_token, user_id=username, role=role)
+        session_dao.add_session(session)
         return jsonify({'token': access_token}), 200
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
