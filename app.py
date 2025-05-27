@@ -4,7 +4,7 @@ from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 import os
 
-# from routes.conversation.routes import conversation_bp
+from routes.conversation.routes import conversation_bp
 from routes.auth.routes import auth_bp
 
 # Load environment variables from .env file
@@ -23,14 +23,14 @@ jwt = JWTManager(app)
 CORS(app, resources={r"/*": 
                 {"origins": [
                     "http://eduquest-frontend.s3-website.us-east-2.amazonaws.com",
-                    "http://localhost:5173"
+                    "http://localhost:5174"
                     ]
                 }
             }
     )
 
 # Register Blueprints
-# app.register_blueprint(conversation_bp)
+app.register_blueprint(conversation_bp)
 app.register_blueprint(auth_bp, url_prefix='/auth')
 
 # Add helloworld route for testing
