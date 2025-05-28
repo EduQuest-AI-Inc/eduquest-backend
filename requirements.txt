@@ -1,5 +1,5 @@
 python-dotenv==1.0.1
-openai==1.61.0
+openai
 firebase_admin==6.6.0
 pandas
 flask==3.0.3
@@ -8,3 +8,5 @@ canvasapi
 bs4
 flask_jwt_extended==4.7.1
 boto3==1.38.17
+openai-agents
+pydantic

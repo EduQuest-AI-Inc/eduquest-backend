@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class Student(BaseModel):
     student_id: str  # Partition Key
@@ -7,13 +7,13 @@ class Student(BaseModel):
     last_name: str
     enrollments: List[str]
     grade: int
-    strenth: str
-    weakness: str
-    interest: str
-    learning_style: str
+    strength: Optional = str
+    weakness: Optional = str
+    interest: Optional = str
+    learning_style: Optional = str
     long_term_goal: str
     last_login: str
     password: str
 
-    def to_item(self):
-        return self.model_dump()
+    # def to_item(self):
+    #     return self.model_dump()

@@ -4,8 +4,9 @@ from typing import List
 class WeeklyQuest(BaseModel):
     student_id: str  # Partition Key
     created_at: str  # Sort Key
-    week: int
+    # week: int
     year: int
+    semester: int
     last_updated_at: str
     quests: List[str]
 

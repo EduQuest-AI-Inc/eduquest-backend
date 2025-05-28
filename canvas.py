@@ -64,7 +64,6 @@ class Course:
                 self.processed_content = None
                 self.metadata = {}
 
-
         class Page:
             def __init__(self, page_id, course):
                 self.course = course
@@ -108,7 +107,6 @@ class Course:
             return item
 
 
-
 def course_to_json(course_obj):
     def datetime_handler(obj):
         if hasattr(obj, 'isoformat'):
@@ -118,13 +116,13 @@ def course_to_json(course_obj):
     course_dict = {
         "modules": []
     }
-    
+
     for module in course_obj.modules:
         module_dict = {
             "title": module.title,
             "items": []
         }
-        
+
         for item in module.items:
             item_dict = {
                 "type": item.__class__.__name__,
@@ -135,7 +133,7 @@ def course_to_json(course_obj):
                 "file_type": getattr(item, 'mime_type', 'NA')
             }
             module_dict["items"].append(item_dict)
-            
+
         course_dict["modules"].append(module_dict)
-    
+
     return json.dumps(course_dict, indent=2)

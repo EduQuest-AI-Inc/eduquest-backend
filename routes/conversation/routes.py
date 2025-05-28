@@ -3,7 +3,11 @@ from flask import Blueprint, request, jsonify
 from flask_cors import CORS
 import json
 import openai
-from data_access.conversation_dao import add_conversation, append_conversation, get_all_conversations
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import core
+from data_access.conversation_dao.ConversationDAO import add_conversation, append_conversation, get_all_conversations
 from assistants import ini_conv, summarize_conversation
 from models.student_profile import student_profile
 from openai import OpenAI

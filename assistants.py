@@ -13,6 +13,10 @@ sec_math_2 = {
     'update': 'asst_oQlKvMpoDPp80zEabjvUiflj'
 }
 
+#if student
+
+
+
 def summarize_conversation(thread_id): #will return two pd_dataframe(student_profile and quests)
     # Retrieve the summarization assistant
     assistant = openai.beta.assistants.retrieve("asst_IMuSxVprkgtBXH3xLXjMAvtB")
@@ -269,7 +273,7 @@ class create_class:
             model="o3-mini",
             tools=[{"type": "file_search"}],
         )
-        if len(self.files) > 0:
+        if len(self.filePaths) > 0:
             self.ini_convo_ass = client.beta.assistants.update(
                 assistant_id=self.ini_convo_ass.id,
                 tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
@@ -282,7 +286,7 @@ class create_class:
             model="03-mini",
             tools=[{"type": "file_search"}],
         )
-        if len(self.files) > 0:
+        if len(self.filePaths) > 0:
             self.update_ass = client.beta.assistants.update(
                 assistant_id=self.ini_convo_ass.id,
                 tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
