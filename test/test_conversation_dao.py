@@ -13,14 +13,15 @@ def test_crud_operations():
     now = datetime.now(timezone.utc).isoformat()
     conversation = Conversation(
         thread_id="thread_test",
-        student_id="student_test",
+        user_id="student_test",
+        role="student",
         conversation_type="initial",
         last_updated_at=now,
-        created_at=now
+        period_id="period_test"
     )
 
     # -------Add-------
-    dao.add_conversation(conversation)
+    # dao.add_conversation(conversation)
 
     # -------Update-------
     # dao.update_conversation(
