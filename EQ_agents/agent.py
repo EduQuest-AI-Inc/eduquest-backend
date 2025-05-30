@@ -1,7 +1,17 @@
-from agents import Agent, Runner, FileSearchTool, output_guardrail, GuardrailFunctionOutput, OutputGuardrailTripwireTriggered, RunContextWrapper, output_guardrail
+from agents import (
+    Agent, 
+    Runner, 
+    FileSearchTool, 
+    output_guardrail, 
+    GuardrailFunctionOutput, 
+    OutputGuardrailTripwireTriggered, 
+    RunContextWrapper, 
+    trace,
+    guardrail_span
+)
 from openai import vector_stores
-from pydantic import BaseModel
 from pydantic import BaseModel, Field
+import asyncio
 
 class IndividualQuest(BaseModel):
     Description: str
@@ -60,47 +70,67 @@ class SchedulesAgent:
             ]
         )
 
-        @output_guardrail()
-        async def guardrail(ctx: RunContextWrapper, agent: Agent, output: schedule) -> GuardrailFunctionOutput:
-            """
-            Guardrail function to ensure weekly quests align with course materials.
-            Checks if each quest's skills and topics match what's being taught in class.
-            If misaligned, triggers regeneration of the schedule.
-            """
-            try:
-                # Run the guardrail agent to verify alignment
+    @output_guardrail()
+    async def guardrail(self, ctx: RunContextWrapper, agent: Agent, output: schedule) -> GuardrailFunctionOutput:
+        """
+        Guardrail function to ensure weekly quests align with course materials.
+        Checks if each quest's skills and topics match what's being taught in class.
+        If misaligned, triggers regeneration of the schedule.
+        """
+        try:
+            # Run the guardrail agent to verify alignment
+            result = await Runner.run(
+                self.guardrial_agent,
+                output.model_dump_json(),
+                context=ctx.context
+            )
+            
+            # If the guardrail agent approves, return the original output
+            if "approved" in result.response.lower():
+                return GuardrailFunctionOutput(output=output)
+            
+            # If not approved, regenerate the schedule
+            new_schedule = await Runner.run(
+                self.schedules_agent,
+                self.input,
+                context=ctx.context
+            )
+            
+            # Check if the new schedule is valid
+            if isinstance(new_schedule.output, schedule):
+                return GuardrailFunctionOutput(output=new_schedule.output)
+            
+            # If regeneration failed, trigger the tripwire
+            raise OutputGuardrailTripwireTriggered(
+                message="Failed to regenerate aligned schedule",
+                original_output=output
+            )
+            
+        except Exception as e:
+            raise OutputGuardrailTripwireTriggered(
+                message=f"Error in guardrail check: {str(e)}",
+                original_output=output
+            )
+
+    async def _run_async(self) -> schedule:
+        """
+        Internal async method to run the SchedulesAgent with guardrail validation.
+        Returns the generated schedule.
+        """
+        with trace("schedule_generation") as span:
+            with guardrail_span("schedule_guardrail"):
                 result = await Runner.run(
-                    self.guardrial_agent,
-                    output.model_dump_json(),
-                    context=ctx.context
-                )
-                
-                # If the guardrail agent approves, return the original output
-                if "approved" in result.response.lower():
-                    return GuardrailFunctionOutput(output=output)
-                
-                # If not approved, regenerate the schedule
-                new_schedule = await Runner.run(
                     self.schedules_agent,
-                    self.input,
-                    context=ctx.context
+                    self.input
                 )
-                
-                # Check if the new schedule is valid
-                if isinstance(new_schedule.output, schedule):
-                    return GuardrailFunctionOutput(output=new_schedule.output)
-                
-                # If regeneration failed, trigger the tripwire
-                raise OutputGuardrailTripwireTriggered(
-                    message="Failed to regenerate aligned schedule",
-                    original_output=output
-                )
-                
-            except Exception as e:
-                raise OutputGuardrailTripwireTriggered(
-                    message=f"Error in guardrail check: {str(e)}",
-                    original_output=output
-                )
+        return result.final_output
+
+    def run(self) -> schedule:
+        """
+        Run the SchedulesAgent to generate a schedule with guardrail validation.
+        Handles async execution internally and returns the final schedule.
+        """
+        return asyncio.run(self._run_async())
 
 
 

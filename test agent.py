@@ -2,7 +2,7 @@ from EQ_agents.agent import *
 from models.period import Period
 from models.student_profile import student_profile
 import asyncio
-from agents import Agent, Runner, guardrail_span
+from agents import Agent, Runner, guardrail_span, trace
 import os
 from dotenv import load_dotenv
 import openai
@@ -40,10 +40,9 @@ schedule_agent = SchedulesAgent(golden, pre_calc)
 
 
 # --- Main Function ---
-async def main():
-    result = await Runner.run(schedule_agent.schedules_agent, schedule_agent.input)
-    return(result.final_output)
+def main():
+    return schedule_agent.run()
 
 
 if __name__ == "__main__":
-    print(asyncio.run(main()))
+    print(main())
