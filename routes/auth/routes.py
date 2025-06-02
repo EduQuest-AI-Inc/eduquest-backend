@@ -2,14 +2,33 @@
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token
+from .auth_service import register_user, authenticate_user
+from data_access.session_dao import SessionDAO
+from models.session import Session
 
 auth_bp = Blueprint('auth', __name__)
+session_dao = SessionDAO()
 
-# Dummy user store — replace with real user database or service
-users = {
-    'admin': 'password123',
-    'user1': 'securepass'
-}
+@auth_bp.route('/signup', methods=['POST'])
+def signup():
+    data = request.get_json()
+    if not data:
+        return jsonify({'message': 'Missing JSON body'}), 400
+
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role')
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    email = data.get('email')
+
+    if not username or not password or not role or not first_name or not last_name or not email:
+        return jsonify({'message': 'Username, password, role, first_name, last_name, and email required'}), 400
+
+    if register_user(username, password, role, first_name, last_name, email):
+        return jsonify({'message': 'User registered successfully'}), 201
+    else:
+        return jsonify({'message': 'Username already exists'}), 409
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
@@ -19,12 +38,16 @@ def login():
 
     username = data.get('username')
     password = data.get('password')
+    role = data.get('role')
 
-    if not username or not password:
-        return jsonify({'message': 'Username and password required'}), 400
+    if not username or not password or not role:
+        return jsonify({'message': 'Username, password, and role required'}), 400
 
-    if users.get(username) == password:
+    if authenticate_user(username, password, role):
         access_token = create_access_token(identity=username)
+        # Store session in DB
+        session = Session(auth_token=access_token, user_id=username, role=role)
+        session_dao.add_session(session)
         return jsonify({'token': access_token}), 200
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
