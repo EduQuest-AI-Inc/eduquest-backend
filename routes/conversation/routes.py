@@ -38,7 +38,7 @@ def start_conversation():
             return jsonify({"error": "period_id is required"}), 400
 
         result = start_conversation_service(auth_token, period_id)
-        return jsonify(result), 200
+        return result, 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

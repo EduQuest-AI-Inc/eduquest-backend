@@ -2,6 +2,7 @@ import openai
 from openai import OpenAI
 import time
 import os
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -49,7 +50,7 @@ class ini_conv:
 
     def initiate(self):
         thread = openai.beta.threads.create()
-        initial_message = f"Hello, I'm {self.student.name}, {self.student.age} years old, in {self.student.grade}th grade."
+        initial_message = f"Hello, I'm {self.student["first_name"] + " " + self.student["last_name"]}."
         self.thread_id = thread.id
         # Send the initial message to the thread
         message = openai.beta.threads.messages.create(thread_id=self.thread_id, role="user", content=initial_message)
@@ -73,8 +74,10 @@ class ini_conv:
         response = last_message.content[0].text.value
         self.conversation_log.append({"role": "assistant", "content": response})
 
-        print(f'messages: {response}')
-        return response
+        response_dict = json.loads(response)
+        response_dict["thread_id"] = self.thread_id
+    
+        return response_dict
 
     def cont_conv(self, user_input):
         self.conversation_log.append({"role": "user", "content": user_input})
