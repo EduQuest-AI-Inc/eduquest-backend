@@ -3,6 +3,7 @@ from models.weekly_quest import WeeklyQuest
 from data_access.config import DynamoDBConfig
 from boto3.dynamodb.conditions import Key
 from typing import Dict, Any
+from datetime import datetime, timezone
 
 class WeeklyQuestDAO(BaseDAO):
     def __init__(self):
@@ -12,20 +13,42 @@ class WeeklyQuestDAO(BaseDAO):
     def add_weekly_quest(self, quest: WeeklyQuest) -> None:
         self.table.put_item(Item=quest.to_item())
 
-    def get_weekly_quests_by_student(self, student_id: str) -> list:
+    def get_weekly_quest_by_id(self, weekly_quest_id: str) -> Dict[str, Any]:
         response = self.table.query(
-            KeyConditionExpression=Key("student_id").eq(student_id)
+            KeyConditionExpression=Key("weekly_quest_id").eq(weekly_quest_id)
         )
         return response["Items"]
 
-    def update_weekly_quest(self, student_id: str, created_at: str, updates: Dict[str, Any]) -> None:
-        update_expr = "SET " + ", ".join(f"{k} = :{k}" for k in updates)
-        expr_attr_vals = {f":{k}": v for k, v in updates.items()}
-        self.table.update_item(
-            Key={"student_id": student_id, "created_at": created_at},
-            UpdateExpression=update_expr,
-            ExpressionAttributeValues=expr_attr_vals
-        )
+    def update_weekly_quest(self, weekly_quest_id: str, updates: Dict[str, Any]) -> None:
+        update_expr_parts = []
+        expr_attr_vals = {}
+        expr_attr_names = {}
 
-    def delete_weekly_quest(self, student_id: str, created_at: str) -> None:
-        self.table.delete_item(Key={"student_id": student_id, "created_at": created_at})
+        # Add automatic last_updated_at timestamp
+        now = datetime.now(timezone.utc).isoformat()
+        updates["last_updated_at"] = now
+
+        for k, v in updates.items():
+            attr_name = f"#{k}" if k in ["year", "last_updated_at"] else k
+            attr_value = f":{k}"
+            update_expr_parts.append(f"{attr_name} = {attr_value}")
+            expr_attr_vals[attr_value] = v
+            if k in ["year", "last_updated_at"]:
+                expr_attr_names[attr_name] = k
+
+        update_expr = "SET " + ", ".join(update_expr_parts)
+
+        kwargs = {
+            "Key": {"weekly_quest_id": weekly_quest_id},
+            "UpdateExpression": update_expr,
+            "ExpressionAttributeValues": expr_attr_vals
+        }
+
+        if expr_attr_names:
+            kwargs["ExpressionAttributeNames"] = expr_attr_names
+
+        self.table.update_item(**kwargs)
+
+
+    def delete_weekly_quest(self, weekly_quest_id: str, created_at: str) -> None:
+        self.table.delete_item(Key={"weekly_quest_id": weekly_quest_id, "created_at": created_at})

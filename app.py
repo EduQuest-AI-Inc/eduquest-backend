@@ -4,7 +4,7 @@ from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 import os
 
-from routes.conversation.routes import conversation_bp
+# from routes.conversation.routes import conversation_bp
 from routes.auth.routes import auth_bp
 
 # Load environment variables from .env file
@@ -30,8 +30,13 @@ CORS(app, resources={r"/*":
     )
 
 # Register Blueprints
-app.register_blueprint(conversation_bp)
+# app.register_blueprint(conversation_bp)
 app.register_blueprint(auth_bp, url_prefix='/auth')
+
+# Add helloworld route for testing
+@app.route('/helloworld', methods=['GET'])
+def hello_world():
+    return "helloworld"
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)

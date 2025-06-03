@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 
+
 class Student(BaseModel):
     student_id: str  # Partition Key
     first_name: str
