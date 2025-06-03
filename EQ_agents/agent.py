@@ -9,6 +9,7 @@ from agents import (
     trace,
     guardrail_span
 )
+import json
 from openai import vector_stores
 from pydantic import BaseModel, Field
 import asyncio
@@ -123,7 +124,8 @@ class SchedulesAgent:
                     self.schedules_agent,
                     self.input
                 )
-        return result.final_output
+        final = json.loads(result.final_output.model_dump_json())
+        return final
 
     def run(self) -> schedule:
         """

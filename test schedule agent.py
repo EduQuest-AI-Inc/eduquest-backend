@@ -35,10 +35,6 @@ pre_calc = Period(
 
 schedule_agent = SchedulesAgent(golden, pre_calc)
 
-
-# async
-
-
 # --- Main Function ---
 def main():
     return schedule_agent.run()
