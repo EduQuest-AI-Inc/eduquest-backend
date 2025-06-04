@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 import openai
 from openai import OpenAI
+import json
 
 load_dotenv()
 
@@ -29,6 +30,7 @@ pre_calc = Period(
     period_id="period_1",
     initial_conversation_assistant_id="assistant_1",
     update_assistant_id="assistant_2",
+    ltg_assistant_id="assistant_3",
     teacher_id="teacher_1",
     vector_store_id="vs_682cfbf6f3a88191bfde8d520e939fd6",
     course="course_1")
@@ -37,8 +39,11 @@ schedule_agent = SchedulesAgent(golden, pre_calc)
 
 # --- Main Function ---
 def main():
-    return schedule_agent.run()
+    schedule = schedule_agent.run()
+    return schedule.model_dump()
 
 
 if __name__ == "__main__":
-    print(main())
+    output = main()
+    with open('output.json', 'w') as f:
+        json.dump(output, f, indent=2)

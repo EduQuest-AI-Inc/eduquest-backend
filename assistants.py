@@ -10,9 +10,10 @@ load_dotenv()
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-sec_math_2 = {
+pre_calc = {
     'initiate': 'asst_bmsuvfNCaHJYmqTlnT52AzXE',
-    'update': 'asst_oQlKvMpoDPp80zEabjvUiflj'
+    'update': 'asst_oQlKvMpoDPp80zEabjvUiflj',
+    'ltg': 'asst_1NnTwxp3tBgFWPp2sMjHU3Or'
 }
 
 #if student
@@ -131,7 +132,7 @@ class ltg:
 
     def initiate(self):
         thread = openai.beta.threads.create()
-        initial_message = f"Hello, I'm {self.student.name}, {self.student.age} years old, in {self.student.grade}th grade. My strengths are {self.student.strength}, my weaknesses are {self.student.weakness}, my interests are {self.student.interest}, and my learning style is {self.student.learning_style}. Please recommend 3 long-term goals for me."
+        initial_message = f"Hello, I'm {self.student.first_name} {self.student.last_name}, in {self.student.grade}th grade. My strengths are {self.student.strength}, my weaknesses are {self.student.weakness}, my interests are {self.student.interest}, and my learning style is {self.student.learning_style}. Please recommend 3 long-term goals for me."
         self.thread_id = thread.id
         # Send the initial message to the thread
         message = openai.beta.threads.messages.create(thread_id=self.thread_id, role="user", content=initial_message)
