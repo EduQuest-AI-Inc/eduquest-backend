@@ -4,14 +4,17 @@ import time
 import os
 import json
 from dotenv import load_dotenv
+import json
+from models.student import Student
 
 load_dotenv()
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-sec_math_2 = {
+pre_calc = {
     'initiate': 'asst_bmsuvfNCaHJYmqTlnT52AzXE',
-    'update': 'asst_oQlKvMpoDPp80zEabjvUiflj'
+    'update': 'asst_oQlKvMpoDPp80zEabjvUiflj',
+    'ltg': 'asst_1NnTwxp3tBgFWPp2sMjHU3Or'
 }
 
 #if student
@@ -46,11 +49,11 @@ def summarize_conversation(thread_id): #will return two pd_dataframe(student_pro
     return response
 
 class ini_conv:
-    def __init__(self, student, assis_id, conversation_log=None):
+    def __init__(self, student, assis_id):
         self.student = student
         self.thread_id = None
         self.assistant = openai.beta.assistants.retrieve(assis_id)
-        self.conversation_log = conversation_log if conversation_log else []
+        # self.conversation_log = conversation_log if conversation_log else []
 
     def initiate(self):
         thread = openai.beta.threads.create()
@@ -76,7 +79,7 @@ class ini_conv:
         messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
         last_message = messages.data[0]
         response = last_message.content[0].text.value
-        self.conversation_log.append({"role": "assistant", "content": response})
+        # self.conversation_log.append({"role": "assistant", "content": response})
 
         response_dict = json.loads(response)
         response_dict["thread_id"] = self.thread_id
@@ -84,7 +87,7 @@ class ini_conv:
         return response_dict
 
     def cont_conv(self, user_input):
-        self.conversation_log.append({"role": "user", "content": user_input})
+        # self.conversation_log.append({"role": "user", "content": user_input})
         message = openai.beta.threads.messages.create(
             thread_id=self.thread_id,
             role="user",
@@ -106,41 +109,82 @@ class ini_conv:
         messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
         last_message = messages.data[0]
         response = last_message.content[0].text.value
-        self.conversation_log.append({"role": "assistant", "content": response})
-        return response
+        # self.conversation_log.append({"role": "assistant", "content": response})
+        return_message = json.loads(response)
+        if return_message['Strengths'] == [] or return_message['Weaknesses'] == [] or return_message['Interests'] == [] or return_message['Learning_Styles'] == []:
+            return return_message['response']
+        else:
+            return self.gen_prof(return_message)
 
-    def rubric(self, quests):
-        assistant = openai.beta.assistants.retrieve(self.assistant.id)
-        thread = openai.beta.threads.retrieve(self.thread_id)
-        self.list_of_rubric = []
-        # Need to figure out how to retrieve the weekly quest title
+    def gen_prof(self, return_message):
+        self.student(
+            strength=return_message['Strengths'],
+            weakness=return_message['Weaknesses'],
+            interest=return_message['Interests'],
+            learning_style=return_message['Learning Styles']
+        )
+        return self.student
 
-        while len(self.list_of_rubric) != 36:
-            for i in range(36):
-                quest = quests[i]
-                prompt = (f"generate a detailed instruction and rubric for week {i + 1} quest: {quest}. "
-                          f"The instruction should be clearly tell the students what to do step by step. The grading rubric should give clear insights for what is expected from the student.")
-                message = openai.beta.threads.messages.create(thread_id=self.thread_id, role="user",
-                                                              content=prompt)
-                # Create a run to get the assistant's response
-                run = openai.beta.threads.runs.create(
-                    thread_id=self.thread_id,
-                    assistant_id=assistant.id
-                )
-                run_id = run.id
 
-                while True:
-                    run_status = openai.beta.threads.runs.retrieve(thread_id=self.thread_id, run_id=run_id)
-                    # print(f"Run status: {run_status.status}")
-                    if run_status.status == 'completed':
-                        break
-                    time.sleep(1)  # Wait for 1 second before checking again
+class ltg:
+    def __init__(self, student, assistant_id):
+        self.student = student
+        self.thread_id = None
+        self.assistant = openai.beta.assistants.retrieve(assistant_id)
+        # self.conversation_log = conversation_log if conversation_log else []
 
-                    # Get messages once the run is completed
-                messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
-                last_message = messages.data[0]
-                response = last_message.content[0].text.value
-                self.list_of_rubric.append(response)
+    def initiate(self):
+        thread = openai.beta.threads.create()
+        initial_message = f"Hello, I'm {self.student.first_name} {self.student.last_name}, in {self.student.grade}th grade. My strengths are {self.student.strength}, my weaknesses are {self.student.weakness}, my interests are {self.student.interest}, and my learning style is {self.student.learning_style}. Please recommend 3 long-term goals for me."
+        self.thread_id = thread.id
+        # Send the initial message to the thread
+        message = openai.beta.threads.messages.create(thread_id=self.thread_id, role="user", content=initial_message)
+        # Create a run to get the assistant's response
+        run = openai.beta.threads.runs.create(
+            thread_id=self.thread_id,
+            assistant_id=self.assistant.id
+        )
+        run_id = run.id
+
+        while True:
+            run_status = openai.beta.threads.runs.retrieve(thread_id=self.thread_id, run_id=run_id)
+            # print(f"Run status: {run_status.status}")
+            if run_status.status == 'completed':
+                break
+            time.sleep(1)
+        messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
+        last_message = messages.data[0]
+        response = last_message.content[0].text.value
+        return_message = json.loads(response)
+        return return_message['message']
+
+    def cont_conv(self, user_input):
+        # self.conversation_log.append({"role": "user", "content": user_input})
+        message = openai.beta.threads.messages.create(
+            thread_id=self.thread_id,
+            role="user",
+            content=user_input
+        )
+        run = openai.beta.threads.runs.create(
+            thread_id=self.thread_id,
+            assistant_id=self.assistant.id
+        )
+        run_id = run.id
+
+        while True:
+            run_status = openai.beta.threads.runs.retrieve(thread_id=self.thread_id, run_id=run_id)
+            # print(f"Run status: {run_status.status}")
+            if run_status.status == 'completed':
+                break
+            time.sleep(1)
+        messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
+        last_message = messages.data[0]
+        response = last_message.content[0].text.value
+        return_message = json.loads(response)
+        if return_message['chosen_goal'] == []:
+            return return_message['message']
+        else:
+            return return_message['chosen_goal']
 
 
 class update:

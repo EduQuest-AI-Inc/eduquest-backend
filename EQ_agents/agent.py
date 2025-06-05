@@ -9,17 +9,23 @@ from agents import (
     trace,
     guardrail_span
 )
+import json
 from openai import vector_stores
 from pydantic import BaseModel, Field
 import asyncio
 
 class IndividualQuest(BaseModel):
     Description: str
-    # Grade: str = Field(description="Grade provided by the grader")
-    # Feedback: str = Field(description="Feedback provided by the grader")
     Skills: str = Field(description="Skills the student will practice through this quest")
     Week: int = Field(description="Week the student will work on this quest")
-    # created_at: str
+
+class HomeworkAssignment(BaseModel):
+    quest: IndividualQuest
+    instructions: str = Field(description="Detailed instructions for completing the quest")
+    rubric: dict = Field(description="Grading criteria and expectations for the quest")
+
+class HomeworkSchedule(BaseModel):
+    assignments: list[HomeworkAssignment] = Field(description="List of homework assignments with instructions and rubrics")
 
 class baseQuest(BaseModel):
     name: str
@@ -142,7 +148,13 @@ class HWAgent:
         self.period = period
         self.vector_store = period.vector_store_id
         self.schedule = schedule
-        self.input = f"""I'm {self.student.first_name} {self.student.last_name}. My strengths are {self.student.strenth}, my weaknesses are {self.student.weakness}, my interests are {self.student.interest}, and my learning style is {self.student.learning_style}. My long-term goal is {self.student.long_term_goal}. I am in grade {self.student.grade}."""
+        self.input = f"""I'm {self.student.first_name} {self.student.last_name}. My strengths are {self.student.strength}, my weaknesses are {self.student.weakness}, my interests are {self.student.interest}, and my learning style is {self.student.learning_style}. My long-term goal is {self.student.long_term_goal}. I am in grade {self.student.grade}.
+
+For each quest in the schedule, I need detailed instructions and a grading rubric that:
+1. Aligns with the skills and topics being taught that week
+2. Accommodates my learning style and interests
+3. Provides clear expectations and evaluation criteria
+4. Helps me practice and master the required skills"""
 
         self.guardrial_agent = Agent(
             name = "Guardrial Agent",
@@ -192,8 +204,70 @@ class HWAgent:
             model = "gpt-4.1-mini",
             tools = [
                 FileSearchTool(
-                    vector_store_ids=[]
+                    vector_store_ids=[self.vector_store]
                 )
             ],
-            handoffs = [self.schedules_agent, self.rubric_agent, self.instruction_agent]
+            handoffs = [self.rubric_agent, self.instruction_agent]
         )
+
+    @output_guardrail()
+    async def guardrail(self, ctx: RunContextWrapper, agent: Agent, output: HomeworkSchedule) -> GuardrailFunctionOutput:
+        """
+        Guardrail function to ensure homework assignments align with course materials and student needs.
+        Checks if each assignment's instructions and rubric match the quest requirements.
+        If misaligned, triggers regeneration of the homework.
+        """
+        try:
+            # Run the guardrail agent to verify alignment
+            result = await Runner.run(
+                self.guardrial_agent,
+                output.model_dump_json(),
+                context=ctx.context
+            )
+            
+            # If the guardrail agent approves, return the original output
+            if "approved" in result.response.lower():
+                return GuardrailFunctionOutput(output=output)
+            
+            # If not approved, regenerate the homework
+            new_homework = await Runner.run(
+                self.homework_agent,
+                self.input,
+                context=ctx.context
+            )
+            
+            # Check if the new homework is valid
+            if isinstance(new_homework.output, HomeworkSchedule):
+                return GuardrailFunctionOutput(output=new_homework.output)
+            
+            # If regeneration failed, trigger the tripwire
+            raise OutputGuardrailTripwireTriggered(
+                message="Failed to regenerate aligned homework",
+                original_output=output
+            )
+            
+        except Exception as e:
+            raise OutputGuardrailTripwireTriggered(
+                message=f"Error in guardrail check: {str(e)}",
+                original_output=output
+            )
+
+    async def _run_async(self) -> HomeworkSchedule:
+        """
+        Internal async method to run the HWAgent with guardrail validation.
+        Returns the generated homework schedule with instructions and rubrics.
+        """
+        with trace("homework_generation") as span:
+            with guardrail_span("homework_guardrail"):
+                result = await Runner.run(
+                    self.homework_agent,
+                    self.input
+                )
+        return result.final_output
+
+    def run(self) -> HomeworkSchedule:
+        """
+        Run the HWAgent to generate homework assignments with guardrail validation.
+        Handles async execution internally and returns the final homework schedule.
+        """
+        return asyncio.run(self._run_async())
