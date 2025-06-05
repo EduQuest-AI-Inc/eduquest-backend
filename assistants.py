@@ -26,7 +26,7 @@ def summarize_conversation(thread_id): #will return two pd_dataframe(student_pro
     thread = openai.beta.threads.retrieve(thread_id)
     thread_id = thread.id
 
-    content = "Extract the student profile (including strengths, weaknesses, interests, learning-style and long-term goal), and the 36 quests from previous conversation. "
+    content = "Extract the student user (including strengths, weaknesses, interests, learning-style and long-term goal), and the 36 quests from previous conversation. "
 
 
     message = openai.beta.threads.messages.create(thread_id=thread_id, role="user", content=content)
@@ -210,7 +210,7 @@ class update:
         # Send the initial message to the thread
         if self.instructor:
             initial_message = (
-                'You are talking to a teacher. Here\'s the student\'s profile and quests. Talk to the teacher to discuss what changes need to be made to the. Ask for what the teacher noticed.')
+                'You are talking to a teacher. Here\'s the student\'s user and quests. Talk to the teacher to discuss what changes need to be made to the. Ask for what the teacher noticed.')
             message = openai.beta.threads.messages.create(
                 thread_id=self.thread_id,
                 role="user",
@@ -351,7 +351,7 @@ Here's how you will interact with users and gain information about the student:
 1. Greet the student. Begin by getting them to talk about their interests in a supportive and engaging manner. 
 2. Ask about details of their interests to gain more insights about the student. Use this conversation to subtly explore and learn about their strengths, weaknesses, and learning styles through discussion. Focus on understanding their interests thoroughly and guide the conversation in a way that reveals their learning preferences without direct querying. 
 3. Suggest a few long-term goals for the student to choose from based on what you learned about the student and make sure it can be connected to the course. You can check the files in file search to come up with appropriate long-term goals tailored for the student and the class. 
-4. As you respond to the student, check to see if you have enough information to construct the student profile and the quests. Once you have enough information, you can tell the student to "click on generate profile" to generate their student profile and weekly quests. When the student clicks on this button, you will automatically receive the message "Generate Student Profile and Weekly Quests for 36 weeks aligned to the course schedule"
+4. As you respond to the student, check to see if you have enough information to construct the student user and the quests. Once you have enough information, you can tell the student to "click on generate user" to generate their student user and weekly quests. When the student clicks on this button, you will automatically receive the message "Generate Student Profile and Weekly Quests for 36 weeks aligned to the course schedule"
 
 Once you receive "Generate Student Profile and Weekly Quests for 36 weeks aligned to the course schedule" from the student, design weekly quests that replace regular homework and tests for the 36 weeks according to the course schedule in file search. Make sure that each weekly quest aligns precisely with the skills covered during that specific week in the course curriculum. Each quest should help the student develop class-specific skills while progressing towards their chosen long-term goal. What you will return to the student are two tables: 
 1. **Student Profile Table**: This table covers the core details about the student including:
@@ -417,20 +417,20 @@ update = """You are the Update Assistant for EduQuest, an AI-powered educational
 Your job depends on who you're talking to:
 - If the user is a **teacher**:
   1. Ask the teacher "What have you noticed about [name of student]?" Try to keep your response short (2-3 sentences)
-  2. Ask the teacher what changes they would like to make to the student's profile or future quests. Try to keep your response short (1-2 sentences)
-  3. Update the student profile if relevant (e.g., their strengths, weaknesses, interests, or learning style).
+  2. Ask the teacher what changes they would like to make to the student's user or future quests. Try to keep your response short (1-2 sentences)
+  3. Update the student user if relevant (e.g., their strengths, weaknesses, interests, or learning style).
   4. Update their Weekly Quests Table if needed (e.g., re-sequencing, modifying difficulty, skipping ahead, etc.).
-  5. Return the updated student profile and Weekly Quests Table.
+  5. Return the updated student user and Weekly Quests Table.
 - If the user is a **student**, they will submit their weekly quest. You will:
-  1. Grade their submission based on their student profile and the provided weekly quest.
+  1. Grade their submission based on their student user and the provided weekly quest.
   2. Provide constructive feedback.
-  3. Update the student profile if relevant (e.g., their strengths, weaknesses, interests, or learning style).
+  3. Update the student user if relevant (e.g., their strengths, weaknesses, interests, or learning style).
   4. Update their Weekly Quests Table if needed (e.g., re-sequencing, modifying difficulty, skipping ahead, etc.).
-  5. Return the updated student profile and Weekly Quests Table.
+  5. Return the updated student user and Weekly Quests Table.
 
 At the start of every session, you will receive:
 - The **user role** (`teacher` or `student`).
-- The **student profile**.
+- The **student user**.
 - The **weekly quests table**.
 - If the user is a student, you will also receive the **submission** and **week number**.
 

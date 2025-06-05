@@ -2,7 +2,7 @@ from data_access.base_dao import BaseDAO
 from models.teacher import Teacher
 from data_access.config import DynamoDBConfig
 from boto3.dynamodb.conditions import Key
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 class TeacherDAO(BaseDAO):
     def __init__(self):
@@ -12,7 +12,7 @@ class TeacherDAO(BaseDAO):
     def add_teacher(self, teacher: Teacher) -> None:
         self.table.put_item(Item=teacher.to_item())
 
-    def get_teacher_by_id(self, teacher_id: str) -> Dict[str, Any]:
+    def get_teacher_by_id(self, teacher_id: str) -> List[Dict[str, Any]]:
         response = self.table.query(
             KeyConditionExpression=Key("teacher_id").eq(teacher_id)
         )
