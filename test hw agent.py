@@ -14,7 +14,7 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Create student profile
+# Create student user
 golden = Student(
     student_id='golden',
     first_name='golden',
