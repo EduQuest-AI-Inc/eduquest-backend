@@ -30,8 +30,10 @@ def start_conversation():
     try:
         data = request.json
         auth_header = request.headers.get('Authorization')
+
         if not auth_header or not auth_header.startswith("Bearer "):
             return jsonify({"error": "Authorization header missing or invalid"}), 401
+
         auth_token = auth_header.split(" ", 1)[1]
         period_id = data.get('period_id')
         if not period_id:
