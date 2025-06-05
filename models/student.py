@@ -1,5 +1,6 @@
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional
+
 
 class Student(BaseModel):
     student_id: str  # Partition Key
@@ -7,7 +8,6 @@ class Student(BaseModel):
     last_name: str
     password: str
     email: str
-
     last_login: Optional[str] = None
     enrollments: Optional[List[str]] = []
     strength: Optional[str] = None
@@ -18,5 +18,5 @@ class Student(BaseModel):
     quests: Optional[List[Dict[str, str]]] = []
     grade: Optional[int] = None
 
-    def to_item(self):
-        return self.model_dump()
+    # def to_item(self):
+    #     return self.model_dump()

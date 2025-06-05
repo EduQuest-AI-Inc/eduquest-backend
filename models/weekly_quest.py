@@ -10,6 +10,11 @@ class WeeklyQuest(BaseModel):
     year: int
     last_updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     quests: List[IndividualQuest]
+    student_id: str  # Partition Key
+    created_at: str  # Sort Key
+    semester: int
+    last_updated_at: str
+
 
     def to_item(self):
         item = self.model_dump()

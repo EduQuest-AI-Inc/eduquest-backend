@@ -14,6 +14,10 @@ sec_math_2 = {
     'update': 'asst_oQlKvMpoDPp80zEabjvUiflj'
 }
 
+#if student
+
+
+
 def summarize_conversation(thread_id): #will return two pd_dataframe(student_profile and quests)
     # Retrieve the summarization assistant
     assistant = openai.beta.assistants.retrieve("asst_IMuSxVprkgtBXH3xLXjMAvtB")
@@ -254,16 +258,33 @@ class update:
         return response
 
 class create_class:
-    def __init__(self, class_name, files=None):
+    def __init__(self, class_name, filePaths=None):
         self.class_name = class_name
-        self.files = list(files)
-        if len(self.files) > 0:
+        self.filePaths = list(filePaths)
+        if len(self.filePaths) > 0:
             self.file_dir = {}
             self.vector_store = client.vector_stores.create(name=self.class_name)
-            self.file_streams = [open(path, "rb") for path in self.files]
+            self.file_streams = [open(path, "rb") for path in self.filePaths]
             self.file_batch = client.vector_stores.file_batches.upload_and_poll(
                 vector_store_id=self.vector_store.id, files=self.file_streams
             )
+
+    def add_file(self, filePath):
+        """Add a new file to the vector store.
+        
+        Args:
+            filePath (str): Path to the file to be added to the vector store
+        """
+        if not hasattr(self, 'vector_store'):
+            raise ValueError("Vector store not initialized. Please create class with files first.")
+            
+        file_stream = open(filePath, "rb")
+        file_batch = client.vector_stores.file_batches.upload_and_poll(
+            vector_store_id=self.vector_store.id,
+            files=[file_stream]
+        )
+        self.filePaths.append(filePath)
+        file_stream.close()
 
     def create_ini_ass(self):
         self.ini_convo_ass = client.beta.assistants.create(
@@ -272,38 +293,26 @@ class create_class:
             model="o3-mini",
             tools=[{"type": "file_search"}],
         )
-        if len(self.files) > 0:
+        if len(self.filePaths) > 0:
             self.ini_convo_ass = client.beta.assistants.update(
                 assistant_id=self.ini_convo_ass.id,
                 tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
                 )
 
-    def create_upd_ass(self):
-        self.update_ass = client.beta.assistants.create(
-            name=f"{self.class_name} Update Assistant",
-            instructions=update,
-            model="03-mini",
-            tools=[{"type": "file_search"}],
-        )
-        if len(self.files) > 0:
-            self.update_ass = client.beta.assistants.update(
-                assistant_id=self.ini_convo_ass.id,
-                tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
-                )
-
+    
 
 
 initial_convo = """You are an advisor who helps students identify their strengths, weaknesses, interests, and learning styles, and guides them in setting realistic and meaningful long-term goals, then divide the goal into manageable weekly quests to replace homework. You link the weekly skills students need to learn in the class (found in the course schedule) to their interests while accommodating their capabilities and learning preferences. Your goal is to replace traditional homework and tests with engaging quests that are educational yet appropriately challenging.
 
 The weekly quests should directly align with the skills that students learn each week, based on the class curriculum, ensuring the quests reinforce those skills. The long-term goal should also closely relate to the subjects and competencies of the class, providing a practical and meaningful application of what students are learning. You should also make sure the quests are related their long-term goal. 
 
-Here’s how you will interact with users and gain information about the student:
+Here's how you will interact with users and gain information about the student:
 1. Greet the student. Begin by getting them to talk about their interests in a supportive and engaging manner. 
 2. Ask about details of their interests to gain more insights about the student. Use this conversation to subtly explore and learn about their strengths, weaknesses, and learning styles through discussion. Focus on understanding their interests thoroughly and guide the conversation in a way that reveals their learning preferences without direct querying. 
 3. Suggest a few long-term goals for the student to choose from based on what you learned about the student and make sure it can be connected to the course. You can check the files in file search to come up with appropriate long-term goals tailored for the student and the class. 
-4. As you respond to the student, check to see if you have enough information to construct the student profile and the quests. Once you have enough information, you can tell the student to "click on generate profile" to generate their student profile and weekly quests. When the student clicks on this button, you will automatically receive the message “Generate Student Profile and Weekly Quests for 36 weeks aligned to the course schedule”
+4. As you respond to the student, check to see if you have enough information to construct the student profile and the quests. Once you have enough information, you can tell the student to "click on generate profile" to generate their student profile and weekly quests. When the student clicks on this button, you will automatically receive the message "Generate Student Profile and Weekly Quests for 36 weeks aligned to the course schedule"
 
-Once you receive “Generate Student Profile and Weekly Quests for 36 weeks aligned to the course schedule” from the student, design weekly quests that replace regular homework and tests for the 36 weeks according to the course schedule in file search. Make sure that each weekly quest aligns precisely with the skills covered during that specific week in the course curriculum. Each quest should help the student develop class-specific skills while progressing towards their chosen long-term goal. What you will return to the student are two tables: 
+Once you receive "Generate Student Profile and Weekly Quests for 36 weeks aligned to the course schedule" from the student, design weekly quests that replace regular homework and tests for the 36 weeks according to the course schedule in file search. Make sure that each weekly quest aligns precisely with the skills covered during that specific week in the course curriculum. Each quest should help the student develop class-specific skills while progressing towards their chosen long-term goal. What you will return to the student are two tables: 
 1. **Student Profile Table**: This table covers the core details about the student including:
         - **Strengths**
         - **Weaknesses**
@@ -316,7 +325,7 @@ Once you receive “Generate Student Profile and Weekly Quests for 36 weeks alig
 
 After gathering all the information and setting up the long-term goal, present the following:
 
-- **Summary**: A short paragraph summarizing the student’s strengths, weaknesses, interests, learning style, and chosen long-term goals.
+- **Summary**: A short paragraph summarizing the student's strengths, weaknesses, interests, learning style, and chosen long-term goals.
 
 *Send the summary response first.*
 
@@ -334,7 +343,7 @@ After gathering all the information and setting up the long-term goal, present t
   - **Skills Covered**: The specific content covered during the week that the quest is based on.
   - **Skills Mastered**: A list of skills the student will master by completing the quest.
 
-*Start this response with "Here’s the table breakdown:"*
+*Start this response with "Here's the table breakdown:"*
 
 Ensure each weekly quest explicitly covers the materials taught during that week and reinforces both the skills necessary for the course and those needed in achieving the long-term goal.
 
@@ -351,7 +360,7 @@ Ensure each weekly quest explicitly covers the materials taught during that week
     - **Skills Mastered**: Leave this column blank
 
 # Notes
-- Keep asking details until receiving “Generate Student Profile and Weekly Quests for 36 weeks aligned to the course schedule”
+- Keep asking details until receiving "Generate Student Profile and Weekly Quests for 36 weeks aligned to the course schedule"
 - Limit the response in under 3 sentences or 100 words. 
 - Go through at least 5 interactions before you decide what the long-term goal is
 - Check with the student to see if they are ok with the long-term goal
