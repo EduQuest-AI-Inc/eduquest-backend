@@ -2,6 +2,7 @@ import openai
 from openai import OpenAI
 import time
 import os
+import json
 from dotenv import load_dotenv
 import json
 from models.student import Student
@@ -48,22 +49,21 @@ def summarize_conversation(thread_id): #will return two pd_dataframe(student_pro
     return response
 
 class ini_conv:
-    def __init__(self, student, assis_id):
+    def __init__(self, student):
         self.student = student
         self.thread_id = None
-        self.assistant = openai.beta.assistants.retrieve(assis_id)
         # self.conversation_log = conversation_log if conversation_log else []
 
     def initiate(self):
         thread = openai.beta.threads.create()
-        initial_message = f"Hello, I'm {self.student.first_name} {self.student.last_name}, in {self.student.grade}th grade."
+        initial_message = f"Hello, I'm {self.student["first_name"] + " " + self.student["last_name"]}."
         self.thread_id = thread.id
         # Send the initial message to the thread
         message = openai.beta.threads.messages.create(thread_id=self.thread_id, role="user", content=initial_message)
         # Create a run to get the assistant's response
         run = openai.beta.threads.runs.create(
             thread_id=self.thread_id,
-            assistant_id=self.assistant.id
+            assistant_id="asst_bmsuvfNCaHJYmqTlnT52AzXE"  # Pass the assistant ID as a string
         )
         run_id = run.id
 
@@ -80,8 +80,10 @@ class ini_conv:
         response = last_message.content[0].text.value
         # self.conversation_log.append({"role": "assistant", "content": response})
 
-        return_message = json.loads(response)
-        return return_message['response']
+        response_dict = json.loads(response)
+        response_dict["thread_id"] = self.thread_id
+    
+        return response_dict
 
     def cont_conv(self, user_input):
         # self.conversation_log.append({"role": "user", "content": user_input})
@@ -109,6 +111,9 @@ class ini_conv:
         response = last_message.content[0].text.value
         # self.conversation_log.append({"role": "assistant", "content": response})
         return_message = json.loads(response)
+
+        print("Here")
+
         if return_message['Strengths'] == [] or return_message['Weaknesses'] == [] or return_message['Interests'] == [] or return_message['Learning_Styles'] == []:
             return return_message['response'], False
         else:

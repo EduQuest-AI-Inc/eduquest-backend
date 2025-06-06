@@ -4,7 +4,7 @@ from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 import os
 
-# from routes.conversation.routes import conversation_bp
+from routes.conversation.routes import conversation_bp
 from routes.auth.routes import auth_bp
 from routes.user.routes import user_bp
 
@@ -31,7 +31,7 @@ CORS(app, resources={r"/*":
     )
 
 # Register Blueprints
-# app.register_blueprint(conversation_bp)
+app.register_blueprint(conversation_bp, url_prefix='/conversation')
 app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(user_bp, url_prefix='/user')
 
