@@ -30,7 +30,7 @@ CORS(app, resources={r"/*":
     )
 
 # Register Blueprints
-app.register_blueprint(conversation_bp)
+app.register_blueprint(conversation_bp, url_prefix='/conversation')
 app.register_blueprint(auth_bp, url_prefix='/auth')
 
 # Add helloworld route for testing

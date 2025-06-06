@@ -21,28 +21,27 @@ sec_math_2 = {'initiate': 'asst_bmsuvfNCaHJYmqTlnT52AzXE',
     'update': 'asst_oQlKvMpoDPp80zEabjvUiflj'}
 
 conversation_bp = Blueprint('conversation', __name__)
-CORS(conversation_bp, resources={r"/*": {"origins": "http://eduquest-frontend.s3-website.us-east-2.amazonaws.com"}})
-
 
 # Routes
 @conversation_bp.route('/start-conversation', methods=['POST'])
 def start_conversation():
-    try:
-        data = request.json
-        auth_header = request.headers.get('Authorization')
+    # try:
+    #     data = request.json
+    #     auth_header = request.headers.get('Authorization')
 
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
+    #     if not auth_header or not auth_header.startswith("Bearer "):
+    #         return jsonify({"error": "Authorization header missing or invalid"}), 401
 
-        auth_token = auth_header.split(" ", 1)[1]
-        period_id = data.get('period_id')
-        if not period_id:
-            return jsonify({"error": "period_id is required"}), 400
+    #     auth_token = auth_header.split(" ", 1)[1]
+    #     period_id = data.get('period_id')
+    #     if not period_id:
+    #         return jsonify({"error": "period_id is required"}), 400
 
-        result = start_conversation_service(auth_token, period_id)
-        return result, 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    #     result = start_conversation_service(auth_token, period_id)
+    #     return result, 200
+    # except Exception as e:
+    #     return jsonify({"error": str(e)}), 500
+    return "Hello"
 
 
 # (Continue defining other routes: /continue-conversation, /get-summary ...)
