@@ -12,4 +12,4 @@ class Session(BaseModel):
     expires_at: int = Field(default_factory=default_expiry)  # Defaults to 12 hours
 
     def to_item(self):
-        return self.model_dump()
+        return self.model_dump(exclude_none=True)
