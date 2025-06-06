@@ -85,6 +85,7 @@ class ini_conv:
 
     def cont_conv(self, user_input):
         # self.conversation_log.append({"role": "user", "content": user_input})
+        """"Returns message or updated student profile, + boolean indicating if the student profile is complete"""
         message = openai.beta.threads.messages.create(
             thread_id=self.thread_id,
             role="user",
@@ -109,9 +110,9 @@ class ini_conv:
         # self.conversation_log.append({"role": "assistant", "content": response})
         return_message = json.loads(response)
         if return_message['Strengths'] == [] or return_message['Weaknesses'] == [] or return_message['Interests'] == [] or return_message['Learning_Styles'] == []:
-            return return_message['response']
+            return return_message['response'], False
         else:
-            return self.gen_prof(return_message)
+            return self.gen_prof(return_message), True
 
     def gen_prof(self, return_message):
         self.student(
@@ -179,9 +180,9 @@ class ltg:
         response = last_message.content[0].text.value
         return_message = json.loads(response)
         if return_message['chosen_goal'] == []:
-            return return_message['message']
+            return return_message['message'], False
         else:
-            return return_message['chosen_goal']
+            return return_message['chosen_goal'], True
 
 
 class update:
