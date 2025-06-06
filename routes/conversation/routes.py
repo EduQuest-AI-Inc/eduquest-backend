@@ -11,7 +11,7 @@ from openai import OpenAI
 import os
 from dotenv import load_dotenv
 # from data_access
-from routes.conversation.conversation_service import start_conversation_service
+from routes.conversation.conversation_service import ConversationService
 
 load_dotenv()
 
@@ -21,27 +21,24 @@ sec_math_2 = {'initiate': 'asst_bmsuvfNCaHJYmqTlnT52AzXE',
     'update': 'asst_oQlKvMpoDPp80zEabjvUiflj'}
 
 conversation_bp = Blueprint('conversation', __name__)
+conversation_service = ConversationService()
 
 # Routes
-@conversation_bp.route('/start-conversation', methods=['POST'])
-def start_conversation():
-    # try:
-    #     data = request.json
-    #     auth_header = request.headers.get('Authorization')
+@conversation_bp.route('/initiate-profile-assistant', methods=['POST'])
+def profile_assistant():
+    try:
+        data = request.json
+        auth_header = request.headers.get('Authorization')
 
-    #     if not auth_header or not auth_header.startswith("Bearer "):
-    #         return jsonify({"error": "Authorization header missing or invalid"}), 401
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Authorization header missing or invalid"}), 401
 
-    #     auth_token = auth_header.split(" ", 1)[1]
-    #     period_id = data.get('period_id')
-    #     if not period_id:
-    #         return jsonify({"error": "period_id is required"}), 400
+        auth_token = auth_header.split(" ", 1)[1]
 
-    #     result = start_conversation_service(auth_token, period_id)
-    #     return result, 200
-    # except Exception as e:
-    #     return jsonify({"error": str(e)}), 500
-    return "Hello"
+        result = conversation_service.start_profile_assistant(auth_token)
+        return result, 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # (Continue defining other routes: /continue-conversation, /get-summary ...)
