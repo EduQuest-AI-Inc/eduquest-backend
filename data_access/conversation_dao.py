@@ -81,3 +81,20 @@ class ConversationDAO(BaseDAO):
         :return: None
         """
         self.table.delete_item(Key={"thread_id": thread_id, "last_updated_at": last_updated_at})
+
+    def get_conversation(self, thread_id: str, user_id: str, conversation_type: str) -> dict:
+        """
+        Retrieve a single conversation record by thread_id, user_id, and conversation_type.
+
+        :param thread_id: The partition key.
+        :param user_id: The user ID.
+        :param conversation_type: The type of conversation (e.g., 'profile').
+        :return: The conversation record as a dictionary, or None if not found.
+        """
+        response = self.table.query(
+            KeyConditionExpression=Key("thread_id").eq(thread_id)
+        )
+        for item in response["Items"]:
+            if item.get("user_id") == user_id and item.get("conversation_type") == conversation_type:
+                return item
+        return None

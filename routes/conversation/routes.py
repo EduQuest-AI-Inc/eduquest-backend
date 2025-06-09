@@ -27,7 +27,6 @@ conversation_service = ConversationService()
 @conversation_bp.route('/initiate-profile-assistant', methods=['POST'])
 def profile_assistant():
     try:
-        data = request.json
         auth_header = request.headers.get('Authorization')
 
         if not auth_header or not auth_header.startswith("Bearer "):
@@ -40,46 +39,18 @@ def profile_assistant():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@conversation_bp.route('/continue-profile-assistant', methods=['POST'])
+def continue_profile_assistant():
+    try:
+        data = request.json
+        auth_header = request.headers.get('Authorization')
 
-# (Continue defining other routes: /continue-conversation, /get-summary ...)
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Authorization header missing or invalid"}), 401
 
+        auth_token = auth_header.split(" ", 1)[1]
 
-# @conversation_bp.route('/continue-conversation', methods=['POST'])
-# def continue_conversation():
-#     data = request.json
-#     user_message = data['message']
-#     student_id = data['name']
-#     thread_id = data['thread_id']
-
-#     student = student_profile(student_id, 12, "Female", 6)  # Placeholder
-#     conversation = ini_conv(student)
-#     conversation.thread_id = thread_id
-#     conversation.student = student
-
-#     response = conversation.cont_conv(user_message)
-#     parsed_response = json.loads(response)
-
-#     append_conversation(student_id, thread_id, {"role": "user", "message": user_message})
-#     append_conversation(student_id, thread_id, {"role": "assistant", "message": parsed_response["response"]})
-
-#     return {
-#         "message": parsed_response["response"],
-#         "has_enough_information": parsed_response["has_enough_information"]
-#     }
-
-# @conversation_bp.route('/get-summary', methods=['POST'])
-# def get_summary():
-#     try:
-#         data = request.json
-#         student_id = data['name']
-#         thread_id = data['thread_id']
-
-#         conversation_log = get_all_conversations(student_id, thread_id)
-
-#         response = summarize_conversation(conversation_log)
-#         parsed_response = json.loads(response)
-
-#         return {"summary": parsed_response}
-
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 400
+        result = conversation_service.continue_profile_assistant(auth_token, data)
+        return result, 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

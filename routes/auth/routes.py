@@ -21,11 +21,12 @@ def signup():
     first_name = data.get('first_name')
     last_name = data.get('last_name')
     email = data.get('email')
+    grade = data.get('grade')
 
-    if not username or not password or not role or not first_name or not last_name or not email:
-        return jsonify({'message': 'Username, password, role, first_name, last_name, and email required'}), 400
+    if not username or not password or not role or not first_name or not last_name or not email or (role == 'student' and not grade):
+        return jsonify({'message': 'Username, password, role, first_name, last_name, email' + (', and grade' if role == 'student' else '') + ' required'}), 400
 
-    if register_user(username, password, role, first_name, last_name, email):
+    if register_user(username, password, role, first_name, last_name, email, grade if role == 'student' else None):
         return jsonify({'message': 'User registered successfully'}), 201
     else:
         return jsonify({'message': 'Username already exists'}), 409

@@ -52,4 +52,8 @@ class ConversationService:
             )
             conversation_dao.add_conversation(conversation)
 
-            return response
+            # Only return thread_id and response
+            return {
+                'thread_id': response['thread_id'],
+                'response': response.get('response')
+            }
