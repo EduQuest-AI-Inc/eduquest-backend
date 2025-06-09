@@ -5,7 +5,6 @@ import os
 import json
 from dotenv import load_dotenv
 import json
-from models.student import Student
 
 load_dotenv()
 
@@ -49,10 +48,10 @@ def summarize_conversation(thread_id): #will return two pd_dataframe(student_pro
     return response
 
 class ini_conv:
-    def __init__(self, student):
+    def __init__(self, student, thread_id=None):
         self.student = student
-        self.thread_id = None
-        # self.conversation_log = conversation_log if conversation_log else []
+        self.thread_id = thread_id
+        self.assistant = openai.beta.assistants.retrieve("asst_bmsuvfNCaHJYmqTlnT52AzXE")
 
     def initiate(self):
         thread = openai.beta.threads.create()
@@ -112,22 +111,22 @@ class ini_conv:
         # self.conversation_log.append({"role": "assistant", "content": response})
         return_message = json.loads(response)
 
-        print("Here")
+        strengths = return_message.get('Strengths', [])
+        weaknesses = return_message.get('Weaknesses', [])
+        interests = return_message.get('Interests', [])
+        learning_styles = return_message.get('Learning_Styles', [])
 
-        if return_message['Strengths'] == [] or return_message['Weaknesses'] == [] or return_message['Interests'] == [] or return_message['Learning_Styles'] == []:
-            return return_message['response'], False
+        if not strengths or not weaknesses or not interests or not learning_styles:
+            return return_message['response'], False, None
         else:
-            return self.gen_prof(return_message), True
-
-    def gen_prof(self, return_message):
-        self.student(
-            strength=return_message['Strengths'],
-            weakness=return_message['Weaknesses'],
-            interest=return_message['Interests'],
-            learning_style=return_message['Learning Styles']
-        )
-        return self.student
-
+            profile = {
+                "strength": strengths,
+                "weakness": weaknesses,
+                "interest": interests,
+                "learning_style": learning_styles,
+            }
+            return return_message['response'], True, profile
+        
 
 class ltg:
     def __init__(self, student, assistant_id):

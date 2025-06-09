@@ -37,7 +37,9 @@ def profile_assistant():
         result = conversation_service.start_profile_assistant(auth_token)
         return result, 200
     except Exception as e:
+        print(f"Error in initiate-profile-assistant: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 @conversation_bp.route('/continue-profile-assistant', methods=['POST'])
 def continue_profile_assistant():
@@ -50,7 +52,20 @@ def continue_profile_assistant():
 
         auth_token = auth_header.split(" ", 1)[1]
 
-        result = conversation_service.continue_profile_assistant(auth_token, data)
+        conversation_type = data.get('conversation_type')
+        thread_id = data.get('thread_id')
+        user_message = data.get('message')
+
+        if not conversation_type:
+            return jsonify({"error": "conversation_type is required"}), 400
+
+        if not thread_id:
+            return jsonify({"error": "thread_id is required"}), 400
+
+        if not user_message:
+            return jsonify({"error": "user_message is required"}), 400
+        
+        result = conversation_service.continue_profile_assistant(auth_token, conversation_type, thread_id, user_message)
         return result, 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500

@@ -16,7 +16,6 @@ def test_crud_operations():
         user_id="student_test",
         role="student",
         conversation_type="initial",
-        last_updated_at=now,
         period_id="period_test"
     )
 
