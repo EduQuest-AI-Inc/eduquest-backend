@@ -34,50 +34,59 @@ class ConversationDAO(BaseDAO):
         )
         return response["Items"]
 
-    def update_conversation(self, thread_id: str, last_updated_at: str, updates: Dict[str, Any]) -> str:
+    def update_conversation(self, thread_id: str, updates: Dict[str, Any]) -> None:
         """
-        Update a conversation record, including changing the last_updated_at (sort key).
-        Since primary and sort keys are immutable, this creates a new item and deletes the old one.
+        Update a conversation record by thread_id.
 
-        :param thread_id: The original thread_id (partition key).
-        :param last_updated_at: The original last_updated_at (sort key).
+        :param thread_id: The thread_id (partition key).
         :param updates: Dictionary of attributes to update.
-        :return: The new last_updated_at timestamp as a string.
-        """
-        # Step 1: Get existing item
-        response = self.table.get_item(Key={
-            "thread_id": thread_id,
-            "last_updated_at": last_updated_at
-        })
-
-        item = response.get("Item")
-        if not item:
-            raise ValueError("Conversation not found.")
-
-        # Step 2: Apply updates
-        item.update(updates)
-
-        # Step 3: Update last_updated_at to now
-        new_timestamp = datetime.now(timezone.utc).isoformat()
-        item["last_updated_at"] = new_timestamp
-
-        # Step 4: Add new item
-        self.table.put_item(Item=item)
-
-        # Step 5: Delete old item
-        self.table.delete_item(Key={
-            "thread_id": thread_id,
-            "last_updated_at": last_updated_at
-        })
-
-        return new_timestamp
-
-    def delete_conversation(self, thread_id: str, last_updated_at: str) -> None:
-        """
-        Delete a conversation record using thread_id and last_updated_at as key.
-
-        :param thread_id: The partition key.
-        :param last_updated_at: The sort key.
         :return: None
         """
-        self.table.delete_item(Key={"thread_id": thread_id, "last_updated_at": last_updated_at})
+        # Query for the conversation(s) with this thread_id
+        response = self.table.query(
+            KeyConditionExpression=Key("thread_id").eq(thread_id)
+        )
+        items = response.get("Items", [])
+        if not items:
+            raise ValueError("Conversation not found.")
+
+        # Assuming only one conversation per thread_id (or update all if multiple)
+        for item in items:
+            key = {"thread_id": item["thread_id"]}
+            # Update the item with new values
+            update_expression = "SET " + ", ".join(f"#{k}=:{k}" for k in updates.keys())
+            expression_attribute_names = {f"#{k}": k for k in updates.keys()}
+            expression_attribute_values = {f":{k}": v for k, v in updates.items()}
+            self.table.update_item(
+                Key=key,
+                UpdateExpression=update_expression,
+                ExpressionAttributeNames=expression_attribute_names,
+                ExpressionAttributeValues=expression_attribute_values
+            )
+
+    def delete_conversation(self, thread_id: str) -> None:
+        """
+        Delete a conversation record using thread_id as key.
+
+        :param thread_id: The partition key.
+
+        :return: None
+        """
+        self.table.delete_item(Key={"thread_id": thread_id})
+
+    def get_conversation_by_thread_user_conversation_type(self, thread_id: str, user_id: str, conversation_type: str) -> dict:
+        """
+        Retrieve a single conversation record by thread_id, user_id, and conversation_type.
+
+        :param thread_id: The partition key.
+        :param user_id: The user ID.
+        :param conversation_type: The type of conversation (e.g., 'profile').
+        :return: The conversation record as a dictionary, or None if not found.
+        """
+        response = self.table.query(
+            KeyConditionExpression=Key("thread_id").eq(thread_id)
+        )
+        for item in response["Items"]:
+            if item.get("user_id") == user_id and item.get("conversation_type") == conversation_type:
+                return item
+        return None

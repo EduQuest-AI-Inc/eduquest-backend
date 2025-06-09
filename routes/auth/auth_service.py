@@ -9,7 +9,7 @@ from models.teacher import Teacher
 student_dao = StudentDAO()
 teacher_dao = TeacherDAO()
 
-def register_user(username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '') -> bool:
+def register_user(username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', grade: str = None) -> bool:
     if role == 'teacher':
         existing = teacher_dao.get_teacher_by_id(username)
         if existing:
@@ -23,7 +23,7 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
         if existing:
             return False
         hashed_pw = generate_password_hash(password)
-        student = Student(student_id=username, password=hashed_pw, first_name=first_name, last_name=last_name, email=email)
+        student = Student(student_id=username, password=hashed_pw, first_name=first_name, last_name=last_name, email=email, grade=grade)
         student_dao.add_student(student)
         return True
 
