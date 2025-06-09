@@ -137,7 +137,9 @@ class ltg:
 
     def initiate(self):
         thread = openai.beta.threads.create()
-        initial_message = f"Hello, I'm {self.student.first_name} {self.student.last_name}, in {self.student.grade}th grade. My strengths are {self.student.strength}, my weaknesses are {self.student.weakness}, my interests are {self.student.interest}, and my learning style is {self.student.learning_style}. Please recommend 3 long-term goals for me."
+        initial_message = f"Hello, I'm {self.student["first_name"]} {self.student["last_name"]}, in {self.student["grade"]}th grade. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. Please recommend 3 long-term goals for me."
+        print(f"Initial message: {initial_message}")
+        print(f"Student: {self.student["strength"]}, {self.student["weakness"]}, {self.student["interest"]}, {self.student["learning_style"]}")
         self.thread_id = thread.id
         # Send the initial message to the thread
         message = openai.beta.threads.messages.create(thread_id=self.thread_id, role="user", content=initial_message)
@@ -158,7 +160,11 @@ class ltg:
         last_message = messages.data[0]
         response = last_message.content[0].text.value
         return_message = json.loads(response)
-        return return_message['message']
+        
+        response_dict = json.loads(response)
+        response_dict["thread_id"] = self.thread_id
+    
+        return response_dict
 
     def cont_conv(self, user_input):
         # self.conversation_log.append({"role": "user", "content": user_input})
