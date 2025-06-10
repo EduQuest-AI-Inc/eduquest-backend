@@ -2,28 +2,27 @@
 from flask import Blueprint, request, jsonify
 from flask_cors import CORS
 import json
-# from data_access.conversation_dao import add_conversation, append_conversation, get_all_conversations
-
+import time
 from assistants import ini_conv, summarize_conversation
 from models.student_profile import student_profile
 from openai import OpenAI
-# import time
 import os
 from dotenv import load_dotenv
-# from data_access
 from routes.conversation.conversation_service import ConversationService
 
 load_dotenv()
-
-OpenAI.api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-sec_math_2 = {'initiate': 'asst_bmsuvfNCaHJYmqTlnT52AzXE',
-    'update': 'asst_oQlKvMpoDPp80zEabjvUiflj'}
+
+assistant_ids = {
+    "initial": "asst_bmsuvfNCaHJYmqTlnT52AzXE",
+    "update": "asst_oQlKvMpoDPp80zEabjvUiflj"
+}
 
 conversation_bp = Blueprint('conversation', __name__)
 conversation_service = ConversationService()
 
-# Routes
+
+# Routes for profile assistant
 @conversation_bp.route('/initiate-profile-assistant', methods=['POST'])
 def profile_assistant():
     try:
@@ -64,8 +63,63 @@ def continue_profile_assistant():
 
         if not user_message:
             return jsonify({"error": "user_message is required"}), 400
-        
+
         result = conversation_service.continue_profile_assistant(auth_token, conversation_type, thread_id, user_message)
         return result, 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# Direct assistant route (no DB)
+@conversation_bp.route("/conversation", methods=["POST"])
+def handle_conversation():
+    data = request.get_json()
+
+    mode = data.get("mode")  # should be 'initial' or 'update'
+    message = data.get("message")
+
+    if not mode or mode not in assistant_ids:
+        return jsonify({"error": "Invalid or missing mode (expected 'initial' or 'update')"}), 400
+    if not message:
+        return jsonify({"error": "Missing message"}), 400
+
+    try:
+        assistant_id = assistant_ids[mode]
+
+        # Create new thread
+        thread = client.beta.threads.create()
+
+        # Send user message
+        client.beta.threads.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content=message
+        )
+
+        # Run the assistant
+        run = client.beta.threads.runs.create(
+            thread_id=thread.id,
+            assistant_id=assistant_id
+        )
+
+        # Poll until complete
+        while True:
+            run_status = client.beta.threads.runs.retrieve(
+                thread_id=thread.id,
+                run_id=run.id
+            )
+            if run_status.status == "completed":
+                break
+            time.sleep(1)
+
+        # Get the reply
+        messages = client.beta.threads.messages.list(thread_id=thread.id)
+        reply = messages.data[0].content[0].text.value
+
+        return jsonify({
+            "reply": reply,
+            "thread_id": thread.id
+        }), 200
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
