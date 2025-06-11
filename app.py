@@ -8,6 +8,7 @@ from routes.conversation.routes import conversation_bp
 from routes.auth.routes import auth_bp
 from routes.user.routes import user_bp
 from routes.period.routes import period_bp
+from routes.teacher.routes import teacher_bp
 
 # Load environment variables from .env file
 load_dotenv()
@@ -37,6 +38,7 @@ app.register_blueprint(conversation_bp, url_prefix='/conversation')
 app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(user_bp, url_prefix='/user')
 app.register_blueprint(period_bp, url_prefix='/period')
+app.register_blueprint(teacher_bp, url_prefix = '/teacher')
 
 # Add helloworld route for testing
 @app.route('/helloworld', methods=['GET'])
