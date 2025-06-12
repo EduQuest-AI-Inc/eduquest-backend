@@ -12,7 +12,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 pre_calc = {
     'initiate': 'asst_bmsuvfNCaHJYmqTlnT52AzXE',
-    'update': 'asst_oQlKvMpoDPp80zEabjvUiflj',
+    'updateasst': 'asst_oQlKvMpoDPp80zEabjvUiflj',
     'ltg': 'asst_1NnTwxp3tBgFWPp2sMjHU3Or'
 }
 
@@ -43,9 +43,16 @@ def summarize_conversation(thread_id): #will return two pd_dataframe(student_pro
         time.sleep(1)
     messages = openai.beta.threads.messages.list(thread_id=thread_id)
     last_message = messages.data[0]
-    response = last_message.content[0].text.value
+    message_content = last_message.content[0]
+
+    if message_content.type == "text":
+        response = message_content.text.value
+    else:
+        print(f"Assistant returned non-text response: {message_content.type}")
+        response = "Assistant refused to respond or returned a non-text reply."
 
     return response
+
 
 class ini_conv:
     def __init__(self, student, thread_id=None):
@@ -423,7 +430,7 @@ Ensure each weekly quest explicitly covers the materials taught during that week
 - The long-term goal and each weekly quest should aim to gradually build real-world proficiency, directly aligned and coherent with the class curriculum, at a manageable pace for the student."""
 
 
-update = """You are the Update Assistant for EduQuest, an AI-powered educational platform. You support both students and teachers.
+updateasst = """You are the Update Assistant for EduQuest, an AI-powered educational platform. You support both students and teachers.
 
 Your job depends on who you're talking to:
 - If the user is a **teacher**:

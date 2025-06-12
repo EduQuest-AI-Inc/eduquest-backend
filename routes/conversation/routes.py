@@ -70,56 +70,74 @@ def continue_profile_assistant():
         return jsonify({"error": str(e)}), 500
 
 
-# Direct assistant route (no DB)
-@conversation_bp.route("/conversation", methods=["POST"])
-def handle_conversation():
-    data = request.get_json()
-
-    mode = data.get("mode")  # should be 'initial' or 'update'
-    message = data.get("message")
-
-    if not mode or mode not in assistant_ids:
-        return jsonify({"error": "Invalid or missing mode (expected 'initial' or 'update')"}), 400
-    if not message:
-        return jsonify({"error": "Missing message"}), 400
-
+# Routes for update assistant
+@conversation_bp.route('/initiate-update-assistant', methods=['POST'])
+def initiate_update():
     try:
-        assistant_id = assistant_ids[mode]
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Authorization header missing or invalid"}), 401
 
-        # Create new thread
-        thread = client.beta.threads.create()
+        auth_token = auth_header.split(" ", 1)[1]
+        data = request.json
 
-        # Send user message
-        client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=message
+        # Required fields
+        quests_file = data.get('quests_file')
+        is_instructor = data.get('is_instructor', False)
+
+        print("DATA RECEIVED:", data)
+
+        if not quests_file:
+            return jsonify({"error": "quests_file is required"}), 400
+
+        # Optional fields for student submissions
+        week = data.get('week')
+        submission_file = data.get('submission_file')
+
+        # Validate student-specific fields
+        if not is_instructor:
+            if not week:
+                return jsonify({"error": "week is required for student submissions"}), 400
+            if not submission_file:
+                return jsonify({"error": "submission_file is required for student submissions"}), 400
+
+        result = conversation_service.start_update_assistant(
+            auth_token=auth_token,
+            quests_file=quests_file,
+            is_instructor=is_instructor,
+            week=week,
+            submission_file=submission_file
         )
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"Error in initiate-update-assistant: {e}")
+        return jsonify({"error": str(e)}), 500
 
-        # Run the assistant
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant_id
+@conversation_bp.route('/continue-update-assistant', methods=['POST'])
+def continue_update():
+    try:
+        data = request.json
+        auth_header = request.headers.get('Authorization')
+
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Authorization header missing or invalid"}), 401
+
+        auth_token = auth_header.split(" ", 1)[1]
+
+        thread_id = data.get('thread_id')
+        user_message = data.get('message')
+
+        if not thread_id:
+            return jsonify({"error": "thread_id is required"}), 400
+
+        if not user_message:
+            return jsonify({"error": "message is required"}), 400
+
+        result = conversation_service.continue_update_assistant(
+            auth_token=auth_token,
+            thread_id=thread_id,
+            message=user_message
         )
-
-        # Poll until complete
-        while True:
-            run_status = client.beta.threads.runs.retrieve(
-                thread_id=thread.id,
-                run_id=run.id
-            )
-            if run_status.status == "completed":
-                break
-            time.sleep(1)
-
-        # Get the reply
-        messages = client.beta.threads.messages.list(thread_id=thread.id)
-        reply = messages.data[0].content[0].text.value
-
-        return jsonify({
-            "reply": reply,
-            "thread_id": thread.id
-        }), 200
-
+        return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
