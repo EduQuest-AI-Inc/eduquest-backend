@@ -30,3 +30,15 @@ class TeacherService:
 
         self.period_dao.add_period(new_period)
         return new_period.to_item()
+
+    def get_periods_by_teacher(self, teacher_id):
+        periods = self.period_dao.get_periods_by_teacher_id(teacher_id)
+        return [
+            {
+                "period_id": p.period_id,
+                "course": p.course
+            }
+            for p in periods
+        ]
+
+
