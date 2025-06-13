@@ -113,6 +113,9 @@ def initiate_update():
         print(f"Error in initiate-update-assistant: {e}")
         return jsonify({"error": str(e)}), 500
 
+    print("DEBUG user profile keys:", user_profile_dict.keys())
+    print("DEBUG full user profile:", user_profile_dict)
+
 @conversation_bp.route('/continue-update-assistant', methods=['POST'])
 def continue_update():
     try:
@@ -141,3 +144,5 @@ def continue_update():
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+

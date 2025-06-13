@@ -31,3 +31,17 @@ def create_period():
     except Exception as e:
         print(f"Error in create_period: {e}")
         return jsonify({"error": "Internal server error"}), 500
+
+@teacher_bp.route("/periods", methods=["GET"])
+@jwt_required()
+def periods():
+    try:
+        teacher_id = get_jwt_identity()
+        periods = teacher_service.get_periods_by_teacher(teacher_id)
+
+        return jsonify(periods), 200
+
+    except Exception as e:
+        print(f"Error in get_teacher_periods: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+

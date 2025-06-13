@@ -21,33 +21,28 @@ def dict_to_temp_file(data: dict, suffix=".json") -> str:
     with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=suffix) as tmp:
         json.dump(data, tmp)
         return tmp.name
-
-
-import tempfile
-import json
-
-def generate_mock_quests_file():
-    mock_quests = [
-        {
-            "week": 1,
-            "quest_name": "Explore Fractions",
-            "description": "Use objects at home to show 1/2, 1/4, and 1/3. Take a photo.",
-            "skills_covered": "Fractions, Visual Math",
-            "skills_mastered": "Understanding Part-Whole Relationships"
-        },
-        {
-            "week": 2,
-            "quest_name": "Math in Recipes",
-            "description": "Double or halve a recipe. Submit the modified version and a reflection.",
-            "skills_covered": "Multiplication, Division",
-            "skills_mastered": "Applying Math to Real Life"
-        }
-    ]
-
-    temp = tempfile.NamedTemporaryFile(delete=False, mode='w', suffix=".json")
-    json.dump(mock_quests, temp, indent=2)
-    temp.close()
-    return temp.name  # for testing only
+# def generate_mock_quests_file():
+#     mock_quests = [
+#         {
+#             "week": 1,
+#             "quest_name": "Explore Fractions",
+#             "description": "Use objects at home to show 1/2, 1/4, and 1/3. Take a photo.",
+#             "skills_covered": "Fractions, Visual Math",
+#             "skills_mastered": "Understanding Part-Whole Relationships"
+#         },
+#         {
+#             "week": 2,
+#             "quest_name": "Math in Recipes",
+#             "description": "Double or halve a recipe. Submit the modified version and a reflection.",
+#             "skills_covered": "Multiplication, Division",
+#             "skills_mastered": "Applying Math to Real Life"
+#         }
+#     ]
+#
+#     temp = tempfile.NamedTemporaryFile(delete=False, mode='w', suffix=".json")
+#     json.dump(mock_quests, temp, indent=2)
+#     temp.close()
+#     return temp.name  # for testing only
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -193,11 +188,11 @@ class ConversationService:
 
         user_profile_dict = user[0]
         student_file = dict_to_temp_file(user_profile_dict)
+        print("DEBUG user_profile_dict:", user_profile_dict)
 
-        quests_file = generate_mock_quests_file() #for testing only
-
-
-        print("DEBUG update type:", type(UpdateAssistant))
+        student_record = user_profile_dict
+        quests = student_record['quests']['pre_calc']
+        quests_file = dict_to_temp_file(quests)
 
         # Initialize update conversation
         update_conversation = UpdateAssistant(
