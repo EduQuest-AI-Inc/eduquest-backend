@@ -10,66 +10,48 @@ dynamodb = boto3.resource("dynamodb")
 
 class EnrollmentDAO(BaseDAO):
     def __init__(self):
-        """
-        Initialize the EnrollmentDAO with the DynamoDB 'enrollment' table.
-        """
         config = DynamoDBConfig()
         self.table = config.get_table("enrollment")
-
+        print(f"Using DynamoDB table: {self.table.name}")
 
     def add_enrollment(self, enrollment: Enrollment) -> None:
-        """
-        Add a new enrollment record to the table.
+        item = enrollment.model_dump()
+        print(f"Adding enrollment: {item}")
+        self.table.put_item(Item=item)
 
-        :param enrollment: An instance of the Enrollment model.
-        """
-        self.table.put_item(Item=enrollment.model_dump())
+    def get_enrollments_by_period(self, period_id: str) -> List[Dict[str, Any]]:
+        print("🔍 Querying enrollments by period")
+        print(f"🧪 period_id type: {type(period_id)} — value: {period_id}")
 
-
-    def get_enrollments_by_class(self, class_id: str) -> List[Enrollment]:
-        """
-        Retrieve all enrollment records for a given class ID.
-
-        :param class_id: The class identifier (partition key).
-        :return: A list of Enrollment instances.
-        """
-        response = self.table.query(
-            KeyConditionExpression=Key("class_id").eq(class_id)
-        )
-
-        print(response)
-
-        return response['Items']
-    
-
-    def update_enrollment(self, class_id: str, enrolled_at: str, updates: Dict[str, Any]) -> None:
-        """
-        Update an existing enrollment record using class_id and enrolled_at.
-
-        :param class_id: The class identifier (partition key).
-        :param enrolled_at: The timestamp of enrollment (sort key).
-        :param updates: Dictionary of fields to update.
-            (ex.
-                {
-                    "student_id": "rkatsura",
-                    "semester": "2026 Winter"
-                }
+        try:
+            response = self.table.query(
+                KeyConditionExpression=Key("period_id").eq(str(period_id))  # force string
             )
-        """
+            print("Query response:", response)
+            return response.get("Items", [])
+        except Exception as e:
+            print("Error querying by period_id:", e)
+            raise
+
+    def update_enrollment(self, period_id: str, enrolled_at: str, updates: Dict[str, Any]) -> None:
         update_expr = "SET " + ", ".join(f"{k} = :{k}" for k in updates)
         expr_attr_vals = {f":{k}": v for k, v in updates.items()}
+        print(f"Updating enrollment with period_id={period_id}, enrolled_at={enrolled_at}")
         self.table.update_item(
-            Key={"class_id": class_id, "enrolled_at": enrolled_at},
+            Key={"period_id": str(period_id), "enrolled_at": str(enrolled_at)},
             UpdateExpression=update_expr,
             ExpressionAttributeValues=expr_attr_vals
         )
 
+    def delete_enrollment(self, period_id: str, enrolled_at: str) -> None:
+        print(f"Deleting enrollment with period_id={period_id}, enrolled_at={enrolled_at}")
+        self.table.delete_item(Key={
+            "period_id": str(period_id),
+            "enrolled_at": str(enrolled_at)
+        })
 
-    def delete_enrollment(self, class_id: str, enrolled_at: str) -> None:
-        """
-        Delete an enrollment record based on class_id and enrolled_at.
-
-        :param class_id: The class identifier (partition key).
-        :param enrolled_at: The timestamp of enrollment (sort key).
-        """
-        self.table.delete_item(Key={"class_id": class_id, "enrolled_at": enrolled_at})
+    def debug_scan_all(self) -> None:
+        print("Scanning all items in enrollment table")
+        response = self.table.scan()
+        for item in response.get("Items", []):
+            print(f"🔎 Item: {item}, period_id type: {type(item.get('period_id'))}")
