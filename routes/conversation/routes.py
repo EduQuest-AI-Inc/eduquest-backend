@@ -44,6 +44,7 @@ def profile_assistant():
 def continue_profile_assistant():
     try:
         data = request.json
+        print("Received data:", data)  # Debug log
         auth_header = request.headers.get('Authorization')
 
         if not auth_header or not auth_header.startswith("Bearer "):
@@ -54,6 +55,8 @@ def continue_profile_assistant():
         conversation_type = data.get('conversation_type')
         thread_id = data.get('thread_id')
         user_message = data.get('message')
+
+        print(f"Parsed data - conversation_type: {conversation_type}, thread_id: {thread_id}, message: {user_message}")  # Debug log
 
         if not conversation_type:
             return jsonify({"error": "conversation_type is required"}), 400
@@ -67,6 +70,9 @@ def continue_profile_assistant():
         result = conversation_service.continue_profile_assistant(auth_token, conversation_type, thread_id, user_message)
         return result, 200
     except Exception as e:
+        print(f"Error in continue-profile-assistant: {str(e)}")  # Debug log
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")  # Debug log
         return jsonify({"error": str(e)}), 500
 
 

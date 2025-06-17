@@ -55,3 +55,28 @@ def continue_ltg_conversation():
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@period_bp.route('/verify-period', methods=['POST'])
+def verify_period():
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Authorization header missing or invalid"}), 401
+        auth_token = auth_header.split(" ", 1)[1]
+
+        data = request.json
+        period_id = data.get('period_id')
+        if not period_id:
+            return jsonify({"error": "period_id is required"}), 400
+
+        # Verify period and add to enrollments
+        period = period_service.verify_period_id(auth_token, period_id)
+        return jsonify({"message": "Period verified and added to enrollments", "period": period}), 200
+
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except LookupError as le:
+        return jsonify({"error": str(le)}), 404
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return jsonify({"error": "An unexpected error occurred"}), 500

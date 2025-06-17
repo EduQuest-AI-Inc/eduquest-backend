@@ -15,16 +15,48 @@ class PeriodService:
         self.student_dao = StudentDAO()
         self.conversation_dao = ConversationDAO()
 
-    def verify_period_id(self, period_id: str) -> Any:
+    def verify_period_id(self, auth_token: str, period_id: str) -> Any:
+        """
+        Verify a period ID and add it to the student's enrollments if valid.
+        
+        Args:
+            auth_token: The user's authentication token
+            period_id: The period ID to verify
+        Returns:
+            dict: The period information if valid
+        """
         if not period_id:
             raise ValueError("Missing period ID")
 
-        period_items = self.period_dao.get_period_by_id(period_id)
+        # Validate session and get user_id
+        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
+        if not sessions:
+            raise Exception("Invalid auth token")
+        user_id = sessions[0]['user_id']
 
+        # Verify period exists
+        period_items = self.period_dao.get_period_by_id(period_id)
         if not period_items:
             raise LookupError("Invalid period ID")
+        
+        period = period_items[0]
+        
+        # Get current student data
+        student = self.student_dao.get_student_by_id(user_id)[0]
+        if not student:
+            raise Exception("Student not found")
+            
+        # Get current enrollments or initialize empty list
+        current_enrollments = student.get('enrollments', [])
+        
+        # Add period to enrollments if not already enrolled
+        if period_id not in current_enrollments:
+            current_enrollments.append(period_id)
+            # Update student record with new enrollments
+            self.student_dao.update_student(user_id, {'enrollments': current_enrollments})
+            print(f"Added period {period_id} to student {user_id}'s enrollments")
 
-        return period_items[0]
+        return period
 
     def initiate_ltg_conversation(self, auth_token: str, period_id: str) -> Any:
         """
@@ -79,37 +111,38 @@ class PeriodService:
         }
 
     def continue_ltg_conversation(self, auth_token: str, conversation_type: str, thread_id: str, message: str) -> Any:
-        """
-        Continue the LTG conversation using the ltg class.
-        Args:
-            auth_token (str): The user's authentication token.
-            conversation_type (str): The type of conversation (should be 'longterm' or similar).
-            thread_id (str): The thread ID for the conversation.
-            message (str): The user's message to continue the conversation.
-        Returns:
-            dict: Assistant's reply and metadata.
-        """
-
+        print(f"\n=== Starting LTG Conversation ===")
+        print(f"Thread ID: {thread_id}")
+        print(f"Message: {message}")
+        
         # Validate session and get user_id
         sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
+            print("Error: Invalid auth token")
             raise Exception("Invalid auth token")
         user_id = sessions[0]['user_id']
+        print(f"User ID: {user_id}")
 
         # Retrieve conversation
         conversation = self.conversation_dao.get_conversation_by_thread_user_conversation_type(
             thread_id, user_id, conversation_type
         )
         if not conversation:
+            print("Error: Conversation not found")
             raise Exception("Conversation not found")
+        print(f"Found conversation: {conversation}")
 
         # Fetch student info
         student = self.student_dao.get_student_by_id(user_id)[0]
         if not student:
+            print("Error: Student not found")
             raise Exception("Student not found")
+        print(f"Found student: {student}")
 
         # Get the assistant id from the period if available, else use default
         period_id = conversation.get('period_id')
+        print(f"Period ID: {period_id}")
+        
         ltg_assistant_id = None
         if period_id:
             period_items = self.period_dao.get_period_by_id(period_id)
@@ -117,17 +150,38 @@ class PeriodService:
                 ltg_assistant_id = period_items[0].get('ltg_assistant_id')
         if not ltg_assistant_id:
             ltg_assistant_id = 'asst_1NnTwxp3tBgFWPp2sMjHU3Or' # Default assistant ID
+        print(f"Using assistant ID: {ltg_assistant_id}")
 
         # Continue conversation
         conv = ltg(student, assistant_id=ltg_assistant_id)
         conv.thread_id = thread_id
         try:
+            reply, goal_chosen = conv.cont_conv(message)
+            print(f"\nLTG Assistant Response:")
+            print(f"Reply: {reply}")
+            print(f"Goal chosen: {goal_chosen}")
 
+            # If a goal was chosen, save it to the student's record
+            if goal_chosen and reply:
+                # Get the period name from the period record
+                period_items = self.period_dao.get_period_by_id(period_id)
+                if period_items:
+                    period_name = period_items[0].get('name', period_id)
+                    print(f"\nSaving goal:")
+                    print(f"Period: {period_name}")
+                    print(f"Goal: {reply}")
+                    # Update the student's long-term goal for this period
+                    self.student_dao.update_long_term_goal(user_id, period_name, reply)
+                    print("Goal saved successfully")
+                else:
+                    print(f"Warning: Could not find period with ID {period_id}")
+            else:
+                print("No goal was chosen or reply was empty")
 
-            reply = conv.cont_conv(message)
-
-            print(f"LTG Conversation continued: {reply}")
-
-            return {"response": reply}
+            return {
+                "response": reply,
+                "goal_chosen": goal_chosen
+            }
         except Exception as e:
+            print(f"\nError in continue_ltg_conversation: {str(e)}")
             return {"error": str(e)}
