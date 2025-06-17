@@ -20,9 +20,6 @@ class EnrollmentDAO(BaseDAO):
         self.table.put_item(Item=item)
 
     def get_enrollments_by_period(self, period_id: str) -> List[Dict[str, Any]]:
-        print("🔍 Querying enrollments by period")
-        print(f"🧪 period_id type: {type(period_id)} — value: {period_id}")
-
         try:
             response = self.table.query(
                 KeyConditionExpression=Key("period_id").eq(str(period_id))  # force string
@@ -54,4 +51,4 @@ class EnrollmentDAO(BaseDAO):
         print("Scanning all items in enrollment table")
         response = self.table.scan()
         for item in response.get("Items", []):
-            print(f"🔎 Item: {item}, period_id type: {type(item.get('period_id'))}")
+            print(f" Item: {item}, period_id type: {type(item.get('period_id'))}")

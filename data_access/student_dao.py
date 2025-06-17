@@ -2,7 +2,7 @@ from typing import List, Dict
 from data_access.base_dao import BaseDAO
 from data_access.config import DynamoDBConfig
 from boto3.dynamodb.conditions import Key
-from typing import Any
+from typing import Any, Optional
 from datetime import datetime, timezone
 from models.student import Student
 
@@ -14,10 +14,12 @@ class StudentDAO(BaseDAO):
     def add_student(self, student: Student) -> None:
         self.table.put_item(Item=student.to_item())
 
-    def get_student_by_id(self, student_id: str) -> List[Dict[str, Any]]:
-        response = self.table.scan()
-        students = response["Items"]
-        return [s for s in students if s.get("student_id") == student_id]
+    def get_student_by_id(self, student_id: str) -> Optional[Dict[str, Any]]:
+        response = self.table.query(
+            KeyConditionExpression=Key("student_id").eq(student_id)
+        )
+        items = response.get("Items", [])
+        return items[0] if items else None
 
     def update_student(self, student_id: str, updates: Dict[str, Any]) -> None:
         updates["last_login"] = datetime.now(timezone.utc).isoformat()
