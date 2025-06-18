@@ -168,7 +168,6 @@ class ltg:
         return response_dict
 
     def cont_conv(self, user_input):
-        # self.conversation_log.append({"role": "user", "content": user_input})
         message = openai.beta.threads.messages.create(
             thread_id=self.thread_id,
             role="user",
@@ -182,18 +181,28 @@ class ltg:
 
         while True:
             run_status = openai.beta.threads.runs.retrieve(thread_id=self.thread_id, run_id=run_id)
-            # print(f"Run status: {run_status.status}")
             if run_status.status == 'completed':
                 break
             time.sleep(1)
         messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
         last_message = messages.data[0]
         response = last_message.content[0].text.value
-        return_message = json.loads(response)
-        if return_message['chosen_goal'] == []:
-            return return_message['message'], False
-        else:
-            return return_message['chosen_goal'], True
+        print(f"\nRaw LTG Assistant Response: {response}")
+        
+        try:
+            return_message = json.loads(response)
+            print(f"Parsed response: {return_message}")
+            
+            # Check if a goal was chosen
+            if not return_message.get('chosen_goal'):
+                print("No goal chosen in response")
+                return return_message.get('message', ''), False
+            else:
+                print(f"Goal chosen: {return_message['chosen_goal']}")
+                return return_message['chosen_goal'], True
+        except json.JSONDecodeError as e:
+            print(f"Error parsing response as JSON: {str(e)}")
+            return response, False
 
 
 class update:

@@ -12,7 +12,7 @@ class Student(BaseModel):
     weakness: Optional[list] = None
     interest: Optional[list] = None
     learning_style: Optional[list] = None
-    long_term_goal: Optional[List[Dict[str, str]]] = []
+    long_term_goal: Optional[Dict[str, str]] = []
     quests: Optional[List[Dict[str, str]]] = []
     password: str
 

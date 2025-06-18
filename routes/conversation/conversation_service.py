@@ -134,10 +134,11 @@ class ConversationService:
         try:
             if conversation_type == "profile":
                 reply, is_complete, updated_profile = conv.cont_conv(message)
-                if is_complete:
+                if is_complete and updated_profile:
                     self.student_dao.update_student(user_id, updated_profile)
                 return {
-                    "response": reply
+                    "response": reply,
+                    "profile_complete": is_complete
                 }
             elif conversation_type == "update":
                 reply = conv.cont_conv(message)
@@ -146,7 +147,8 @@ class ConversationService:
                 }
 
         except Exception as e:
-            return {"error": str(e)}
+            print(f"Error in continue_profile_assistant: {str(e)}")
+            raise Exception(f"Failed to continue conversation: {str(e)}")
 
     def start_update_assistant(self, auth_token: str, quests_file: str, is_instructor: bool, week: int = None,
                                submission_file: str = None):
