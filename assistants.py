@@ -314,34 +314,44 @@ class update:
         return response
 
 
+# class create_class:
+#     def __init__(self, class_name, filePaths=None):
+#         self.class_name = class_name
+#         self.filePaths = list(filePaths)
+#         if len(self.filePaths) > 0:
+#             self.file_dir = {}
+#             self.vector_store = client.vector_stores.create(name=self.class_name)
+#             self.file_streams = [open(path, "rb") for path in self.filePaths]
+#             self.file_batch = client.vector_stores.file_batches.upload_and_poll(
+#                 vector_store_id=self.vector_store.id, files=self.file_streams
+#             )
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class create_class:
-    def __init__(self, class_name, filePaths=None):
+    def __init__(self, class_name):
         self.class_name = class_name
-        self.filePaths = list(filePaths)
-        if len(self.filePaths) > 0:
-            self.file_dir = {}
-            self.vector_store = client.vector_stores.create(name=self.class_name)
-            self.file_streams = [open(path, "rb") for path in self.filePaths]
-            self.file_batch = client.vector_stores.file_batches.upload_and_poll(
-                vector_store_id=self.vector_store.id, files=self.file_streams
-            )
+        self.vector_store = client.beta.vector_stores.create(name=self.class_name)
+        self.vector_store_id = self.vector_store.id
 
-    def add_file(self, filePath):
-        """Add a new file to the vector store.
+    #commented this out for now. routes.py and teacher_service.py are handling this.
 
-        Args:
-            filePath (str): Path to the file to be added to the vector store
-        """
-        if not hasattr(self, 'vector_store'):
-            raise ValueError("Vector store not initialized. Please create class with files first.")
+    # def add_file(self, filePath):
+    #     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    #     """Add a new file to the vector store.
 
-        file_stream = open(filePath, "rb")
-        file_batch = client.vector_stores.file_batches.upload_and_poll(
-            vector_store_id=self.vector_store.id,
-            files=[file_stream]
-        )
-        self.filePaths.append(filePath)
-        file_stream.close()
+    #     Args:
+    #         filePath (str): Path to the file to be added to the vector store
+    #     """
+    #     if not hasattr(self, 'vector_store'):
+    #         raise ValueError("Vector store not initialized. Please create class with files first.")
+
+    #     file_stream = open(filePath, "rb")
+    #     file_batch = client.vector_stores.file_batches.upload_and_poll(
+    #         vector_store_id=self.vector_store.id,
+    #         files=[file_stream]
+    #     )
+    #     self.filePaths.append(filePath)
+    #     file_stream.close()
 
     def create_update_ass(self):
         self.ini_convo_ass = client.beta.assistants.create(

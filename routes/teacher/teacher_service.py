@@ -10,9 +10,11 @@ class TeacherService:
         existing = self.period_dao.get_period_by_id(period_id)
         if existing:
             raise ValueError("Period ID already exists")
+        
+        new_class = create_class(class_name=course)
+        vector_store_id = new_class.vector_store.id
 
-        new_class = create_class(class_name=course, filePaths=["test/test_period_dao.py"])  # update with real files later
-
+        #this is the old code
         initial_id = "asst_bmsuvfNCaHJYmqTlnT52AzXE"
         update_id = "asst_oQlKvMpoDPp80zEabjvUiflj"
         ltg_id = "asst_1NnTwxp3tBgFWPp2sMjHU3Or"
@@ -40,5 +42,10 @@ class TeacherService:
             }
             for p in periods
         ]
-
+    
+    def get_vector_store_id_for_period(self, period_id):
+        period = self.period_dao.get_period_by_id(period_id)
+        if not period:
+            raise ValueError("Period not found")
+        return period['vector_store_id']
 
