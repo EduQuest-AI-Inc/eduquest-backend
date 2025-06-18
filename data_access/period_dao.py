@@ -17,7 +17,8 @@ class PeriodDAO(BaseDAO):
         response = self.table.query(
             KeyConditionExpression=Key("period_id").eq(period_id)
         )
-        return response["Items"]
+        items = response.get("Items", [])
+        return items[0] if items else None
 
     def update_period(self, period_id: str, updates: Dict[str, Any]) -> None:
         update_expr = "SET " + ", ".join(f"{k} = :{k}" for k in updates)
