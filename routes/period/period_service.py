@@ -45,7 +45,7 @@ class PeriodService:
         user_id = sessions[0]['user_id']
 
         # Fetch student info
-        student = self.student_dao.get_student_by_id(user_id)[0]
+        student = self.student_dao.get_student_by_id(user_id)
         if not student:
             raise Exception("Student not found")
 
@@ -53,7 +53,7 @@ class PeriodService:
         period_items = self.period_dao.get_period_by_id(period_id)
         if not period_items:
             raise LookupError("Invalid period ID")
-        period = period_items[0]
+        period = period_items
         ltg_assistant_id = period.get("ltg_assistant_id")
 
         # Start LTG conversation
@@ -104,7 +104,7 @@ class PeriodService:
             raise Exception("Conversation not found")
 
         # Fetch student info
-        student = self.student_dao.get_student_by_id(user_id)[0]
+        student = self.student_dao.get_student_by_id(user_id)
         if not student:
             raise Exception("Student not found")
 
@@ -114,7 +114,7 @@ class PeriodService:
         if period_id:
             period_items = self.period_dao.get_period_by_id(period_id)
             if period_items:
-                ltg_assistant_id = period_items[0].get('ltg_assistant_id')
+                ltg_assistant_id = period_items.get('ltg_assistant_id')
         if not ltg_assistant_id:
             ltg_assistant_id = 'asst_1NnTwxp3tBgFWPp2sMjHU3Or' # Default assistant ID
 

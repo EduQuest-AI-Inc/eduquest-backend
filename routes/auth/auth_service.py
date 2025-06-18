@@ -29,14 +29,12 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
 
 def authenticate_user(username: str, password: str, role: str) -> bool:
     if role == 'teacher':
-        user_items = teacher_dao.get_teacher_by_id(username)
-        if not user_items:
+        user = teacher_dao.get_teacher_by_id(username)
+        if not user:
             return False
-        user = user_items[0]
         return check_password_hash(user['password'], password)
     else:
-        user_items = student_dao.get_student_by_id(username)
-        if not user_items:
+        user = student_dao.get_student_by_id(username)
+        if not user:
             return False
-        user = user_items[0]
         return check_password_hash(user['password'], password)
