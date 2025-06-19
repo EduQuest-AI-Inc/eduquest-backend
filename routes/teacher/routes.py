@@ -4,6 +4,7 @@ from routes.teacher.teacher_service import TeacherService
 from openai import OpenAI
 import shutil
 import tempfile, os
+from assistants import create_class
 
 teacher_bp = Blueprint("teacher", __name__)
 teacher_service = TeacherService()
@@ -33,16 +34,28 @@ def create_period():
 
         print("Received files:", file_paths)
 
-        vector_store = client.beta.vector_stores.create(name=course)
+        vector_store = client.vector_stores.create(name=course)
         file_streams = [open(path, "rb") for path in file_paths]
-        client.beta.vector_stores.file_batches.upload_and_poll(
+        client.vector_stores.file_batches.upload_and_poll(
             vector_store_id=vector_store.id,
             files=file_streams
         )
         print("Uploaded files to vector store:", vector_store.id)
 
-        update_assistant_id, ltg_assistant_id = teacher_service.create_update_and_ltg_assistants(vector_store.id)
+        class_instance = create_class(course)
+        class_instance.vector_store = vector_store  
         
+        class_instance.create_update_assistant()
+        class_instance.create_ltg_assistant()
+        
+        update_assistant_id = class_instance.update_assistant.id
+        ltg_assistant_id = class_instance.ltg_assistant.id
+
+        #printing this for test only
+        print("Created update assistant:", update_assistant_id)
+        print("Created LTG assistant:", ltg_assistant_id)
+
+
         period = teacher_service.create_period(
             period_id=period_id,
             course=course,

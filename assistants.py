@@ -339,7 +339,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class create_class:
     def __init__(self, class_name):
         self.class_name = class_name
-        self.vector_store = client.beta.vector_stores.create(name=self.class_name)
+        self.vector_store = client.vector_stores.create(name=self.class_name)
         self.vector_store_id = self.vector_store.id
 
     #commented this out for now. routes.py and teacher_service.py are handling this.
@@ -369,11 +369,10 @@ class create_class:
             model="o3-mini",
             tools=[{"type": "file_search"}],
         )
-        if len(self.filePaths) > 0:
-            self.ini_convo_ass = client.beta.assistants.update(
-                assistant_id=self.ini_convo_ass.id,
-                tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
-            )
+        self.update_assistant = client.beta.assistants.update(
+            assistant_id=self.update_assistant.id,
+            tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
+        )
 
     def create_ltg_assistant(self):
         self.ltg_assistant = client.beta.assistants.create(
@@ -381,6 +380,10 @@ class create_class:
             instructions=ltg_inst,
             model="gpt-4.1-mini",
             tools=[{"type": "file_search"}],
+        )
+        self.ltg_assistant = client.beta.assistants.update(
+            assistant_id=self.ltg_assistant.id,
+            tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
         )
 
 
@@ -415,5 +418,3 @@ At the start of every session, you will receive:
 Always reflect a warm, encouraging tone with students, and a collaborative tone with teachers. Ask clarifying questions if anything is unclear.
 
 At the end, you will output a table with the same format you received. """
-
-
