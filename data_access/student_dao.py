@@ -33,3 +33,42 @@ class StudentDAO(BaseDAO):
 
     def delete_student(self, student_id: str) -> None:
         self.table.delete_item(Key={"student_id": student_id})
+
+    def update_long_term_goal(self, student_id: str, period: str, goal: str) -> None:
+        """
+        Update the long-term goal for a student for a specific period.
+        
+        Args:
+            student_id: The ID of the student
+            period: The period for which to update the goal
+            goal: The long-term goal text
+        """
+        print(f"Updating long-term goal for student {student_id}, period {period}")
+        print(f"Goal to be saved: {goal}")
+        
+        # First get the current student data
+        student_data = self.get_student_by_id(student_id)
+        if not student_data:
+            print(f"Error: Student with ID {student_id} not found")
+            raise ValueError(f"Student with ID {student_id} not found")
+            
+        print(f"Current student data: {student_data[0]}")
+        
+        # Get current long_term_goal or initialize empty dict
+        current_goals = student_data[0].get('long_term_goal', {})
+        # If current_goals is a list, convert it to a dict
+        if isinstance(current_goals, list):
+            current_goals = {}
+        print(f"Current goals: {current_goals}")
+        
+        # Update the goal for the specific period
+        current_goals[period] = goal
+        print(f"Updated goals: {current_goals}")
+        
+        try:
+            # Update the student record
+            self.update_student(student_id, {'long_term_goal': current_goals})
+            print(f"Successfully updated long-term goal in database")
+        except Exception as e:
+            print(f"Error updating long-term goal in database: {str(e)}")
+            raise

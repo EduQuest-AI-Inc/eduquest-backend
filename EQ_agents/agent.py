@@ -27,9 +27,9 @@ class HomeworkAssignment(BaseModel):
 class HomeworkSchedule(BaseModel):
     assignments: list[HomeworkAssignment] = Field(description="List of homework assignments with instructions and rubrics")
 
-class baseQuest(BaseModel):
-    name: str
-    topics: list[str] = Field(description="List of course topics covered in the quest")
+# class baseQuest(BaseModel):
+#     name: str
+#     topics: list[str] = Field(description="List of course topics covered in the quest")
 
 class schedule(BaseModel):
     list_of_quests: list[IndividualQuest] = Field(description="List of quests for the student")

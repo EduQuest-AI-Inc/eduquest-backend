@@ -4,10 +4,14 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token
 from .auth_service import register_user, authenticate_user
 from data_access.session_dao import SessionDAO
+from data_access.student_dao import StudentDAO
 from models.session import Session
+from routes.conversation.conversation_service import ConversationService
 
 auth_bp = Blueprint('auth', __name__)
 session_dao = SessionDAO()
+student_dao = StudentDAO()
+conversation_service = ConversationService()
 
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
@@ -49,6 +53,16 @@ def login():
         # Store session in DB
         session = Session(auth_token=access_token, user_id=username, role=role)
         session_dao.add_session(session)
+        
+        # If student, check if profile is blank
+        if role == 'student':
+            student = student_dao.get_student_by_id(username)[0]
+            if not student.get('strength') or not student.get('weakness') or not student.get('interest') or not student.get('learning_style'):
+                return jsonify({
+                    'token': access_token,
+                    'needs_profile': True
+                }), 200
+        
         return jsonify({'token': access_token}), 200
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
