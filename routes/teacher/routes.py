@@ -33,28 +33,29 @@ def create_period():
 
         print("Received files:", file_paths)
 
+        vector_store = client.beta.vector_stores.create(name=course)
+        file_streams = [open(path, "rb") for path in file_paths]
+        client.beta.vector_stores.file_batches.upload_and_poll(
+            vector_store_id=vector_store.id,
+            files=file_streams
+        )
+        print("Uploaded files to vector store:", vector_store.id)
+
+        update_assistant_id, ltg_assistant_id = teacher_service.create_update_and_ltg_assistants(vector_store.id)
+        
         period = teacher_service.create_period(
             period_id=period_id,
             course=course,
-            teacher_id=teacher_id
+            teacher_id=teacher_id,
+            vector_store_id=vector_store.id
         )
-
-        vector_store_id = period['vector_store_id']
-
-        file_streams = [open(path, "rb") for path in file_paths]
-        file_batch = client.beta.vector_stores.file_batches.upload_and_poll(
-            vector_store_id=vector_store_id,
-            files=file_streams
-        )
-
-        #printing this for test only
-        print("Uploaded files to vector store:", vector_store_id)
-
-        #file cleanup just in case
+        
+        teacher_service.update_period_assistants(period_id, update_assistant_id, ltg_assistant_id)
+        
+        # cleanup
         for f in file_streams:
-             f.close()
-             shutil.rmtree(temp_dir)
-
+            f.close()
+        shutil.rmtree(temp_dir)
 
         return jsonify({
             "message": "Period created successfully",
@@ -79,4 +80,3 @@ def periods():
     except Exception as e:
         print(f"Error in get_teacher_periods: {e}")
         return jsonify({"error": "Internal server error"}), 500
-
