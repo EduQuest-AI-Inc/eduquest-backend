@@ -13,23 +13,21 @@ import json
 from openai import vector_stores
 from pydantic import BaseModel, Field
 import asyncio
+from models.period import Period
+from models.rubric import Rubric
 
 class IndividualQuest(BaseModel):
-    Description: str
+    Name: str = Field(description="Name of the quest")
     Skills: str = Field(description="Skills the student will practice through this quest")
     Week: int = Field(description="Week the student will work on this quest")
 
-class HomeworkAssignment(BaseModel):
-    quest: IndividualQuest
+
+class IndividualQuest(BaseModel):
+    Name: str = Field(description="Name of the quest")
+    Skills: str = Field(description="Skills the student will practice through this quest")
+    Week: int = Field(description="Week the student will work on this quest")
     instructions: str = Field(description="Detailed instructions for completing the quest")
-    rubric: dict = Field(description="Grading criteria and expectations for the quest")
-
-class HomeworkSchedule(BaseModel):
-    assignments: list[HomeworkAssignment] = Field(description="List of homework assignments with instructions and rubrics")
-
-# class baseQuest(BaseModel):
-#     name: str
-#     topics: list[str] = Field(description="List of course topics covered in the quest")
+    rubric: Rubric = Field(description="Grading criteria and expectations for the quest")
 
 class schedule(BaseModel):
     list_of_quests: list[IndividualQuest] = Field(description="List of quests for the student")
@@ -207,6 +205,7 @@ For each quest in the schedule, I need detailed instructions and a grading rubri
                     vector_store_ids=[self.vector_store]
                 )
             ],
+            output_type = HomeworkSchedule,
             handoffs = [self.rubric_agent, self.instruction_agent]
         )
 
@@ -271,3 +270,10 @@ For each quest in the schedule, I need detailed instructions and a grading rubri
         Handles async execution internally and returns the final homework schedule.
         """
         return asyncio.run(self._run_async())
+
+
+# def run_agent(student, period_id):
+#     period = Period.get_period(period_id)
+#     schedule = SchedulesAgent(student, period).run()
+#     homework = HWAgent(student, period, schedule).run()
+#     return homework
