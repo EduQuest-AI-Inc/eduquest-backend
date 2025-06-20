@@ -35,6 +35,7 @@ def get_enrollments(period_id):
         print("GET ENROLLMENTS ERROR:", str(e))
         return jsonify({"error": "Failed to fetch enrollments"}), 500
 
+
 @enrollment_bp.route('/student-profile/<period_id>/<student_id>', methods=['GET'])
 def get_student_profile(period_id, student_id):
     try:

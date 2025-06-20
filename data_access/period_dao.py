@@ -18,15 +18,28 @@ class PeriodDAO(BaseDAO):
             KeyConditionExpression=Key("period_id").eq(period_id)
         )
         items = response.get("Items", [])
-        return items[0] if items else None
+        if not items:
+            return None
+        
+        # Convert DynamoDB item to Period model and then back to dict to ensure proper typing
+        period = Period(**items[0])
+        return period.model_dump()
 
     def update_period(self, period_id: str, updates: Dict[str, Any]) -> None:
-        update_expr = "SET " + ", ".join(f"{k} = :{k}" for k in updates)
+        # Convert any empty lists to DynamoDB format
+        for key, value in updates.items():
+            if isinstance(value, list) and not value:
+                updates[key] = []  # DynamoDB expects empty lists in this format
+        
+        update_expr = "SET " + ", ".join(f"#{k} = :{k}" for k in updates)
         expr_attr_vals = {f":{k}": v for k, v in updates.items()}
+        expr_attr_names = {f"#{k}": k for k in updates}
+        
         self.table.update_item(
             Key={"period_id": period_id},
             UpdateExpression=update_expr,
-            ExpressionAttributeValues=expr_attr_vals
+            ExpressionAttributeValues=expr_attr_vals,
+            ExpressionAttributeNames=expr_attr_names
         )
 
     def delete_period(self, period_id: str) -> None:

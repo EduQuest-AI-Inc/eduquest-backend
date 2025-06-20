@@ -1,10 +1,12 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from routes.teacher.teacher_service import TeacherService
 from openai import OpenAI
+import boto3
 import shutil
 import tempfile, os
 from assistants import create_class
+from s3 import upload_to_s3
 
 teacher_bp = Blueprint("teacher", __name__)
 teacher_service = TeacherService()
@@ -26,11 +28,17 @@ def create_period():
 
         temp_dir = tempfile.mkdtemp()
         file_paths = []
+        s3_keys = []
 
         for file in files:
             file_path = os.path.join(temp_dir, file.filename)
             file.save(file_path)
             file_paths.append(file_path)
+            
+            file.seek(0) #reset the file pointer to the beginning
+            s3_key = upload_to_s3(file, folder=f"periods/{period_id}")
+            print("Uploaded to S3:", s3_key)
+            s3_keys.append(s3_key) #this is the key that we'll use to serve the file
 
         print("Received files:", file_paths)
 
@@ -60,7 +68,8 @@ def create_period():
             period_id=period_id,
             course=course,
             teacher_id=teacher_id,
-            vector_store_id=vector_store.id
+            vector_store_id=vector_store.id,
+            file_urls=[url for url in s3_keys if url is not None]
         )
         
         teacher_service.update_period_assistants(period_id, update_assistant_id, ltg_assistant_id)
@@ -93,3 +102,26 @@ def periods():
     except Exception as e:
         print(f"Error in get_teacher_periods: {e}")
         return jsonify({"error": "Internal server error"}), 500
+    
+
+@teacher_bp.route('/get-file/<path:key>', methods=['GET'])
+@jwt_required()
+def get_file(key):
+    try:
+        s3 = boto3.client(
+            "s3",
+            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+            region_name=os.getenv("AWS_REGION")
+        )
+        BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+
+        file_obj = s3.get_object(Bucket=BUCKET_NAME, Key=key)
+        return Response(
+            file_obj['Body'].read(),
+            content_type=file_obj['ContentType'],
+            headers={"Content-Disposition": f"inline; filename={key.split('/')[-1]}"}
+        )
+    except Exception as e:
+        print("Error retrieving file:", e)
+        return jsonify({"error": "Failed to retrieve file"}), 500

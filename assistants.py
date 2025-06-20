@@ -133,14 +133,20 @@ class ltg:
         self.student = student
         self.thread_id = None
         self.assistant = openai.beta.assistants.retrieve(assistant_id)
-        # self.conversation_log = conversation_log if conversation_log else []
 
     def initiate(self):
         thread = openai.beta.threads.create()
-        initial_message = f"Hello, I'm {self.student["first_name"]} {self.student["last_name"]}, in {self.student["grade"]}th grade. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. Please recommend 3 long-term goals for me."
+        first_name = self.student.get("first_name", "")
+        last_name = self.student.get("last_name", "")
+        grade = self.student.get("grade", "")
+        strengths = ", ".join(self.student.get("strength", [])) if isinstance(self.student.get("strength"), list) else str(self.student.get("strength", ""))
+        weaknesses = ", ".join(self.student.get("weakness", [])) if isinstance(self.student.get("weakness"), list) else str(self.student.get("weakness", ""))
+        interests = ", ".join(self.student.get("interest", [])) if isinstance(self.student.get("interest"), list) else str(self.student.get("interest", ""))
+        learning_style = ", ".join(self.student.get("learning_style", [])) if isinstance(self.student.get("learning_style"), list) else str(self.student.get("learning_style", ""))
+        
+        initial_message = f"Hello, I'm {first_name} {last_name}, in {grade}th grade. My strengths are {strengths}, my weaknesses are {weaknesses}, my interests are {interests}, and my learning style is {learning_style}. Please recommend 3 long-term goals for me."
         print(f"Initial message: {initial_message}")
-        print(
-            f"Student: {self.student["strength"]}, {self.student["weakness"]}, {self.student["interest"]}, {self.student["learning_style"]}")
+        
         self.thread_id = thread.id
         # Send the initial message to the thread
         message = openai.beta.threads.messages.create(thread_id=self.thread_id, role="user", content=initial_message)
@@ -153,19 +159,24 @@ class ltg:
 
         while True:
             run_status = openai.beta.threads.runs.retrieve(thread_id=self.thread_id, run_id=run_id)
-            # print(f"Run status: {run_status.status}")
             if run_status.status == 'completed':
                 break
             time.sleep(1)
         messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
         last_message = messages.data[0]
         response = last_message.content[0].text.value
-        return_message = json.loads(response)
-
-        response_dict = json.loads(response)
-        response_dict["thread_id"] = self.thread_id
-
-        return response_dict
+        
+        try:
+            response_dict = json.loads(response)
+            response_dict["thread_id"] = self.thread_id
+            return response_dict
+        except json.JSONDecodeError as e:
+            print(f"Error parsing response as JSON: {str(e)}")
+            return {
+                "thread_id": self.thread_id,
+                "message": response,
+                "error": "Failed to parse response as JSON"
+            }
 
     def cont_conv(self, user_input):
         message = openai.beta.threads.messages.create(

@@ -8,7 +8,8 @@ class TeacherService:
     def __init__(self):
         self.period_dao = PeriodDAO()
 
-    def create_period(self, period_id, course, teacher_id, vector_store_id):
+    def create_period(self, period_id, course, teacher_id, vector_store_id, file_urls):
+        print(f"Creating period with file_urls: {file_urls}")
         existing = self.period_dao.get_period_by_id(period_id)
         
         if existing:
@@ -29,11 +30,15 @@ class TeacherService:
             update_assistant_id=update_id,
             vector_store_id=vector_store_id,
             ltg_assistant_id=ltg_id,
-            teacher_id=teacher_id
+            teacher_id=teacher_id,
+            file_urls=file_urls
         )
+        print(f"Created Period object with file_urls: {new_period.file_urls}")
 
         self.period_dao.add_period(new_period)
-        return new_period.to_item()
+        result = new_period.to_item()
+        print(f"Saved period with file_urls: {result.get('file_urls')}")
+        return result
 
     def get_periods_by_teacher(self, teacher_id):
         periods = self.period_dao.get_periods_by_teacher_id(teacher_id)

@@ -35,9 +35,18 @@ class EnrollmentService:
         self.enrollment_dao.add_enrollment(enrollment)
 
         return {"message": f"Student {student_id} enrolled in {period_id} successfully"}
-
+    
     def get_enrollments_for_period(self, period_id: str):
-        return self.enrollment_dao.get_enrollments_by_period(period_id)
+        enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
+        period = self.period_dao.get_period_by_id(period_id)
+
+        return {
+            "students": enrollments,
+            "file_urls": period.get("file_urls", []) if period else []
+        }
+    
+    def get_enrollment_by_id(self, enrollment_id: str):
+        return self.enrollment_dao.get_enrollment_by_id(enrollment_id)
 
     def delete_enrollment(self, student_id: str, period_id: str, enrolled_at: str):
         self.enrollment_dao.delete_enrollment(period_id, enrolled_at)

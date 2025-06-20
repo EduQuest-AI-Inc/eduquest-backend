@@ -23,12 +23,14 @@ class StudentDAO(BaseDAO):
 
     def update_student(self, student_id: str, updates: Dict[str, Any]) -> None:
         updates["last_login"] = datetime.now(timezone.utc).isoformat()
-        update_expr = "SET " + ", ".join(f"{k} = :{k}" for k in updates)
+        update_expr = "SET " + ", ".join(f"#{k} = :{k}" for k in updates)
         expr_attr_vals = {f":{k}": v for k, v in updates.items()}
+        expr_attr_names = {f"#{k}": k for k in updates}
         self.table.update_item(
-            Key("student_id").eq(str(student_id)),
+            Key={"student_id": str(student_id)},
             UpdateExpression=update_expr,
-            ExpressionAttributeValues=expr_attr_vals
+            ExpressionAttributeValues=expr_attr_vals,
+            ExpressionAttributeNames=expr_attr_names
         )
 
     def delete_student(self, student_id: str) -> None:
