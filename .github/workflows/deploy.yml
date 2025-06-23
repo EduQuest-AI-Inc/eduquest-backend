@@ -25,7 +25,7 @@ jobs:
 
           if [ ! -d "eduquest-backend/.git" ]; then
             echo "Repo not found, cloning fresh..."
-            git clone https://github.com/yourusername/yourrepo.git eduquest-backend
+            git clone https://github.com/eduquest2024/eduquest-backend.git eduquest-backend
           else
             echo "Repo found, updating..."
             cd eduquest-backend
