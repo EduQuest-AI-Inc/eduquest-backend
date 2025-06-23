@@ -3,7 +3,7 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      - production
+      - production  # or your deployment branch
 
 jobs:
   deploy:
@@ -22,22 +22,16 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
           cd /home/ubuntu/eduquest-backend
+          echo "Pulling latest changes..."
+          git pull origin production
 
-          echo "Updating code from production branch..."
-          git fetch origin
-          git reset --hard origin/production
+          echo "Activating virtual environment..."
+          source venv/bin/activate
+          pip install -r requirements.txt
 
-          echo "Setting up virtualenv..."
-          if [ ! -d "venv" ]; then
-            python3 -m venv venv
-          fi
+          echo "Killing existing Flask app (if any)..."
+          pkill -f app.py || true  # continue even if nothing is killed
 
-          echo "Installing dependencies..."
-          ./venv/bin/pip install -r requirements.txt
-
-          echo "Restarting Flask app..."
-          pkill -f app.py || true
-          nohup ./venv/bin/python app.py > app.log 2>&1 &
-
-          echo "✅ Deployment finished."
+          echo "Starting Flask app in background..."
+          nohup python app.py > app.log 2>&1 &
         EOF
