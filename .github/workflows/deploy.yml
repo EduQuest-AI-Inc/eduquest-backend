@@ -27,15 +27,17 @@ jobs:
           git fetch origin
           git reset --hard origin/production
 
-          echo "Activating virtualenv..."
-          source venv/bin/activate
+          echo "Setting up virtualenv..."
+          if [ ! -d "venv" ]; then
+            python3 -m venv venv
+          fi
 
           echo "Installing dependencies..."
-          pip install -r requirements.txt
+          ./venv/bin/pip install -r requirements.txt
 
           echo "Restarting Flask app..."
           pkill -f app.py || true
-          nohup python app.py > app.log 2>&1 &
+          nohup ./venv/bin/python app.py > app.log 2>&1 &
 
           echo "✅ Deployment finished."
         EOF
