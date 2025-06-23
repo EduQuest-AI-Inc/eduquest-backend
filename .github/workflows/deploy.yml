@@ -22,16 +22,26 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
           cd /home/ubuntu/eduquest-backend
-          echo "Pulling latest changes..."
-          git pull origin production
+          echo "Before update:"
+          git status
+          git branch
+          git log -1
 
-          echo "Activating virtual environment..."
+          echo "Updating code..."
+          git fetch origin
+          git reset --hard origin/production
+
+          echo "After update:"
+          git status
+          git log -1
+
+          echo "Activating virtualenv..."
           source venv/bin/activate
           pip install -r requirements.txt
 
-          echo "Killing existing Flask app (if any)..."
-          pkill -f app.py || true  # continue even if nothing is killed
-
-          echo "Starting Flask app in background..."
+          echo "Restarting Flask app..."
+          pkill -f app.py || true
           nohup python app.py > app.log 2>&1 &
+
+          echo "Deployment finished."
         EOF
