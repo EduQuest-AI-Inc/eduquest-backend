@@ -4,6 +4,7 @@ from flask_cors import CORS
 import json
 import time
 from assistants import ini_conv, summarize_conversation
+from EQ_agents.agent import SchedulesAgent
 from models.student_profile import student_profile
 from openai import OpenAI
 import os
@@ -76,7 +77,31 @@ def continue_profile_assistant():
         return jsonify({"error": str(e)}), 500
 
 
-# Routes for update assistant
+# this needs fixing!!!!!!
+# @conversation_bp.route('/initiate-schedules-agent', methods=['POST'])
+# def initiate_schedules_agent():
+#     try:
+#         auth_header = request.headers.get('Authorization')
+#         if not auth_header or not auth_header.startswith("Bearer "):
+#             return jsonify({"error": "Authorization header missing or invalid"}), 401
+        
+#         auth_token = auth_header.split(" ", 1)[1]
+#         data = request.json
+        
+#         if not data.get('conversation_type'):
+#             return jsonify({"error": "conversation_type is required"}), 400
+        
+#         if data.get('conversation_type') == "schedules":
+#             result = conversation_service.start_schedules_agent(auth_token)
+#             return result, 200
+#         else:
+#             return jsonify({"error": "Invalid conversation type"}), 400
+#     except Exception as e:
+#         print(f"Error in initiate-schedules-agent: {str(e)}")
+#         return jsonify({"error": str(e)}), 500
+    
+    
+
 @conversation_bp.route('/initiate-update-assistant', methods=['POST'])
 def initiate_update():
     try:

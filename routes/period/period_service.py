@@ -187,9 +187,10 @@ class PeriodService:
             # If a goal was chosen, save it to the student's record
             if goal_chosen and reply:
                 # Get the period name from the period record
-                period_items = self.period_dao.get_period_by_id(period_id)
-                if period_items:
-                    period_name = period_items[0].get('name', period_id)
+                period_data = self.period_dao.get_period_by_id(period_id)
+                if period_data:
+                    # Use course name as period name, fallback to period_id
+                    period_name = period_data.get('course', period_id)
                     print(f"\nSaving goal:")
                     print(f"Period: {period_name}")
                     print(f"Goal: {reply}")
