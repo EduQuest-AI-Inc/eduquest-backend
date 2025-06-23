@@ -42,7 +42,7 @@ app.register_blueprint(period_bp, url_prefix='/period')
 app.register_blueprint(teacher_bp, url_prefix = '/teacher')
 app.register_blueprint(enrollment_bp, url_prefix = '/enrollment')
 
-# Add helloworld route for testing
+# Add helloworld route for testing connection
 @app.route('/helloworld', methods=['GET'])
 def hello_world():
     return "helloworld"
