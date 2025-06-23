@@ -1,6 +1,9 @@
 # db/base_dao.py
 from data_access.config import DynamoDBConfig
 import boto3
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # BaseDAO class for common database operations
 # 

@@ -4,8 +4,11 @@ import boto3
 from data_access.config import DynamoDBConfig
 from boto3.dynamodb.conditions import Key
 from typing import List, Dict, Any
+from dotenv import load_dotenv
 
-dynamodb = boto3.resource("dynamodb")
+load_dotenv()
+
+# dynamodb = boto3.resource("dynamodb")
 
 
 class EnrollmentDAO(BaseDAO):
