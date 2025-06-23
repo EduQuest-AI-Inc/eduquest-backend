@@ -56,7 +56,7 @@ def login():
         
         # If student, check if profile is blank
         if role == 'student':
-            student = student_dao.get_student_by_id(username)[0]
+            student = student_dao.get_student_by_id(username) # this is a dict
             if not student.get('strength') or not student.get('weakness') or not student.get('interest') or not student.get('learning_style'):
                 return jsonify({
                     'token': access_token,

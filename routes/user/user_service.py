@@ -29,14 +29,14 @@ class UserService:
             teacher = self.teacher_dao.get_teacher_by_id(user_id)
             if not teacher:
                 raise ValueError("Teacher not found")
-            teacher_profile = teacher[0]
+            teacher_profile = teacher
             teacher_profile['role'] = 'teacher'
             return teacher_profile
         elif role == 'student':
             student = self.student_dao.get_student_by_id(user_id)
             if not student:
                 raise ValueError("Student not found")
-            student_profile = student[0]
+            student_profile = student
             student_profile['role'] = 'student'
             return student_profile
         else:

@@ -12,11 +12,12 @@ class TeacherDAO(BaseDAO):
     def add_teacher(self, teacher: Teacher) -> None:
         self.table.put_item(Item=teacher.to_item())
 
-    def get_teacher_by_id(self, teacher_id: str) -> List[Dict[str, Any]]:
+    def get_teacher_by_id(self, teacher_id: str) -> Dict[str, Any]:
         response = self.table.query(
             KeyConditionExpression=Key("teacher_id").eq(teacher_id)
         )
-        return response["Items"]
+        items = response.get("Items", [])
+        return items[0] if items else None
 
     def update_teacher(self, teacher_id: str, updates: Dict[str, Any]) -> None:
         update_expr = "SET " + ", ".join(f"{k} = :{k}" for k in updates)

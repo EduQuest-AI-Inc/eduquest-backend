@@ -133,14 +133,20 @@ class ltg:
         self.student = student
         self.thread_id = None
         self.assistant = openai.beta.assistants.retrieve(assistant_id)
-        # self.conversation_log = conversation_log if conversation_log else []
 
     def initiate(self):
         thread = openai.beta.threads.create()
-        initial_message = f"Hello, I'm {self.student["first_name"]} {self.student["last_name"]}, in {self.student["grade"]}th grade. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. Please recommend 3 long-term goals for me."
+        first_name = self.student.get("first_name", "")
+        last_name = self.student.get("last_name", "")
+        grade = self.student.get("grade", "")
+        strengths = ", ".join(self.student.get("strength", [])) if isinstance(self.student.get("strength"), list) else str(self.student.get("strength", ""))
+        weaknesses = ", ".join(self.student.get("weakness", [])) if isinstance(self.student.get("weakness"), list) else str(self.student.get("weakness", ""))
+        interests = ", ".join(self.student.get("interest", [])) if isinstance(self.student.get("interest"), list) else str(self.student.get("interest", ""))
+        learning_style = ", ".join(self.student.get("learning_style", [])) if isinstance(self.student.get("learning_style"), list) else str(self.student.get("learning_style", ""))
+        
+        initial_message = f"Hello, I'm {first_name} {last_name}, in {grade}th grade. My strengths are {strengths}, my weaknesses are {weaknesses}, my interests are {interests}, and my learning style is {learning_style}. Please recommend 3 long-term goals for me."
         print(f"Initial message: {initial_message}")
-        print(
-            f"Student: {self.student["strength"]}, {self.student["weakness"]}, {self.student["interest"]}, {self.student["learning_style"]}")
+        
         self.thread_id = thread.id
         # Send the initial message to the thread
         message = openai.beta.threads.messages.create(thread_id=self.thread_id, role="user", content=initial_message)
@@ -153,19 +159,24 @@ class ltg:
 
         while True:
             run_status = openai.beta.threads.runs.retrieve(thread_id=self.thread_id, run_id=run_id)
-            # print(f"Run status: {run_status.status}")
             if run_status.status == 'completed':
                 break
             time.sleep(1)
         messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
         last_message = messages.data[0]
         response = last_message.content[0].text.value
-        return_message = json.loads(response)
-
-        response_dict = json.loads(response)
-        response_dict["thread_id"] = self.thread_id
-
-        return response_dict
+        
+        try:
+            response_dict = json.loads(response)
+            response_dict["thread_id"] = self.thread_id
+            return response_dict
+        except json.JSONDecodeError as e:
+            print(f"Error parsing response as JSON: {str(e)}")
+            return {
+                "thread_id": self.thread_id,
+                "message": response,
+                "error": "Failed to parse response as JSON"
+            }
 
     def cont_conv(self, user_input):
         message = openai.beta.threads.messages.create(
@@ -323,34 +334,44 @@ class update:
         return response
 
 
+# class create_class:
+#     def __init__(self, class_name, filePaths=None):
+#         self.class_name = class_name
+#         self.filePaths = list(filePaths)
+#         if len(self.filePaths) > 0:
+#             self.file_dir = {}
+#             self.vector_store = client.vector_stores.create(name=self.class_name)
+#             self.file_streams = [open(path, "rb") for path in self.filePaths]
+#             self.file_batch = client.vector_stores.file_batches.upload_and_poll(
+#                 vector_store_id=self.vector_store.id, files=self.file_streams
+#             )
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class create_class:
-    def __init__(self, class_name, filePaths=None):
+    def __init__(self, class_name):
         self.class_name = class_name
-        self.filePaths = list(filePaths)
-        if len(self.filePaths) > 0:
-            self.file_dir = {}
-            self.vector_store = client.vector_stores.create(name=self.class_name)
-            self.file_streams = [open(path, "rb") for path in self.filePaths]
-            self.file_batch = client.vector_stores.file_batches.upload_and_poll(
-                vector_store_id=self.vector_store.id, files=self.file_streams
-            )
+        self.vector_store = client.vector_stores.create(name=self.class_name)
+        self.vector_store_id = self.vector_store.id
 
-    def add_file(self, filePath):
-        """Add a new file to the vector store.
+    #commented this out for now. routes.py and teacher_service.py are handling this.
 
-        Args:
-            filePath (str): Path to the file to be added to the vector store
-        """
-        if not hasattr(self, 'vector_store'):
-            raise ValueError("Vector store not initialized. Please create class with files first.")
+    # def add_file(self, filePath):
+    #     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    #     """Add a new file to the vector store.
 
-        file_stream = open(filePath, "rb")
-        file_batch = client.vector_stores.file_batches.upload_and_poll(
-            vector_store_id=self.vector_store.id,
-            files=[file_stream]
-        )
-        self.filePaths.append(filePath)
-        file_stream.close()
+    #     Args:
+    #         filePath (str): Path to the file to be added to the vector store
+    #     """
+    #     if not hasattr(self, 'vector_store'):
+    #         raise ValueError("Vector store not initialized. Please create class with files first.")
+
+    #     file_stream = open(filePath, "rb")
+    #     file_batch = client.vector_stores.file_batches.upload_and_poll(
+    #         vector_store_id=self.vector_store.id,
+    #         files=[file_stream]
+    #     )
+    #     self.filePaths.append(filePath)
+    #     file_stream.close()
 
     def create_update_assistant(self):
         self.update_assistant = client.beta.assistants.create(
@@ -359,11 +380,10 @@ class create_class:
             model="o3-mini",
             tools=[{"type": "file_search"}],
         )
-        if len(self.filePaths) > 0:
-            self.ini_convo_ass = client.beta.assistants.update(
-                assistant_id=self.ini_convo_ass.id,
-                tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
-            )
+        self.update_assistant = client.beta.assistants.update(
+            assistant_id=self.update_assistant.id,
+            tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
+        )
 
     def create_ltg_assistant(self):
         self.ltg_assistant = client.beta.assistants.create(
@@ -371,6 +391,10 @@ class create_class:
             instructions=ltg_inst,
             model="gpt-4.1-mini",
             tools=[{"type": "file_search"}],
+        )
+        self.ltg_assistant = client.beta.assistants.update(
+            assistant_id=self.ltg_assistant.id,
+            tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
         )
 
 
@@ -405,5 +429,3 @@ At the start of every session, you will receive:
 Always reflect a warm, encouraging tone with students, and a collaborative tone with teachers. Ask clarifying questions if anything is unclear.
 
 At the end, you will output a table with the same format you received. """
-
-

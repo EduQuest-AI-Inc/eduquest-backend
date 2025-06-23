@@ -1,35 +1,44 @@
 from data_access.period_dao import PeriodDAO
 from models.period import Period
-from assistants import create_class
+import os
+import assistants
+from openai import OpenAI
 
 class TeacherService:
     def __init__(self):
         self.period_dao = PeriodDAO()
 
-    def create_period(self, period_id, course, teacher_id):
+    def create_period(self, period_id, course, teacher_id, vector_store_id, file_urls):
+        print(f"Creating period with file_urls: {file_urls}")
         existing = self.period_dao.get_period_by_id(period_id)
+        
         if existing:
             raise ValueError("Period ID already exists")
-
-        new_class = create_class(class_name=course, filePaths=["test/test_period_dao.py"])  # update with real files later
-
-        initial_id = "asst_bmsuvfNCaHJYmqTlnT52AzXE"
-        update_id = "asst_oQlKvMpoDPp80zEabjvUiflj"
-        ltg_id = "asst_1NnTwxp3tBgFWPp2sMjHU3Or"
-        vector_id = new_class.vector_store.id
+        
+        #call create_class from assistants.py
+        # new_class = assistants.create_class(course)
+        # vector_store_id = new_class.vector_store.id
+        
+        initial_id = "asst_bmsuvfNCaHJYmqTlnT52AzXE"  # default; we'll keep reusing this
+        update_id = "placeholder_update_assistant_id"  # will be replaced with custom assistant
+        ltg_id = "placeholder_ltg_assistant_id"  # will be replaced with custom assistant
 
         new_period = Period(
             period_id=period_id,
             course=course,
             initial_conversation_assistant_id=initial_id,
             update_assistant_id=update_id,
-            vector_store_id=vector_id,
+            vector_store_id=vector_store_id,
             ltg_assistant_id=ltg_id,
-            teacher_id=teacher_id
+            teacher_id=teacher_id,
+            file_urls=file_urls
         )
+        print(f"Created Period object with file_urls: {new_period.file_urls}")
 
         self.period_dao.add_period(new_period)
-        return new_period.to_item()
+        result = new_period.to_item()
+        print(f"Saved period with file_urls: {result.get('file_urls')}")
+        return result
 
     def get_periods_by_teacher(self, teacher_id):
         periods = self.period_dao.get_periods_by_teacher_id(teacher_id)
@@ -40,5 +49,16 @@ class TeacherService:
             }
             for p in periods
         ]
-
-
+    
+    def get_vector_store_id_for_period(self, period_id):
+        period = self.period_dao.get_period_by_id(period_id)
+        if not period:
+            raise ValueError("Period not found")
+        return period['vector_store_id']
+    
+    def update_period_assistants(self, period_id, update_assistant_id, ltg_assistant_id):
+        updates = {
+            "update_assistant_id": update_assistant_id,
+            "ltg_assistant_id": ltg_assistant_id
+        }
+        self.period_dao.update_period(period_id, updates)
