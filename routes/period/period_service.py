@@ -3,7 +3,9 @@ from data_access.period_dao import PeriodDAO
 from data_access.session_dao import SessionDAO
 from data_access.student_dao import StudentDAO
 from data_access.conversation_dao import ConversationDAO
+from data_access.enrollment_dao import EnrollmentDAO
 from models.conversation import Conversation
+from models.enrollment import Enrollment
 from assistants import ltg
 from datetime import datetime, timezone
 
@@ -14,6 +16,7 @@ class PeriodService:
         self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()
         self.conversation_dao = ConversationDAO()
+        self.enrollment_dao = EnrollmentDAO()
 
     def verify_period_id(self, auth_token: str, period_id: str) -> Any:
         """
@@ -35,14 +38,12 @@ class PeriodService:
         user_id = sessions[0]['user_id']
 
         # Verify period exists
-        period_items = self.period_dao.get_period_by_id(period_id)
-        if not period_items:
+        period = self.period_dao.get_period_by_id(period_id)
+        if not period:
             raise LookupError("Invalid period ID")
         
-        period = period_items[0]
-        
         # Get current student data
-        student = self.student_dao.get_student_by_id(user_id)[0]
+        student = self.student_dao.get_student_by_id(user_id)
         if not student:
             raise Exception("Student not found")
             
@@ -55,6 +56,15 @@ class PeriodService:
             # Update student record with new enrollments
             self.student_dao.update_student(user_id, {'enrollments': current_enrollments})
             print(f"Added period {period_id} to student {user_id}'s enrollments")
+
+            # Create enrollment record
+            enrollment = Enrollment(
+                period_id=period_id,
+                student_id=user_id,
+                semester="2024-spring"  # You might want to make this configurable
+            )
+            self.enrollment_dao.add_enrollment(enrollment)
+            print(f"Created enrollment record for student {user_id} in period {period_id}")
 
         return period
 
@@ -77,19 +87,32 @@ class PeriodService:
         user_id = sessions[0]['user_id']
 
         # Fetch student info
-        student = self.student_dao.get_student_by_id(user_id)[0]
+        student = self.student_dao.get_student_by_id(user_id)
         if not student:
             raise Exception("Student not found")
 
+        # Ensure student data has all required fields
+        student_data = {
+            "first_name": student.get("first_name", ""),
+            "last_name": student.get("last_name", ""),
+            "grade": student.get("grade", ""),
+            "strength": student.get("strength", []),
+            "weakness": student.get("weakness", []),
+            "interest": student.get("interest", []),
+            "learning_style": student.get("learning_style", [])
+        }
+
         # Fetch period info (optional, for validation or context)
-        period_items = self.period_dao.get_period_by_id(period_id)
-        if not period_items:
+        period = self.period_dao.get_period_by_id(period_id)
+        if not period:
             raise LookupError("Invalid period ID")
-        period = period_items[0]
+        
         ltg_assistant_id = period.get("ltg_assistant_id")
+        if not ltg_assistant_id:
+            ltg_assistant_id = 'asst_1NnTwxp3tBgFWPp2sMjHU3Or'  # Default assistant ID
 
         # Start LTG conversation
-        ltg_conversation = ltg(student, assistant_id=ltg_assistant_id)
+        ltg_conversation = ltg(student_data, assistant_id=ltg_assistant_id)
         response = ltg_conversation.initiate()
 
         thread_id = response.get('thread_id')
@@ -133,7 +156,7 @@ class PeriodService:
         print(f"Found conversation: {conversation}")
 
         # Fetch student info
-        student = self.student_dao.get_student_by_id(user_id)[0]
+        student = self.student_dao.get_student_by_id(user_id)
         if not student:
             print("Error: Student not found")
             raise Exception("Student not found")
@@ -147,7 +170,7 @@ class PeriodService:
         if period_id:
             period_items = self.period_dao.get_period_by_id(period_id)
             if period_items:
-                ltg_assistant_id = period_items[0].get('ltg_assistant_id')
+                ltg_assistant_id = period_items.get('ltg_assistant_id')
         if not ltg_assistant_id:
             ltg_assistant_id = 'asst_1NnTwxp3tBgFWPp2sMjHU3Or' # Default assistant ID
         print(f"Using assistant ID: {ltg_assistant_id}")
@@ -164,9 +187,10 @@ class PeriodService:
             # If a goal was chosen, save it to the student's record
             if goal_chosen and reply:
                 # Get the period name from the period record
-                period_items = self.period_dao.get_period_by_id(period_id)
-                if period_items:
-                    period_name = period_items[0].get('name', period_id)
+                period_data = self.period_dao.get_period_by_id(period_id)
+                if period_data:
+                    # Use course name as period name, fallback to period_id
+                    period_name = period_data.get('course', period_id)
                     print(f"\nSaving goal:")
                     print(f"Period: {period_name}")
                     print(f"Goal: {reply}")
