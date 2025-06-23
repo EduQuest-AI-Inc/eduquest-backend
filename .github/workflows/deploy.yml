@@ -21,22 +21,23 @@ jobs:
     - name: Deploy to EC2
       run: |
         ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          cd /home/ubuntu/eduquest-backend
-          echo "Before update:"
-          git status
-          git branch
-          git log -1
+          cd /home/ubuntu
 
-          echo "Updating code..."
-          git fetch origin
-          git reset --hard origin/production
+          if [ ! -d "eduquest-backend/.git" ]; then
+            echo "Repo not found, cloning fresh..."
+            git clone https://github.com/yourusername/yourrepo.git eduquest-backend
+          else
+            echo "Repo found, updating..."
+            cd eduquest-backend
+            git fetch origin
+            git reset --hard origin/production
+          fi
 
-          echo "After update:"
-          git status
-          git log -1
+          cd eduquest-backend
 
           echo "Activating virtualenv..."
-          source venv/bin/activate
+          source venv/bin/activate || echo "Virtualenv not found, please create it manually."
+
           pip install -r requirements.txt
 
           echo "Restarting Flask app..."
