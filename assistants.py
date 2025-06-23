@@ -391,12 +391,36 @@ class create_class:
             instructions=ltg_inst,
             model="gpt-4.1-mini",
             tools=[{"type": "file_search"}],
+            response_format=ltg_response_format
         )
         self.ltg_assistant = client.beta.assistants.update(
             assistant_id=self.ltg_assistant.id,
             tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
         )
 
+
+ltg_response_format = """{
+  "name": "goal_setting",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "message": {
+        "type": "string",
+        "description": "Message from assistant"
+      },
+      "chosen_goal": {
+        "type": "string",
+        "description": "A long-term goal that has been chosen."
+      }
+    },
+    "required": [
+      "message",
+      "chosen_goal"
+    ],
+    "additionalProperties": false
+  }
+}"""
 
 ltg_inst = """You will suggest three long-term goals for a student to work on based on the class they are taking and their strengths, weaknesses, interests, and learning style. This long-term goal should help the student to practice the materials learned in class in the field of their interest in a way that suits their learning style. The student should be able to achieve this long-term goal in 18 weeks while incorporating the things they are learning in the class
 

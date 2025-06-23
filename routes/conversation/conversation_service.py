@@ -22,7 +22,6 @@ def dict_to_temp_file(data: dict, suffix=".json") -> str:
     with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=suffix) as tmp:
         json.dump(data, tmp)
         return tmp.name
-#let's not delete this for now. i need to test some stuff.
 # def generate_mock_quests_file():
 #     mock_quests = [
 #         {
@@ -68,7 +67,7 @@ class ConversationService:
         user_id = sessions[0]['user_id']
 
         # Fetch student info
-        student = self.student_dao.get_student_by_id(user_id)
+        student = self.student_dao.get_student_by_id(user_id)[0]
         if not student:
             raise Exception("Student not found")
 
@@ -77,7 +76,7 @@ class ConversationService:
             initial_conversation = ini_conv(student)
         elif conversation_type == "update":
             initial_conversation = UpdateAssistant(
-                assistant_id=ASSISTANT_ID_INITIAL,
+                assistant_id=ASSISTANT_ID_UPDATE,
                 instructor=True  # or False depending on user role
             )
         else:
@@ -116,7 +115,7 @@ class ConversationService:
             raise Exception("Conversation not found")
 
         # Fetch student info
-        student = self.student_dao.get_student_by_id(user_id)
+        student = self.student_dao.get_student_by_id(user_id)[0]
         if not student:
             raise Exception("Student not found")
 
@@ -125,7 +124,7 @@ class ConversationService:
             conv = ini_conv(student, thread_id)
         elif conversation_type == "update":
             conv = UpdateAssistant(
-                assistant_id=ASSISTANT_ID_INITIAL,
+                assistant_id=ASSISTANT_ID_UPDATE,
                 instructor=True,  # or False depending on who is continuing
                 week=3,
                 thread_id=thread_id
@@ -174,6 +173,7 @@ class ConversationService:
         #         "message": "Schedule generated successfully"
         #     }
 
+
     def start_update_assistant(self, auth_token: str, quests_file: str, is_instructor: bool, week: int = None,
                                submission_file: str = None):
         """
@@ -211,28 +211,25 @@ class ConversationService:
 
         if not user:
             raise Exception(f"{role.capitalize()} not found")
-        
-        period = self.period_dao.get_period_by_id(period_id)
-        if not period:
-            raise Exception("Period not found")
-        update_assistant_id = period.get("update_assistant_id")
-        
-        if not update_assistant_id:
-            raise Exception("No update assistant assigned to this period")
-            
-        student_file = dict_to_temp_file(user)
-        quests = user['quests']['course_name'] 
+
+        user_profile_dict = user[0]
+        student_file = dict_to_temp_file(user_profile_dict)
+        print("DEBUG user_profile_dict:", user_profile_dict)
+
+        student_record = user_profile_dict
+        quests = student_record['quests']['pre_calc']
         quests_file = dict_to_temp_file(quests)
-        
+
+        # Initialize update conversation
         update_conversation = UpdateAssistant(
-            update_assistant_id,
+            ASSISTANT_ID_UPDATE,
             student_file,
             quests_file,
             is_instructor,
             week,
             submission_file
-            )
-        
+        )
+
         raw_response = update_conversation.initiate()
         print("Raw response from update_conversation.initiate():", raw_response)
 
@@ -282,17 +279,12 @@ class ConversationService:
             raise Exception("Conversation not found")
 
         # Fetch student info
-        student = self.student_dao.get_student_by_id(user_id)
+        student = self.student_dao.get_student_by_id(user_id)[0]
         if not student:
             raise Exception("Student not found")
-        
-        update_assistant_id = period.get("update_assistant_id")
-        
-        if not update_assistant_id:
-            raise Exception("No update assistant assigned to this period")
 
         # Continue conversation
-        update_conv = UpdateAssistant(update_assistant_id, student, None, conversation.role == "instructor")
+        update_conv = UpdateAssistant(ASSISTANT_ID_UPDATE, student, None, conversation.role == "instructor")
         update_conv.thread_id = thread_id
 
         try:
