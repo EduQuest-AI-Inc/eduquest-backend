@@ -16,14 +16,13 @@ import asyncio
 from models.period import Period
 from models.rubric import Rubric
 
-class HomeworkSchedule(BaseModel):
+class BaseQuest(BaseModel):
     Name: str = Field(description="Name of the quest")
     Skills: str = Field(description="Skills the student will practice through this quest")
     Week: int = Field(description="Week the student will work on this quest")
     instructions: str = Field(description="Detailed instructions for completing the quest")
     rubric: Rubric = Field(description="Grading criteria and expectations for the quest")
 
-#both of these classes were named IndividualQuest. not sure which one is supposed to be the HomeworkSchedule. 
 class IndividualQuest(BaseModel):
     Name: str = Field(description="Name of the quest")
     Skills: str = Field(description="Skills the student will practice through this quest")
@@ -205,12 +204,12 @@ For each quest in the schedule, I need detailed instructions and a grading rubri
                     vector_store_ids=[self.vector_store]
                 )
             ],
-            output_type = HomeworkSchedule,
+            output_type = BaseQuest,
             handoffs = [self.rubric_agent, self.instruction_agent]
         )
 
     @output_guardrail()
-    async def guardrail(self, ctx: RunContextWrapper, agent: Agent, output: HomeworkSchedule) -> GuardrailFunctionOutput:
+    async def guardrail(self, ctx: RunContextWrapper, agent: Agent, output: BaseQuest) -> GuardrailFunctionOutput:
         """
         Guardrail function to ensure homework assignments align with course materials and student needs.
         Checks if each assignment's instructions and rubric match the quest requirements.
@@ -236,7 +235,7 @@ For each quest in the schedule, I need detailed instructions and a grading rubri
             )
             
             # Check if the new homework is valid
-            if isinstance(new_homework.output, HomeworkSchedule):
+            if isinstance(new_homework.output, BaseQuest):
                 return GuardrailFunctionOutput(output=new_homework.output)
             
             # If regeneration failed, trigger the tripwire
@@ -251,7 +250,7 @@ For each quest in the schedule, I need detailed instructions and a grading rubri
                 original_output=output
             )
 
-    async def _run_async(self) -> HomeworkSchedule:
+    async def _run_async(self) -> BaseQuest:
         """
         Internal async method to run the HWAgent with guardrail validation.
         Returns the generated homework schedule with instructions and rubrics.
@@ -264,7 +263,7 @@ For each quest in the schedule, I need detailed instructions and a grading rubri
                 )
         return result.final_output
 
-    def run(self) -> HomeworkSchedule:
+    def run(self) -> BaseQuest:
         """
         Run the HWAgent to generate homework assignments with guardrail validation.
         Handles async execution internally and returns the final homework schedule.
