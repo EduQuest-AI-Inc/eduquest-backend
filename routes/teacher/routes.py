@@ -17,28 +17,26 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 @jwt_required()
 def create_period():
     try:
-        period_id = request.form.get("period_id")
         course = request.form.get("course")
         files = request.files.getlist("files")
         
-        if not period_id or not course:
-            return jsonify({"error": "Missing required fields"}), 400
+        if not course:
+            return jsonify({"error": "Course name is required"}), 400
 
         teacher_id = get_jwt_identity()
 
         temp_dir = tempfile.mkdtemp()
         file_paths = []
-        s3_keys = []
+        s3_urls = []
 
         for file in files:
             file_path = os.path.join(temp_dir, file.filename)
             file.save(file_path)
             file_paths.append(file_path)
-            
-            file.seek(0) #reset the file pointer to the beginning
-            s3_key = upload_to_s3(file, folder=f"periods/{period_id}")
-            print("Uploaded to S3:", s3_key)
-            s3_keys.append(s3_key) #this is the key that we'll use to serve the file
+
+            s3_url = upload_to_s3(file, folder=f"periods/{course}")  # Use course name for folder
+            print("Uploaded to S3:", s3_url) #uploading to s3 as well.
+            s3_urls.append(s3_url)
 
         print("Received files:", file_paths)
 
@@ -63,16 +61,14 @@ def create_period():
         print("Created update assistant:", update_assistant_id)
         print("Created LTG assistant:", ltg_assistant_id)
 
-
         period = teacher_service.create_period(
-            period_id=period_id,
             course=course,
             teacher_id=teacher_id,
             vector_store_id=vector_store.id,
-            file_urls=[url for url in s3_keys if url is not None]
+            file_urls=[url for url in s3_urls if url is not None]
         )
         
-        teacher_service.update_period_assistants(period_id, update_assistant_id, ltg_assistant_id)
+        teacher_service.update_period_assistants(period['period_id'], update_assistant_id, ltg_assistant_id)
         
         # cleanup
         for f in file_streams:
