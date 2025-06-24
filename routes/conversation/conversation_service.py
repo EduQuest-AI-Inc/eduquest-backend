@@ -11,7 +11,6 @@ from models.conversation import Conversation
 from datetime import datetime, timezone
 from assistants import ini_conv
 from assistants import update as UpdateAssistant
-# from EQ_agents.agent import SchedulesAgent
 
 #creating a temp file
 
@@ -151,28 +150,6 @@ class ConversationService:
         except Exception as e:
             print(f"Error in continue_profile_assistant: {str(e)}")
             raise Exception(f"Failed to continue conversation: {str(e)}")
-        
-        # def start_schedules_agent(self, auth_token: str, period_id: str):
-        #     sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        #     if not sessions:
-        #         raise Exception("Invalid auth token")
-        #     user_id = sessions[0]['user_id']
-
-        #     student = self.student_dao.get_student_by_id(user_id)
-        #     if not student:
-        #         raise Exception("Student not found")
-            
-        #     period = self.period_dao.get_period_by_id(period_id)
-        #     if not period:
-        #         raise Exception("Period not found")
-
-        #     schedules_agent = SchedulesAgent(student, period)
-        #     schedule = schedules_agent.run()
-            
-        #     return {
-        #         "schedule": schedule.model_dump(),
-        #         "message": "Schedule generated successfully"
-        #     }
 
     def start_update_assistant(self, auth_token: str, quests_file: str, is_instructor: bool, week: int = None,
                                submission_file: str = None):
