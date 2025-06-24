@@ -4,7 +4,7 @@ import time
 import os
 import json
 from dotenv import load_dotenv
-import json
+from openai.types.shared_params.response_format_json_schema import ResponseFormatJSONSchema
 
 load_dotenv()
 
@@ -494,3 +494,5 @@ At the start of every session, you will receive:
 Always reflect a warm, encouraging tone with students, and a collaborative tone with teachers. Ask clarifying questions if anything is unclear.
 
 At the end, you will output a table with the same format you received. """
+
+
