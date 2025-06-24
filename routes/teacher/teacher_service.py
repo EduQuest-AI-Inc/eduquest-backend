@@ -3,21 +3,46 @@ from models.period import Period
 import os
 import assistants
 from openai import OpenAI
+import uuid
+import re
 
 class TeacherService:
     def __init__(self):
         self.period_dao = PeriodDAO()
 
-    def create_period(self, period_id, course, teacher_id, vector_store_id, file_urls):
-        print(f"Creating period with file_urls: {file_urls}")
+    def generate_period_id(self, course_name: str) -> str:
+        """
+        Generate a unique period ID based on course name and random string.
+        Format: COURSE-XXXX-XXXX (e.g., MATH101-A1B2-C3D4)
+        """
+        # Clean course name: remove spaces, special chars, convert to uppercase
+        clean_course = re.sub(r'[^a-zA-Z0-9]', '', course_name).upper()
+        if len(clean_course) > 8:
+            clean_course = clean_course[:8]
+        
+        # Generate random 4-character strings
+        random_part1 = str(uuid.uuid4())[:4].upper()
+        random_part2 = str(uuid.uuid4())[:4].upper()
+        
+        period_id = f"{clean_course}-{random_part1}-{random_part2}"
+        return period_id
+
+    def create_period(self, course, teacher_id, vector_store_id, file_urls):
+        # Generate unique period ID
+        period_id = self.generate_period_id(course)
+        
+        # Check if period ID already exists (very unlikely but good practice)
         existing = self.period_dao.get_period_by_id(period_id)
+        attempts = 0
+        while existing and attempts < 5:
+            period_id = self.generate_period_id(course)
+            existing = self.period_dao.get_period_by_id(period_id)
+            attempts += 1
         
         if existing:
-            raise ValueError("Period ID already exists")
+            raise ValueError("Unable to generate unique period ID")
         
-        #call create_class from assistants.py
-        # new_class = assistants.create_class(course)
-        # vector_store_id = new_class.vector_store.id
+        print(f"Creating period with ID: {period_id}")
         
         initial_id = "asst_bmsuvfNCaHJYmqTlnT52AzXE"  # default; we'll keep reusing this
         update_id = "placeholder_update_assistant_id"  # will be replaced with custom assistant
