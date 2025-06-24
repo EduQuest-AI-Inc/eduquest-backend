@@ -20,26 +20,25 @@ class BaseQuest(BaseModel):
     Name: str = Field(description="Name of the quest")
     Skills: str = Field(description="Skills the student will practice through this quest")
     Week: int = Field(description="Week the student will work on this quest")
-
+    instructions: str = Field(description="Detailed instructions for completing the quest")
+    rubric: Rubric = Field(description="Grading criteria and expectations for the quest")
 
 class IndividualQuest(BaseModel):
     Name: str = Field(description="Name of the quest")
     Skills: str = Field(description="Skills the student will practice through this quest")
     Week: int = Field(description="Week the student will work on this quest")
-    instructions: str = Field(description="Detailed instructions for completing the quest")
-    rubric: Rubric = Field(description="Grading criteria and expectations for the quest")
 
 class schedule(BaseModel):
     list_of_quests: list[BaseQuest] = Field(description="List of quests for the student")
-
-
 
 class SchedulesAgent:
     def __init__(self, student, period):
         self.student = student
         self.period = period
-        self.vector_store = period.vector_store_id
-        self.input = f"""I'm {self.student.first_name} {self.student.last_name}. My strengths are {self.student.strength}, my weaknesses are {self.student.weakness}, my interests are {self.student.interest}, and my learning style is {self.student.learning_style}. My long-term goal is {self.student.long_term_goal}. I am in grade {self.student.grade}."""
+        self.vector_store = period["vector_store_id"] #this was period.vector_store_id, changed because route expects a dict
+        # self.input = f"""I'm {self.student.first_name} {self.student.last_name}. My strengths are {self.student.strength}, my weaknesses are {self.student.weakness}, my interests are {self.student.interest}, and my learning style is {self.student.learning_style}. My long-term goal is {self.student.long_term_goal}. I am in grade {self.student.grade}."""
+        self.input = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}."""
+
 
         self.schedules_agent = Agent(
             name="Schedules Agent",
