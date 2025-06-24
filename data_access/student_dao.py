@@ -5,6 +5,9 @@ from boto3.dynamodb.conditions import Key
 from typing import Any, Optional
 from datetime import datetime, timezone
 from models.student import Student
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class StudentDAO(BaseDAO):
     def __init__(self):
@@ -54,10 +57,10 @@ class StudentDAO(BaseDAO):
             print(f"Error: Student with ID {student_id} not found")
             raise ValueError(f"Student with ID {student_id} not found")
             
-        print(f"Current student data: {student_data[0]}")
+        print(f"Current student data: {student_data}")
         
         # Get current long_term_goal or initialize empty dict
-        current_goals = student_data[0].get('long_term_goal', {})
+        current_goals = student_data.get('long_term_goal', {})
         # If current_goals is a list, convert it to a dict
         if isinstance(current_goals, list):
             current_goals = {}

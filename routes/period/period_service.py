@@ -8,6 +8,7 @@ from models.conversation import Conversation
 from models.enrollment import Enrollment
 from assistants import ltg
 from datetime import datetime, timezone
+from EQ_agents.agent import SchedulesAgent
 
 class PeriodService:
 
@@ -187,9 +188,10 @@ class PeriodService:
             # If a goal was chosen, save it to the student's record
             if goal_chosen and reply:
                 # Get the period name from the period record
-                period_items = self.period_dao.get_period_by_id(period_id)
-                if period_items:
-                    period_name = period_items[0].get('name', period_id)
+                period_data = self.period_dao.get_period_by_id(period_id)
+                if period_data:
+                    # Use course name as period name, fallback to period_id
+                    period_name = period_data.get('course', period_id)
                     print(f"\nSaving goal:")
                     print(f"Period: {period_name}")
                     print(f"Goal: {reply}")
@@ -208,3 +210,25 @@ class PeriodService:
         except Exception as e:
             print(f"\nError in continue_ltg_conversation: {str(e)}")
             return {"error": str(e)}
+        
+    def start_schedules_agent(self, auth_token: str, period_id: str):
+            sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
+            if not sessions:
+                raise Exception("Invalid auth token")
+            user_id = sessions[0]['user_id']
+
+            student = self.student_dao.get_student_by_id(user_id)
+            if not student:
+                raise Exception("Student not found")
+            
+            period = self.period_dao.get_period_by_id(period_id)
+            if not period:
+                raise Exception("Period not found")
+
+            schedules_agent = SchedulesAgent(student, period)
+            schedule = schedules_agent.run()
+            
+            return {
+                "schedule": schedule.model_dump(), #converts to dict because agent is returning a pydantic model object
+                "message": "Schedule generated successfully"
+        }

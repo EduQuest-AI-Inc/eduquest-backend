@@ -3,6 +3,9 @@ from models.teacher import Teacher
 from data_access.config import DynamoDBConfig
 from boto3.dynamodb.conditions import Key
 from typing import Dict, Any, List
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class TeacherDAO(BaseDAO):
     def __init__(self):

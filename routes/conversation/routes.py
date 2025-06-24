@@ -4,6 +4,7 @@ from flask_cors import CORS
 import json
 import time
 from assistants import ini_conv, summarize_conversation
+# from EQ_agents.agent import SchedulesAgent
 from models.student_profile import student_profile
 from openai import OpenAI
 import os
@@ -70,13 +71,12 @@ def continue_profile_assistant():
         result = conversation_service.continue_profile_assistant(auth_token, conversation_type, thread_id, user_message)
         return result, 200
     except Exception as e:
-        print(f"Error in continue-profile-assistant: {str(e)}")  # Debug log
+        print(f"Error in continue-profile-assistant: {str(e)}")  
         import traceback
-        print(f"Traceback: {traceback.format_exc()}")  # Debug log
+        print(f"Traceback: {traceback.format_exc()}")  
         return jsonify({"error": str(e)}), 500
 
 
-# Routes for update assistant
 @conversation_bp.route('/initiate-update-assistant', methods=['POST'])
 def initiate_update():
     try:
@@ -150,5 +150,3 @@ def continue_update():
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
