@@ -17,7 +17,6 @@ from models.period import Period
 from models.rubric import Rubric
 
 class BaseQuest(BaseModel):
-class BaseQuest(BaseModel):
     Name: str = Field(description="Name of the quest")
     Skills: str = Field(description="Skills the student will practice through this quest")
     Week: int = Field(description="Week the student will work on this quest")
