@@ -17,6 +17,7 @@ from models.period import Period
 from models.rubric import Rubric
 
 class BaseQuest(BaseModel):
+class BaseQuest(BaseModel):
     Name: str = Field(description="Name of the quest")
     Skills: str = Field(description="Skills the student will practice through this quest")
     Week: int = Field(description="Week the student will work on this quest")
@@ -29,7 +30,7 @@ class IndividualQuest(BaseModel):
     Week: int = Field(description="Week the student will work on this quest")
 
 class schedule(BaseModel):
-    list_of_quests: list[IndividualQuest] = Field(description="List of quests for the student")
+    list_of_quests: list[BaseQuest] = Field(description="List of quests for the student")
 
 class SchedulesAgent:
     def __init__(self, student, period):
@@ -276,3 +277,7 @@ For each quest in the schedule, I need detailed instructions and a grading rubri
 #     schedule = SchedulesAgent(student, period).run()
 #     homework = HWAgent(student, period, schedule).run()
 #     return homework
+
+"""
+1. call schedules agent -> get 
+"""

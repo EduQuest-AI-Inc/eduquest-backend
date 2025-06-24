@@ -4,6 +4,9 @@ from data_access.config import DynamoDBConfig
 from boto3.dynamodb.conditions import Key
 from boto3.dynamodb.conditions import Attr
 from typing import Dict, Any
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class PeriodDAO(BaseDAO):
     def __init__(self):

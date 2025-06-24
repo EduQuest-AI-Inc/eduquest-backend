@@ -4,6 +4,9 @@ from data_access.config import DynamoDBConfig
 from boto3.dynamodb.conditions import Key
 from typing import List, Dict, Any
 from datetime import datetime, timezone
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class ConversationDAO(BaseDAO):
     def __init__(self):

@@ -3,6 +3,9 @@ from models.school import School
 from data_access.config import DynamoDBConfig
 from boto3.dynamodb.conditions import Key
 from typing import Dict, Any
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class SchoolDAO(BaseDAO):
     def __init__(self):

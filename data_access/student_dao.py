@@ -5,6 +5,9 @@ from boto3.dynamodb.conditions import Key
 from typing import Any, Optional
 from datetime import datetime, timezone
 from models.student import Student
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class StudentDAO(BaseDAO):
     def __init__(self):
