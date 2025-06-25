@@ -74,7 +74,7 @@ def continue_ltg_conversation():
         if not thread_id:
             return jsonify({"error": "thread_id is required"}), 400
         if not user_message:
-            return jsonify({"error": "user_message is required"}), 400
+            return jsonify({"error": "message is required"}), 400
 
         result = period_service.continue_ltg_conversation(auth_token, conversation_type, thread_id, user_message)
         return jsonify(result), 200

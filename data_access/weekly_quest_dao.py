@@ -2,7 +2,7 @@ from data_access.base_dao import BaseDAO
 from models.weekly_quest import WeeklyQuest
 from data_access.config import DynamoDBConfig
 from boto3.dynamodb.conditions import Key
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
@@ -16,13 +16,16 @@ class WeeklyQuestDAO(BaseDAO):
     def add_weekly_quest(self, quest: WeeklyQuest) -> None:
         self.table.put_item(Item=quest.to_item())
 
-    def get_weekly_quest_by_id(self, weekly_quest_id: str) -> Dict[str, Any]:
+    def get_weekly_quest_by_id(self, quest_id: str) -> WeeklyQuest:
         response = self.table.query(
-            KeyConditionExpression=Key("weekly_quest_id").eq(weekly_quest_id)
+            KeyConditionExpression=Key("quest_id").eq(quest_id)
         )
-        return response["Items"]
+        items = response.get("Items", [])
+        if items:
+            return WeeklyQuest.from_item(items[0])
+        return None
 
-    def update_weekly_quest(self, weekly_quest_id: str, updates: Dict[str, Any]) -> None:
+    def update_weekly_quest(self, quest_id: str, updates: Dict[str, Any]) -> None:
         update_expr_parts = []
         expr_attr_vals = {}
         expr_attr_names = {}
@@ -42,7 +45,7 @@ class WeeklyQuestDAO(BaseDAO):
         update_expr = "SET " + ", ".join(update_expr_parts)
 
         kwargs = {
-            "Key": {"weekly_quest_id": weekly_quest_id},
+            "Key": {"quest_id": quest_id},
             "UpdateExpression": update_expr,
             "ExpressionAttributeValues": expr_attr_vals
         }
@@ -52,6 +55,43 @@ class WeeklyQuestDAO(BaseDAO):
 
         self.table.update_item(**kwargs)
 
+    def update_individual_quest_in_weekly_quest(self, quest_id: str, individual_quest_id: str, updates: Dict[str, Any]) -> None:
+        """Update a specific individual quest within a weekly quest list."""
+        # First get the current weekly quest
+        weekly_quest = self.get_weekly_quest_by_id(quest_id)
+        if not weekly_quest:
+            raise ValueError(f"Weekly quest with id {quest_id} not found")
+        
+        # Find and update the specific individual quest
+        quest_updated = False
+        for quest in weekly_quest.quests:
+            if quest.individual_quest_id == individual_quest_id:
+                for key, value in updates.items():
+                    setattr(quest, key, value)
+                quest.last_updated_at = datetime.now(timezone.utc).isoformat()
+                quest_updated = True
+                break
+        
+        if not quest_updated:
+            raise ValueError(f"Individual quest with id {individual_quest_id} not found in weekly quest {quest_id}")
+        
+        # Save the updated weekly quest
+        self.add_weekly_quest(weekly_quest)
 
-    def delete_weekly_quest(self, weekly_quest_id: str, created_at: str) -> None:
-        self.table.delete_item(Key={"weekly_quest_id": weekly_quest_id, "created_at": created_at})
+    def delete_weekly_quest(self, quest_id: str) -> None:
+        self.table.delete_item(Key={"quest_id": quest_id})
+
+    def get_quests_by_student_and_period(self, student_id: str, period_id: str) -> List[WeeklyQuest]:
+        """Get all weekly quests for a student in a specific period."""
+        response = self.table.scan(
+            FilterExpression=Key("student_id").eq(student_id) & Key("period_id").eq(period_id)
+        )
+        items = response.get("Items", [])
+        return [WeeklyQuest.from_item(item) for item in items]
+
+    def get_weekly_quest_by_student_and_period(self, student_id: str, period_id: str) -> WeeklyQuest:
+        """Get the weekly quest for a student in a specific period (should be only one)."""
+        weekly_quests = self.get_quests_by_student_and_period(student_id, period_id)
+        if weekly_quests:
+            return weekly_quests[0]  # Return the first (and should be only) weekly quest
+        return None

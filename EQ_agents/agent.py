@@ -120,14 +120,23 @@ class HWAgent:
         self.vector_store = period["vector_store_id"]
         self.schedule = schedule
 
+        # Convert schedule to JSON string for inclusion in the input
+        schedule_json = json.dumps(schedule, indent=2)
+
         self.input = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}.
 
-The following is a course schedule consisting of 18 quests. For each quest, please generate:
+The following is a course schedule consisting of 18 quests:
+
+{schedule_json}
+
+For each of the 18 quests in the schedule above, please generate:
 1. A **string** for the 'Skills' field (not a list) that summarizes the key skills practiced, separated by commas
 2. A **detailed 'instructions'** field in paragraph form
 3. A **'rubric'** object that includes:
    - A 'Grade_Scale' field (e.g., 'A to F based on rubric')
    - A 'Criteria' dictionary with at least 4 keys: 'Criterion A', 'Criterion B', etc.
+
+IMPORTANT: You must generate detailed homework for ALL 18 quests in the schedule. Do not skip any quests.
 
 Your response must follow this format exactly:
 
@@ -198,7 +207,15 @@ Only return valid **JSON**, no markdown, no commentary, and no code blocks.
         self.homework_agent = Agent(
             name="Homework Agent",
             instructions="""
-            You will generate a detailed homework assignment including a rubric and detailed instructions for a student. 
+            You will generate detailed homework assignments including rubrics and detailed instructions for a student.
+            
+            CRITICAL: You must generate detailed homework for ALL 18 quests in the schedule provided. Do not skip any quests.
+            
+            For each quest in the schedule, you must create:
+            - A detailed name that reflects the quest content
+            - A comprehensive skills list as a comma-separated string
+            - Detailed step-by-step instructions
+            - A complete rubric with grade scale and 4 criteria
             
             You must return a valid JSON object with the following structure:
             {
@@ -221,6 +238,7 @@ Only return valid **JSON**, no markdown, no commentary, and no code blocks.
                 ]
             }
             
+            IMPORTANT: Ensure you generate exactly 18 quests, one for each week in the schedule.
             Make sure to return only valid JSON, no markdown formatting or code blocks.
             """,
             model="gpt-4.1-mini",
@@ -277,9 +295,7 @@ Only return valid **JSON**, no markdown, no commentary, and no code blocks.
                 print(f"Result.final_output type: {type(result.final_output)}")
                 print(f"Result.final_output: {result.final_output}")
 
-        # Handle the response manually
         if isinstance(result.final_output, dict):
-            # Process the quests to ensure Skills is a string
             for quest in result.final_output.get("list_of_quests", []):
                 if isinstance(quest.get("Skills"), list):
                     quest["Skills"] = ", ".join(quest["Skills"])

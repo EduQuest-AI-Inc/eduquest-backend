@@ -66,7 +66,7 @@ class ConversationService:
         user_id = sessions[0]['user_id']
 
         # Fetch student info
-        student = self.student_dao.get_student_by_id(user_id)[0]
+        student = self.student_dao.get_student_by_id(user_id)
         if not student:
             raise Exception("Student not found")
 
@@ -114,7 +114,7 @@ class ConversationService:
             raise Exception("Conversation not found")
 
         # Fetch student info
-        student = self.student_dao.get_student_by_id(user_id)[0]
+        student = self.student_dao.get_student_by_id(user_id)
         if not student:
             raise Exception("Student not found")
 
