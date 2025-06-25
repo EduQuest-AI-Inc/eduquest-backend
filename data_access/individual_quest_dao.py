@@ -1,7 +1,7 @@
 from data_access.base_dao import BaseDAO
 from models.individual_quest import IndividualQuest
 from data_access.config import DynamoDBConfig
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Key, Attr
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 from dotenv import load_dotenv
@@ -17,10 +17,10 @@ class IndividualQuestDAO(BaseDAO):
         """Add a new individual quest to the database."""
         self.table.put_item(Item=quest.to_item())
 
-    def get_individual_quest_by_id(self, quest_id: str) -> Optional[Dict[str, Any]]:
-        """Get an individual quest by its ID."""
+    def get_individual_quest_by_id(self, individual_quest_id: str) -> Optional[Dict[str, Any]]:
+        """Get an individual quest by its individual_quest_id."""
         response = self.table.query(
-            KeyConditionExpression=Key("quest_id").eq(quest_id)
+            KeyConditionExpression=Key("individual_quest_id").eq(individual_quest_id)
         )
         items = response.get("Items", [])
         return items[0] if items else None
@@ -39,14 +39,18 @@ class IndividualQuestDAO(BaseDAO):
         )
         return response.get("Items", [])
 
-    def update_individual_quest(self, quest_id: str, updates: Dict[str, Any]) -> None:
+    def update_individual_quest(self, individual_quest_id: str, updates: Dict[str, Any]) -> None:
         """Update an individual quest with new data."""
+        # Add automatic last_updated_at timestamp
+        now = datetime.now(timezone.utc).isoformat()
+        updates["last_updated_at"] = now
+        
         update_expr = "SET " + ", ".join(f"#{k} = :{k}" for k in updates)
         expr_attr_vals = {f":{k}": v for k, v in updates.items()}
         expr_attr_names = {f"#{k}": k for k in updates}
         
         self.table.update_item(
-            Key={"quest_id": quest_id},
+            Key={"individual_quest_id": individual_quest_id},
             UpdateExpression=update_expr,
             ExpressionAttributeValues=expr_attr_vals,
             ExpressionAttributeNames=expr_attr_names
@@ -54,44 +58,37 @@ class IndividualQuestDAO(BaseDAO):
 
     def update_individual_quest_by_individual_id(self, individual_quest_id: str, updates: Dict[str, Any]) -> None:
         """Update an individual quest by its individual_quest_id."""
-        # First find the quest by individual_quest_id
-        response = self.table.scan(
-            FilterExpression=Key("individual_quest_id").eq(individual_quest_id)
-        )
-        items = response.get("Items", [])
-        if not items:
-            raise ValueError(f"Individual quest with id {individual_quest_id} not found")
+        # Add automatic last_updated_at timestamp
+        now = datetime.now(timezone.utc).isoformat()
+        updates["last_updated_at"] = now
         
-        quest_item = items[0]
-        quest_id = quest_item["quest_id"]
-        
-        # Now update using the quest_id
         update_expr = "SET " + ", ".join(f"#{k} = :{k}" for k in updates)
         expr_attr_vals = {f":{k}": v for k, v in updates.items()}
         expr_attr_names = {f"#{k}": k for k in updates}
         
+        # Use individual_quest_id as the primary key
         self.table.update_item(
-            Key={"quest_id": quest_id},
+            Key={"individual_quest_id": individual_quest_id},
             UpdateExpression=update_expr,
             ExpressionAttributeValues=expr_attr_vals,
             ExpressionAttributeNames=expr_attr_names
         )
 
-    def update_quest_grade_and_feedback(self, quest_id: str, grade: str, feedback: str) -> None:
+    def update_quest_grade_and_feedback(self, individual_quest_id: str, grade: str, feedback: str) -> None:
         """Update the grade and feedback for a quest."""
-        self.update_individual_quest(quest_id, {
+        self.update_individual_quest(individual_quest_id, {
             "grade": grade,
             "feedback": feedback,
             "status": "completed"
         })
 
-    def update_quest_status(self, quest_id: str, status: str) -> None:
+    def update_quest_status(self, individual_quest_id: str, status: str) -> None:
         """Update the status of a quest."""
-        self.update_individual_quest(quest_id, {"status": status})
+        self.update_individual_quest(individual_quest_id, {"status": status})
 
-    def delete_individual_quest(self, quest_id: str) -> None:
+    def delete_individual_quest(self, individual_quest_id: str) -> None:
         """Delete an individual quest from the database."""
-        self.table.delete_item(Key={"quest_id": quest_id})
+        self.table.delete_item(Key={"individual_quest_id": individual_quest_id})
 
     def get_all_quests(self) -> List[Dict[str, Any]]:
         """Get all individual quests from the database."""
@@ -121,7 +118,7 @@ class IndividualQuestDAO(BaseDAO):
 
     def get_quests_by_quest_id(self, quest_id: str) -> List[Dict[str, Any]]:
         """Get all individual quests that share the same quest_id (should be 18 quests)."""
-        response = self.table.query(
-            KeyConditionExpression=Key("quest_id").eq(quest_id)
+        response = self.table.scan(
+            FilterExpression=Attr("quest_id").eq(quest_id)
         )
         return response.get("Items", [])
