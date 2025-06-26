@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 
 class WeeklyQuestItem(BaseModel):
-    individual_quest_id: str  # Individual quest ID within the weekly quest list
+    individual_quest_id: str 
     name: str
     skills: str
     week: int

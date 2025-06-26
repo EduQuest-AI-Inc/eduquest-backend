@@ -41,7 +41,11 @@ def get_individual_quests():
             return jsonify({"error": "Invalid auth token"}), 401
         user_id = sessions[0]['user_id']
 
-        quests = quest_service.get_individual_quests_for_student(user_id)
+        period_id = request.args.get('period_id')
+        if period_id:
+            quests = quest_service.get_individual_quests_for_student_and_period(user_id, period_id)
+        else:
+            quests = quest_service.get_individual_quests_for_student(user_id)
         return jsonify(quests), 200
     except Exception as e:
         print(f"Error getting individual quests: {str(e)}")

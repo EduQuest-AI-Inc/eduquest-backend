@@ -58,7 +58,6 @@ class IndividualQuestDAO(BaseDAO):
 
     def update_individual_quest_by_individual_id(self, individual_quest_id: str, updates: Dict[str, Any]) -> None:
         """Update an individual quest by its individual_quest_id."""
-        # Add automatic last_updated_at timestamp
         now = datetime.now(timezone.utc).isoformat()
         updates["last_updated_at"] = now
         
@@ -66,7 +65,6 @@ class IndividualQuestDAO(BaseDAO):
         expr_attr_vals = {f":{k}": v for k, v in updates.items()}
         expr_attr_names = {f"#{k}": k for k in updates}
         
-        # Use individual_quest_id as the primary key
         self.table.update_item(
             Key={"individual_quest_id": individual_quest_id},
             UpdateExpression=update_expr,
@@ -120,5 +118,11 @@ class IndividualQuestDAO(BaseDAO):
         """Get all individual quests that share the same quest_id (should be 18 quests)."""
         response = self.table.scan(
             FilterExpression=Attr("quest_id").eq(quest_id)
+        )
+        return response.get("Items", [])
+
+    def get_quests_by_student_and_period(self, student_id: str, period_id: str) -> List[Dict[str, Any]]:
+        response = self.table.scan(
+            FilterExpression=Attr("student_id").eq(student_id) & Attr("period_id").eq(period_id)
         )
         return response.get("Items", [])

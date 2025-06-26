@@ -120,7 +120,6 @@ class HWAgent:
         self.vector_store = period["vector_store_id"]
         self.schedule = schedule
 
-        # Convert schedule to JSON string for inclusion in the input
         schedule_json = json.dumps(schedule, indent=2)
 
         self.input = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}.

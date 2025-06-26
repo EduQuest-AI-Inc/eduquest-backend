@@ -194,18 +194,16 @@ class ConversationService:
         user_profile_dict = user  # user is already a dictionary, not a list
         print("DEBUG user_profile_dict:", user_profile_dict)
 
-        # Handle quests data - if it's a JSON string, parse it; otherwise treat as file path
         quests_data = None
         try:
-            # Try to parse as JSON first (new approach)
+            # parsing it as a json first
             quests_data = json.loads(quests_file)
             print("DEBUG: Using quest data from JSON string")
         except (json.JSONDecodeError, TypeError) as e:
-            # Fall back to treating as file path (old approach)
+            # treating it as a file path if that fails
             print(f"DEBUG: JSON parsing failed: {e}")
             print("DEBUG: Using quest data from file path")
             if is_instructor and student_id:
-                # For teachers viewing student data, fetch actual student quests
                 try:
                     from routes.quest.quest_service import QuestService
                     quest_service = QuestService()
@@ -215,9 +213,7 @@ class ConversationService:
                     print(f"DEBUG: Error fetching student quests: {quest_error}")
                     raise Exception(f"Failed to fetch student quests: {quest_error}")
             else:
-                # Use the provided quests_file as is
                 print("DEBUG: Using provided quests_file as is")
-                # Load quests from file path
                 try:
                     with open(quests_file, 'r') as f:
                         quests_data = json.load(f)
@@ -225,11 +221,10 @@ class ConversationService:
                     print(f"DEBUG: Error loading quests from file: {file_error}")
                     raise Exception(f"Failed to load quests from file: {file_error}")
 
-        # Initialize update conversation
         update_conversation = UpdateAssistant(
             ASSISTANT_ID_UPDATE,
-            user_profile_dict,  # Pass student data directly
-            quests_data,        # Pass quests data directly
+            user_profile_dict,  
+            quests_data,        
             is_instructor,
             week,
             submission_file
@@ -241,11 +236,9 @@ class ConversationService:
         if not raw_response:
             raise Exception("Failed to initiate update conversation")
 
-        # The update assistant returns a plain string, not JSON
-        # So we don't need to parse it as JSON
-        response_text = raw_response
+        # update assistant returns a plain string       response_text = raw_response
 
-        # Save conversation to DB
+        # saving conversation to DB
         conversation = Conversation(
             thread_id=update_conversation.thread_id,
             user_id=user_id,
@@ -256,7 +249,7 @@ class ConversationService:
 
         return {
             "thread_id": update_conversation.thread_id,
-            "response": response_text
+            "response": raw_response
         }
 
     def continue_update_assistant(self, auth_token: str, thread_id: str, message: str):

@@ -3,8 +3,8 @@ from typing import List, Optional, Literal, Dict, Any
 from datetime import datetime, timezone
 
 class IndividualQuest(BaseModel):
-    individual_quest_id: str  # Individual quest ID - matches database expectation
-    quest_id: str  # Partition Key
+    individual_quest_id: str  
+    quest_id: str  
     student_id: str
     period_id: str
     description: str

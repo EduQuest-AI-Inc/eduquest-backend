@@ -30,7 +30,6 @@ class WeeklyQuestDAO(BaseDAO):
         expr_attr_vals = {}
         expr_attr_names = {}
 
-        # Add automatic last_updated_at timestamp
         now = datetime.now(timezone.utc).isoformat()
         updates["last_updated_at"] = now
 
@@ -57,12 +56,10 @@ class WeeklyQuestDAO(BaseDAO):
 
     def update_individual_quest_in_weekly_quest(self, quest_id: str, individual_quest_id: str, updates: Dict[str, Any]) -> None:
         """Update a specific individual quest within a weekly quest list."""
-        # First get the current weekly quest
         weekly_quest = self.get_weekly_quest_by_id(quest_id)
         if not weekly_quest:
             raise ValueError(f"Weekly quest with id {quest_id} not found")
         
-        # Find and update the specific individual quest
         quest_updated = False
         for quest in weekly_quest.quests:
             if quest.individual_quest_id == individual_quest_id:
@@ -75,7 +72,6 @@ class WeeklyQuestDAO(BaseDAO):
         if not quest_updated:
             raise ValueError(f"Individual quest with id {individual_quest_id} not found in weekly quest {quest_id}")
         
-        # Save the updated weekly quest
         self.add_weekly_quest(weekly_quest)
 
     def delete_weekly_quest(self, quest_id: str) -> None:
@@ -93,5 +89,5 @@ class WeeklyQuestDAO(BaseDAO):
         """Get the weekly quest for a student in a specific period (should be only one)."""
         weekly_quests = self.get_quests_by_student_and_period(student_id, period_id)
         if weekly_quests:
-            return weekly_quests[0]  # Return the first (and should be only) weekly quest
+            return weekly_quests[0]  
         return None

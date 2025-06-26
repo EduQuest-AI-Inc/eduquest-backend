@@ -143,7 +143,6 @@ def add_files_to_period():
 
         teacher_id = get_jwt_identity()
 
-        # Get the existing period to get the course name
         period = teacher_service.get_period_by_id(period_id)
         if not period:
             return jsonify({"error": "Period not found"}), 404
@@ -168,15 +167,12 @@ def add_files_to_period():
         print(f"DEBUG: All S3 URLs: {s3_urls}")
         print(f"DEBUG: Filtered S3 URLs: {[url for url in s3_urls if url is not None]}")
 
-        # Get existing file URLs and add new ones
         existing_file_urls = period.get('file_urls', [])
         new_file_urls = [url for url in s3_urls if url is not None]
         updated_file_urls = existing_file_urls + new_file_urls
 
-        # Update the period with new file URLs
         teacher_service.update_period_files(period_id, updated_file_urls)
 
-        # Cleanup
         shutil.rmtree(temp_dir)
 
         return jsonify({
