@@ -47,6 +47,29 @@ def get_individual_quests():
         print(f"Error getting individual quests: {str(e)}")
         return jsonify({"error": "Failed to get individual quests"}), 500
 
+@quest_bp.route('/individual-quests/<student_id>', methods=['GET'])
+def get_student_individual_quests(student_id):
+    """Get individual quests for a specific student (for teachers)."""
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Authorization header missing or invalid"}), 401
+        auth_token = auth_header.split(" ", 1)[1]
+
+        sessions = session_dao.get_sessions_by_auth_token(auth_token)
+        if not sessions:
+            return jsonify({"error": "Invalid auth token"}), 401
+        teacher_id = sessions[0]['user_id']
+
+        # we still need to add authorization check to ensure the teacher has access to this student. 
+        # for now, any authenticated user can view any student's quests
+        
+        quests = quest_service.get_individual_quests_for_student(student_id)
+        return jsonify(quests), 200
+    except Exception as e:
+        print(f"Error getting student individual quests: {str(e)}")
+        return jsonify({"error": "Failed to get student individual quests"}), 500
+
 @quest_bp.route('/weekly-quests/<weekly_quest_id>/individual-quests/<individual_quest_id>/status', methods=['PUT'])
 def update_individual_quest_status(weekly_quest_id, individual_quest_id):
     """Update the status of a specific individual quest within a weekly quest list."""
