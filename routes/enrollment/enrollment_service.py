@@ -39,6 +39,10 @@ class EnrollmentService:
     def get_enrollments_for_period(self, period_id: str):
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
         period = self.period_dao.get_period_by_id(period_id)
+        
+        print(f"DEBUG: Period ID: {period_id}")
+        print(f"DEBUG: Period data: {period}")
+        print(f"DEBUG: Period file_urls: {period.get('file_urls', []) if period else 'No period found'}")
 
         return {
             "students": enrollments,

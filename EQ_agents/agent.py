@@ -1,11 +1,11 @@
 from agents import (
-    Agent, 
-    Runner, 
-    FileSearchTool, 
-    output_guardrail, 
-    GuardrailFunctionOutput, 
-    OutputGuardrailTripwireTriggered, 
-    RunContextWrapper, 
+    Agent,
+    Runner,
+    FileSearchTool,
+    output_guardrail,
+    GuardrailFunctionOutput,
+    OutputGuardrailTripwireTriggered,
+    RunContextWrapper,
     trace,
     guardrail_span
 )
@@ -21,7 +21,7 @@ class IndividualQuest(BaseModel):
     Skills: str = Field(description="Skills the student will practice through this quest")
     Week: int = Field(description="Week the student will work on this quest")
     instructions: str = Field(description="Detailed instructions for completing the quest")
-    rubric: Rubric = Field(description="Grading criteria and expectations for the quest")
+    rubric: dict = Field(description="Grading criteria and expectations for the quest")
 
 class BaseQuest(BaseModel):
     Name: str = Field(description="Name of the quest")
@@ -31,34 +31,33 @@ class BaseQuest(BaseModel):
 class schedule(BaseModel):
     list_of_quests: list[BaseQuest] = Field(description="List of quests for the student")
 
+class detailed_schedule(BaseModel):
+    list_of_quests: list[IndividualQuest] = Field(description="List of quests for the student")
+
 class SchedulesAgent:
     def __init__(self, student, period):
         self.student = student
         self.period = period
-        self.vector_store = period["vector_store_id"] #this was period.vector_store_id, changed because route expects a dict
-        # self.input = f"""I'm {self.student.first_name} {self.student.last_name}. My strengths are {self.student.strength}, my weaknesses are {self.student.weakness}, my interests are {self.student.interest}, and my learning style is {self.student.learning_style}. My long-term goal is {self.student.long_term_goal}. I am in grade {self.student.grade}."""
+        self.vector_store = period["vector_store_id"]
         self.input = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}."""
-
 
         self.schedules_agent = Agent(
             name="Schedules Agent",
-            # handoff_description="""You specialize in breaking down the long-term goal into weekly quest. into manageable weekly quests to replace homework. You link the weekly skills students need to learn in the class (found in the course schedule) to their interests while accommodating their capabilities and learning preferences. """,
             instructions="""
-                    You specialize in breaking down the long-term goal into manageable weekly quests to replace homework. You link the weekly skills students need to learn in the class (found in the course schedule) to their interests while accommodating their capabilities and learning preferences. 
-                    First, you will determine and/or decide what the students are required to learn in the class each week based on the course modules items from file search. There are 18 weeks in total.
-                    Baseed on that, you will create a weekly quest for the student that aligns with their long-term goal, interests, strengths, weaknesses, and learning style.
-                    Each quest should be a thorough practice of the skills and knowledge learned in class that week and help the student to master these skills and knowledge.
-                    You will return the homework schedule for the duration of the course, including the weekly quests and their due dates.
-                    By the 18th week, the student will have accomplished their lone term goal.
-                    """,
+                You specialize in breaking down the long-term goal into manageable weekly quests to replace homework. You link the weekly skills students need to learn in the class (found in the course schedule) to their interests while accommodating their capabilities and learning preferences. 
+                First, you will determine and/or decide what the students are required to learn in the class each week based on the course modules items from file search. There are 18 weeks in total.
+                Based on that, you will create a weekly quest for the student that aligns with their long-term goal, interests, strengths, weaknesses, and learning style.
+                Each quest should be a thorough practice of the skills and knowledge learned in class that week and help the student to master these skills and knowledge.
+                You will return the homework schedule for the duration of the course, including the weekly quests and their due dates.
+                By the 18th week, the student will have accomplished their long term goal.
+            """,
             model="gpt-4.1",
             tools=[
                 FileSearchTool(
                     vector_store_ids=[self.vector_store]
                 )
             ],
-            # output_guardrail()
-            output_type = schedule
+            output_type=schedule
         )
 
         self.guardrial_agent = Agent(
@@ -75,40 +74,27 @@ class SchedulesAgent:
 
     @output_guardrail()
     async def guardrail(self, ctx: RunContextWrapper, agent: Agent, output: schedule) -> GuardrailFunctionOutput:
-        """
-        Guardrail function to ensure weekly quests align with course materials.
-        Checks if each quest's skills and topics match what's being taught in class.
-        If misaligned, triggers regeneration of the schedule.
-        """
         try:
-            # Run the guardrail agent to verify alignment
             result = await Runner.run(
                 self.guardrial_agent,
                 output.model_dump_json(),
                 context=ctx.context
             )
-            
-            # If the guardrail agent approves, return the original output
             if "approved" in result.response.lower():
                 return GuardrailFunctionOutput(output=output)
-            
-            # If not approved, regenerate the schedule
+
             new_schedule = await Runner.run(
                 self.schedules_agent,
                 self.input,
                 context=ctx.context
             )
-            
-            # Check if the new schedule is valid
             if isinstance(new_schedule.output, schedule):
                 return GuardrailFunctionOutput(output=new_schedule.output)
-            
-            # If regeneration failed, trigger the tripwire
+
             raise OutputGuardrailTripwireTriggered(
                 message="Failed to regenerate aligned schedule",
                 original_output=output
             )
-            
         except Exception as e:
             raise OutputGuardrailTripwireTriggered(
                 message=f"Error in guardrail check: {str(e)}",
@@ -116,10 +102,6 @@ class SchedulesAgent:
             )
 
     async def _run_async(self) -> schedule:
-        """
-        Internal async method to run the SchedulesAgent with guardrail validation.
-        Returns the generated schedule.
-        """
         with trace("schedule_generation") as span:
             with guardrail_span("schedule_guardrail"):
                 result = await Runner.run(
@@ -129,32 +111,64 @@ class SchedulesAgent:
         return result.final_output
 
     def run(self) -> schedule:
-        """
-        Run the SchedulesAgent to generate a schedule with guardrail validation.
-        Handles async execution internally and returns the final schedule.
-        """
         return asyncio.run(self._run_async())
 
 class HWAgent:
     def __init__(self, student, period, schedule):
         self.student = student
         self.period = period
-        self.vector_store = period.vector_store_id
+        self.vector_store = period["vector_store_id"]
         self.schedule = schedule
-        self.input = f"""I'm {self.student.first_name} {self.student.last_name}. My strengths are {self.student.strength}, my weaknesses are {self.student.weakness}, my interests are {self.student.interest}, and my learning style is {self.student.learning_style}. My long-term goal is {self.student.long_term_goal}. I am in grade {self.student.grade}.
 
-For each quest in the schedule, I need detailed instructions and a grading rubric that:
-1. Aligns with the skills and topics being taught that week
-2. Accommodates my learning style and interests
-3. Provides clear expectations and evaluation criteria
-4. Helps me practice and master the required skills"""
+        schedule_json = json.dumps(schedule, indent=2)
+
+        self.input = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}.
+
+The following is a course schedule consisting of 18 quests:
+
+{schedule_json}
+
+For each of the 18 quests in the schedule above, please generate:
+1. A **string** for the 'Skills' field (not a list) that summarizes the key skills practiced, separated by commas
+2. A **detailed 'instructions'** field in paragraph form
+3. A **'rubric'** object that includes:
+   - A 'Grade_Scale' field (e.g., 'A to F based on rubric')
+   - A 'Criteria' dictionary with at least 4 keys: 'Criterion A', 'Criterion B', etc.
+
+IMPORTANT: You must generate detailed homework for ALL 18 quests in the schedule. Do not skip any quests.
+
+Your response must follow this format exactly:
+
+{{
+  "list_of_quests": [
+    {{
+      "Name": "Quest Name",
+      "Skills": "Skill A, Skill B, Skill C",
+      "Week": 1,
+      "instructions": "Step-by-step instructions...",
+      "rubric": {{
+        "Grade_Scale": "Letter grades based on mastery",
+        "Criteria": {{
+          "Criterion A": "...",
+          "Criterion B": "...",
+          "Criterion C": "...",
+          "Criterion D": "..."
+        }}
+      }}
+    }},
+    ...
+  ]
+}}
+
+Only return valid **JSON**, no markdown, no commentary, and no code blocks.
+"""
 
         self.guardrial_agent = Agent(
-            name = "Guardrial Agent",
-            handoff_description = "You check if the weekly quests align with the materials taught in class accurately and timely. If not, you will handoff to the Schedules Agent.",
-            instructions = "You check if the weekly quests align with the materials taught in class for that corresponding week accurately and timely. If not, you will handoff to the Schedules Agent.",
-            model = "gpt-o3",
-            tools = [
+            name="Guardrial Agent",
+            handoff_description="You check if the weekly quests align with the materials taught in class accurately and timely. If not, you will handoff to the Schedules Agent.",
+            instructions="You check if the weekly quests align with the materials taught in class for that corresponding week accurately and timely. If not, you will handoff to the Schedules Agent.",
+            model="gpt-o3",
+            tools=[
                 FileSearchTool(
                     vector_store_ids=[self.vector_store]
                 )
@@ -162,13 +176,13 @@ For each quest in the schedule, I need detailed instructions and a grading rubri
         )
 
         self.instruction_agent = Agent(
-            name = "Instruction Agent",
-            handoff_description = """You specialize in providing detailed instructions for weekly quests""",
-            instructions = """
+            name="Instruction Agent",
+            handoff_description="""You specialize in providing detailed instructions for weekly quests""",
+            instructions="""
             You will provide detailed instructions for the weekly quests. Make sure to address the materials taught in class for the corresponding week. 
             """,
-            model = "gpt-4.1-mini",
-            tools = [
+            model="gpt-4.1-mini",
+            tools=[
                 FileSearchTool(
                     vector_store_ids=[self.vector_store]
                 )
@@ -176,13 +190,13 @@ For each quest in the schedule, I need detailed instructions and a grading rubri
         )
 
         self.rubric_agent = Agent(
-            name = "Rubric Agent",
-            handoff_description = """You specialize in creating rubrics for weekly quests""",
-            instructions = """
+            name="Rubric Agent",
+            handoff_description="""You specialize in creating rubrics for weekly quests""",
+            instructions="""
             You will create a detailed rubric for the weekly quests. Make sure to address the materials taught in class for the corresponding week.
             """,
-            model = "gpt-4.1-mini",
-            tools = [
+            model="gpt-4.1-mini",
+            tools=[
                 FileSearchTool(
                     vector_store_ids=[self.vector_store]
                 )
@@ -190,27 +204,53 @@ For each quest in the schedule, I need detailed instructions and a grading rubri
         )
 
         self.homework_agent = Agent(
-            name = "Homework Agent",
-            instructions = """
-            You will generate a detailed homework assignment including a rubric and detailed instructions for a student. 
+            name="Homework Agent",
+            instructions="""
+            You will generate detailed homework assignments including rubrics and detailed instructions for a student.
+            
+            CRITICAL: You must generate detailed homework for ALL 18 quests in the schedule provided. Do not skip any quests.
+            
+            For each quest in the schedule, you must create:
+            - A detailed name that reflects the quest content
+            - A comprehensive skills list as a comma-separated string
+            - Detailed step-by-step instructions
+            - A complete rubric with grade scale and 4 criteria
+            
+            You must return a valid JSON object with the following structure:
+            {
+                "list_of_quests": [
+                    {
+                        "Name": "Quest Name",
+                        "Skills": "Skill A, Skill B, Skill C",
+                        "Week": 1,
+                        "instructions": "Detailed step-by-step instructions...",
+                        "rubric": {
+                            "Grade_Scale": "A to F based on rubric",
+                            "Criteria": {
+                                "Criterion A": "Description of criterion A",
+                                "Criterion B": "Description of criterion B",
+                                "Criterion C": "Description of criterion C",
+                                "Criterion D": "Description of criterion D"
+                            }
+                        }
+                    }
+                ]
+            }
+            
+            IMPORTANT: Ensure you generate exactly 18 quests, one for each week in the schedule.
+            Make sure to return only valid JSON, no markdown formatting or code blocks.
             """,
-            model = "gpt-4.1-mini",
-            tools = [
+            model="gpt-4.1-mini",
+            tools=[
                 FileSearchTool(
                     vector_store_ids=[self.vector_store]
                 )
             ],
-            output_type = schedule,
-            handoffs = [self.rubric_agent, self.instruction_agent]
+            handoffs=[self.rubric_agent, self.instruction_agent]
         )
 
     @output_guardrail()
-    async def guardrail(self, ctx: RunContextWrapper, agent: Agent, output: schedule) -> GuardrailFunctionOutput:
-        """
-        Guardrail function to ensure homework assignments align with course materials and student needs.
-        Checks if each assignment's instructions and rubric match the quest requirements.
-        If misaligned, triggers regeneration of the homework.
-        """
+    async def guardrail(self, ctx: RunContextWrapper, agent: Agent, output: detailed_schedule) -> GuardrailFunctionOutput:
         try:
             result = await Runner.run(
                 self.guardrial_agent,
@@ -227,7 +267,7 @@ For each quest in the schedule, I need detailed instructions and a grading rubri
                 context=ctx.context
             )
 
-            if isinstance(new_homework.output, schedule):
+            if isinstance(new_homework.output, detailed_schedule):
                 return GuardrailFunctionOutput(output=new_homework.output)
 
             raise OutputGuardrailTripwireTriggered(
@@ -241,26 +281,81 @@ For each quest in the schedule, I need detailed instructions and a grading rubri
                 original_output=output
             )
 
-    async def _run_async(self) -> schedule:
-        """
-        Internal async method to run the HWAgent with guardrail validation.
-        Returns the generated homework schedule with instructions and rubrics.
-        """
+    async def _run_async(self) -> detailed_schedule:
         with trace("homework_generation") as span:
             with guardrail_span("homework_guardrail"):
+                print("Starting HWAgent._run_async()")
                 result = await Runner.run(
                     self.homework_agent,
                     self.input
                 )
+                print(f"Raw result type: {type(result)}")
+                print(f"Raw result: {result}")
+                print(f"Result.final_output type: {type(result.final_output)}")
+                print(f"Result.final_output: {result.final_output}")
+
+        if isinstance(result.final_output, dict):
+            for quest in result.final_output.get("list_of_quests", []):
+                if isinstance(quest.get("Skills"), list):
+                    quest["Skills"] = ", ".join(quest["Skills"])
+            return detailed_schedule(**result.final_output)
+        elif isinstance(result.final_output, str):
+            print("Agent returned a string instead of structured data")
+            print(f"String content: {result.final_output}")
+            try:
+                parsed = json.loads(result.final_output)
+                if isinstance(parsed, dict):
+                    for quest in parsed.get("list_of_quests", []):
+                        if isinstance(quest.get("Skills"), list):
+                            quest["Skills"] = ", ".join(quest["Skills"])
+                    return detailed_schedule(**parsed)
+            except json.JSONDecodeError:
+                print("Failed to parse string as JSON")
+                raise Exception("Agent returned invalid format")
+
         return result.final_output
 
-    def run(self) -> schedule:
-        """
-        Run the HWAgent to generate homework assignments with guardrail validation.
-        Handles async execution internally and returns the final homework schedule.
-        """
-        return asyncio.run(self._run_async())
+    def run(self) -> detailed_schedule:
+        try:
+            print("Starting HWAgent.run()")
+            result = asyncio.run(self._run_async())
+            print(f"HWAgent result type: {type(result)}")
+            print(f"HWAgent result: {result}")
+            return result
+        except Exception as e:
+            print(f"Error in HWAgent.run(): {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
 
+# Add response format schema for homework agent
+homework_response_format = {
+    "type": "object",
+    "properties": {
+        "list_of_quests": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "Name": {"type": "string"},
+                    "Skills": {"type": "string"},
+                    "Week": {"type": "integer"},
+                    "instructions": {"type": "string"},
+                    "rubric": {
+                        "type": "object",
+                        "properties": {
+                            "Grade_Scale": {"type": "string"},
+                            "Criteria": {"type": "object"}
+                        },
+                        "required": ["Grade_Scale", "Criteria"]
+                    }
+                },
+                "required": ["Name", "Skills", "Week", "instructions", "rubric"]
+            }
+        }
+    },
+    "required": ["list_of_quests"]
+}
 
 # def run_agent(student, period_id):
 #     period = Period.get_period(period_id)

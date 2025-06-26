@@ -74,7 +74,7 @@ def continue_ltg_conversation():
         if not thread_id:
             return jsonify({"error": "thread_id is required"}), 400
         if not user_message:
-            return jsonify({"error": "user_message is required"}), 400
+            return jsonify({"error": "message is required"}), 400
 
         result = period_service.continue_ltg_conversation(auth_token, conversation_type, thread_id, user_message)
         return jsonify(result), 200
@@ -99,4 +99,23 @@ def initiate_schedules_agent():
         return jsonify(result), 200
     except Exception as e:
         print(f"Error in initiate-schedules-agent: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    
+@period_bp.route('/initiate-homework-agent', methods=['POST'])
+def initiate_homework_agent():
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Authorization header missing or invalid"}), 401
+            
+        auth_token = auth_header.split(" ", 1)[1]
+        data = request.json
+        period_id = data.get('period_id')
+        if not period_id:
+            return jsonify({"error": "period_id is required"}), 400
+        
+        result = period_service.start_homework_agent(auth_token, period_id)
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"Error in initiate-homework-agent: {str(e)}")
         return jsonify({"error": str(e)}), 500
