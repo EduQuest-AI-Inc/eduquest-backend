@@ -265,6 +265,10 @@ class update:
             file=open(temp_student_file, "rb"),
             purpose="assistants"
         )
+
+        # Clean up the temporary file
+
+        os.remove(temp_student_file)
         # Create a temporary file with quests data
         temp_quests_file = "temp_quests.json"
         try:
@@ -282,6 +286,8 @@ class update:
             try:
                 if os.path.exists(temp_quests_file):
                     os.remove(temp_quests_file)
+                if os.path.exists(temp_student_file):
+                    os.remove(temp_student_file)
             except Exception as e:
                 print(f"Warning: Could not remove temporary file {temp_quests_file}: {e}")
 
