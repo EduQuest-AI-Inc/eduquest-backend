@@ -218,7 +218,13 @@ class ltg:
 
 class update:
     def __init__(self, assistant_id, student, quests, instructor, week=None, submission=None):
-        self.student = student
+        temp_student_file = "student.json"
+        with open(temp_student_file, "w") as f:
+            json.dump(student, f, indent=2)
+        self.student = openai.files.create(
+            file=open(temp_student_file, "rb"),
+            purpose="assistants"
+        )
         # Create a temporary file with quests data
         temp_quests_file = "temp_quests.json"
         with open(temp_quests_file, "w") as f:
@@ -229,6 +235,7 @@ class update:
         )
         # Clean up the temporary file
         os.remove(temp_quests_file)
+        os.remove(temp_student_file)
 
         self.assistant = openai.beta.assistants.retrieve(assistant_id)
         self.conversation_log = []
@@ -256,6 +263,10 @@ class update:
                 attachments=[
                     {
                         "file_id": self.quests.id,
+                        "tools": [{"type": "file_search"}]
+                    },
+                    {
+                        "file_id": self.student.id,
                         "tools": [{"type": "file_search"}]
                     }
                 ]
