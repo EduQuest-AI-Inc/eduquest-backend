@@ -241,14 +241,23 @@ class update:
         self.student = student
         # Create a temporary file with quests data
         temp_quests_file = "temp_quests.json"
-        with open(temp_quests_file, "w") as f:
-            json.dump(quests, f, indent=2)
-        self.quests = openai.files.create(
-            file=open(temp_quests_file, "rb"),
-            purpose="assistants"
-        )
-        # Clean up the temporary file
-        os.remove(temp_quests_file)
+        try:
+            with open(temp_quests_file, "w") as f:
+                json.dump(quests, f, indent=2)
+            self.quests = openai.files.create(
+                file=open(temp_quests_file, "rb"),
+                purpose="assistants"
+            )
+        except Exception as e:
+            print(f"Error creating quests file: {e}")
+            raise Exception(f"Failed to create quests file: {e}")
+        finally:
+            # Clean up the temporary file
+            try:
+                if os.path.exists(temp_quests_file):
+                    os.remove(temp_quests_file)
+            except Exception as e:
+                print(f"Warning: Could not remove temporary file {temp_quests_file}: {e}")
 
         self.assistant = openai.beta.assistants.retrieve(assistant_id)
         self.conversation_log = []

@@ -99,6 +99,8 @@ def initiate_update():
         # Optional fields for student submissions
         week = data.get('week')
         submission_file = data.get('submission_file')
+        student_id = data.get('student_id')
+        period_id = data.get('period_id')
 
         # Validate student-specific fields
         if not is_instructor:
@@ -112,11 +114,15 @@ def initiate_update():
             quests_file=quests_file,
             is_instructor=is_instructor,
             week=week,
-            submission_file=submission_file
+            submission_file=submission_file,
+            student_id=student_id,
+            period_id=period_id
         )
         return jsonify(result), 200
     except Exception as e:
         print(f"Error in initiate-update-assistant: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
     print("DEBUG user profile keys:", user_profile_dict.keys())
