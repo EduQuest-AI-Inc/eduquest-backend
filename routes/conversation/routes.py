@@ -71,31 +71,10 @@ def continue_profile_assistant():
         result = conversation_service.continue_profile_assistant(auth_token, conversation_type, thread_id, user_message)
         return result, 200
     except Exception as e:
-        print(f"Error in continue-profile-assistant: {str(e)}")  # Debug log
+        print(f"Error in continue-profile-assistant: {str(e)}")  
         import traceback
-        print(f"Traceback: {traceback.format_exc()}")  # Debug log
+        print(f"Traceback: {traceback.format_exc()}")  
         return jsonify({"error": str(e)}), 500
-
-
-# @conversation_bp.route('/initiate-schedules-agent', methods=['POST'])
-# def initiate_schedules_agent():
-#     try:
-#         auth_header = request.headers.get('Authorization')
-#         if not auth_header or not auth_header.startswith("Bearer "):
-#             return jsonify({"error": "Authorization header missing or invalid"}), 401
-        
-#         auth_token = auth_header.split(" ", 1)[1]
-#         data = request.json
-        
-#         period_id = data.get('period_id')  
-#         if not period_id:
-#             return jsonify({"error": "period_id is required"}), 400
-        
-#         result = conversation_service.start_schedules_agent(auth_token, period_id)
-#         return jsonify(result), 200
-#     except Exception as e:
-#         print(f"Error in initiate-schedules-agent: {str(e)}")
-#         return jsonify({"error": str(e)}), 500
 
 
 @conversation_bp.route('/initiate-update-assistant', methods=['POST'])
@@ -171,5 +150,3 @@ def continue_update():
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-

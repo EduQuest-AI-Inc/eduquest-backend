@@ -16,12 +16,6 @@ import asyncio
 from models.period import Period
 from models.rubric import Rubric
 
-class BaseQuest(BaseModel):
-    Name: str = Field(description="Name of the quest")
-    Skills: str = Field(description="Skills the student will practice through this quest")
-    Week: int = Field(description="Week the student will work on this quest")
-
-
 class IndividualQuest(BaseModel):
     Name: str = Field(description="Name of the quest")
     Skills: str = Field(description="Skills the student will practice through this quest")
@@ -29,17 +23,22 @@ class IndividualQuest(BaseModel):
     instructions: str = Field(description="Detailed instructions for completing the quest")
     rubric: Rubric = Field(description="Grading criteria and expectations for the quest")
 
+class BaseQuest(BaseModel):
+    Name: str = Field(description="Name of the quest")
+    Skills: str = Field(description="Skills the student will practice through this quest")
+    Week: int = Field(description="Week the student will work on this quest")
+
 class schedule(BaseModel):
     list_of_quests: list[BaseQuest] = Field(description="List of quests for the student")
-
-
 
 class SchedulesAgent:
     def __init__(self, student, period):
         self.student = student
         self.period = period
-        self.vector_store = period.vector_store_id
-        self.input = f"""I'm {self.student.first_name} {self.student.last_name}. My strengths are {self.student.strength}, my weaknesses are {self.student.weakness}, my interests are {self.student.interest}, and my learning style is {self.student.learning_style}. My long-term goal is {self.student.long_term_goal}. I am in grade {self.student.grade}."""
+        self.vector_store = period["vector_store_id"] #this was period.vector_store_id, changed because route expects a dict
+        # self.input = f"""I'm {self.student.first_name} {self.student.last_name}. My strengths are {self.student.strength}, my weaknesses are {self.student.weakness}, my interests are {self.student.interest}, and my learning style is {self.student.learning_style}. My long-term goal is {self.student.long_term_goal}. I am in grade {self.student.grade}."""
+        self.input = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}."""
+
 
         self.schedules_agent = Agent(
             name="Schedules Agent",
@@ -136,10 +135,6 @@ class SchedulesAgent:
         """
         return asyncio.run(self._run_async())
 
-
-
-
-
 class HWAgent:
     def __init__(self, student, period, schedule):
         self.student = student
@@ -217,34 +212,29 @@ For each quest in the schedule, I need detailed instructions and a grading rubri
         If misaligned, triggers regeneration of the homework.
         """
         try:
-            # Run the guardrail agent to verify alignment
             result = await Runner.run(
                 self.guardrial_agent,
                 output.model_dump_json(),
                 context=ctx.context
             )
-            
-            # If the guardrail agent approves, return the original output
+
             if "approved" in result.response.lower():
                 return GuardrailFunctionOutput(output=output)
-            
-            # If not approved, regenerate the homework
+
             new_homework = await Runner.run(
                 self.homework_agent,
                 self.input,
                 context=ctx.context
             )
-            
-            # Check if the new homework is valid
+
             if isinstance(new_homework.output, schedule):
                 return GuardrailFunctionOutput(output=new_homework.output)
-            
-            # If regeneration failed, trigger the tripwire
+
             raise OutputGuardrailTripwireTriggered(
                 message="Failed to regenerate aligned homework",
                 original_output=output
             )
-            
+
         except Exception as e:
             raise OutputGuardrailTripwireTriggered(
                 message=f"Error in guardrail check: {str(e)}",

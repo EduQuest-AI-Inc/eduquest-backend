@@ -410,7 +410,8 @@ class create_class:
         self.ltg_assistant = client.beta.assistants.update(
             assistant_id=self.ltg_assistant.id,
             tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
-        )
+            )
+
 
 
 ltg_response_format = '''{
@@ -443,7 +444,8 @@ ltg_inst = """You will suggest three long-term goals for a student to work on ba
 
 Note: Most important thing is to incorporate the ALL class materials in the JSON course schedule from the file search in the suggested long-term goal. 
 
-You will only return the three long-term goal suggestions"""
+You will only return the three long-term goal suggestions. 
+"""
 
 update_inst = """You are the Update Assistant for EduQuest, an AI-powered educational platform. You support both students and teachers.
 
@@ -470,5 +472,3 @@ At the start of every session, you will receive:
 Always reflect a warm, encouraging tone with students, and a collaborative tone with teachers. Ask clarifying questions if anything is unclear.
 
 At the end, you will output a table with the same format you received. """
-
-
