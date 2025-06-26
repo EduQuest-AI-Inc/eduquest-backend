@@ -75,6 +75,16 @@ class TeacherService:
             for p in periods
         ]
     
+    def get_period_by_id(self, period_id):
+        """Get a period by its ID"""
+        return self.period_dao.get_period_by_id(period_id)
+    
+    def update_period_files(self, period_id, file_urls):
+        """Update the file_urls field of a period"""
+        updates = {"file_urls": file_urls}
+        self.period_dao.update_period(period_id, updates)
+        print(f"DEBUG: Updated period {period_id} with {len(file_urls)} files")
+    
     def get_vector_store_id_for_period(self, period_id):
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
