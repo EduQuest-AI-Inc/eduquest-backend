@@ -42,7 +42,7 @@ class QuestService:
                     period_id=period_id,
                     description=quest_data.get("Name", ""),
                     skills=quest_data.get("Skills", ""),
-                    Week=quest_data.get("Week", 1),
+                    week=quest_data.get("Week", 1),
                     instructions="",  # Will be filled by homework agent
                     rubric={},  # Will be filled by homework agent
                     status="not_started"
@@ -96,7 +96,7 @@ class QuestService:
                     period_id=period_id,
                     description=quest_data.get("Name", ""),  # Map Name to description
                     skills=quest_data.get("Skills", ""),
-                    Week=quest_data.get("Week", 1),
+                    week=quest_data.get("Week", 1),
                     instructions=quest_data.get("instructions", ""),  # Map instructions to instructions
                     rubric=quest_data.get("rubric", {}),  # Map rubric to rubric
                     status="not_started"
@@ -241,7 +241,7 @@ class QuestService:
                     "total_count": len(individual_quests),
                     "quest_id": weekly_quest.quest_id,  # Should be the same for all
                     "individual_quest_ids": [quest["individual_quest_id"] for quest in individual_quests],
-                    "weeks": [quest["Week"] for quest in individual_quests]
+                    "weeks": [quest["week"] for quest in individual_quests]
                 },
                 "verification": {
                     "weekly_quest_count": len(weekly_quest.quests),

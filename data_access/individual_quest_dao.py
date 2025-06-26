@@ -28,14 +28,14 @@ class IndividualQuestDAO(BaseDAO):
     def get_quests_by_week(self, week: int) -> List[Dict[str, Any]]:
         """Get all quests for a specific week."""
         response = self.table.scan(
-            FilterExpression=Key("Week").eq(week)
+            FilterExpression=Attr("week").eq(week)
         )
         return response.get("Items", [])
 
     def get_quests_by_status(self, status: str) -> List[Dict[str, Any]]:
         """Get all quests with a specific status."""
         response = self.table.scan(
-            FilterExpression=Key("status").eq(status)
+            FilterExpression=Attr("status").eq(status)
         )
         return response.get("Items", [])
 
@@ -98,21 +98,21 @@ class IndividualQuestDAO(BaseDAO):
     def get_quests_by_date_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """Get quests within a specific date range."""
         response = self.table.scan(
-            FilterExpression=Key("due_date").between(start_date, end_date)
+            FilterExpression=Attr("due_date").between(start_date, end_date)
         )
         return response.get("Items", [])
 
     def get_quests_by_skills(self, skills: str) -> List[Dict[str, Any]]:
         """Get quests that match specific skills."""
         response = self.table.scan(
-            FilterExpression=Key("skills").contains(skills)
+            FilterExpression=Attr("skills").contains(skills)
         )
         return response.get("Items", [])
 
     def get_quests_by_student(self, student_id: str) -> List[Dict[str, Any]]:
         """Get all individual quests for a specific student."""
         response = self.table.scan(
-            FilterExpression=Key("student_id").eq(student_id)
+            FilterExpression=Attr("student_id").eq(student_id)
         )
         return response.get("Items", [])
 
