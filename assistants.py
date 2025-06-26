@@ -238,7 +238,13 @@ class ltg:
 
 class update:
     def __init__(self, assistant_id, student, quests, instructor, week=None, submission=None):
-        self.student = student
+        temp_student_file = "student.json"
+        with open(temp_student_file, "w") as f:
+            json.dump(student, f, indent=2)
+        self.student = openai.files.create(
+            file=open(temp_student_file, "rb"),
+            purpose="assistants"
+        )
         # Create a temporary file with quests data
         temp_quests_file = "temp_quests.json"
         try:
@@ -285,6 +291,10 @@ class update:
                 attachments=[
                     {
                         "file_id": self.quests.id,
+                        "tools": [{"type": "file_search"}]
+                    },
+                    {
+                        "file_id": self.student.id,
                         "tools": [{"type": "file_search"}]
                     }
                 ]
