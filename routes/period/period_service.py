@@ -8,7 +8,8 @@ from models.conversation import Conversation
 from models.enrollment import Enrollment
 from assistants import ltg
 from datetime import datetime, timezone
-from EQ_agents.agent import SchedulesAgent
+from EQ_agents.agent import SchedulesAgent, HWAgent
+from routes.quest.quest_service import QuestService
 
 class PeriodService:
 
@@ -18,6 +19,7 @@ class PeriodService:
         self.student_dao = StudentDAO()
         self.conversation_dao = ConversationDAO()
         self.enrollment_dao = EnrollmentDAO()
+        self.quest_service = QuestService()
 
     def verify_period_id(self, auth_token: str, period_id: str) -> Any:
         """
@@ -212,6 +214,7 @@ class PeriodService:
             return {"error": str(e)}
         
     def start_schedules_agent(self, auth_token: str, period_id: str):
+        try:
             sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
             if not sessions:
                 raise Exception("Invalid auth token")
@@ -227,8 +230,83 @@ class PeriodService:
 
             schedules_agent = SchedulesAgent(student, period)
             schedule = schedules_agent.run()
+            print(schedule)
+            print(type(schedule))
+            print(schedule.model_dump_json())
+            
+            # Save schedule to database
+            schedule_dict = schedule.model_dump()
+            save_result = self.quest_service.save_schedule_to_weekly_quests(schedule_dict, user_id, period_id)
             
             return {
-                "schedule": schedule.model_dump(), #converts to dict because agent is returning a pydantic model object
-                "message": "Schedule generated successfully"
-        }
+                "schedule": schedule_dict,
+                "message": "Schedule generated and saved successfully",
+                "saved_quests": save_result
+            }
+        except Exception as e:
+            print(f"Error in start_schedules_agent: {str(e)}")
+            raise Exception(f"Failed to generate schedule: {str(e)}")
+    
+    def start_homework_agent(self, auth_token: str, period_id: str):
+        try:
+            sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
+            if not sessions:
+                raise Exception("Invalid auth token")
+            user_id = sessions[0]['user_id']
+            
+            student = self.student_dao.get_student_by_id(user_id)
+            if not student:
+                raise Exception("Student not found")
+            
+            period = self.period_dao.get_period_by_id(period_id)
+            if not period:
+                raise Exception("Period not found")
+            
+            # Get the existing schedule from the weekly quest table
+            weekly_quest = self.quest_service.get_weekly_quests_for_student(user_id, period_id)
+            if not weekly_quest:
+                raise Exception("No weekly quest found. Please run the schedules agent first.")
+            
+            print(f"DEBUG: Found weekly quest with {len(weekly_quest.quests)} quests")
+            
+            # Convert weekly quest to schedule format for homework agent
+            schedule_quests = []
+            for quest_item in weekly_quest.quests:
+                schedule_quests.append({
+                    "Name": quest_item.name,
+                    "Skills": quest_item.skills,
+                    "Week": quest_item.week
+                })
+            
+            schedule_dict = {"list_of_quests": schedule_quests}
+            print(f"DEBUG: Schedule dict for homework agent: {schedule_dict}")
+            
+            homework_agent = HWAgent(student, period, schedule_dict)
+            homework = homework_agent.run()
+            
+            print(f"Homework type: {type(homework)}")
+            print(f"Homework content: {homework}")
+            
+            if hasattr(homework, 'model_dump'):
+                homework_dict = homework.model_dump()
+            elif isinstance(homework, dict):
+                homework_dict = homework
+            else:
+                raise Exception(f"Invalid homework format: {type(homework)}")
+            
+            print(f"Homework dict: {homework_dict}")
+            print(f"DEBUG: Homework quests count: {len(homework_dict.get('list_of_quests', []))}")
+            
+            # Update the weekly quest with detailed homework information
+            save_result = self.quest_service.update_weekly_quest_with_homework(homework_dict, user_id, period_id)
+            
+            return {
+                "homework": homework_dict,
+                "message": "Homework generated and saved successfully",
+                "saved_quests": save_result
+            }
+        except Exception as e:
+            print(f"Error in start_homework_agent: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise Exception(f"Failed to generate homework: {str(e)}")

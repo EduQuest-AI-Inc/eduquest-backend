@@ -31,3 +31,24 @@ def upload_to_s3(file_obj, filename=None, folder=None):
     except (NoCredentialsError, ClientError) as e:
         print("S3 upload failed:", e)
         return None
+
+def upload_file_to_s3(file_path, filename=None, folder=None):
+    """
+    Uploads a file from a file path to S3 and returns its key (not URL).
+    """
+    try:
+        key = f"{folder}/{filename or os.path.basename(file_path)}" if folder else (filename or os.path.basename(file_path))
+        
+        s3.upload_file(
+            Filename=file_path,
+            Bucket=BUCKET_NAME,
+            Key=key,
+            ExtraArgs={"ACL": "private"}  
+        )
+
+        # returning only the key and serving it through our own endpoint in teacher/routes.py
+        return key
+
+    except (NoCredentialsError, ClientError) as e:
+        print("S3 upload failed:", e)
+        return None

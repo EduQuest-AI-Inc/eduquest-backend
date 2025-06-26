@@ -179,41 +179,61 @@ class ltg:
             }
 
     def cont_conv(self, user_input):
-        message = openai.beta.threads.messages.create(
-            thread_id=self.thread_id,
-            role="user",
-            content=user_input
-        )
-        run = openai.beta.threads.runs.create(
-            thread_id=self.thread_id,
-            assistant_id=self.assistant.id
-        )
-        run_id = run.id
-
-        while True:
-            run_status = openai.beta.threads.runs.retrieve(thread_id=self.thread_id, run_id=run_id)
-            if run_status.status == 'completed':
-                break
-            time.sleep(1)
-        messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
-        last_message = messages.data[0]
-        response = last_message.content[0].text.value
-        print(f"\nRaw LTG Assistant Response: {response}")
-        
         try:
-            return_message = json.loads(response)
-            print(f"Parsed response: {return_message}")
+            # Check for active runs first
+            runs = openai.beta.threads.runs.list(thread_id=self.thread_id)
+            active_runs = [run for run in runs.data if run.status in ['queued', 'in_progress', 'requires_action']]
             
-            # Check if a goal was chosen
-            if not return_message.get('chosen_goal'):
-                print("No goal chosen in response")
-                return return_message.get('message', ''), False
-            else:
-                print(f"Goal chosen: {return_message['chosen_goal']}")
-                return return_message['chosen_goal'], True
-        except json.JSONDecodeError as e:
-            print(f"Error parsing response as JSON: {str(e)}")
-            return response, False
+            if active_runs:
+                print(f"Found {len(active_runs)} active runs, waiting for completion...")
+                # Wait for active runs to complete
+                for run in active_runs:
+                    while True:
+                        run_status = openai.beta.threads.runs.retrieve(thread_id=self.thread_id, run_id=run.id)
+                        if run_status.status in ['completed', 'failed', 'cancelled', 'expired']:
+                            break
+                        time.sleep(1)
+            
+            message = openai.beta.threads.messages.create(
+                thread_id=self.thread_id,
+                role="user",
+                content=user_input
+            )
+            run = openai.beta.threads.runs.create(
+                thread_id=self.thread_id,
+                assistant_id=self.assistant.id
+            )
+            run_id = run.id
+
+            while True:
+                run_status = openai.beta.threads.runs.retrieve(thread_id=self.thread_id, run_id=run_id)
+                if run_status.status == 'completed':
+                    break
+                elif run_status.status in ['failed', 'cancelled', 'expired']:
+                    raise Exception(f"Run failed with status: {run_status.status}")
+                time.sleep(1)
+            messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
+            last_message = messages.data[0]
+            response = last_message.content[0].text.value
+            print(f"\nRaw LTG Assistant Response: {response}")
+            
+            try:
+                return_message = json.loads(response)
+                print(f"Parsed response: {return_message}")
+                
+                # Check if a goal was chosen
+                if not return_message.get('chosen_goal'):
+                    print("No goal chosen in response")
+                    return return_message.get('message', ''), False
+                else:
+                    print(f"Goal chosen: {return_message['chosen_goal']}")
+                    return return_message['chosen_goal'], True
+            except json.JSONDecodeError as e:
+                print(f"Error parsing response as JSON: {str(e)}")
+                return response, False
+        except Exception as e:
+            print(f"Error in LTG cont_conv: {str(e)}")
+            return f"Sorry, I encountered an error: {str(e)}", False
 
 
 class update:
@@ -225,17 +245,29 @@ class update:
             file=open(temp_student_file, "rb"),
             purpose="assistants"
         )
-        # Create a temporary file with quests data
-        temp_quests_file = "temp_quests.json"
-        with open(temp_quests_file, "w") as f:
-            json.dump(quests, f, indent=2)
-        self.quests = openai.files.create(
-            file=open(temp_quests_file, "rb"),
-            purpose="assistants"
-        )
+
         # Clean up the temporary file
-        os.remove(temp_quests_file)
+
         os.remove(temp_student_file)
+        try:
+            with open(temp_quests_file, "w") as f:
+                json.dump(quests, f, indent=2)
+            self.quests = openai.files.create(
+                file=open(temp_quests_file, "rb"),
+                purpose="assistants"
+            )
+        except Exception as e:
+            print(f"Error creating quests file: {e}")
+            raise Exception(f"Failed to create quests file: {e}")
+        finally:
+            # Clean up the temporary file
+            try:
+                if os.path.exists(temp_quests_file):
+                    os.remove(temp_quests_file)
+                if os.path.exists(temp_student_file):
+                    os.remove(temp_student_file)
+            except Exception as e:
+                print(f"Warning: Could not remove temporary file {temp_quests_file}: {e}")
 
         self.assistant = openai.beta.assistants.retrieve(assistant_id)
         self.conversation_log = []
@@ -440,11 +472,19 @@ ltg_response_format = '''{
 
 # ltg_response_format_dict = json.loads(ltg_response_format)
 
-ltg_inst = """You will suggest three long-term goals for a student to work on based on the class they are taking and their strengths, weaknesses, interests, and learning style. This long-term goal should help the student to practice the materials learned in class in the field of their interest in a way that suits their learning style. The student should be able to achieve this long-term goal in 18 weeks while incorporating the things they are learning in the class
+ltg_inst = """You will suggest three long-term goals for a student to work on based on the class they are taking and their strengths, weaknesses, interests, and learning style. This long-term goal should help the student to practice the materials learned in class in the field of their interest in a way that suits their learning style. The student should be able to achieve this long-term goal in 18 weeks while incorporating the things they are learning in the class.
 
 Note: Most important thing is to incorporate the ALL class materials in the JSON course schedule from the file search in the suggested long-term goal. 
 
-You will only return the three long-term goal suggestions. 
+IMPORTANT: You must ALWAYS respond in JSON format with the following structure:
+{
+  "message": "Your response message here",
+  "chosen_goal": "The goal that was chosen, or null if no goal was chosen"
+}
+
+When the student says they choose a goal (like "I pick this one" or "I choose goal 1"), set the chosen_goal field to the full text of that goal. Otherwise, set chosen_goal to null.
+
+You will only return the three long-term goal suggestions initially, and then respond to the student's choice in the JSON format above.
 """
 
 update_inst = """You are the Update Assistant for EduQuest, an AI-powered educational platform. You support both students and teachers.
@@ -472,3 +512,21 @@ At the start of every session, you will receive:
 Always reflect a warm, encouraging tone with students, and a collaborative tone with teachers. Ask clarifying questions if anything is unclear.
 
 At the end, you will output a table with the same format you received. """
+
+def update_ltg_assistant(assistant_id: str):
+    """Update an existing LTG assistant with proper JSON response format."""
+    try:
+        # Update the assistant with JSON response format
+        updated_assistant = client.beta.assistants.update(
+            assistant_id=assistant_id,
+            instructions=ltg_inst,
+            response_format={
+                "type": "json_schema",
+                "json_schema": json.loads(ltg_response_format)
+            }
+        )
+        print(f"Successfully updated assistant {assistant_id} with JSON response format")
+        return updated_assistant
+    except Exception as e:
+        print(f"Error updating assistant {assistant_id}: {str(e)}")
+        return None
