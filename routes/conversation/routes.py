@@ -132,27 +132,41 @@ def initiate_update():
 def continue_update():
     try:
         data = request.json
+        print("[DEBUG] Received data:", data)
         auth_header = request.headers.get('Authorization')
+        print("[DEBUG] Auth header:", auth_header)
 
         if not auth_header or not auth_header.startswith("Bearer "):
+            print("[DEBUG] Missing or invalid auth header")
             return jsonify({"error": "Authorization header missing or invalid"}), 401
 
         auth_token = auth_header.split(" ", 1)[1]
+        print("[DEBUG] Auth token:", auth_token)
 
         thread_id = data.get('thread_id')
         user_message = data.get('message')
+        student_id = data.get('student_id')
+
+        print(f"[DEBUG] thread_id: {thread_id}, user_message: {user_message}, student_id: {student_id}")
 
         if not thread_id:
+            print("[DEBUG] Missing thread_id")
             return jsonify({"error": "thread_id is required"}), 400
 
         if not user_message:
+            print("[DEBUG] Missing message")
             return jsonify({"error": "message is required"}), 400
 
         result = conversation_service.continue_update_assistant(
             auth_token=auth_token,
             thread_id=thread_id,
-            message=user_message
+            message=user_message,
+            student_id=student_id
         )
+        print("[DEBUG] Result from service:", result)
         return jsonify(result), 200
     except Exception as e:
+        import traceback
+        print(f"[DEBUG] Exception in continue-update-assistant: {e}")
+        print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500

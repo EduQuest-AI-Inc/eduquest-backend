@@ -241,7 +241,7 @@ class ConversationService:
         # saving conversation to DB
         conversation = Conversation(
             thread_id=update_conversation.thread_id,
-            user_id=user_id,
+            user_id=student_id if role == "teacher" and student_id else user_id,
             role=role,
             conversation_type="update"
         )
@@ -252,13 +252,14 @@ class ConversationService:
             "response": raw_response
         }
 
-    def continue_update_assistant(self, auth_token: str, thread_id: str, message: str):
+    def continue_update_assistant(self, auth_token: str, thread_id: str, message: str, student_id: str = None):
         """
         Continue the update assistant conversation.
         Args:
             auth_token (str): The user's authentication token.
             thread_id (str): The thread ID for the conversation.
             message (str): The user's message to continue the conversation.
+            student_id (str, optional): The student ID if the user is a teacher.
         Returns:
             dict: Assistant's response.
         """
@@ -267,21 +268,25 @@ class ConversationService:
         if not sessions:
             raise Exception("Invalid auth token")
         user_id = sessions[0]['user_id']
+        role = sessions[0].get('role', 'student')
+
+        # Use student_id if teacher, else use user_id
+        target_user_id = student_id if (role == "teacher" and student_id) else user_id
 
         # Retrieve conversation
         conversation = self.conversation_dao.get_conversation_by_thread_user_conversation_type(
-            thread_id, user_id, "update"
+            thread_id, target_user_id, "update"
         )
         if not conversation:
             raise Exception("Conversation not found")
 
         # Fetch student info
-        student = self.student_dao.get_student_by_id(user_id)
+        student = self.student_dao.get_student_by_id(target_user_id)
         if not student:
             raise Exception("Student not found")
 
         # Continue conversation
-        update_conv = UpdateAssistant(ASSISTANT_ID_UPDATE, student, None, conversation.role == "instructor")
+        update_conv = UpdateAssistant(ASSISTANT_ID_UPDATE, student, None, conversation.get('role') == "instructor")
         update_conv.thread_id = thread_id
 
         try:
