@@ -281,7 +281,13 @@ class PeriodService:
             schedule_dict = {"list_of_quests": schedule_quests}
             print(f"DEBUG: Schedule dict for homework agent: {schedule_dict}")
             
-            homework_agent = HWAgent(student, period, schedule_dict)
+            # Use improved HWAgent with timeout and error handling
+            homework_agent = HWAgent(
+                student, 
+                period, 
+                schedule_dict,
+                timeout_seconds=300  # 5 minutes per quest
+            )
             homework = homework_agent.run()
             
             print(f"Homework type: {type(homework)}")

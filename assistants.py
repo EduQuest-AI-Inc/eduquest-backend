@@ -491,7 +491,9 @@ ltg_response_format = '''{
       }
     },
     "required": [
-      "message"
+      "message",
+      "chosen_goal",
+      "goals"
     ],
     "additionalProperties": false
   }

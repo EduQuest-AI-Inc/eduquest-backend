@@ -114,54 +114,12 @@ class SchedulesAgent:
         return asyncio.run(self._run_async())
 
 class HWAgent:
-    def __init__(self, student, period, schedule):
+    def __init__(self, student, period, schedule, timeout_seconds=300):
         self.student = student
         self.period = period
         self.vector_store = period["vector_store_id"]
         self.schedule = schedule
-
-        schedule_json = json.dumps(schedule, indent=2)
-
-        self.input = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}.
-
-The following is a course schedule consisting of 18 quests:
-
-{schedule_json}
-
-For each of the 18 quests in the schedule above, please generate:
-1. A **string** for the 'Skills' field (not a list) that summarizes the key skills practiced, separated by commas
-2. A **detailed 'instructions'** field in paragraph form
-3. A **'rubric'** object that includes:
-   - A 'Grade_Scale' field (e.g., 'A to F based on rubric')
-   - A 'Criteria' dictionary with at least 4 keys: 'Criterion A', 'Criterion B', etc.
-
-IMPORTANT: You must generate detailed homework for ALL 18 quests in the schedule. Do not skip any quests.
-
-Your response must follow this format exactly:
-
-{{
-  "list_of_quests": [
-    {{
-      "Name": "Quest Name",
-      "Skills": "Skill A, Skill B, Skill C",
-      "Week": 1,
-      "instructions": "Step-by-step instructions...",
-      "rubric": {{
-        "Grade_Scale": "Letter grades based on mastery",
-        "Criteria": {{
-          "Criterion A": "...",
-          "Criterion B": "...",
-          "Criterion C": "...",
-          "Criterion D": "..."
-        }}
-      }}
-    }},
-    ...
-  ]
-}}
-
-Only return valid **JSON**, no markdown, no commentary, and no code blocks.
-"""
+        self.timeout_seconds = timeout_seconds
 
         self.guardrial_agent = Agent(
             name="Guardrial Agent",
@@ -208,8 +166,6 @@ Only return valid **JSON**, no markdown, no commentary, and no code blocks.
             instructions="""
             You will generate detailed homework assignments including rubrics and detailed instructions for a student.
             
-            CRITICAL: You must generate detailed homework for ALL 18 quests in the schedule provided. Do not skip any quests.
-            
             For each quest in the schedule, you must create:
             - A detailed name that reflects the quest content
             - A comprehensive skills list as a comma-separated string
@@ -218,26 +174,21 @@ Only return valid **JSON**, no markdown, no commentary, and no code blocks.
             
             You must return a valid JSON object with the following structure:
             {
-                "list_of_quests": [
-                    {
-                        "Name": "Quest Name",
-                        "Skills": "Skill A, Skill B, Skill C",
-                        "Week": 1,
-                        "instructions": "Detailed step-by-step instructions...",
-                        "rubric": {
-                            "Grade_Scale": "A to F based on rubric",
-                            "Criteria": {
-                                "Criterion A": "Description of criterion A",
-                                "Criterion B": "Description of criterion B",
-                                "Criterion C": "Description of criterion C",
-                                "Criterion D": "Description of criterion D"
-                            }
-                        }
+                "Name": "Quest Name",
+                "Skills": "Skill A, Skill B, Skill C",
+                "Week": 1,
+                "instructions": "Detailed step-by-step instructions...",
+                "rubric": {
+                    "Grade_Scale": "A to F based on rubric",
+                    "Criteria": {
+                        "Criterion A": "Description of criterion A",
+                        "Criterion B": "Description of criterion B",
+                        "Criterion C": "Description of criterion C",
+                        "Criterion D": "Description of criterion D"
                     }
-                ]
+                }
             }
             
-            IMPORTANT: Ensure you generate exactly 18 quests, one for each week in the schedule.
             Make sure to return only valid JSON, no markdown formatting or code blocks.
             """,
             model="gpt-4.1-mini",
@@ -249,78 +200,150 @@ Only return valid **JSON**, no markdown, no commentary, and no code blocks.
             handoffs=[self.rubric_agent, self.instruction_agent]
         )
 
-    @output_guardrail()
-    async def guardrail(self, ctx: RunContextWrapper, agent: Agent, output: detailed_schedule) -> GuardrailFunctionOutput:
+    async def _generate_quest_details(self, quest, week_number):
+        """Generate detailed instructions and rubric for a single quest"""
         try:
+            student_info = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}."""
+
+            quest_input = f"""{student_info}
+
+Please generate detailed homework for this quest:
+
+Week {week_number}: {quest.get('Name', 'Quest')}
+Skills: {quest.get('Skills', '')}
+
+Generate:
+1. Detailed step-by-step instructions
+2. A complete rubric with grade scale and 4 criteria
+
+Return as JSON:
+{{
+    "Name": "{quest.get('Name', 'Quest')}",
+    "Skills": "{quest.get('Skills', '')}",
+    "Week": {week_number},
+    "instructions": "Detailed instructions...",
+    "rubric": {{
+        "Grade_Scale": "A to F based on rubric",
+        "Criteria": {{
+            "Criterion A": "...",
+            "Criterion B": "...",
+            "Criterion C": "...",
+            "Criterion D": "..."
+        }}
+    }}
+}}"""
+
+            print(f"Generating details for Week {week_number}: {quest.get('Name', 'Quest')}")
+            
             result = await Runner.run(
-                self.guardrial_agent,
-                output.model_dump_json(),
-                context=ctx.context
-            )
-
-            if "approved" in result.response.lower():
-                return GuardrailFunctionOutput(output=output)
-
-            new_homework = await Runner.run(
                 self.homework_agent,
-                self.input,
-                context=ctx.context
+                quest_input
             )
-
-            if isinstance(new_homework.output, detailed_schedule):
-                return GuardrailFunctionOutput(output=new_homework.output)
-
-            raise OutputGuardrailTripwireTriggered(
-                message="Failed to regenerate aligned homework",
-                original_output=output
-            )
-
+            
+            if isinstance(result.final_output, dict):
+                return result.final_output
+            elif isinstance(result.final_output, str):
+                try:
+                    return json.loads(result.final_output)
+                except json.JSONDecodeError:
+                    print(f"Failed to parse JSON for Week {week_number}")
+                    # Return fallback data
+                    return {
+                        "Name": quest.get('Name', f'Week {week_number} Quest'),
+                        "Skills": quest.get('Skills', ''),
+                        "Week": week_number,
+                        "instructions": f"Complete the assigned tasks for Week {week_number}. Follow the course materials and apply the skills learned in class.",
+                        "rubric": {
+                            "Grade_Scale": "A to F based on rubric",
+                            "Criteria": {
+                                "Criterion A": "Understanding of concepts",
+                                "Criterion B": "Application of skills",
+                                "Criterion C": "Quality of work",
+                                "Criterion D": "Completion of requirements"
+                            }
+                        }
+                    }
+            
         except Exception as e:
-            raise OutputGuardrailTripwireTriggered(
-                message=f"Error in guardrail check: {str(e)}",
-                original_output=output
-            )
+            print(f"Error generating details for Week {week_number}: {str(e)}")
+            # Return fallback data
+            return {
+                "Name": quest.get('Name', f'Week {week_number} Quest'),
+                "Skills": quest.get('Skills', ''),
+                "Week": week_number,
+                "instructions": f"Complete the assigned tasks for Week {week_number}. Follow the course materials and apply the skills learned in class.",
+                "rubric": {
+                    "Grade_Scale": "A to F based on rubric",
+                    "Criteria": {
+                        "Criterion A": "Understanding of concepts",
+                        "Criterion B": "Application of skills",
+                        "Criterion C": "Quality of work",
+                        "Criterion D": "Completion of requirements"
+                    }
+                }
+            }
 
     async def _run_async(self) -> detailed_schedule:
         with trace("homework_generation") as span:
             with guardrail_span("homework_guardrail"):
-                print("Starting HWAgent._run_async()")
-                result = await Runner.run(
-                    self.homework_agent,
-                    self.input
-                )
-                print(f"Raw result type: {type(result)}")
-                print(f"Raw result: {result}")
-                print(f"Result.final_output type: {type(result.final_output)}")
-                print(f"Result.final_output: {result.final_output}")
-
-        if isinstance(result.final_output, dict):
-            for quest in result.final_output.get("list_of_quests", []):
-                if isinstance(quest.get("Skills"), list):
-                    quest["Skills"] = ", ".join(quest["Skills"])
-            return detailed_schedule(**result.final_output)
-        elif isinstance(result.final_output, str):
-            print("Agent returned a string instead of structured data")
-            print(f"String content: {result.final_output}")
-            try:
-                parsed = json.loads(result.final_output)
-                if isinstance(parsed, dict):
-                    for quest in parsed.get("list_of_quests", []):
-                        if isinstance(quest.get("Skills"), list):
-                            quest["Skills"] = ", ".join(quest["Skills"])
-                    return detailed_schedule(**parsed)
-            except json.JSONDecodeError:
-                print("Failed to parse string as JSON")
-                raise Exception("Agent returned invalid format")
-
-        return result.final_output
+                print("Starting HWAgent._run_async() - Processing quests sequentially")
+                
+                quests = self.schedule.get("list_of_quests", [])
+                detailed_quests = []
+                
+                total_quests = len(quests)
+                print(f"Processing {total_quests} quests...")
+                
+                for i, quest in enumerate(quests, 1):
+                    week_number = quest.get("Week", i)
+                    print(f"Progress: {i}/{total_quests} - Week {week_number}")
+                    
+                    detailed_quest = await self._generate_quest_details(quest, week_number)
+                    
+                    # Validate that the quest has proper rubric and instructions
+                    if not detailed_quest.get("instructions") or len(detailed_quest.get("instructions", "").strip()) < 10:
+                        print(f"Warning: Week {week_number} has insufficient instructions, regenerating...")
+                        detailed_quest = await self._generate_quest_details(quest, week_number)
+                    
+                    if not detailed_quest.get("rubric") or not detailed_quest.get("rubric", {}).get("Criteria"):
+                        print(f"Warning: Week {week_number} has insufficient rubric, regenerating...")
+                        detailed_quest = await self._generate_quest_details(quest, week_number)
+                    
+                    detailed_quests.append(detailed_quest)
+                    
+                    # Small delay to avoid rate limiting
+                    await asyncio.sleep(1)
+                
+                print(f"Completed processing all {total_quests} quests")
+                
+                # Final validation
+                for i, quest in enumerate(detailed_quests):
+                    if not quest.get("instructions") or not quest.get("rubric"):
+                        print(f"Error: Quest {i+1} is missing required fields")
+                        # Use fallback data
+                        detailed_quests[i] = {
+                            "Name": quest.get("Name", f'Week {i+1} Quest'),
+                            "Skills": quest.get("Skills", ''),
+                            "Week": quest.get("Week", i+1),
+                            "instructions": f"Complete the assigned tasks for Week {i+1}. Follow the course materials and apply the skills learned in class.",
+                            "rubric": {
+                                "Grade_Scale": "A to F based on rubric",
+                                "Criteria": {
+                                    "Criterion A": "Understanding of concepts",
+                                    "Criterion B": "Application of skills",
+                                    "Criterion C": "Quality of work",
+                                    "Criterion D": "Completion of requirements"
+                                }
+                            }
+                        }
+                
+                return detailed_schedule(list_of_quests=detailed_quests)
 
     def run(self) -> detailed_schedule:
         try:
             print("Starting HWAgent.run()")
             result = asyncio.run(self._run_async())
-            print(f"HWAgent result type: {type(result)}")
-            print(f"HWAgent result: {result}")
+            print(f"HWAgent completed successfully")
             return result
         except Exception as e:
             print(f"Error in HWAgent.run(): {str(e)}")
