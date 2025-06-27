@@ -5,6 +5,17 @@ import os
 import json
 from dotenv import load_dotenv
 from openai.types.shared_params.response_format_json_schema import ResponseFormatJSONSchema
+import decimal
+
+def convert_decimal(obj):
+    if isinstance(obj, list):
+        return [convert_decimal(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {k: convert_decimal(v) for k, v in obj.items()}
+    elif isinstance(obj, decimal.Decimal):
+        return float(obj)
+    else:
+        return obj
 
 load_dotenv()
 
@@ -238,6 +249,7 @@ class ltg:
 
 class update:
     def __init__(self, assistant_id, student, quests, instructor, week=None, submission=None):
+        student = convert_decimal(student)
         temp_student_file = "student.json"
         with open(temp_student_file, "w") as f:
             json.dump(student, f, indent=2)
@@ -246,9 +258,7 @@ class update:
             purpose="assistants"
         )
 
-        # Clean up the temporary file
-
-        os.remove(temp_student_file)
+        temp_quests_file = "quest.json"
         try:
             with open(temp_quests_file, "w") as f:
                 json.dump(quests, f, indent=2)

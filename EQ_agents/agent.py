@@ -21,7 +21,7 @@ class IndividualQuest(BaseModel):
     Skills: str = Field(description="Skills the student will practice through this quest")
     Week: int = Field(description="Week the student will work on this quest")
     instructions: str = Field(description="Detailed instructions for completing the quest")
-    rubric: dict = Field(description="Grading criteria and expectations for the quest")
+    rubric: Rubric = Field(description="Grading criteria and expectations for the quest")
 
 class BaseQuest(BaseModel):
     Name: str = Field(description="Name of the quest")
@@ -137,29 +137,6 @@ For each of the 18 quests in the schedule above, please generate:
 
 IMPORTANT: You must generate detailed homework for ALL 18 quests in the schedule. Do not skip any quests.
 
-Your response must follow this format exactly:
-
-{{
-  "list_of_quests": [
-    {{
-      "Name": "Quest Name",
-      "Skills": "Skill A, Skill B, Skill C",
-      "Week": 1,
-      "instructions": "Step-by-step instructions...",
-      "rubric": {{
-        "Grade_Scale": "Letter grades based on mastery",
-        "Criteria": {{
-          "Criterion A": "...",
-          "Criterion B": "...",
-          "Criterion C": "...",
-          "Criterion D": "..."
-        }}
-      }}
-    }},
-    ...
-  ]
-}}
-
 Only return valid **JSON**, no markdown, no commentary, and no code blocks.
 """
 
@@ -200,7 +177,8 @@ Only return valid **JSON**, no markdown, no commentary, and no code blocks.
                 FileSearchTool(
                     vector_store_ids=[self.vector_store]
                 )
-            ]
+            ],
+            output_type=Rubric
         )
 
         self.homework_agent = Agent(
@@ -216,27 +194,6 @@ Only return valid **JSON**, no markdown, no commentary, and no code blocks.
             - Detailed step-by-step instructions
             - A complete rubric with grade scale and 4 criteria
             
-            You must return a valid JSON object with the following structure:
-            {
-                "list_of_quests": [
-                    {
-                        "Name": "Quest Name",
-                        "Skills": "Skill A, Skill B, Skill C",
-                        "Week": 1,
-                        "instructions": "Detailed step-by-step instructions...",
-                        "rubric": {
-                            "Grade_Scale": "A to F based on rubric",
-                            "Criteria": {
-                                "Criterion A": "Description of criterion A",
-                                "Criterion B": "Description of criterion B",
-                                "Criterion C": "Description of criterion C",
-                                "Criterion D": "Description of criterion D"
-                            }
-                        }
-                    }
-                ]
-            }
-            
             IMPORTANT: Ensure you generate exactly 18 quests, one for each week in the schedule.
             Make sure to return only valid JSON, no markdown formatting or code blocks.
             """,
@@ -246,7 +203,8 @@ Only return valid **JSON**, no markdown, no commentary, and no code blocks.
                     vector_store_ids=[self.vector_store]
                 )
             ],
-            handoffs=[self.rubric_agent, self.instruction_agent]
+            handoffs=[self.rubric_agent, self.instruction_agent],
+            output_type=detailed_schedule
         )
 
     @output_guardrail()
@@ -328,34 +286,34 @@ Only return valid **JSON**, no markdown, no commentary, and no code blocks.
             traceback.print_exc()
             raise
 
-# Add response format schema for homework agent
-homework_response_format = {
-    "type": "object",
-    "properties": {
-        "list_of_quests": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "Name": {"type": "string"},
-                    "Skills": {"type": "string"},
-                    "Week": {"type": "integer"},
-                    "instructions": {"type": "string"},
-                    "rubric": {
-                        "type": "object",
-                        "properties": {
-                            "Grade_Scale": {"type": "string"},
-                            "Criteria": {"type": "object"}
-                        },
-                        "required": ["Grade_Scale", "Criteria"]
-                    }
-                },
-                "required": ["Name", "Skills", "Week", "instructions", "rubric"]
-            }
-        }
-    },
-    "required": ["list_of_quests"]
-}
+# # Add response format schema for homework agent
+# homework_response_format = {
+#     "type": "object",
+#     "properties": {
+#         "list_of_quests": {
+#             "type": "array",
+#             "items": {
+#                 "type": "object",
+#                 "properties": {
+#                     "Name": {"type": "string"},
+#                     "Skills": {"type": "string"},
+#                     "Week": {"type": "integer"},
+#                     "instructions": {"type": "string"},
+#                     "rubric": {
+#                         "type": "object",
+#                         "properties": {
+#                             "Grade_Scale": {"type": "string"},
+#                             "Criteria": {"type": "object"}
+#                         },
+#                         "required": ["Grade_Scale", "Criteria"]
+#                     }
+#                 },
+#                 "required": ["Name", "Skills", "Week", "instructions", "rubric"]
+#             }
+#         }
+#     },
+#     "required": ["list_of_quests"]
+# }
 
 # def run_agent(student, period_id):
 #     period = Period.get_period(period_id)
