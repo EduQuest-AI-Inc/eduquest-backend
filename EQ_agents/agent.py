@@ -132,11 +132,9 @@ For each of the 18 quests in the schedule above, please generate:
 2. A **detailed 'instructions'** field in paragraph form
 3. A **'rubric'** object that includes:
    - A 'Grade_Scale' field (e.g., 'A to F based on rubric')
-   - A 'Criteria' dictionary with at least 4 keys: 'Criterion A', 'Criterion B', etc.
+   - A 'Criteria' dictionary with at least 4 keys
 
 IMPORTANT: You must generate detailed homework for ALL 18 quests in the schedule. Do not skip any quests.
-
-Only return valid **JSON**, no markdown, no commentary, and no code blocks.
 """
         self.timeout_seconds = timeout_seconds
 
@@ -190,7 +188,7 @@ Only return valid **JSON**, no markdown, no commentary, and no code blocks.
             - A detailed name that reflects the quest content
             - A comprehensive skills list as a comma-separated string
             - Detailed step-by-step instructions
-            - A complete rubric with grade scale and 4 criteria
+            - A complete rubric with grade scales for each criterion
             IMPORTANT: Ensure you generate exactly 18 quests, one for each week in the schedule.
 
             Make sure to return only valid JSON, no markdown formatting or code blocks.
