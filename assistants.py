@@ -458,6 +458,10 @@ class create_class:
             instructions=update_inst,
             model="o3-mini",
             tools=[{"type": "file_search"}],
+            response_format={
+            "type": "json_schema",
+            "json_schema": json.loads(update_response_format)
+        }
         )
         self.update_assistant = client.beta.assistants.update(
             assistant_id=self.update_assistant.id,
@@ -480,7 +484,33 @@ class create_class:
             tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
             )
 
-
+update_response_format = '''
+{
+  "name": "quest_feedback",
+  "strict": false,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "grade": {
+        "type": "integer",
+        "description": "The grade received for the quest.",
+        "minimum": 0,
+        "maximum": 100
+      },
+      "feedback": {
+        "type": "string",
+        "description": "Comments or feedback about the quest."
+      },
+      "recommended_change": {
+        "type": "string",
+        "description": "Suggestions for changes in future quests."
+      }
+    },
+    "additionalProperties": false,
+    "required": []
+  }
+}
+'''
 
 ltg_response_format = '''{
   "name": "goal_setting",
