@@ -5,6 +5,17 @@ import os
 import json
 from dotenv import load_dotenv
 from openai.types.shared_params.response_format_json_schema import ResponseFormatJSONSchema
+import decimal
+
+def convert_decimal(obj):
+    if isinstance(obj, list):
+        return [convert_decimal(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {k: convert_decimal(v) for k, v in obj.items()}
+    elif isinstance(obj, decimal.Decimal):
+        return float(obj)
+    else:
+        return obj
 
 load_dotenv()
 
@@ -258,6 +269,7 @@ class ltg:
 
 class update:
     def __init__(self, assistant_id, student, quests, instructor, week=None, submission=None):
+        student = convert_decimal(student)
         temp_student_file = "student.json"
         with open(temp_student_file, "w") as f:
             json.dump(student, f, indent=2)
@@ -266,11 +278,13 @@ class update:
             purpose="assistants"
         )
 
+
         # Clean up the temporary file
 
         os.remove(temp_student_file)
         # Create a temporary file with quests data
         temp_quests_file = "temp_quests.json"
+
         try:
             with open(temp_quests_file, "w") as f:
                 json.dump(quests, f, indent=2)
@@ -398,19 +412,6 @@ class update:
         self.conversation_log.append({"role": "assistant", "content": response})
         return response
 
-
-# class create_class:
-#     def __init__(self, class_name, filePaths=None):
-#         self.class_name = class_name
-#         self.filePaths = list(filePaths)
-#         if len(self.filePaths) > 0:
-#             self.file_dir = {}
-#             self.vector_store = client.vector_stores.create(name=self.class_name)
-#             self.file_streams = [open(path, "rb") for path in self.filePaths]
-#             self.file_batch = client.vector_stores.file_batches.upload_and_poll(
-#                 vector_store_id=self.vector_store.id, files=self.file_streams
-#             )
-
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class create_class:
     def __init__(self, class_name):
@@ -444,6 +445,10 @@ class create_class:
             instructions=update_inst,
             model="o3-mini",
             tools=[{"type": "file_search"}],
+            response_format={
+            "type": "json_schema",
+            "json_schema": json.loads(update_response_format)
+        }
         )
         self.update_assistant = client.beta.assistants.update(
             assistant_id=self.update_assistant.id,
@@ -466,7 +471,33 @@ class create_class:
             tool_resources={"file_search": {"vector_store_ids": [self.vector_store.id]}},
             )
 
-
+update_response_format = '''
+{
+  "name": "quest_feedback",
+  "strict": false,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "grade": {
+        "type": "integer",
+        "description": "The grade received for the quest.",
+        "minimum": 0,
+        "maximum": 100
+      },
+      "feedback": {
+        "type": "string",
+        "description": "Comments or feedback about the quest."
+      },
+      "recommended_change": {
+        "type": "string",
+        "description": "Suggestions for changes in future quests."
+      }
+    },
+    "additionalProperties": false,
+    "required": []
+  }
+}
+'''
 
 ltg_response_format = '''{
   "name": "goal_setting",
@@ -491,7 +522,9 @@ ltg_response_format = '''{
       }
     },
     "required": [
-      "message"
+      "message",
+      "chosen_goal",
+      "goals"
     ],
     "additionalProperties": false
   }
