@@ -205,10 +205,9 @@ IMPORTANT: You must generate detailed homework for ALL 18 quests in the schedule
 
     async def _generate_quest_details(self, quest, week_number):
         """Generate detailed instructions and rubric for a single quest"""
-        try:
-            student_info = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}."""
+        student_info = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}."""
 
-            quest_input = f"""{student_info}
+        quest_input = f"""{student_info}
 
 Please generate detailed homework for this quest:
 
@@ -220,55 +219,14 @@ Generate:
 2. A complete rubric with grade scale and 4 criteria
 """
 
-            print(f"Generating details for Week {week_number}: {quest.get('Name', 'Quest')}")
-            
-            result = await Runner.run(
-                self.homework_agent,
-                quest_input
-            )
-            
-            if isinstance(result.final_output, dict):
-                return result.final_output
-            elif isinstance(result.final_output, str):
-                try:
-                    return json.loads(result.final_output)
-                except json.JSONDecodeError:
-                    print(f"Failed to parse JSON for Week {week_number}")
-                    # Return fallback data
-                    return {
-                        "Name": quest.get('Name', f'Week {week_number} Quest'),
-                        "Skills": quest.get('Skills', ''),
-                        "Week": week_number,
-                        "instructions": f"Complete the assigned tasks for Week {week_number}. Follow the course materials and apply the skills learned in class.",
-                        "rubric": {
-                            "Grade_Scale": "A to F based on rubric",
-                            "Criteria": {
-                                "Criterion A": "Understanding of concepts",
-                                "Criterion B": "Application of skills",
-                                "Criterion C": "Quality of work",
-                                "Criterion D": "Completion of requirements"
-                            }
-                        }
-                    }
-            
-        except Exception as e:
-            print(f"Error generating details for Week {week_number}: {str(e)}")
-            # Return fallback data
-            return {
-                "Name": quest.get('Name', f'Week {week_number} Quest'),
-                "Skills": quest.get('Skills', ''),
-                "Week": week_number,
-                "instructions": f"Complete the assigned tasks for Week {week_number}. Follow the course materials and apply the skills learned in class.",
-                "rubric": {
-                    "Grade_Scale": "A to F based on rubric",
-                    "Criteria": {
-                        "Criterion A": "Understanding of concepts",
-                        "Criterion B": "Application of skills",
-                        "Criterion C": "Quality of work",
-                        "Criterion D": "Completion of requirements"
-                    }
-                }
-            }
+        print(f"Generating details for Week {week_number}: {quest.get('Name', 'Quest')}")
+        
+        result = await Runner.run(
+            self.homework_agent,
+            quest_input
+        )
+        
+        return result.final_output
 
     async def _run_async(self) -> detailed_schedule:
         with trace("homework_generation") as span:
@@ -286,16 +244,6 @@ Generate:
                     print(f"Progress: {i}/{total_quests} - Week {week_number}")
                     
                     detailed_quest = await self._generate_quest_details(quest, week_number)
-                    
-                    # Validate that the quest has proper rubric and instructions
-                    if not detailed_quest.get("instructions") or len(detailed_quest.get("instructions", "").strip()) < 10:
-                        print(f"Warning: Week {week_number} has insufficient instructions, regenerating...")
-                        detailed_quest = await self._generate_quest_details(quest, week_number)
-                    
-                    if not detailed_quest.get("rubric") or not detailed_quest.get("rubric", {}).get("Criteria"):
-                        print(f"Warning: Week {week_number} has insufficient rubric, regenerating...")
-                        detailed_quest = await self._generate_quest_details(quest, week_number)
-                    
                     detailed_quests.append(detailed_quest)
                     
                     # Small delay to avoid rate limiting
@@ -303,69 +251,13 @@ Generate:
                 
                 print(f"Completed processing all {total_quests} quests")
                 
-                # Final validation
-                for i, quest in enumerate(detailed_quests):
-                    if not quest.get("instructions") or not quest.get("rubric"):
-                        print(f"Error: Quest {i+1} is missing required fields")
-                        # Use fallback data
-                        detailed_quests[i] = {
-                            "Name": quest.get("Name", f'Week {i+1} Quest'),
-                            "Skills": quest.get("Skills", ''),
-                            "Week": quest.get("Week", i+1),
-                            "instructions": f"Complete the assigned tasks for Week {i+1}. Follow the course materials and apply the skills learned in class.",
-                            "rubric": {
-                                "Grade_Scale": "A to F based on rubric",
-                                "Criteria": {
-                                    "Criterion A": "Understanding of concepts",
-                                    "Criterion B": "Application of skills",
-                                    "Criterion C": "Quality of work",
-                                    "Criterion D": "Completion of requirements"
-                                }
-                            }
-                        }
-                
                 return detailed_schedule(list_of_quests=detailed_quests)
 
     def run(self) -> detailed_schedule:
-        try:
-            print("Starting HWAgent.run()")
-            result = asyncio.run(self._run_async())
-            print(f"HWAgent completed successfully")
-            return result
-        except Exception as e:
-            print(f"Error in HWAgent.run(): {str(e)}")
-            import traceback
-            traceback.print_exc()
-            raise
-
-# # Add response format schema for homework agent
-# homework_response_format = {
-#     "type": "object",
-#     "properties": {
-#         "list_of_quests": {
-#             "type": "array",
-#             "items": {
-#                 "type": "object",
-#                 "properties": {
-#                     "Name": {"type": "string"},
-#                     "Skills": {"type": "string"},
-#                     "Week": {"type": "integer"},
-#                     "instructions": {"type": "string"},
-#                     "rubric": {
-#                         "type": "object",
-#                         "properties": {
-#                             "Grade_Scale": {"type": "string"},
-#                             "Criteria": {"type": "object"}
-#                         },
-#                         "required": ["Grade_Scale", "Criteria"]
-#                     }
-#                 },
-#                 "required": ["Name", "Skills", "Week", "instructions", "rubric"]
-#             }
-#         }
-#     },
-#     "required": ["list_of_quests"]
-# }
+        print("Starting HWAgent.run()")
+        result = asyncio.run(self._run_async())
+        print(f"HWAgent completed successfully")
+        return result
 
 # def run_agent(student, period_id):
 #     period = Period.get_period(period_id)
