@@ -412,19 +412,6 @@ class update:
         self.conversation_log.append({"role": "assistant", "content": response})
         return response
 
-
-# class create_class:
-#     def __init__(self, class_name, filePaths=None):
-#         self.class_name = class_name
-#         self.filePaths = list(filePaths)
-#         if len(self.filePaths) > 0:
-#             self.file_dir = {}
-#             self.vector_store = client.vector_stores.create(name=self.class_name)
-#             self.file_streams = [open(path, "rb") for path in self.filePaths]
-#             self.file_batch = client.vector_stores.file_batches.upload_and_poll(
-#                 vector_store_id=self.vector_store.id, files=self.file_streams
-#             )
-
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class create_class:
     def __init__(self, class_name):
