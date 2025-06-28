@@ -48,7 +48,7 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 ASSISTANT_ID_INITIAL = 'asst_bmsuvfNCaHJYmqTlnT52AzXE'  # initial conversation assistant
-ASSISTANT_ID_UPDATE = 'asst_oQlKvMpoDPp80zEabjvUiflj'   # update assistant
+# ASSISTANT_ID_UPDATE = 'asst_oQlKvMpoDPp80zEabjvUiflj'   # update assistant
 
 class ConversationService:
     def __init__(self):
@@ -123,7 +123,7 @@ class ConversationService:
             conv = ini_conv(student, thread_id)
         elif conversation_type == "update":
             conv = UpdateAssistant(
-                assistant_id=ASSISTANT_ID_UPDATE,
+                assistant_id=ASSISTANT_ID_INITIAL,
                 instructor=True,  # or False depending on who is continuing
                 week=3,
                 thread_id=thread_id
@@ -194,6 +194,22 @@ class ConversationService:
         user_profile_dict = user  # user is already a dictionary, not a list
         print("DEBUG user_profile_dict:", user_profile_dict)
 
+        # Get the update assistant ID from the period (same logic as LTG assistant)
+        update_assistant_id = 'asst_oQlKvMpoDPp80zEabjvUiflj'  # Default assistant ID
+        if period_id:
+            period = self.period_dao.get_period_by_id(period_id)
+            if period:
+                custom_update_assistant_id = period.get('update_assistant_id')
+                if custom_update_assistant_id and custom_update_assistant_id != "placeholder_update_assistant_id":
+                    update_assistant_id = custom_update_assistant_id
+                    print(f"Using custom update assistant ID: {update_assistant_id}")
+                else:
+                    print(f"Using default update assistant ID: {update_assistant_id}")
+            else:
+                print(f"Period {period_id} not found, using default assistant ID")
+        else:
+            print("No period_id provided, using default assistant ID")
+
         quests_data = None
         try:
             # parsing it as a json first
@@ -222,7 +238,7 @@ class ConversationService:
                     raise Exception(f"Failed to load quests from file: {file_error}")
 
         update_conversation = UpdateAssistant(
-            ASSISTANT_ID_UPDATE,
+            update_assistant_id,  # Use the custom or default assistant ID
             user_profile_dict,  
             quests_data,        
             is_instructor,
@@ -243,7 +259,8 @@ class ConversationService:
             thread_id=update_conversation.thread_id,
             user_id=student_id if role == "teacher" and student_id else user_id,
             role=role,
-            conversation_type="update"
+            conversation_type="update",
+            period_id=period_id
         )
         self.conversation_dao.add_conversation(conversation)
 
@@ -285,8 +302,24 @@ class ConversationService:
         if not student:
             raise Exception("Student not found")
 
+        update_assistant_id = 'asst_oQlKvMpoDPp80zEabjvUiflj'  # Default assistant ID
+        period_id = conversation.get('period_id')
+        if period_id:
+            period = self.period_dao.get_period_by_id(period_id)
+            if period:
+                custom_update_assistant_id = period.get('update_assistant_id')
+                if custom_update_assistant_id and custom_update_assistant_id != "placeholder_update_assistant_id":
+                    update_assistant_id = custom_update_assistant_id
+                    print(f"Using custom update assistant ID for continuation: {update_assistant_id}")
+                else:
+                    print(f"Using default update assistant ID for continuation: {update_assistant_id}")
+            else:
+                print(f"Period {period_id} not found, using default assistant ID for continuation")
+        else:
+            print("No period_id in conversation, using default assistant ID for continuation")
+
         # Continue conversation
-        update_conv = UpdateAssistant(ASSISTANT_ID_UPDATE, student, None, conversation.get('role') == "instructor")
+        update_conv = UpdateAssistant(update_assistant_id, student, None, conversation.get('role') == "instructor")
         update_conv.thread_id = thread_id
 
         try:
