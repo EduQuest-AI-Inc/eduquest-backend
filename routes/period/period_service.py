@@ -306,6 +306,13 @@ class PeriodService:
             # Update the weekly quest with detailed homework information
             save_result = self.quest_service.update_weekly_quest_with_homework(homework_dict, user_id, period_id)
             
+            # Check if individual quests were created, if not create them
+            individual_quests = self.quest_service.get_individual_quests_for_student_and_period(user_id, period_id)
+            if not individual_quests:
+                print("DEBUG: No individual quests found, creating them from homework data")
+                create_result = self.quest_service.create_individual_quests_from_homework(homework_dict, user_id, period_id)
+                print(f"DEBUG: Created individual quests: {create_result}")
+            
             return {
                 "homework": homework_dict,
                 "message": "Homework generated and saved successfully",

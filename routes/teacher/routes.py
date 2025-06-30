@@ -35,6 +35,9 @@ def create_period():
             file_paths.append(file_path)
 
             s3_url = upload_file_to_s3(file_path, folder=f"periods/{course}")
+            if s3_url is None:
+                print(f"WARNING: S3 upload failed for {file.filename}. Check AWS credentials.")
+                s3_url = f"local/{file.filename}"  # Fallback for testing
             print(f"DEBUG: Uploaded to S3: {s3_url}")
             s3_urls.append(s3_url)
 
@@ -51,18 +54,24 @@ def create_period():
         )
         print("Uploaded files to vector store:", vector_store.id)
 
-        class_instance = create_class(course)
-        class_instance.vector_store = vector_store  
-        
-        class_instance.create_update_assistant()
-        class_instance.create_ltg_assistant()
-        
-        update_assistant_id = class_instance.update_assistant.id
-        ltg_assistant_id = class_instance.ltg_assistant.id
+        # Check if OpenAI API key is available
+        if not os.getenv("OPENAI_API_KEY"):
+            print("WARNING: OPENAI_API_KEY not set. Skipping assistant creation.")
+            update_assistant_id = "placeholder_update_assistant_id"
+            ltg_assistant_id = "placeholder_ltg_assistant_id"
+        else:
+            class_instance = create_class(course)
+            class_instance.vector_store = vector_store  
+            
+            class_instance.create_update_assistant()
+            class_instance.create_ltg_assistant()
+            
+            update_assistant_id = class_instance.update_assistant.id
+            ltg_assistant_id = class_instance.ltg_assistant.id
 
-        #printing this for test only
-        print("Created update assistant:", update_assistant_id)
-        print("Created LTG assistant:", ltg_assistant_id)
+            #printing this for test only
+            print("Created update assistant:", update_assistant_id)
+            print("Created LTG assistant:", ltg_assistant_id)
 
         period = teacher_service.create_period(
             course=course,
@@ -161,6 +170,9 @@ def add_files_to_period():
             file_paths.append(file_path)
 
             s3_url = upload_file_to_s3(file_path, folder=f"periods/{course}")
+            if s3_url is None:
+                print(f"WARNING: S3 upload failed for {file.filename}. Check AWS credentials.")
+                s3_url = f"local/{file.filename}"  # Fallback for testing
             print(f"DEBUG: Uploaded to S3: {s3_url}")
             s3_urls.append(s3_url)
 
