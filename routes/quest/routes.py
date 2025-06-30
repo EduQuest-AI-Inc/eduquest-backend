@@ -141,4 +141,30 @@ def verify_quest_structure(period_id):
         return jsonify(verification), 200
     except Exception as e:
         print(f"Error verifying quest structure: {str(e)}")
-        return jsonify({"error": "Failed to verify quest structure"}), 500 
+        return jsonify({"error": "Failed to verify quest structure"}), 500
+
+@quest_bp.route('/individual-quests/<individual_quest_id>/details', methods=['GET'])
+def get_individual_quest_details(individual_quest_id):
+    """Get a specific individual quest details from the individual_quest table."""
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Authorization header missing or invalid"}), 401
+        auth_token = auth_header.split(" ", 1)[1]
+
+        sessions = session_dao.get_sessions_by_auth_token(auth_token)
+        if not sessions:
+            return jsonify({"error": "Invalid auth token"}), 401
+
+        # Get the individual quest directly from the individual_quest table
+        from data_access.individual_quest_dao import IndividualQuestDAO
+        quest_dao = IndividualQuestDAO()
+        quest = quest_dao.get_individual_quest_by_id(individual_quest_id)
+        
+        if quest:
+            return jsonify(quest), 200
+        else:
+            return jsonify({"error": "Individual quest not found"}), 404
+    except Exception as e:
+        print(f"Error getting individual quest details: {str(e)}")
+        return jsonify({"error": "Failed to get individual quest details"}), 500 

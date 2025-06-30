@@ -341,7 +341,7 @@ class update:
             )
         elif not self.instructor:
             initial_message = (
-                f'You are grading a quest submission from a student. This is for week {self.week}. Please grade and provide feedback the quest submission based on the provided quest details and rubric')
+                f'You are grading a quest submission from a student. This is for week {self.week}. Please grade and provide feedback the quest submission based on the provided quest details and rubric.')
             message = openai.beta.threads.messages.create(
                 thread_id=self.thread_id,
                 role="user",
@@ -384,6 +384,16 @@ class update:
         # print(f"EduQuest: {messages}")
         # print(f"Response: {response}")
         self.conversation_log.append({"role": "assistant", "content": response})
+
+        #parsing response as json for student
+        if not self.instructor:
+            try:
+                response_json = json.loads(response)
+                return json.dumps(response_json)
+            except json.JSONDecodeError:
+                print(f"Warning: Could not parse assistant response as JSON: {response}")
+                return response
+        
         return response
 
     def cont_conv(self, user_input):
