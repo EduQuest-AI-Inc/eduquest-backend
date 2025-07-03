@@ -75,7 +75,7 @@ class ConversationService:
             initial_conversation = ini_conv(student)
         elif conversation_type == "update":
             initial_conversation = UpdateAssistant(
-                assistant_id=ASSISTANT_ID_UPDATE,
+                assistant_id=ASSISTANT_ID_INITIAL,
                 instructor=True  # or False depending on user role
             )
         else:
@@ -251,6 +251,55 @@ class ConversationService:
 
         if not raw_response:
             raise Exception("Failed to initiate update conversation")
+
+        if not is_instructor and week and student_id:
+            try:
+                response_data = json.loads(raw_response)
+                grade = response_data.get('grade')
+                feedback = response_data.get('feedback')
+                
+                if grade is not None and feedback is not None:
+                    from routes.quest.quest_service import QuestService
+                    quest_service = QuestService()
+                    
+                    individual_quests = quest_service.get_individual_quests_for_student(student_id)
+                    target_quest = None
+                    
+                    # First try to find quest by week and period_id (if period_id is provided)
+                    if period_id:
+                        for quest in individual_quests:
+                            if quest.get('week') == week and quest.get('period_id') == period_id:
+                                target_quest = quest
+                                break
+                    
+                    # If not found and period_id is None, try to find by week only
+                    if not target_quest:
+                        for quest in individual_quests:
+                            if quest.get('week') == week:
+                                target_quest = quest
+                                print(f"Found quest by week only: {quest.get('individual_quest_id')} (period_id: {quest.get('period_id')})")
+                                break
+                    
+                    if target_quest:
+                        from data_access.individual_quest_dao import IndividualQuestDAO
+                        quest_dao = IndividualQuestDAO()
+                        quest_dao.update_quest_grade_and_feedback(
+                            target_quest['individual_quest_id'],
+                            str(grade),
+                            feedback
+                        )
+                        print(f"Saved grade {grade} and feedback for quest {target_quest['individual_quest_id']}")
+                    else:
+                        print(f"Warning: Could not find individual quest for student {student_id}, week {week}, period {period_id}")
+                        print(f"Available quests for student: {[(q.get('week'), q.get('period_id'), q.get('individual_quest_id')) for q in individual_quests]}")
+                else:
+                    print(f"Warning: Missing grade or feedback in response: {response_data}")
+                    
+            except json.JSONDecodeError as e:
+                print(f"Warning: Could not parse assistant response as JSON: {e}")
+                print(f"Raw response: {raw_response}")
+            except Exception as e:
+                print(f"Error saving grade and feedback: {e}")
 
         # update assistant returns a plain string       response_text = raw_response
 

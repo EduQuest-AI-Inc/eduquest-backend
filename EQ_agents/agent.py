@@ -14,7 +14,8 @@ from openai import vector_stores
 from pydantic import BaseModel, Field
 import asyncio
 from models.period import Period
-from models.rubric import Rubric
+from models.rubric import Rubric, Scale
+from pydantic import BaseModel, Field
 
 class IndividualQuest(BaseModel):
     Name: str = Field(description="Name of the quest")
@@ -182,14 +183,13 @@ IMPORTANT: You must generate detailed homework for ALL 18 quests in the schedule
         self.homework_agent = Agent(
             name="Homework Agent",
             instructions="""
-            You will generate detailed homework assignments including rubrics and detailed instructions for a student.
+            You will generate detailed homework assignments including rubrics and detailed instructions for EXISTING quests.
             
-            For each quest in the schedule, you must create:
-            - A detailed name that reflects the quest content
-            - A comprehensive skills list as a comma-separated string
-            - Detailed step-by-step instructions
+            IMPORTANT: Do NOT create new quests or modify the schedule. Only add detailed instructions and rubrics to the existing quest.
+            
+            For the given quest, you must create:
+            - Detailed step-by-step instructions that align with the quest's skills and objectives
             - A complete rubric with grade scales for each criterion
-            IMPORTANT: Ensure you generate exactly 18 quests, one for each week in the schedule.
 
             Make sure to return only valid JSON, no markdown formatting or code blocks.
             """,
@@ -200,23 +200,21 @@ IMPORTANT: You must generate detailed homework for ALL 18 quests in the schedule
                 )
             ],
             handoffs=[self.rubric_agent, self.instruction_agent],
-            output_type=detailed_schedule
+            output_type=IndividualQuest
         )
 
     async def _generate_quest_details(self, quest, week_number):
         """Generate detailed instructions and rubric for a single quest"""
-        student_info = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}."""
+        student_info = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long_term_goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}."""
 
         quest_input = f"""{student_info}
 
-Please generate detailed homework for this quest:
+Please generate detailed homework for this existing quest:
 
 Week {week_number}: {quest.get('Name', 'Quest')}
 Skills: {quest.get('Skills', '')}
 
-Generate:
-1. Detailed step-by-step instructions
-2. A complete rubric with grade scale and 4 criteria
+Generate ONLY the detailed instructions and rubric for this specific quest. Do NOT create a new schedule or modify the quest name/skills.
 """
 
         print(f"Generating details for Week {week_number}: {quest.get('Name', 'Quest')}")
