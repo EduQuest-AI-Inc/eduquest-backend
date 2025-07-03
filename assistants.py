@@ -88,11 +88,14 @@ class ini_conv:
         messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
         last_message = messages.data[0]
         response = last_message.content[0].text.value
+
         # self.conversation_log.append({"role": "assistant", "content": response})
 
         response_dict = json.loads(response)
+        # except json.JSONDecodeError:
+        #     response_dict = {"response": response}
+        
         response_dict["thread_id"] = self.thread_id
-
         return response_dict
 
     def cont_conv(self, user_input):
@@ -119,7 +122,7 @@ class ini_conv:
         messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
         last_message = messages.data[0]
         response = last_message.content[0].text.value
-        # self.conversation_log.append({"role": "assistant", "content": response})
+        
         return_message = json.loads(response)
 
         strengths = return_message.get('Strengths', [])

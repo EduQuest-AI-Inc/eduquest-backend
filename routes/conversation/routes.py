@@ -49,6 +49,9 @@ def profile_assistant():
         auth_token = auth_header.split(" ", 1)[1]
 
         result = conversation_service.start_profile_assistant(auth_token)
+        #always returns json
+        if isinstance(result, dict):
+            return jsonify(result), 200
         return result, 200
     except Exception as e:
         print(f"Error in initiate-profile-assistant: {e}")

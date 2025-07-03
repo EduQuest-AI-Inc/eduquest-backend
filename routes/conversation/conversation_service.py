@@ -75,7 +75,7 @@ class ConversationService:
             initial_conversation = ini_conv(student)
         elif conversation_type == "update":
             initial_conversation = UpdateAssistant(
-                assistant_id=ASSISTANT_ID_UPDATE,
+                assistant_id=ASSISTANT_ID_INITIAL,
                 instructor=True  # or False depending on user role
             )
         else:
