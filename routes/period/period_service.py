@@ -278,22 +278,42 @@ class PeriodService:
                     "Week": quest_item.week
                 })
             
-            schedule_dict = {"list_of_quests": schedule_quests}
-            print(f"DEBUG: Schedule dict for homework agent: {schedule_dict}")
+            # schedule_dict = {"list_of_quests": schedule_quests}
+            # print(f"DEBUG: Schedule dict for homework agent: {schedule_dict}")
             
             # Use improved HWAgent with timeout and error handling
             homework_agent = HWAgent(
                 student, 
                 period, 
-                schedule_dict,
-                timeout_seconds=300  # 5 minutes per quest
+                schedule_quests
             )
             homework = homework_agent.run()
             
             print(f"Homework type: {type(homework)}")
             print(f"Homework content: {homework}")
             
-            if hasattr(homework, 'model_dump'):
+            # Handle list of IndividualQuest objects
+            if isinstance(homework, list):
+                # Convert list of IndividualQuest objects to the expected dict format
+                homework_dict = {
+                    "list_of_quests": []
+                }
+                for quest in homework:
+                    if hasattr(quest, 'model_dump'):
+                        homework_dict["list_of_quests"].append(quest.model_dump())
+                    elif isinstance(quest, dict):
+                        homework_dict["list_of_quests"].append(quest)
+                    else:
+                        # Try to convert to dict manually if it's an IndividualQuest object
+                        quest_dict = {
+                            "Name": getattr(quest, 'Name', ''),
+                            "Skills": getattr(quest, 'Skills', ''),
+                            "Week": getattr(quest, 'Week', 1),
+                            "instructions": getattr(quest, 'instructions', ''),
+                            "rubric": getattr(quest, 'rubric', {})
+                        }
+                        homework_dict["list_of_quests"].append(quest_dict)
+            elif hasattr(homework, 'model_dump'):
                 homework_dict = homework.model_dump()
             elif isinstance(homework, dict):
                 homework_dict = homework

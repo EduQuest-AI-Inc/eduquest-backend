@@ -1,3 +1,9 @@
+import sys
+import os
+
+# Add the parent directory to Python path so we can import from eduquest-backend
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from agents import (
     Agent,
     Runner,
@@ -8,7 +14,9 @@ from agents import (
     RunContextWrapper,
     trace,
     guardrail_span
+
 )
+from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
 import json
 from openai import vector_stores
 from pydantic import BaseModel, Field
@@ -115,147 +123,139 @@ class SchedulesAgent:
         return asyncio.run(self._run_async())
 
 class HWAgent:
+    """A simpler homework agent that generates instructions and rubrics directly"""
+    
     def __init__(self, student, period, schedule, timeout_seconds=300):
         self.student = student
         self.period = period
-        self.vector_store = period["vector_store_id"]
         self.schedule = schedule
-        schedule_json = json.dumps(schedule, indent=2)
-
-        self.input = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}.
-
-The following is a course schedule consisting of 18 quests:
-
-{schedule_json}
-
-For each of the 18 quests in the schedule above, please generate:
-1. A **string** for the 'Skills' field (not a list) that summarizes the key skills practiced, separated by commas
-2. A **detailed 'instructions'** field in paragraph form
-3. A **'rubric'** object that includes:
-   - A 'Grade_Scale' field (e.g., 'A to F based on rubric')
-   - A 'Criteria' dictionary with at least 4 keys
-
-IMPORTANT: You must generate detailed homework for ALL 18 quests in the schedule. Do not skip any quests.
-"""
+        self.vector_store = period["vector_store_id"]
         self.timeout_seconds = timeout_seconds
-
-        self.guardrial_agent = Agent(
-            name="Guardrial Agent",
-            handoff_description="You check if the weekly quests align with the materials taught in class accurately and timely. If not, you will handoff to the Schedules Agent.",
-            instructions="You check if the weekly quests align with the materials taught in class for that corresponding week accurately and timely. If not, you will handoff to the Schedules Agent.",
-            model="gpt-o3",
-            tools=[
-                FileSearchTool(
-                    vector_store_ids=[self.vector_store]
-                )
-            ]
-        )
-
-        self.instruction_agent = Agent(
-            name="Instruction Agent",
-            handoff_description="""You specialize in providing detailed instructions for weekly quests""",
-            instructions="""
-            You will provide detailed instructions for the weekly quests. Make sure to address the materials taught in class for the corresponding week. 
-            """,
-            model="gpt-4.1-mini",
-            tools=[
-                FileSearchTool(
-                    vector_store_ids=[self.vector_store]
-                )
-            ]
-        )
-
-        self.rubric_agent = Agent(
-            name="Rubric Agent",
-            handoff_description="""You specialize in creating rubrics for weekly quests""",
-            instructions="""
-            You will create a detailed rubric for the weekly quests. Make sure to address the materials taught in class for the corresponding week.
-            """,
-            model="gpt-4.1-mini",
-            tools=[
-                FileSearchTool(
-                    vector_store_ids=[self.vector_store]
-                )
-            ],
-            output_type=Rubric
-        )
-
-        self.homework_agent = Agent(
-            name="Homework Agent",
-            instructions="""
-            You will generate detailed homework assignments including rubrics and detailed instructions for EXISTING quests.
+        
+    async def generate_instructions(self, quest) -> str:
+        """Generate detailed instructions for a quest"""
+        # Handle both dict and object formats
+        quest_name = quest.get("Name") if isinstance(quest, dict) else getattr(quest, "name", "")
+        quest_skills = quest.get("Skills") if isinstance(quest, dict) else getattr(quest, "skills", "")
+        
+        instruction_agent = Agent(
+            name="Instruction Generator",
+            instructions=f"""
+            You create detailed step-by-step instructions for a quest.
             
-            IMPORTANT: Do NOT create new quests or modify the schedule. Only add detailed instructions and rubrics to the existing quest.
+            Student Information:
+            - Name: {self.student["first_name"]} {self.student["last_name"]}
+            - Strengths: {self.student["strength"]}
+            - Weaknesses: {self.student["weakness"]}
+            - Interests: {self.student["interest"]}
+            - Learning Style: {self.student["learning_style"]}
+            - Grade: {self.student["grade"]}
             
-            For the given quest, you must create:
-            - Detailed step-by-step instructions that align with the quest's skills and objectives
-            - A complete rubric with grade scales for each criterion
-
-            Make sure to return only valid JSON, no markdown formatting or code blocks.
+            Create instructions that:
+            1. Are clear and numbered (1, 2, 3, etc.)
+            2. Align with the quest skills: {quest_skills}
+            3. Consider the student's profile above
+            4. Are practical and actionable
+            5. Connect to the student's interests where possible
+            
+            Return ONLY the instructions as a numbered list. No headers or extra text.
             """,
-            model="gpt-4.1-mini",
-            tools=[
-                FileSearchTool(
-                    vector_store_ids=[self.vector_store]
-                )
-            ],
-            handoffs=[self.rubric_agent, self.instruction_agent],
-            output_type=IndividualQuest
+            model="gpt-4o"
         )
-
-    async def _generate_quest_details(self, quest, week_number):
-        """Generate detailed instructions and rubric for a single quest"""
-        student_info = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long_term_goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}."""
-
-        quest_input = f"""{student_info}
-
-Please generate detailed homework for this existing quest:
-
-Week {week_number}: {quest.get('Name', 'Quest')}
-Skills: {quest.get('Skills', '')}
-
-Generate ONLY the detailed instructions and rubric for this specific quest. Do NOT create a new schedule or modify the quest name/skills.
-"""
-
-        print(f"Generating details for Week {week_number}: {quest.get('Name', 'Quest')}")
         
         result = await Runner.run(
-            self.homework_agent,
-            quest_input
+            instruction_agent,
+            f"Create detailed instructions for this quest: {quest_name} - Skills: {quest_skills}"
         )
         
         return result.final_output
-
-    async def _run_async(self) -> detailed_schedule:
-        with trace("homework_generation") as span:
-            with guardrail_span("homework_guardrail"):
-                print("Starting HWAgent._run_async() - Processing quests sequentially")
+    
+    async def generate_rubric(self, quest) -> Rubric:
+        """Generate a rubric for a quest"""
+        # Handle both dict and object formats
+        quest_name = quest.get("Name") if isinstance(quest, dict) else getattr(quest, "name", "")
+        quest_skills = quest.get("Skills") if isinstance(quest, dict) else getattr(quest, "skills", "")
+        
+        rubric_agent = Agent(
+            name="Rubric Generator",
+            instructions=f"""
+            You create grading rubrics for quests.
+            
+            For the quest "{quest_name}" focusing on skills: {quest_skills}
+            
+            Create a rubric with:
+            - Score_0: Complete failure or no submission
+            - Score_1: Minimal attempt with major issues
+            - Score_2: Below expectations, significant problems
+            - Score_3: Meets basic expectations
+            - Score_4: Good work, exceeds expectations in some areas
+            - Score_5: Excellent work, exceeds all expectations
+            
+            The Criteria should explain what aspects are being evaluated.
+            
+            Make the rubric specific to this quest's objectives.
+            """,
+            model="gpt-4o",
+            output_type=Rubric
+        )
+        
+        result = await Runner.run(
+            rubric_agent,
+            f"Create a rubric for: {quest_name}"
+        )
+        
+        return result.final_output
+    
+    async def process_quest(self, quest) -> IndividualQuest:
+        """Process a single quest to generate instructions and rubric"""
+        # Handle both dict and object formats
+        quest_name = quest.get("Name") if isinstance(quest, dict) else getattr(quest, "name", "")
+        quest_skills = quest.get("Skills") if isinstance(quest, dict) else getattr(quest, "skills", "")
+        quest_week = quest.get("Week") if isinstance(quest, dict) else getattr(quest, "week", 1)
+        
+        print(f"Processing quest: {quest_name}")
+        
+        # Generate instructions and rubric in parallel
+        instructions, rubric = await asyncio.gather(
+            self.generate_instructions(quest),
+            self.generate_rubric(quest)
+        )
+        
+        # Create the IndividualQuest object
+        individual_quest = IndividualQuest(
+            Name=quest_name,
+            Skills=quest_skills,
+            Week=quest_week,
+            instructions=instructions,
+            rubric=rubric
+        )
+        
+        return individual_quest
+    
+    def run(self) -> list[IndividualQuest]:
+        """Process all quests in the schedule"""
+        detailed_quests = []
+        total_quests = len(self.schedule)
+        
+        print(f"Starting HWAgent - Processing {total_quests} quests")
+        
+        for i, quest in enumerate(self.schedule, 1):
+            print(f"\nProgress: {i}/{total_quests}")
+            try:
+                detailed_quest = asyncio.run(self.process_quest(quest))
+                detailed_quests.append(detailed_quest)
+                print(f"✓ Completed quest {i}")
                 
-                quests = self.schedule.get("list_of_quests", [])
-                detailed_quests = []
-                
-                total_quests = len(quests)
-                print(f"Processing {total_quests} quests...")
-                
-                for i, quest in enumerate(quests, 1):
-                    week_number = quest.get("Week", i)
-                    print(f"Progress: {i}/{total_quests} - Week {week_number}")
+                # For testing, just process the first quest
+                # if i == 1:
+                #     break
                     
-                    detailed_quest = await self._generate_quest_details(quest, week_number)
-                    detailed_quests.append(detailed_quest)
-                    
-                    # Small delay to avoid rate limiting
-                    await asyncio.sleep(1)
-                
-                print(f"Completed processing all {total_quests} quests")
-                
-                return detailed_schedule(list_of_quests=detailed_quests)
-
-    def run(self) -> detailed_schedule:
-        print("Starting HWAgent.run()")
-        result = asyncio.run(self._run_async())
-        print(f"HWAgent completed successfully")
-        return result
+            except Exception as e:
+                print(f"✗ Error processing quest {i}: {str(e)}")
+                continue
+        
+        print(f"\nHWAgent completed - Processed {len(detailed_quests)} quests successfully")
+        return detailed_quests
 
 # def run_agent(student, period_id):
 #     period = Period.get_period(period_id)
