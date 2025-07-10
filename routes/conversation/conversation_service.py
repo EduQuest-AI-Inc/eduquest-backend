@@ -367,8 +367,21 @@ class ConversationService:
         else:
             print("No period_id in conversation, using default assistant ID for continuation")
 
+        # Get quest data for continuation
+        quests_data = None
+        if role == "teacher" and student_id:
+            try:
+                from routes.quest.quest_service import QuestService
+                quest_service = QuestService()
+                quests_data = quest_service.get_individual_quests_for_student(student_id)
+                print(f"DEBUG: Fetched {len(quests_data)} quests for continuation")
+            except Exception as quest_error:
+                print(f"DEBUG: Error fetching quests for continuation: {quest_error}")
+                # Continue without quest data if fetch fails
+                quests_data = None
+
         # Continue conversation
-        update_conv = UpdateAssistant(update_assistant_id, student, None, conversation.get('role') == "instructor")
+        update_conv = UpdateAssistant(update_assistant_id, student, quests_data, role == "teacher")
         update_conv.thread_id = thread_id
 
         try:
