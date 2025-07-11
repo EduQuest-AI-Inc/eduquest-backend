@@ -16,6 +16,7 @@ from assistants import update as UpdateAssistant
 
 import tempfile
 import json
+from s3 import upload_file_to_s3
 
 def dict_to_temp_file(data: dict, suffix=".json") -> str:
     with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=suffix) as tmp:
@@ -209,7 +210,14 @@ class ConversationService:
             quests_data = json.loads(quests_file)
             print(f"Loaded {len(quests_data)} quests from JSON string")
 
-        # Start assistant
+        s3_key = None
+        if not is_instructor and submission_file and period_id and student_id and individual_quest_id:
+            import time
+            timestamp = int(time.time())
+            filename = f"{timestamp}_{os.path.basename(submission_file)}"
+            folder = f"periods/{period_id}/students/{student_id}/{individual_quest_id}"
+            s3_key = upload_file_to_s3(submission_file, filename=filename, folder=folder)
+            print(f"Uploaded submission to S3: {s3_key}")
         update_conversation = UpdateAssistant(
             update_assistant_id,
             user_profile_dict,
@@ -223,7 +231,6 @@ class ConversationService:
         if not raw_response:
             raise Exception("Failed to initiate update conversation")
 
-        # Instructors get formatted response
         if is_instructor:
             try:
                 response_json = json.loads(raw_response)
@@ -234,7 +241,6 @@ Recommended Changes: {response_json.get('recommended_change', 'None')}"""
             except json.JSONDecodeError:
                 pass  # leave raw_response as-is
 
-        # Save grade/feedback if student
         if not is_instructor and week and student_id:
             try:
                 response_data = json.loads(raw_response)
@@ -305,7 +311,8 @@ Recommended Changes: {response_json.get('recommended_change', 'None')}"""
 
         return {
             "thread_id": update_conversation.thread_id,
-            "response": raw_response
+            "response": raw_response,
+            **({"s3_key": s3_key} if s3_key else {})
         }
 
 
