@@ -70,7 +70,11 @@ def get_student_individual_quests(student_id):
         # we still need to add authorization check to ensure the teacher has access to this student. 
         # for now, any authenticated user can view any student's quests
         
-        quests = quest_service.get_individual_quests_for_student(student_id)
+        period_id = request.args.get('period_id')
+        if period_id:
+            quests = quest_service.get_individual_quests_for_student_and_period(student_id, period_id)
+        else:
+            quests = quest_service.get_individual_quests_for_student(student_id)
         return jsonify(quests), 200
     except Exception as e:
         print(f"Error getting student individual quests: {str(e)}")
@@ -214,4 +218,43 @@ def get_submission_files(period_id, student_id, individual_quest_id):
             
     except Exception as e:
         print(f"Error getting submission files: {str(e)}")
-        return jsonify({"error": "Failed to get submission files"}), 500 
+        return jsonify({"error": "Failed to get submission files"}), 500
+
+@quest_bp.route('/individual-quests/<individual_quest_id>/grade', methods=['PUT'])
+def grade_individual_quest(individual_quest_id):
+    """Grade an individual quest (for teachers)."""
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Authorization header missing or invalid"}), 401
+        auth_token = auth_header.split(" ", 1)[1]
+
+        sessions = session_dao.get_sessions_by_auth_token(auth_token)
+        if not sessions:
+            return jsonify({"error": "Invalid auth token"}), 401
+        teacher_id = sessions[0]['user_id']
+
+        data = request.json
+        grade = data.get('grade')
+        feedback = data.get('feedback')
+        
+        if not grade:
+            return jsonify({"error": "grade is required"}), 400
+        if not feedback:
+            return jsonify({"error": "feedback is required"}), 400
+
+        # Update the individual quest with grade and feedback
+        from data_access.individual_quest_dao import IndividualQuestDAO
+        quest_dao = IndividualQuestDAO()
+        quest_dao.update_quest_grade_and_feedback(individual_quest_id, grade, feedback)
+        
+        return jsonify({
+            "message": "Grade and feedback submitted successfully",
+            "individual_quest_id": individual_quest_id,
+            "grade": grade,
+            "feedback": feedback
+        }), 200
+        
+    except Exception as e:
+        print(f"Error grading individual quest: {str(e)}")
+        return jsonify({"error": "Failed to grade quest"}), 500 
