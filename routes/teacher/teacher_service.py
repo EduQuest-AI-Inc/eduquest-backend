@@ -11,16 +11,10 @@ class TeacherService:
         self.period_dao = PeriodDAO()
 
     def generate_period_id(self, course_name: str) -> str:
-        """
-        Generate a unique period ID based on course name and random string.
-        Format: COURSE-XXXX-XXXX (e.g., MATH101-A1B2-C3D4)
-        """
-        # Clean course name: remove spaces, special chars, convert to uppercase
         clean_course = re.sub(r'[^a-zA-Z0-9]', '', course_name).upper()
         if len(clean_course) > 8:
             clean_course = clean_course[:8]
         
-        # Generate random 4-character strings
         random_part1 = str(uuid.uuid4())[:4].upper()
         random_part2 = str(uuid.uuid4())[:4].upper()
         
@@ -28,10 +22,8 @@ class TeacherService:
         return period_id
 
     def create_period(self, course, teacher_id, vector_store_id, file_urls):
-        # Generate unique period ID
         period_id = self.generate_period_id(course)
         
-        # Check if period ID already exists (very unlikely but good practice)
         existing = self.period_dao.get_period_by_id(period_id)
         attempts = 0
         while existing and attempts < 5:
@@ -74,6 +66,16 @@ class TeacherService:
             }
             for p in periods
         ]
+    
+    def get_period_by_id(self, period_id):
+        """Get a period by its ID"""
+        return self.period_dao.get_period_by_id(period_id)
+    
+    def update_period_files(self, period_id, file_urls):
+        """Update the file_urls field of a period"""
+        updates = {"file_urls": file_urls}
+        self.period_dao.update_period(period_id, updates)
+        print(f"DEBUG: Updated period {period_id} with {len(file_urls)} files")
     
     def get_vector_store_id_for_period(self, period_id):
         period = self.period_dao.get_period_by_id(period_id)

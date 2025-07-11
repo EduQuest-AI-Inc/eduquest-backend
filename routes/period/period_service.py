@@ -8,7 +8,8 @@ from models.conversation import Conversation
 from models.enrollment import Enrollment
 from assistants import ltg
 from datetime import datetime, timezone
-from EQ_agents.agent import SchedulesAgent
+from EQ_agents.agent import SchedulesAgent, HWAgent
+from routes.quest.quest_service import QuestService
 
 class PeriodService:
 
@@ -18,6 +19,7 @@ class PeriodService:
         self.student_dao = StudentDAO()
         self.conversation_dao = ConversationDAO()
         self.enrollment_dao = EnrollmentDAO()
+        self.quest_service = QuestService()
 
     def verify_period_id(self, auth_token: str, period_id: str) -> Any:
         """
@@ -51,21 +53,24 @@ class PeriodService:
         # Get current enrollments or initialize empty list
         current_enrollments = student.get('enrollments', [])
         
-        # Add period to enrollments if not already enrolled
-        if period_id not in current_enrollments:
-            current_enrollments.append(period_id)
-            # Update student record with new enrollments
-            self.student_dao.update_student(user_id, {'enrollments': current_enrollments})
-            print(f"Added period {period_id} to student {user_id}'s enrollments")
+        # Check if student is already enrolled in this period
+        if period_id in current_enrollments:
+            raise ValueError(f"You are already enrolled in period {period_id}")
+        
+        # Add period to enrollments
+        current_enrollments.append(period_id)
+        # Update student record with new enrollments
+        self.student_dao.update_student(user_id, {'enrollments': current_enrollments})
+        print(f"Added period {period_id} to student {user_id}'s enrollments")
 
-            # Create enrollment record
-            enrollment = Enrollment(
-                period_id=period_id,
-                student_id=user_id,
-                semester="2024-spring"  # You might want to make this configurable
-            )
-            self.enrollment_dao.add_enrollment(enrollment)
-            print(f"Created enrollment record for student {user_id} in period {period_id}")
+        # Create enrollment record
+        enrollment = Enrollment(
+            period_id=period_id,
+            student_id=user_id,
+            semester="2024-spring"  # You might want to make this configurable
+        )
+        self.enrollment_dao.add_enrollment(enrollment)
+        print(f"Created enrollment record for student {user_id} in period {period_id}")
 
         return period
 
@@ -212,6 +217,7 @@ class PeriodService:
             return {"error": str(e)}
         
     def start_schedules_agent(self, auth_token: str, period_id: str):
+        try:
             sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
             if not sessions:
                 raise Exception("Invalid auth token")
@@ -227,8 +233,116 @@ class PeriodService:
 
             schedules_agent = SchedulesAgent(student, period)
             schedule = schedules_agent.run()
+            print(schedule)
+            print(type(schedule))
+            print(schedule.model_dump_json())
+            
+            # Save schedule to database
+            schedule_dict = schedule.model_dump()
+            save_result = self.quest_service.save_schedule_to_weekly_quests(schedule_dict, user_id, period_id)
             
             return {
-                "schedule": schedule.model_dump(), #converts to dict because agent is returning a pydantic model object
-                "message": "Schedule generated successfully"
-        }
+                "schedule": schedule_dict,
+                "message": "Schedule generated and saved successfully",
+                "saved_quests": save_result
+            }
+        except Exception as e:
+            print(f"Error in start_schedules_agent: {str(e)}")
+            raise Exception(f"Failed to generate schedule: {str(e)}")
+    
+    def start_homework_agent(self, auth_token: str, period_id: str):
+        try:
+            sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
+            if not sessions:
+                raise Exception("Invalid auth token")
+            user_id = sessions[0]['user_id']
+            
+            student = self.student_dao.get_student_by_id(user_id)
+            if not student:
+                raise Exception("Student not found")
+            
+            period = self.period_dao.get_period_by_id(period_id)
+            if not period:
+                raise Exception("Period not found")
+            
+            # Get the existing schedule from the weekly quest table
+            weekly_quest = self.quest_service.get_weekly_quests_for_student(user_id, period_id)
+            if not weekly_quest:
+                raise Exception("No weekly quest found. Please run the schedules agent first.")
+            
+            print(f"DEBUG: Found weekly quest with {len(weekly_quest.quests)} quests")
+            
+            # Convert weekly quest to schedule format for homework agent
+            schedule_quests = []
+            for quest_item in weekly_quest.quests:
+                schedule_quests.append({
+                    "Name": quest_item.name,
+                    "Skills": quest_item.skills,
+                    "Week": quest_item.week
+                })
+            
+            # schedule_dict = {"list_of_quests": schedule_quests}
+            # print(f"DEBUG: Schedule dict for homework agent: {schedule_dict}")
+            
+            # Use improved HWAgent with timeout and error handling
+            homework_agent = HWAgent(
+                student, 
+                period, 
+                schedule_quests
+            )
+            homework = homework_agent.run()
+            
+            print(f"Homework type: {type(homework)}")
+            print(f"Homework content: {homework}")
+            
+            # Handle list of IndividualQuest objects
+            if isinstance(homework, list):
+                # Convert list of IndividualQuest objects to the expected dict format
+                homework_dict = {
+                    "list_of_quests": []
+                }
+                for quest in homework:
+                    if hasattr(quest, 'model_dump'):
+                        homework_dict["list_of_quests"].append(quest.model_dump())
+                    elif isinstance(quest, dict):
+                        homework_dict["list_of_quests"].append(quest)
+                    else:
+                        # Try to convert to dict manually if it's an IndividualQuest object
+                        quest_dict = {
+                            "Name": getattr(quest, 'Name', ''),
+                            "Skills": getattr(quest, 'Skills', ''),
+                            "Week": getattr(quest, 'Week', 1),
+                            "instructions": getattr(quest, 'instructions', ''),
+                            "rubric": getattr(quest, 'rubric', {})
+                        }
+                        homework_dict["list_of_quests"].append(quest_dict)
+            elif hasattr(homework, 'model_dump'):
+                homework_dict = homework.model_dump()
+            elif isinstance(homework, dict):
+                homework_dict = homework
+            else:
+                raise Exception(f"Invalid homework format: {type(homework)}")
+            
+            print(f"Homework dict: {homework_dict}")
+            print(f"DEBUG: Homework quests count: {len(homework_dict.get('list_of_quests', []))}")
+            
+            # Update the weekly quest with detailed homework information
+            save_result = self.quest_service.update_weekly_quest_with_homework(homework_dict, user_id, period_id)
+            
+            # Check if individual quests were created, if not create them
+            individual_quests = self.quest_service.get_individual_quests_for_student_and_period(user_id, period_id)
+            if not individual_quests:
+                print("DEBUG: No individual quests found, creating them from homework data")
+                create_result = self.quest_service.create_individual_quests_from_homework(homework_dict, user_id, period_id)
+                print(f"DEBUG: Created individual quests: {create_result}")
+            
+            return {
+                "homework": homework_dict,
+                "message": "Homework generated and saved successfully",
+                "saved_quests": save_result
+            }
+        except Exception as e:
+            print(f"Error in start_homework_agent: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise Exception(f"Failed to generate homework: {str(e)}")
