@@ -53,21 +53,24 @@ class PeriodService:
         # Get current enrollments or initialize empty list
         current_enrollments = student.get('enrollments', [])
         
-        # Add period to enrollments if not already enrolled
-        if period_id not in current_enrollments:
-            current_enrollments.append(period_id)
-            # Update student record with new enrollments
-            self.student_dao.update_student(user_id, {'enrollments': current_enrollments})
-            print(f"Added period {period_id} to student {user_id}'s enrollments")
+        # Check if student is already enrolled in this period
+        if period_id in current_enrollments:
+            raise ValueError(f"You are already enrolled in period {period_id}")
+        
+        # Add period to enrollments
+        current_enrollments.append(period_id)
+        # Update student record with new enrollments
+        self.student_dao.update_student(user_id, {'enrollments': current_enrollments})
+        print(f"Added period {period_id} to student {user_id}'s enrollments")
 
-            # Create enrollment record
-            enrollment = Enrollment(
-                period_id=period_id,
-                student_id=user_id,
-                semester="2024-spring"  # You might want to make this configurable
-            )
-            self.enrollment_dao.add_enrollment(enrollment)
-            print(f"Created enrollment record for student {user_id} in period {period_id}")
+        # Create enrollment record
+        enrollment = Enrollment(
+            period_id=period_id,
+            student_id=user_id,
+            semester="2024-spring"  # You might want to make this configurable
+        )
+        self.enrollment_dao.add_enrollment(enrollment)
+        print(f"Created enrollment record for student {user_id} in period {period_id}")
 
         return period
 
