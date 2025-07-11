@@ -152,7 +152,7 @@ class ConversationService:
 
 
     def start_update_assistant(self, auth_token: str, quests_file: str, is_instructor: bool, week: int = None,
-                               submission_file: str = None, student_id: str = None, period_id: str = None):
+                               submission_file: str = None, student_id: str = None, period_id: str = None, individual_quest_id: str = None):
         """
         Start the update assistant conversation.
 
@@ -164,6 +164,7 @@ class ConversationService:
             submission_file (str, optional): Path to the submission file for students.
             student_id (str, optional): Student ID when teacher is viewing student data.
             period_id (str, optional): Period ID when teacher is viewing student data.
+            individual_quest_id (str, optional): Individual quest ID for direct quest lookup.
 
         Returns:
             dict: Assistant's response and thread ID.
@@ -259,39 +260,51 @@ class ConversationService:
                 feedback = response_data.get('feedback')
                 
                 if grade is not None and feedback is not None:
-                    from routes.quest.quest_service import QuestService
-                    quest_service = QuestService()
-                    
-                    individual_quests = quest_service.get_individual_quests_for_student(student_id)
-                    target_quest = None
-                    
-                    # First try to find quest by week and period_id (if period_id is provided)
-                    if period_id:
-                        for quest in individual_quests:
-                            if quest.get('week') == week and quest.get('period_id') == period_id:
-                                target_quest = quest
-                                break
-                    
-                    # If not found and period_id is None, try to find by week only
-                    if not target_quest:
-                        for quest in individual_quests:
-                            if quest.get('week') == week:
-                                target_quest = quest
-                                print(f"Found quest by week only: {quest.get('individual_quest_id')} (period_id: {quest.get('period_id')})")
-                                break
-                    
-                    if target_quest:
+                    # Use direct quest lookup if individual_quest_id is provided (much more efficient)
+                    if individual_quest_id:
                         from data_access.individual_quest_dao import IndividualQuestDAO
                         quest_dao = IndividualQuestDAO()
                         quest_dao.update_quest_grade_and_feedback(
-                            target_quest['individual_quest_id'],
+                            individual_quest_id,
                             str(grade),
                             feedback
                         )
-                        print(f"Saved grade {grade} and feedback for quest {target_quest['individual_quest_id']}")
+                        print(f"Saved grade {grade} and feedback for quest {individual_quest_id}")
                     else:
-                        print(f"Warning: Could not find individual quest for student {student_id}, week {week}, period {period_id}")
-                        print(f"Available quests for student: {[(q.get('week'), q.get('period_id'), q.get('individual_quest_id')) for q in individual_quests]}")
+                        # Fallback to old method if individual_quest_id is not provided
+                        from routes.quest.quest_service import QuestService
+                        quest_service = QuestService()
+                        
+                        individual_quests = quest_service.get_individual_quests_for_student(student_id)
+                        target_quest = None
+                        
+                        # First try to find quest by week and period_id (if period_id is provided)
+                        if period_id:
+                            for quest in individual_quests:
+                                if quest.get('week') == week and quest.get('period_id') == period_id:
+                                    target_quest = quest
+                                    break
+                        
+                        # If not found and period_id is None, try to find by week only
+                        if not target_quest:
+                            for quest in individual_quests:
+                                if quest.get('week') == week:
+                                    target_quest = quest
+                                    print(f"Found quest by week only: {quest.get('individual_quest_id')} (period_id: {quest.get('period_id')})")
+                                    break
+                        
+                        if target_quest:
+                            from data_access.individual_quest_dao import IndividualQuestDAO
+                            quest_dao = IndividualQuestDAO()
+                            quest_dao.update_quest_grade_and_feedback(
+                                target_quest['individual_quest_id'],
+                                str(grade),
+                                feedback
+                            )
+                            print(f"Saved grade {grade} and feedback for quest {target_quest['individual_quest_id']}")
+                        else:
+                            print(f"Warning: Could not find individual quest for student {student_id}, week {week}, period {period_id}")
+                            print(f"Available quests for student: {[(q.get('week'), q.get('period_id'), q.get('individual_quest_id')) for q in individual_quests]}")
                 else:
                     print(f"Warning: Missing grade or feedback in response: {response_data}")
                     

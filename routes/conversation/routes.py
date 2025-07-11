@@ -121,25 +121,32 @@ def initiate_update():
             print(f"Saved uploaded file to: {temp_file.name}")
             
             # Get other form data
+            individual_quest_id = request.form.get('individual_quest_id')
             week = request.form.get('week')
             student_id = request.form.get('student_id')
             period_id = request.form.get('period_id')
             
+            if not individual_quest_id:
+                return jsonify({"error": "individual_quest_id is required for student submissions"}), 400
             if not week:
                 return jsonify({"error": "week is required for student submissions"}), 400
             
-            # For student submissions, we need to fetch their quests
+            # Get the specific quest directly using individual_quest_id (much more efficient)
             try:
-                from routes.quest.quest_service import QuestService
-                quest_service = QuestService()
-                quests_data = quest_service.get_individual_quests_for_student(student_id)
+                from data_access.individual_quest_dao import IndividualQuestDAO
+                quest_dao = IndividualQuestDAO()
+                quest_data = quest_dao.get_individual_quest_by_id(individual_quest_id)
+                
+                if not quest_data:
+                    return jsonify({"error": "Quest not found"}), 404
+                
                 # Convert Decimal objects to regular numbers for JSON serialization
-                quests_data = convert_decimals(quests_data)
-                quests_file = json.dumps(quests_data)
-                print(f"Fetched {len(quests_data)} quests for student {student_id}")
+                quest_data = convert_decimals(quest_data)
+                quests_file = json.dumps([quest_data])  # Single quest in array format
+                print(f"Fetched quest {individual_quest_id} for student {student_id}")
             except Exception as quest_error:
-                print(f"Error fetching student quests: {quest_error}")
-                return jsonify({"error": f"Failed to fetch student quests: {quest_error}"}), 500
+                print(f"Error fetching quest: {quest_error}")
+                return jsonify({"error": f"Failed to fetch quest: {quest_error}"}), 500
             
             result = conversation_service.start_update_assistant(
                 auth_token=auth_token,
@@ -148,7 +155,8 @@ def initiate_update():
                 week=int(week),
                 submission_file=temp_file.name,
                 student_id=student_id,
-                period_id=period_id
+                period_id=period_id,
+                individual_quest_id=individual_quest_id
             )
             
             # Clean up temporary file after processing
