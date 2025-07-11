@@ -152,9 +152,25 @@ class ConversationService:
         user_profile_dict = user
         print("DEBUG user_profile_dict:", user_profile_dict)
 
-        # Validate period_id and get assistant ID
-        if not period_id:
-            raise Exception("period_id is required")
+        if is_instructor:
+            if not period_id:
+                raise Exception("period_id is required for instructors")
+        else:
+            if not quests_file:
+                raise Exception("quests_file is required for students")
+            
+            try:
+                quests_data = json.loads(quests_file)
+                if not quests_data or not isinstance(quests_data, list) or len(quests_data) == 0:
+                    raise Exception("Invalid quests data format")
+                
+                period_id = quests_data[0].get('period_id')
+                if not period_id:
+                    raise Exception("No period_id found in quest data")
+                
+                print(f"Extracted period_id from quest data: {period_id}")
+            except json.JSONDecodeError as e:
+                raise Exception(f"Failed to parse quests JSON: {e}")
         
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
@@ -175,11 +191,9 @@ class ConversationService:
             quests_data = QuestService().get_individual_quests_for_student(student_id)
             print(f"Fetched {len(quests_data)} quests for student {student_id}")
         else:
-            try:
-                quests_data = json.loads(quests_file)
-                print("Loaded quests from JSON string")
-            except (json.JSONDecodeError, TypeError) as e:
-                raise Exception(f"Failed to parse quests JSON: {e}")
+            # For students, quests_data was already parsed when extracting period_id
+            quests_data = json.loads(quests_file)
+            print(f"Loaded {len(quests_data)} quests from JSON string")
 
         # Start assistant
         update_conversation = UpdateAssistant(
