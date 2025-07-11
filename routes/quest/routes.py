@@ -74,8 +74,8 @@ def get_student_individual_quests(student_id):
         print(f"Error getting student individual quests: {str(e)}")
         return jsonify({"error": "Failed to get student individual quests"}), 500
 
-@quest_bp.route('/weekly-quests/<weekly_quest_id>/individual-quests/<individual_quest_id>/status', methods=['PUT'])
-def update_individual_quest_status(weekly_quest_id, individual_quest_id):
+@quest_bp.route('/weekly-quests/<quest_id>/individual-quests/<individual_quest_id>/status', methods=['PUT'])
+def update_individual_quest_status(quest_id, individual_quest_id):
     """Update the status of a specific individual quest within a weekly quest list."""
     try:
         auth_header = request.headers.get('Authorization')
@@ -95,14 +95,14 @@ def update_individual_quest_status(weekly_quest_id, individual_quest_id):
         if status not in ["not_started", "in_progress", "completed"]:
             return jsonify({"error": "status must be one of: not_started, in_progress, completed"}), 400
 
-        result = quest_service.update_individual_quest_status(weekly_quest_id, individual_quest_id, status)
+        result = quest_service.update_individual_quest_status(quest_id, individual_quest_id, status)
         return jsonify(result), 200
     except Exception as e:
         print(f"Error updating individual quest status: {str(e)}")
         return jsonify({"error": "Failed to update quest status"}), 500
 
-@quest_bp.route('/weekly-quests/<weekly_quest_id>/individual-quests/<individual_quest_id>', methods=['GET'])
-def get_individual_quest(weekly_quest_id, individual_quest_id):
+@quest_bp.route('/weekly-quests/<quest_id>/individual-quests/<individual_quest_id>', methods=['GET'])
+def get_individual_quest(quest_id, individual_quest_id):
     """Get a specific individual quest from a weekly quest list."""
     try:
         auth_header = request.headers.get('Authorization')
@@ -114,7 +114,7 @@ def get_individual_quest(weekly_quest_id, individual_quest_id):
         if not sessions:
             return jsonify({"error": "Invalid auth token"}), 401
 
-        quest = quest_service.get_individual_quest_by_id(weekly_quest_id, individual_quest_id)
+        quest = quest_service.get_individual_quest_by_id(quest_id, individual_quest_id)
         if quest:
             return jsonify(quest.model_dump()), 200
         else:
