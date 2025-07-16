@@ -201,18 +201,18 @@ class QuestService:
     def get_individual_quests_for_student_and_period(self, student_id: str, period_id: str) -> list:
         return self.individual_quest_dao.get_quests_by_student_and_period(student_id, period_id)
 
-    def update_individual_quest_status(self, weekly_quest_id: str, individual_quest_id: str, status: str) -> dict:
+    def update_individual_quest_status(self, quest_id: str, individual_quest_id: str, status: str) -> dict:
         """Update the status of a specific individual quest within a weekly quest list."""
         try:
             self.weekly_quest_dao.update_individual_quest_in_weekly_quest(
-                weekly_quest_id, 
+                quest_id, 
                 individual_quest_id, 
                 {"status": status}
             )
             
             return {
                 "message": f"Successfully updated individual quest {individual_quest_id} status to {status}",
-                "weekly_quest_id": weekly_quest_id,
+                "quest_id": quest_id,
                 "individual_quest_id": individual_quest_id,
                 "status": status
             }
@@ -221,9 +221,9 @@ class QuestService:
             print(f"Error updating individual quest status: {str(e)}")
             raise Exception(f"Failed to update quest status: {str(e)}")
 
-    def get_individual_quest_by_id(self, weekly_quest_id: str, individual_quest_id: str) -> WeeklyQuestItem:
+    def get_individual_quest_by_id(self, quest_id: str, individual_quest_id: str) -> WeeklyQuestItem:
         """Get a specific individual quest from a weekly quest list."""
-        weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_id(weekly_quest_id)
+        weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_id(quest_id)
         if not weekly_quest:
             return None
         

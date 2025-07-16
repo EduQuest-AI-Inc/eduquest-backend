@@ -51,12 +51,10 @@ class PeriodDAO(BaseDAO):
     def get_periods_by_teacher_id(self, teacher_id):
         try:
             response = self.table.scan(
-                FilterExpression=Attr("teacher_id").eq(teacher_id)
-            )
+            FilterExpression=Attr("teacher_id").eq(teacher_id)
+        )
             items = response.get("Items", [])
-
-            for item in items:
-                return [Period(**item) for item in items]
+            return [Period(**item) for item in items]
         except Exception as e:
             print(f"Error in get_periods_by_teacher_id: {e}")
             return []
