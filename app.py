@@ -28,6 +28,8 @@ jwt = JWTManager(app)
 CORS(app, resources={r"/*": 
                 {"origins": [
                     "http://eduquest-frontend.s3-website.us-east-2.amazonaws.com",
+                    "http://eduquestai.org",
+                    "https://eduquestai.org",
                     "http://localhost:5173",
                     "http://localhost:5174",
                     ]

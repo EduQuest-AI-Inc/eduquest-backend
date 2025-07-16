@@ -5,6 +5,7 @@ from models.weekly_quest_item import WeeklyQuestItem
 from models.individual_quest import IndividualQuest
 from datetime import datetime, timezone
 import uuid
+import json
 
 class QuestService:
     def __init__(self):
@@ -313,3 +314,246 @@ class QuestService:
         except Exception as e:
             print(f"Error creating individual quests from homework: {str(e)}")
             raise Exception(f"Failed to create individual quests: {str(e)}") 
+
+    def update_quests_preserving_completed_data(self, schedule_data: dict, homework_data: dict, student_id: str, period_id: str) -> dict:
+        """
+        Safely update quests while preserving completed quest data (grades, feedback, status).
+        This method is designed for use when recommended changes trigger quest updates.
+        
+        Args:
+            schedule_data: New schedule data from SchedulesAgent
+            homework_data: New homework data from HWAgent  
+            student_id: Student ID
+            period_id: Period ID
+            
+        Returns:
+            dict: Results of the update process
+        """
+        try:
+            print(f"DEBUG: Starting safe quest update preserving completed data")
+            
+            # Get existing quests
+            existing_quests = self.get_individual_quests_for_student_and_period(student_id, period_id)
+            existing_by_week = {quest['week']: quest for quest in existing_quests}
+            
+            print(f"DEBUG: Found {len(existing_quests)} existing quests")
+            
+            # Get weekly quest
+            weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_student_and_period(student_id, period_id)
+            if not weekly_quest and existing_quests:
+                # Create a weekly quest structure from existing individual quests
+                print("DEBUG: No weekly quest found but individual quests exist - creating weekly quest structure")
+                
+                # Use the quest_id from the first existing quest (they should all have the same quest_id)
+                quest_id = existing_quests[0]['quest_id']
+                
+                # Create weekly quest items from existing quests
+                quest_items = []
+                for quest in existing_quests:
+                    quest_item = WeeklyQuestItem(
+                        individual_quest_id=quest['individual_quest_id'],
+                        name=quest.get('description', ''),
+                        skills=quest.get('skills', ''),
+                        week=quest['week'],
+                        status=quest.get('status', 'not_started'),
+                        description=quest.get('description', ''),
+                        instructions=quest.get('instructions', ''),
+                        rubric=quest.get('rubric', {})
+                    )
+                    quest_items.append(quest_item)
+                
+                # Create and save weekly quest
+                weekly_quest = WeeklyQuest(
+                    quest_id=quest_id,
+                    student_id=student_id,
+                    period_id=period_id,
+                    quests=quest_items
+                )
+                self.weekly_quest_dao.add_weekly_quest(weekly_quest)
+                print(f"DEBUG: Created weekly quest structure with {len(quest_items)} existing quests")
+                
+            elif not weekly_quest:
+                # If no weekly quest exists and no individual quests, use the regular save method
+                print("DEBUG: No existing weekly quest or individual quests found, creating new structure")
+                schedule_result = self.save_schedule_to_weekly_quests(schedule_data, student_id, period_id)
+                homework_result = self.update_weekly_quest_with_homework(homework_data, student_id, period_id)
+                return {
+                    "message": "Created new quest structure",
+                    "schedule_result": schedule_result,
+                    "homework_result": homework_result,
+                    "preserved_quests": 0,
+                    "updated_quests": 0,
+                    "created_quests": len(schedule_data.get("list_of_quests", [])),
+                    "total_quests": len(schedule_data.get("list_of_quests", []))
+                }
+            
+            # Process homework data by week for easier lookup
+            homework_by_week = {}
+            for quest_data in homework_data.get("list_of_quests", []):
+                week = quest_data.get("Week", 1)
+                homework_by_week[week] = quest_data
+            
+            # Update quests preserving completed data
+            updated_count = 0
+            preserved_count = 0
+            created_count = 0
+            
+            for quest_data in schedule_data.get("list_of_quests", []):
+                week = quest_data.get("Week", 1)
+                existing_quest = existing_by_week.get(week)
+                homework_quest = homework_by_week.get(week, {})
+                
+                if existing_quest:
+                    # Check if quest is completed or has a grade
+                    has_grade = existing_quest.get('grade') is not None
+                    is_completed = existing_quest.get('status') == 'completed'
+                    is_in_progress = existing_quest.get('status') == 'in_progress'
+                    
+                    if has_grade or is_completed or is_in_progress:
+                        # Preserve completed/graded/in-progress quest data
+                        print(f"DEBUG: Preserving completed data for week {week} quest {existing_quest['individual_quest_id']}")
+                        
+                        # Only update non-critical fields that won't affect graded work
+                        updates = {}
+                        
+                        # We can safely update skills if they've changed (this is metadata)
+                        new_skills = quest_data.get("Skills", existing_quest.get('skills', ''))
+                        if new_skills != existing_quest.get('skills', ''):
+                            updates['skills'] = new_skills
+                        
+                        # Don't update instructions, rubric, description for completed quests
+                        # as this could invalidate the work that was already graded
+                        
+                        if updates:
+                            self.individual_quest_dao.update_individual_quest(
+                                existing_quest['individual_quest_id'],
+                                updates
+                            )
+                            print(f"DEBUG: Updated metadata for preserved quest week {week}")
+                        
+                        preserved_count += 1
+                        
+                    else:
+                        # Quest not yet completed - safe to update with new content
+                        print(f"DEBUG: Updating incomplete quest for week {week}")
+                        
+                        updates = {
+                            "description": homework_quest.get("Name", quest_data.get("Name", "")),
+                            "skills": quest_data.get("Skills", ""),
+                            "instructions": homework_quest.get("instructions", ""),
+                            "rubric": homework_quest.get("rubric", {})
+                        }
+                        
+                        self.individual_quest_dao.update_individual_quest(
+                            existing_quest['individual_quest_id'],
+                            updates
+                        )
+                        updated_count += 1
+                else:
+                    # New quest - create it
+                    print(f"DEBUG: Creating new quest for week {week}")
+                    
+                    individual_quest_id = str(uuid.uuid4())
+                    individual_quest = IndividualQuest(
+                        individual_quest_id=individual_quest_id,
+                        quest_id=weekly_quest.quest_id,
+                        student_id=student_id,
+                        period_id=period_id,
+                        description=homework_quest.get("Name", quest_data.get("Name", "")),
+                        skills=quest_data.get("Skills", ""),
+                        week=week,
+                        instructions=homework_quest.get("instructions", ""),
+                        rubric=homework_quest.get("rubric", {}),
+                        status="not_started"
+                    )
+                    
+                    self.individual_quest_dao.add_individual_quest(individual_quest)
+                    created_count += 1
+            
+            # Update weekly quest structure if needed
+            # We'll rebuild the weekly quest items from current individual quests
+            updated_individual_quests = self.get_individual_quests_for_student_and_period(student_id, period_id)
+            quest_items = []
+            
+            for quest in updated_individual_quests:
+                quest_item = WeeklyQuestItem(
+                    individual_quest_id=quest['individual_quest_id'],
+                    name=quest.get('description', ''),
+                    skills=quest.get('skills', ''),
+                    week=quest['week'],
+                    status=quest.get('status', 'not_started'),
+                    description=quest.get('description', ''),
+                    instructions=quest.get('instructions', ''),
+                    rubric=quest.get('rubric', {})
+                )
+                quest_items.append(quest_item)
+            
+            # Update weekly quest with new structure
+            weekly_quest.quests = quest_items
+            weekly_quest.last_updated_at = datetime.now(timezone.utc).isoformat()
+            self.weekly_quest_dao.add_weekly_quest(weekly_quest)
+            
+            return {
+                "message": f"Successfully updated quests preserving completed data",
+                "preserved_quests": preserved_count,
+                "updated_quests": updated_count,
+                "created_quests": created_count,
+                "total_quests": len(updated_individual_quests),
+                "quest_id": weekly_quest.quest_id
+            }
+            
+        except Exception as e:
+            print(f"Error updating quests while preserving data: {str(e)}")
+            raise Exception(f"Failed to update quests safely: {str(e)}")
+
+    @staticmethod
+    def parse_grade_data(grade_str: str) -> dict:
+        """
+        Parse grade data from stored string format.
+        Handles both new rubric-based grades and legacy simple grades.
+        
+        Args:
+            grade_str: The grade string from the database
+            
+        Returns:
+            dict: Parsed grade information with 'detailed_grade', 'overall_score', and 'display_grade'
+        """
+        if not grade_str:
+            return {
+                "detailed_grade": None,
+                "overall_score": None,
+                "display_grade": "Not graded"
+            }
+        
+        try:
+            # Try to parse as new JSON format
+            grade_data = json.loads(grade_str)
+            if isinstance(grade_data, dict) and "detailed_grade" in grade_data:
+                return {
+                    "detailed_grade": grade_data.get("detailed_grade"),
+                    "overall_score": grade_data.get("overall_score", "Score not available"),
+                    "display_grade": grade_data.get("overall_score", "Score not available")
+                }
+        except (json.JSONDecodeError, TypeError):
+            pass
+        
+        # Legacy format - simple grade string
+        return {
+            "detailed_grade": None,
+            "overall_score": grade_str,
+            "display_grade": grade_str
+        }
+
+    @staticmethod
+    def format_grade_for_display(grade_str: str) -> str:
+        """
+        Format grade data for simple display purposes.
+        
+        Args:
+            grade_str: The grade string from the database
+            
+        Returns:
+            str: Formatted grade string for display
+        """
+        grade_data = QuestService.parse_grade_data(grade_str)
+        return grade_data["display_grade"] 

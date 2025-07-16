@@ -341,7 +341,7 @@ class ConversationService:
                             recommended_change
                         )
                         
-                        print(f"DEBUG: Quest update completed: {quest_update_result.get("message", "No message")}")
+                        print(f"DEBUG: Quest update completed: {quest_update_result.get('message', 'No message')}")
                         print(f"DEBUG: Updated {quest_update_result.get('updated_quests', 0)} quests")
                         
                         # Update the response to include quest update information
@@ -553,18 +553,6 @@ class ConversationService:
                         print("WARNING: Change was recommended but no recommended_change text provided")
                     else:
                         print("DEBUG: No change recommended or change is False - no quest updates needed")
-                        
-                    # For teacher conversations, extract just the response text for display
-                    try:
-                        response_data = json.loads(response)
-                        if 'response' in response_data:
-                            response = response_data['response']
-                        else:
-                            # If no response field, return formatted JSON for debugging
-                            response = json.dumps(response_data, indent=2)
-                    except json.JSONDecodeError:
-                        # Response is already plain text, use as is
-                        pass
                         
                 except json.JSONDecodeError:
                     print("DEBUG: Response is not JSON, skipping change detection for teacher")

@@ -44,22 +44,41 @@ class detailed_schedule(BaseModel):
     list_of_quests: list[IndividualQuest] = Field(description="List of quests for the student")
 
 class SchedulesAgent:
-    def __init__(self, student, period):
+    def __init__(self, student, period, recommended_change=None):
         self.student = student
         self.period = period
         self.vector_store = period["vector_store_id"]
-        self.input = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}."""
+        
+        # Base input for the agent
+        base_input = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}."""
 
-        self.schedules_agent = Agent(
-            name="Schedules Agent",
-            instructions="""
+        # Add recommended change context if provided
+        if recommended_change:
+            base_input += f"\n\nIMPORTANT: Based on recent feedback, the following adjustments should be made to future quests: {recommended_change}"
+            self.input = base_input
+        else:
+            self.input = base_input
+
+        # Enhanced instructions to consider recommended changes
+        instructions = """
                 You specialize in breaking down the long-term goal into manageable weekly quests to replace homework. You link the weekly skills students need to learn in the class (found in the course schedule) to their interests while accommodating their capabilities and learning preferences. 
                 First, you will determine and/or decide what the students are required to learn in the class each week based on the course modules items from file search. There are 18 weeks in total.
                 Based on that, you will create a weekly quest for the student that aligns with their long-term goal, interests, strengths, weaknesses, and learning style.
                 Each quest should be a thorough practice of the skills and knowledge learned in class that week and help the student to master these skills and knowledge.
                 You will return the homework schedule for the duration of the course, including the weekly quests and their due dates.
                 By the 18th week, the student will have accomplished their long term goal.
-            """,
+        """
+        
+        # Add specific instructions for recommended changes
+        if recommended_change:
+            instructions += f"""
+            
+            IMPORTANT: Pay special attention to the recommended changes provided in the student context. Incorporate these suggestions into the quest design to address any identified weaknesses or areas for improvement. The recommended changes should influence the difficulty, focus, or approach of future quests.
+            """
+
+        self.schedules_agent = Agent(
+            name="Schedules Agent",
+            instructions=instructions,
             model="gpt-4.1",
             tools=[
                 FileSearchTool(
