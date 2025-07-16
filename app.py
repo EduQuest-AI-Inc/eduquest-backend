@@ -30,6 +30,8 @@ CORS(app, resources={r"/*":
                     "http://eduquestai.org",
                     "https://eduquestai.org",
                     "http://eduquest-frontend.s3-website.us-east-2.amazonaws.com",
+                    "http://eduquestai.org",
+                    "https://eduquestai.org",
                     "http://eduquestai.org.s3-website.us-east-2.amazonaws.com",
                     "http://localhost:5173",
                     "http://localhost:5174",

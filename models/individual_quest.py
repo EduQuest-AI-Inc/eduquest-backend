@@ -8,7 +8,7 @@ class IndividualQuest(BaseModel):
     student_id: str
     period_id: str
     description: str
-    grade: Optional[str] = Field(default=None, description="Grade provided by the grader")
+    grade: Optional[str] = Field(default=None, description="Grade data as JSON string containing detailed_grade (rubric breakdown) and overall_score (summary). For legacy compatibility, may contain simple grade values.")
     feedback: Optional[str] = Field(default=None, description="Feedback provided by the grader")
     skills: str = Field(description="Skills the student will practice through this quest")
     week: int = Field(description="Week the student will work on this quest")

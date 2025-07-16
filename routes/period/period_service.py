@@ -346,3 +346,235 @@ class PeriodService:
             import traceback
             traceback.print_exc()
             raise Exception(f"Failed to generate homework: {str(e)}")
+
+    def update_quests_with_recommended_change(self, auth_token: str, period_id: str, recommended_change: str, student_id: str = None):
+        """
+        Update student quests based on recommended changes from the update assistant.
+        This method identifies which quests are affected by the recommended change
+        and only updates those specific quests, preserving all other quest data.
+        
+        Args:
+            auth_token: The user's authentication token
+            period_id: The period ID for the student
+            recommended_change: The recommended change text from the update assistant
+            student_id: Optional student ID (used when teacher makes recommendations)
+            
+        Returns:
+            dict: Results of the quest update process
+        """
+        try:
+            print(f"DEBUG: Starting targeted quest update with recommended change: {recommended_change}")
+            
+            # Validate session and get user_id
+            sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
+            if not sessions:
+                raise Exception("Invalid auth token")
+            session_user_id = sessions[0]['user_id']
+            session_role = sessions[0].get('role', 'student')
+
+            # Determine the target student ID
+            if student_id:
+                # Teacher specifying a student to update
+                target_student_id = student_id
+                print(f"DEBUG: Teacher ({session_user_id}) updating quests for student {target_student_id}")
+            else:
+                # Student updating their own quests
+                target_student_id = session_user_id
+                print(f"DEBUG: Student ({session_user_id}) updating their own quests")
+
+            student = self.student_dao.get_student_by_id(target_student_id)
+            if not student:
+                raise Exception(f"Student not found: {target_student_id}")
+            
+            period = self.period_dao.get_period_by_id(period_id)
+            if not period:
+                raise Exception("Period not found")
+
+            # Get existing quests to understand current structure
+            existing_quests = self.quest_service.get_individual_quests_for_student_and_period(target_student_id, period_id)
+            if not existing_quests:
+                raise Exception("No existing quests found. Cannot update without existing quest structure.")
+            
+            print(f"DEBUG: Found {len(existing_quests)} existing quests")
+
+            # Step 1: Generate new schedule with recommended changes
+            print("DEBUG: Generating new schedule with recommended changes...")
+            schedules_agent = SchedulesAgent(student, period, recommended_change)
+            new_schedule = schedules_agent.run()
+            new_schedule_dict = new_schedule.model_dump()
+            
+            # Step 2: Compare schedules to identify affected quests
+            print("DEBUG: Identifying which quests were affected by the recommended change...")
+            existing_by_week = {quest['week']: quest for quest in existing_quests}
+            affected_weeks = []
+            
+            for new_quest_data in new_schedule_dict.get("list_of_quests", []):
+                week = new_quest_data.get("Week", 1)
+                existing_quest = existing_by_week.get(week)
+                
+                if not existing_quest:
+                    # New quest week - needs homework generation
+                    affected_weeks.append(week)
+                    print(f"DEBUG: Week {week} is new, needs homework generation")
+                else:
+                    # Check if quest details changed significantly
+                    new_name = new_quest_data.get("Name", "")
+                    new_skills = new_quest_data.get("Skills", "")
+                    existing_name = existing_quest.get('description', '')
+                    existing_skills = existing_quest.get('skills', '')
+                    
+                    # Consider quest affected if name or skills changed significantly
+                    if new_name != existing_name or new_skills != existing_skills:
+                        # Only update if quest is not completed/graded
+                        has_grade = existing_quest.get('grade') is not None
+                        is_completed = existing_quest.get('status') == 'completed'
+                        
+                        if not has_grade and not is_completed:
+                            affected_weeks.append(week)
+                            print(f"DEBUG: Week {week} quest changed and is incomplete, needs homework regeneration")
+                        else:
+                            print(f"DEBUG: Week {week} quest changed but is completed/graded, preserving existing data")
+            
+            if not affected_weeks:
+                print("DEBUG: No quests need updating based on recommended change")
+                return {
+                    "message": "No quests need updating - recommended change does not affect any incomplete quests",
+                    "recommended_change": recommended_change,
+                    "affected_quests": 0,
+                    "preserved_quests": len(existing_quests),
+                    "updated_quests": 0,
+                    "created_quests": 0,
+                    "total_quests": len(existing_quests)
+                }
+            
+            print(f"DEBUG: {len(affected_weeks)} quests need updating: weeks {affected_weeks}")
+            
+            # Step 3: Generate homework ONLY for affected quests
+            print("DEBUG: Generating homework only for affected quests...")
+            
+            # Create a minimal schedule containing only affected quests
+            affected_schedule_quests = []
+            for new_quest_data in new_schedule_dict.get("list_of_quests", []):
+                week = new_quest_data.get("Week", 1)
+                if week in affected_weeks:
+                    affected_schedule_quests.append({
+                        "Name": new_quest_data.get("Name", ""),
+                        "Skills": new_quest_data.get("Skills", ""),
+                        "Week": week
+                    })
+            
+            if affected_schedule_quests:
+                # Generate homework only for the affected quests
+                homework_agent = HWAgent(student, period, affected_schedule_quests)
+                homework = homework_agent.run()
+                
+                # Convert homework to expected dict format
+                if isinstance(homework, list):
+                    homework_dict = {"list_of_quests": []}
+                    for quest in homework:
+                        if hasattr(quest, 'model_dump'):
+                            homework_dict["list_of_quests"].append(quest.model_dump())
+                        elif isinstance(quest, dict):
+                            homework_dict["list_of_quests"].append(quest)
+                        else:
+                            quest_dict = {
+                                "Name": getattr(quest, 'Name', ''),
+                                "Skills": getattr(quest, 'Skills', ''),
+                                "Week": getattr(quest, 'Week', 1),
+                                "instructions": getattr(quest, 'instructions', ''),
+                                "rubric": getattr(quest, 'rubric', {})
+                            }
+                            homework_dict["list_of_quests"].append(quest_dict)
+                else:
+                    homework_dict = homework if isinstance(homework, dict) else homework.model_dump()
+                
+                print(f"DEBUG: Generated homework for {len(homework_dict.get('list_of_quests', []))} affected quests")
+            else:
+                homework_dict = {"list_of_quests": []}
+            
+            # Step 4: Apply targeted updates preserving completed data
+            print("DEBUG: Applying targeted updates while preserving completed data...")
+            
+            # Create a combined schedule that includes both unchanged and changed quests
+            combined_schedule_dict = {"list_of_quests": []}
+            
+            # Add all quests from new schedule
+            for new_quest_data in new_schedule_dict.get("list_of_quests", []):
+                combined_schedule_dict["list_of_quests"].append(new_quest_data)
+            
+            # Use the targeted update method
+            update_result = self.quest_service.update_quests_preserving_completed_data(
+                combined_schedule_dict, 
+                homework_dict, 
+                target_student_id, 
+                period_id
+            )
+            
+            print(f"DEBUG: Targeted quest update completed: {update_result.get('message', 'No message')}")
+            
+            return {
+                "message": f"Successfully updated {len(affected_weeks)} quests based on recommended changes while preserving completed work",
+                "recommended_change": recommended_change,
+                "affected_weeks": affected_weeks,
+                "quest_update_details": update_result,
+                "affected_quests": len(affected_weeks),
+                "preserved_quests": update_result.get("preserved_quests", 0),
+                "updated_quests": update_result.get("updated_quests", 0),
+                "created_quests": update_result.get("created_quests", 0),
+                "total_quests": update_result.get("total_quests", 0)
+            }
+            
+        except Exception as e:
+            print(f"Error in update_quests_with_recommended_change: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise Exception(f"Failed to update quests with recommended change: {str(e)}")
+
+    def start_schedules_agent_with_changes(self, auth_token: str, period_id: str, recommended_change: str = None):
+        """
+        Start the schedules agent with optional recommended changes.
+        
+        Args:
+            auth_token: The user's authentication token
+            period_id: The period ID
+            recommended_change: Optional recommended change text
+            
+        Returns:
+            dict: Results of the schedule generation
+        """
+        try:
+            sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
+            if not sessions:
+                raise Exception("Invalid auth token")
+            user_id = sessions[0]['user_id']
+
+            student = self.student_dao.get_student_by_id(user_id)
+            if not student:
+                raise Exception("Student not found")
+            
+            period = self.period_dao.get_period_by_id(period_id)
+            if not period:
+                raise Exception("Period not found")
+
+            # Use the enhanced SchedulesAgent with recommended changes
+            schedules_agent = SchedulesAgent(student, period, recommended_change)
+            schedule = schedules_agent.run()
+            print(schedule)
+            print(type(schedule))
+            print(schedule.model_dump_json())
+            
+            # Save schedule to database
+            schedule_dict = schedule.model_dump()
+            save_result = self.quest_service.save_schedule_to_weekly_quests(schedule_dict, user_id, period_id)
+            
+            change_message = f" with recommended changes: {recommended_change}" if recommended_change else ""
+            
+            return {
+                "schedule": schedule_dict,
+                "message": f"Schedule generated and saved successfully{change_message}",
+                "saved_quests": save_result,
+                "recommended_change_applied": bool(recommended_change)
+            }
+        except Exception as e:
+            print(f"Error in start_schedules_agent_with_changes: {str(e)}")
+            raise Exception(f"Failed to generate schedule with changes: {str(e)}")

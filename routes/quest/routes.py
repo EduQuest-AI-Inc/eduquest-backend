@@ -48,6 +48,17 @@ def get_individual_quests():
             quests = quest_service.get_individual_quests_for_student_and_period(user_id, period_id)
         else:
             quests = quest_service.get_individual_quests_for_student(user_id)
+        
+        # Add grade parsing for each quest
+        for quest in quests:
+            if quest.get('grade'):
+                grade_info = quest_service.parse_grade_data(quest['grade'])
+                quest['grade_info'] = grade_info
+                quest['display_grade'] = grade_info['display_grade']
+            else:
+                quest['grade_info'] = quest_service.parse_grade_data(None)
+                quest['display_grade'] = "Not graded"
+        
         return jsonify(quests), 200
     except Exception as e:
         print(f"Error getting individual quests: {str(e)}")
@@ -70,11 +81,18 @@ def get_student_individual_quests(student_id):
         # we still need to add authorization check to ensure the teacher has access to this student. 
         # for now, any authenticated user can view any student's quests
         
-        period_id = request.args.get('period_id')
-        if period_id:
-            quests = quest_service.get_individual_quests_for_student_and_period(student_id, period_id)
-        else:
-            quests = quest_service.get_individual_quests_for_student(student_id)
+        quests = quest_service.get_individual_quests_for_student(student_id)
+        
+        # Add grade parsing for each quest
+        for quest in quests:
+            if quest.get('grade'):
+                grade_info = quest_service.parse_grade_data(quest['grade'])
+                quest['grade_info'] = grade_info
+                quest['display_grade'] = grade_info['display_grade']
+            else:
+                quest['grade_info'] = quest_service.parse_grade_data(None)
+                quest['display_grade'] = "Not graded"
+        
         return jsonify(quests), 200
     except Exception as e:
         print(f"Error getting student individual quests: {str(e)}")
@@ -168,20 +186,48 @@ def get_individual_quest_details(individual_quest_id):
         quest = quest_dao.get_individual_quest_by_id(individual_quest_id)
         
         if quest:
+            # Parse grade data for frontend display
+            if quest.get('grade'):
+                grade_info = quest_service.parse_grade_data(quest['grade'])
+                quest['grade_info'] = grade_info
+                quest['display_grade'] = grade_info['display_grade']
+            else:
+                quest['grade_info'] = quest_service.parse_grade_data(None)
+                quest['display_grade'] = "Not graded"
+            
             return jsonify(quest), 200
         else:
             return jsonify({"error": "Individual quest not found"}), 404
     except Exception as e:
-        print(f"Error getting individual quest details: {str(e)}")
+
+        print(f"Error getting individual quest details: {e}")
         return jsonify({"error": "Failed to get individual quest details"}), 500 
 
-@quest_bp.route('/submission-files/<period_id>/<student_id>/<individual_quest_id>', methods=['GET'])
-def get_submission_files(period_id, student_id, individual_quest_id):
-    """Get submission files for a specific individual quest."""
+@quest_bp.route('/grade/parse', methods=['POST'])
+def parse_grade_data():
+    """Parse grade data and return in frontend-friendly format."""
+
     try:
         auth_header = request.headers.get('Authorization')
         if not auth_header or not auth_header.startswith("Bearer "):
             return jsonify({"error": "Authorization header missing or invalid"}), 401
+
+        data = request.json
+        grade_str = data.get('grade')
+        
+        if grade_str is None:
+            return jsonify({"error": "grade field is required"}), 400
+        
+        grade_info = quest_service.parse_grade_data(grade_str)
+        
+        return jsonify({
+            "parsed_grade": grade_info,
+            "display_grade": grade_info['display_grade']
+        }), 200
+        
+    except Exception as e:
+        print(f"Error parsing grade data: {e}")
+        return jsonify({"error": "Failed to parse grade data"}), 500 
         auth_token = auth_header.split(" ", 1)[1]
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
