@@ -241,6 +241,7 @@ Recommended Changes: {response_json.get('recommended_change', 'None')}"""
             except json.JSONDecodeError:
                 pass  # leave raw_response as-is
 
+        # For student grading, save grade and feedback FIRST before any agent processing
         if not is_instructor and week and student_id:
             try:
                 response_data = json.loads(raw_response)
@@ -251,10 +252,53 @@ Recommended Changes: {response_json.get('recommended_change', 'None')}"""
                 change = response_data.get('change')
                 recommended_change = response_data.get('recommended_change')
 
-                if grade is not None and feedback is not None:
+                # PRIORITY 1: Save grade and feedback immediately (before any agent calls)
+                # This ensures grades are preserved even if quest updates fail
+                # if grade is not None and feedback is not None:
 
-                    # Use direct quest lookup if individual_quest_id is provided (much more efficient)
-                    if individual_quest_id:
+                print(f"DEBUG: Saving grade and feedback before any agent processing...")
+                
+                # Use direct quest lookup if individual_quest_id is provided (much more efficient)
+                if individual_quest_id:
+                    from data_access.individual_quest_dao import IndividualQuestDAO
+                    quest_dao = IndividualQuestDAO()
+                    
+                    # Store both the detailed grade object and the overall score
+                    grade_data = {
+                        "detailed_grade": grade,
+                        "overall_score": overall_score
+                    }
+                    
+                    quest_dao.update_quest_grade_and_feedback(
+                        individual_quest_id,
+                        json.dumps(grade_data),  # Store as JSON string
+                        feedback
+                    )
+                    print(f"✅ SAVED rubric-based grade {overall_score} and feedback for quest {individual_quest_id}")
+                else:
+                    # Fallback to old method if individual_quest_id is not provided
+                    from routes.quest.quest_service import QuestService
+                    quest_service = QuestService()
+                    
+                    individual_quests = quest_service.get_individual_quests_for_student(student_id)
+                    target_quest = None
+                    
+                    # First try to find quest by week and period_id (if period_id is provided)
+                    if period_id:
+                        for quest in individual_quests:
+                            if quest.get('week') == week and quest.get('period_id') == period_id:
+                                target_quest = quest
+                                break
+                    
+                    # If not found and period_id is None, try to find by week only
+                    if not target_quest:
+                        for quest in individual_quests:
+                            if quest.get('week') == week:
+                                target_quest = quest
+                                print(f"Found quest by week only: {quest.get('individual_quest_id')} (period_id: {quest.get('period_id')})")
+                                break
+                    
+                    if target_quest:
                         from data_access.individual_quest_dao import IndividualQuestDAO
                         quest_dao = IndividualQuestDAO()
                         
@@ -265,55 +309,25 @@ Recommended Changes: {response_json.get('recommended_change', 'None')}"""
                         }
                         
                         quest_dao.update_quest_grade_and_feedback(
-                            individual_quest_id,
+                            target_quest['individual_quest_id'],
                             json.dumps(grade_data),  # Store as JSON string
                             feedback
                         )
-                        print(f"Saved rubric-based grade {overall_score} and feedback for quest {individual_quest_id}")
+                        print(f"✅ SAVED rubric-based grade {overall_score} and feedback for quest {target_quest['individual_quest_id']}")
                     else:
-                        # Fallback to old method if individual_quest_id is not provided
-                        from routes.quest.quest_service import QuestService
-                        quest_service = QuestService()
-                        
-                        individual_quests = quest_service.get_individual_quests_for_student(student_id)
-                        target_quest = None
-                        
-                        # First try to find quest by week and period_id (if period_id is provided)
-                        if period_id:
-                            for quest in individual_quests:
-                                if quest.get('week') == week and quest.get('period_id') == period_id:
-                                    target_quest = quest
-                                    break
-                        
-                        # If not found and period_id is None, try to find by week only
-                        if not target_quest:
-                            for quest in individual_quests:
-                                if quest.get('week') == week:
-                                    target_quest = quest
-                                    print(f"Found quest by week only: {quest.get('individual_quest_id')} (period_id: {quest.get('period_id')})")
-                                    break
-                        
-                        if target_quest:
-                            from data_access.individual_quest_dao import IndividualQuestDAO
-                            quest_dao = IndividualQuestDAO()
-                            
-                            # Store both the detailed grade object and the overall score
-                            grade_data = {
-                                "detailed_grade": grade,
-                                "overall_score": overall_score
-                            }
-                            
-                            quest_dao.update_quest_grade_and_feedback(
-                                target_quest['individual_quest_id'],
-                                json.dumps(grade_data),  # Store as JSON string
-                                feedback
-                            )
-                            print(f"Saved rubric-based grade {overall_score} and feedback for quest {target_quest['individual_quest_id']}")
-                        else:
-                            print(f"Warning: Could not find individual quest for student {student_id}, week {week}, period {period_id}")
-                            print(f"Available quests for student: {[(q.get('week'), q.get('period_id'), q.get('individual_quest_id')) for q in individual_quests]}")
+                        print(f"❌ WARNING: Could not find individual quest for student {student_id}, week {week}, period {period_id}")
+                        print(f"Available quests for student: {[(q.get('week'), q.get('period_id'), q.get('individual_quest_id')) for q in individual_quests]}")
+                    
+                    # except Exception as save_error:
+                    #     print(f"❌ ERROR saving grade and feedback: {save_error}")
+                    #     # Don't re-raise - we want to continue with quest updates even if grade save fails
+                    #     import traceback
+                    #     traceback.print_exc()
+                # else:
+                #     print(f"DEBUG: Skipping grade save - grade: {grade}, feedback: {feedback}")
                 
-                # Step 2: If change is recommended, update future quests
+                # PRIORITY 2: Handle quest updates (separate from grade saving)
+                # This happens AFTER grades are safely saved
                 if change and recommended_change and period_id:
                     try:
                         print(f"DEBUG: Change recommended - updating future quests")
