@@ -267,7 +267,7 @@ class ltg:
 
 
 class update:
-    def __init__(self, assistant_id, student, quests, instructor, week=None, submission=None):
+    def __init__(self, assistant_id, student, quests, instructor, week=None, submission=None, thread_id=None):
         student = convert_decimal(student)
         temp_student_file = "student.json"
         with open(temp_student_file, "w") as f:
@@ -285,8 +285,11 @@ class update:
         temp_quests_file = "temp_quests.json"
 
         try:
+            # Convert Decimal objects to float before JSON serialization
+            quests_converted = convert_decimal(quests) if quests else None
+            
             with open(temp_quests_file, "w") as f:
-                json.dump(quests, f, indent=2)
+                json.dump(quests_converted, f, indent=2)
             self.quests = openai.files.create(
                 file=open(temp_quests_file, "rb"),
                 purpose="assistants"
@@ -307,6 +310,7 @@ class update:
         self.assistant = openai.beta.assistants.retrieve(assistant_id)
         self.conversation_log = []
         self.instructor = bool(instructor)
+        self.thread_id = thread_id  # Set thread_id if provided
         if not self.instructor:
             self.week = week
             if submission:
