@@ -344,7 +344,7 @@ class update:
             )
         elif not self.instructor:
             initial_message = (
-                f'You are grading a quest submission from a student. This is for week {self.week}. Please grade and provide feedback the quest submission based on the provided quest details and rubric.')
+                f'You are grading a quest submission from a student. This is for week {self.week}. Please grade each criterion and provide and overall grade (sum of all criteria scores) and feedback for the quest submission based on the provided quest details and rubric.')
             message = openai.beta.threads.messages.create(
                 thread_id=self.thread_id,
                 role="user",
@@ -629,3 +629,56 @@ Always reflect a warm, encouraging tone with students, and a collaborative tone 
 
 At the end, you will output a table with the same format you received. """
 
+ini_conv_format = """{
+  "name": "student_analysis",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "response": {
+        "type": "string",
+        "description": "The assistant's primary response to the user's prompt."
+      },
+      "Strengths": {
+        "type": "array",
+        "description": "A list of identified strengths of the student.",
+        "items": {
+          "type": "string",
+          "description": "A specific student strength."
+        }
+      },
+      "Weaknesses": {
+        "type": "array",
+        "description": "A list of identified weaknesses of the student.",
+        "items": {
+          "type": "string",
+          "description": "A specific student weakness."
+        }
+      },
+      "Interests": {
+        "type": "array",
+        "description": "A list of identified student interests.",
+        "items": {
+          "type": "string",
+          "description": "A specific student interest."
+        }
+      },
+      "Learning_Styles": {
+        "type": "array",
+        "description": "A list of identified student learning styles.",
+        "items": {
+          "type": "string",
+          "description": "A specific learning style, e.g., visual, auditory, kinesthetic."
+        }
+      }
+    },
+    "required": [
+      "response",
+      "Strengths",
+      "Weaknesses",
+      "Interests",
+      "Learning_Styles"
+    ],
+    "additionalProperties": false
+  }
+}"""
