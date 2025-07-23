@@ -24,21 +24,26 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'fallback-secret')  #
 # Initialize JWT
 jwt = JWTManager(app)
 
-# Enable CORS for your frontend (add localhost for dev if needed)
-CORS(app, resources={r"/*": 
-                {"origins": [
-                    "http://eduquestai.org",
-                    "https://eduquestai.org",
-                    "http://eduquest-frontend.s3-website.us-east-2.amazonaws.com",
-                    "http://eduquestai.org",
-                    "https://eduquestai.org",
-                    "http://eduquestai.org.s3-website.us-east-2.amazonaws.com",
-                    "http://localhost:5173",
-                    "http://localhost:5174",
-                    ]
-                }
-            }
-    )
+# Enable CORS for your frontend
+CORS(app, resources={r"/*": {
+    "origins": [
+        # Production domains
+        "https://eduquestai.org",
+        "http://eduquestai.org", 
+        "http://eduquestai.org.s3-website.us-east-2.amazonaws.com",
+        "https://eduquestai.org.s3-website.us-east-2.amazonaws.com",
+        
+        # Development domains
+        "http://localhost:3000",
+        "http://localhost:5173", 
+        "http://localhost:5174",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174"
+    ],
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization"]
+}})
 
 # Register Blueprints
 app.register_blueprint(conversation_bp, url_prefix='/conversation')
