@@ -42,7 +42,8 @@ CORS(app, resources={r"/*": {
         "http://127.0.0.1:5174"
     ],
     "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    "allow_headers": ["Content-Type", "Authorization"]
+    "allow_headers": ["Content-Type", "Authorization"],
+    "supports_credentials": True
 }})
 
 # Register Blueprints

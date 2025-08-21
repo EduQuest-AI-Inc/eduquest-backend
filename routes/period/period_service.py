@@ -11,6 +11,9 @@ from datetime import datetime, timezone
 from EQ_agents.agent import SchedulesAgent, HWAgent
 from routes.quest.quest_service import QuestService
 
+# Tutorial period constant
+TUTORIAL_PERIOD_ID = "PRECALC-58F9-88F5"
+
 class PeriodService:
 
     def __init__(self):
@@ -71,6 +74,10 @@ class PeriodService:
         )
         self.enrollment_dao.add_enrollment(enrollment)
         print(f"Created enrollment record for student {user_id} in period {period_id}")
+
+        # If this is a real period (not tutorial), clean up tutorial periods
+        if period_id != TUTORIAL_PERIOD_ID:
+            self._cleanup_tutorial_periods(user_id)
 
         return period
 
@@ -266,6 +273,7 @@ class PeriodService:
                 raise Exception("Period not found")
             
             # Get the existing schedule from the weekly quest table
+            print(f"DEBUG: Looking for weekly quest for user_id={user_id}, period_id={period_id}")
             weekly_quest = self.quest_service.get_weekly_quests_for_student(user_id, period_id)
             if not weekly_quest:
                 raise Exception("No weekly quest found. Please run the schedules agent first.")
@@ -578,3 +586,38 @@ class PeriodService:
         except Exception as e:
             print(f"Error in start_schedules_agent_with_changes: {str(e)}")
             raise Exception(f"Failed to generate schedule with changes: {str(e)}")
+
+    def _cleanup_tutorial_periods(self, student_id: str):
+        """Remove tutorial periods when student adds their first real period"""
+        student = self.student_dao.get_student_by_id(student_id)
+        if not student:
+            return
+        
+        current_enrollments = student.get('enrollments', [])
+        
+        # Check if student has tutorial period enrolled
+        if TUTORIAL_PERIOD_ID in current_enrollments:
+            # Remove tutorial period from enrollments
+            updated_enrollments = [p for p in current_enrollments if p != TUTORIAL_PERIOD_ID]
+            self.student_dao.update_student(student_id, {'enrollments': updated_enrollments})
+            
+            # Remove tutorial enrollment record
+            self._remove_tutorial_enrollment(student_id)
+            
+            print(f"Cleaned up tutorial period for student {student_id}")
+
+    def _remove_tutorial_enrollment(self, student_id: str):
+        """Remove tutorial enrollment record"""
+        try:
+            enrollments = self.enrollment_dao.get_enrollments_by_period(TUTORIAL_PERIOD_ID)
+            for enrollment in enrollments:
+                if enrollment.get('student_id') == student_id:
+                    self.enrollment_dao.delete_enrollment(
+                        TUTORIAL_PERIOD_ID, 
+                        enrollment.get('enrolled_at')
+                    )
+                    print(f"Removed tutorial enrollment for student {student_id}")
+                    break
+        except Exception as e:
+            print(f"Error removing tutorial enrollment: {e}")
+
