@@ -1,31 +1,34 @@
 from flask import Blueprint, jsonify, request
 from .user_service import UserService
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, decode_token
+from data_access.student_dao import StudentDAO
+from data_access.teacher_dao import TeacherDAO
+
 
 user_bp = Blueprint('user', __name__)
 user_service = UserService()
+student_dao = StudentDAO()
+teacher_dao = TeacherDAO()
 
 @user_bp.route('/profile', methods=['GET'])
-def get_profile():
-    auth_header = request.headers.get("Authorization")
-
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return jsonify({"error": "Authorization header missing or invalid"}), 401
-
+def get_profile_cookie():
+    token = request.cookies.get('auth_token')
+    if not token:
+        return jsonify({'message': 'Missing auth_token cookie'}), 401
     try:
-        auth_token = auth_header.split(" ", 1)[1]
-        user_data = user_service.get_user_profile(auth_token)
-        return jsonify(user_data), 200
-
-    except IndexError:
-        return jsonify({"error": "Session data not found or malformed"}), 404
-
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
-
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        return jsonify({"error": "An unexpected error occurred"}), 500
+        decoded = decode_token(token)
+        username = decoded.get('sub')
+        # Try student first
+        student = student_dao.get_student_by_id(username)
+        if student:
+            return jsonify({'user': student}), 200
+        # Try teacher
+        teacher = teacher_dao.get_teacher_by_id(username)
+        if teacher:
+            return jsonify({'user': teacher}), 200
+        return jsonify({'message': 'User not found'}), 404
+    except Exception:
+        return jsonify({'message': 'Invalid or expired token'}), 401
 
 @user_bp.route('/update-tutorial', methods=['POST'])
 @jwt_required()

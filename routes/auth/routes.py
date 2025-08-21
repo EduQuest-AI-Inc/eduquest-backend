@@ -1,7 +1,7 @@
 # auth/routes.py
 
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token
+from flask import Blueprint, request, jsonify, make_response
+from flask_jwt_extended import create_access_token, decode_token
 from .auth_service import register_user, authenticate_user
 from data_access.session_dao import SessionDAO
 from data_access.student_dao import StudentDAO
@@ -50,19 +50,19 @@ def login():
 
     if authenticate_user(username, password, role):
         access_token = create_access_token(identity=username)
-        # Store session in DB
         session = Session(auth_token=access_token, user_id=username, role=role)
         session_dao.add_session(session)
-        
+        response_data = {'token': access_token}
         # If student, check if profile is blank
         if role == 'student':
-            student = student_dao.get_student_by_id(username) # this is a dict
+            student = student_dao.get_student_by_id(username)
             if not student.get('strength') or not student.get('weakness') or not student.get('interest') or not student.get('learning_style'):
-                return jsonify({
-                    'token': access_token,
-                    'needs_profile': True
-                }), 200
-        
-        return jsonify({'token': access_token}), 200
+                response_data['needs_profile'] = True
+        # Set cookie
+        resp = make_response(jsonify(response_data), 200)
+        resp.set_cookie('auth_token', access_token, httponly=True, secure=True, samesite='Strict')
+        return resp
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
+
+
