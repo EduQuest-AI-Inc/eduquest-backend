@@ -15,6 +15,7 @@ class Student(BaseModel):
     long_term_goal: Optional[Dict[str, str]] = []
     quests: Optional[List[Dict[str, str]]] = []
     password: str
+    completed_tutorial: Optional[bool] = False  # New field for tutorial tracking
 
     def to_item(self):
         return self.model_dump()

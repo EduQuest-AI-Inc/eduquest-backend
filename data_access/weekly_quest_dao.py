@@ -1,7 +1,7 @@
 from data_access.base_dao import BaseDAO
 from models.weekly_quest import WeeklyQuest
 from data_access.config import DynamoDBConfig
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Key, Attr
 from typing import Dict, Any, List
 from datetime import datetime, timezone
 from dotenv import load_dotenv
@@ -79,15 +79,37 @@ class WeeklyQuestDAO(BaseDAO):
 
     def get_quests_by_student_and_period(self, student_id: str, period_id: str) -> List[WeeklyQuest]:
         """Get all weekly quests for a student in a specific period."""
-        response = self.table.scan(
-            FilterExpression=Key("student_id").eq(student_id) & Key("period_id").eq(period_id)
+        composite_key = f"{student_id}#{period_id}"
+        response = self.table.query(
+            IndexName="student_period_index",
+            KeyConditionExpression=Key("student_period_key").eq(composite_key)
         )
         items = response.get("Items", [])
         return [WeeklyQuest.from_item(item) for item in items]
 
     def get_weekly_quest_by_student_and_period(self, student_id: str, period_id: str) -> WeeklyQuest:
         """Get the weekly quest for a student in a specific period (should be only one)."""
-        weekly_quests = self.get_quests_by_student_and_period(student_id, period_id)
-        if weekly_quests:
-            return weekly_quests[0]  
+        import time
+        
+        print(f"DEBUG: Searching for weekly quest with student_id={student_id}, period_id={period_id}")
+        
+        # Implement retry logic with exponential backoff for eventual consistency on GSI
+        max_retries = 3
+        base_delay = 0.5  # Start with 500ms
+        
+        for attempt in range(max_retries + 1):
+            weekly_quests = self.get_quests_by_student_and_period(student_id, period_id)
+            print(f"DEBUG: Attempt {attempt + 1}: Found {len(weekly_quests)} weekly quests")
+            
+            if weekly_quests:
+                print(f"DEBUG: Returning first weekly quest with quest_id={weekly_quests[0].quest_id}")
+                return weekly_quests[0]
+            
+            # If not found and we have retries left, wait with exponential backoff
+            if attempt < max_retries:
+                delay = base_delay * (2 ** attempt)
+                print(f"DEBUG: No weekly quest found on attempt {attempt + 1}, waiting {delay}s before retry...")
+                time.sleep(delay)
+        
+        print("DEBUG: No weekly quests found after all retries, returning None")
         return None

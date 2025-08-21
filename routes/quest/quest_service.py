@@ -50,10 +50,13 @@ class QuestService:
                 quest_id=quest_id,
                 student_id=student_id,
                 period_id=period_id,
+                student_period_key=f"{student_id}#{period_id}",
                 quests=quest_items
             )
             
+            print(f"DEBUG: Saving weekly quest with quest_id={quest_id}, student_id={student_id}, period_id={period_id}")
             self.weekly_quest_dao.add_weekly_quest(weekly_quest)
+            print(f"DEBUG: Successfully saved weekly quest to database")
             
             for individual_quest in individual_quests:
                 self.individual_quest_dao.add_individual_quest(individual_quest)
