@@ -11,10 +11,11 @@ session_dao = SessionDAO()
 @quest_bp.route('/weekly-quests/<period_id>', methods=['GET'])
 def get_weekly_quests(period_id):
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
-        auth_token = auth_header.split(" ", 1)[1]
+        
+        
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -33,10 +34,11 @@ def get_weekly_quests(period_id):
 @quest_bp.route('/individual-quests', methods=['GET'])
 def get_individual_quests():
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
-        auth_token = auth_header.split(" ", 1)[1]
+        
+        
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -68,10 +70,11 @@ def get_individual_quests():
 def get_student_individual_quests(student_id):
     """Get individual quests for a specific student (for teachers)."""
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
-        auth_token = auth_header.split(" ", 1)[1]
+        
+        
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -102,10 +105,11 @@ def get_student_individual_quests(student_id):
 def update_individual_quest_status(quest_id, individual_quest_id):
     """Update the status of a specific individual quest within a weekly quest list."""
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
-        auth_token = auth_header.split(" ", 1)[1]
+        
+        
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -129,10 +133,11 @@ def update_individual_quest_status(quest_id, individual_quest_id):
 def get_individual_quest(quest_id, individual_quest_id):
     """Get a specific individual quest from a weekly quest list."""
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
-        auth_token = auth_header.split(" ", 1)[1]
+        
+        
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -151,10 +156,11 @@ def get_individual_quest(quest_id, individual_quest_id):
 def verify_quest_structure(period_id):
     """Verify that quests are saved correctly in both tables."""
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
-        auth_token = auth_header.split(" ", 1)[1]
+        
+        
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -171,10 +177,11 @@ def verify_quest_structure(period_id):
 def get_individual_quest_details(individual_quest_id):
     """Get a specific individual quest details from the individual_quest table."""
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
-        auth_token = auth_header.split(" ", 1)[1]
+        
+        
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -208,9 +215,8 @@ def parse_grade_data():
     """Parse grade data and return in frontend-friendly format."""
 
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
+        
+        
 
         data = request.json
         grade_str = data.get('grade')
@@ -228,7 +234,6 @@ def parse_grade_data():
     except Exception as e:
         print(f"Error parsing grade data: {e}")
         return jsonify({"error": "Failed to parse grade data"}), 500 
-        auth_token = auth_header.split(" ", 1)[1]
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -270,10 +275,11 @@ def parse_grade_data():
 def grade_individual_quest(individual_quest_id):
     """Grade an individual quest (for teachers)."""
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
-        auth_token = auth_header.split(" ", 1)[1]
+        
+        
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:

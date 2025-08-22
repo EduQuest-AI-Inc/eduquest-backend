@@ -41,12 +41,9 @@ def convert_decimals(obj):
 @conversation_bp.route('/initiate-profile-assistant', methods=['POST'])
 def profile_assistant():
     try:
-        auth_header = request.headers.get('Authorization')
-
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
-
-        auth_token = auth_header.split(" ", 1)[1]
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
 
         result = conversation_service.start_profile_assistant(auth_token)
         #always returns json
@@ -63,12 +60,13 @@ def continue_profile_assistant():
     try:
         data = request.json
         print("Received data:", data)  # Debug log
-        auth_header = request.headers.get('Authorization')
+        
 
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
+        
 
-        auth_token = auth_header.split(" ", 1)[1]
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
 
         conversation_type = data.get('conversation_type')
         thread_id = data.get('thread_id')
@@ -97,11 +95,12 @@ def continue_profile_assistant():
 @conversation_bp.route('/initiate-update-assistant', methods=['POST'])
 def initiate_update():
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
+        
+        
 
-        auth_token = auth_header.split(" ", 1)[1]
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
         
         # Check if this is a file upload (FormData) or JSON request
         if request.files:
@@ -219,14 +218,10 @@ def continue_update():
     try:
         data = request.json
         print("[DEBUG] Received data:", data)
-        auth_header = request.headers.get('Authorization')
-        print("[DEBUG] Auth header:", auth_header)
 
-        if not auth_header or not auth_header.startswith("Bearer "):
-            print("[DEBUG] Missing or invalid auth header")
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
-
-        auth_token = auth_header.split(" ", 1)[1]
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
         print("[DEBUG] Auth token:", auth_token)
 
         thread_id = data.get('thread_id')

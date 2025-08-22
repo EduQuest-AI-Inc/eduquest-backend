@@ -64,5 +64,3 @@ def login():
         return resp
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
-
-

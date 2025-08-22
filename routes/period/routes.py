@@ -7,10 +7,11 @@ period_service = PeriodService()
 @period_bp.route('/verify-period', methods=['POST'])
 def verify_period():
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
-        auth_token = auth_header.split(" ", 1)[1]
+        
+        
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
 
         data = request.json
         period_id = data.get('period_id')
@@ -32,10 +33,11 @@ def verify_period():
 @period_bp.route('/initiate-ltg-conversation', methods=['POST'])
 def initiate_ltg_conversation():
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
-        auth_token = auth_header.split(" ", 1)[1]
+        
+        
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
 
         data = request.json
         period_id = data.get('period_id')
@@ -60,10 +62,11 @@ def initiate_ltg_conversation():
 def continue_ltg_conversation():
     try:
         data = request.json
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
-        auth_token = auth_header.split(" ", 1)[1]
+        
+        
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
 
         conversation_type = data.get('conversation_type')
         thread_id = data.get('thread_id')
@@ -84,11 +87,12 @@ def continue_ltg_conversation():
 @period_bp.route('/initiate-schedules-agent', methods=['POST'])
 def initiate_schedules_agent():
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
         
-        auth_token = auth_header.split(" ", 1)[1]
+        
+        
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
         data = request.json
         
         period_id = data.get('period_id')  
@@ -104,11 +108,12 @@ def initiate_schedules_agent():
 @period_bp.route('/initiate-homework-agent', methods=['POST'])
 def initiate_homework_agent():
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Authorization header missing or invalid"}), 401
+        
+        
             
-        auth_token = auth_header.split(" ", 1)[1]
+        auth_token = request.cookies.get("auth_token")
+        if not auth_token:
+            return jsonify({"error": "auth token missing"}), 401
         data = request.json
         period_id = data.get('period_id')
         if not period_id:
