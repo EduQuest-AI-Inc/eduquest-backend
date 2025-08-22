@@ -6,6 +6,7 @@ class Student(BaseModel):
     student_id: str  # Partition Key
     first_name: str
     last_name: str
+    email: str
     enrollments: Optional[List[str]] = []
     grade: int
     strength: Optional[list] = None
