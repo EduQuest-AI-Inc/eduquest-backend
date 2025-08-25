@@ -20,6 +20,7 @@ app = Flask(__name__)
 
 # Config
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'fallback-secret')  # Set secret securely
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600  # 1 hour (in seconds)
 
 # Initialize JWT
 jwt = JWTManager(app)

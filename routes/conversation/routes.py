@@ -61,9 +61,6 @@ def continue_profile_assistant():
         data = request.json
         print("Received data:", data)  # Debug log
         
-
-        
-
         auth_token = request.cookies.get("auth_token")
         if not auth_token:
             return jsonify({"error": "auth token missing"}), 401

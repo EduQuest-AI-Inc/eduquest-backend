@@ -27,7 +27,8 @@ def get_profile_cookie():
         if teacher:
             return jsonify({'user': teacher}), 200
         return jsonify({'message': 'User not found'}), 404
-    except Exception:
+    except Exception as e:
+        print(f"Error in get_profile_cookie: {e}")
         return jsonify({'message': 'Invalid or expired token'}), 401
 
 @user_bp.route('/update-tutorial', methods=['POST'])
