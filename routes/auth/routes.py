@@ -68,7 +68,7 @@ def login():
                 response_data['needs_profile'] = True
         # Set cookie
         resp = make_response(jsonify(response_data), 200)
-        resp.set_cookie('auth_token', access_token, httponly=True, secure=True, samesite='Strict')
+        resp.set_cookie('auth_token', access_token, httponly=False, secure=True, samesite='Strict')
         return resp
     else:
         return jsonify({'message': 'Invalid credentials'}), 401

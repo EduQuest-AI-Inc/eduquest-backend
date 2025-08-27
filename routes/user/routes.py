@@ -62,5 +62,3 @@ def get_tutorial_status():
     except Exception as e:
         print(f"Error getting tutorial status: {e}")
         return jsonify({'error': 'Failed to get tutorial status'}), 500
-
-

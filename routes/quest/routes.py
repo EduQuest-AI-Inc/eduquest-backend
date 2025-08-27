@@ -34,8 +34,6 @@ def get_weekly_quests(period_id):
 @quest_bp.route('/individual-quests', methods=['GET'])
 def get_individual_quests():
     try:
-        
-        
         auth_token = request.cookies.get("auth_token")
         if not auth_token:
             return jsonify({"error": "auth token missing"}), 401

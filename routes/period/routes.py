@@ -49,6 +49,7 @@ def initiate_ltg_conversation():
         return jsonify(result), 200
 
     except ValueError as ve:
+        print(f"ValueError: {ve}")
         return jsonify({"error": str(ve)}), 400
 
     except LookupError as le:
@@ -87,8 +88,6 @@ def continue_ltg_conversation():
 @period_bp.route('/initiate-schedules-agent', methods=['POST'])
 def initiate_schedules_agent():
     try:
-        
-        
         
         auth_token = request.cookies.get("auth_token")
         if not auth_token:
