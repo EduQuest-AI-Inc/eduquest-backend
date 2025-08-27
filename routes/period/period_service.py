@@ -172,8 +172,6 @@ class PeriodService:
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
             print("Error: Student not found")
-            raise Exception("Student not found")
-        print(f"Found student: {student}")
 
         # Get the assistant id from the period if available, else use default
         period_id = conversation.get('period_id')

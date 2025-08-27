@@ -5,12 +5,14 @@ from flask_jwt_extended import create_access_token, decode_token
 from .auth_service import register_user, authenticate_user
 from data_access.session_dao import SessionDAO
 from data_access.student_dao import StudentDAO
+from data_access.teacher_dao import TeacherDAO
 from models.session import Session
 from routes.conversation.conversation_service import ConversationService
 
 auth_bp = Blueprint('auth', __name__)
 session_dao = SessionDAO()
 student_dao = StudentDAO()
+teacher_dao = TeacherDAO()
 conversation_service = ConversationService()
 
 @auth_bp.route('/signup', methods=['POST'])
@@ -29,6 +31,12 @@ def signup():
 
     if not username or not password or not role or not first_name or not last_name or not email or (role == 'student' and not grade):
         return jsonify({'message': 'Username, password, role, first_name, last_name, email' + (', and grade' if role == 'student' else '') + ' required'}), 400
+
+    # Check if email already exists for student or teacher
+    student_items = student_dao.table.scan(FilterExpression="email = :email", ExpressionAttributeValues={":email": email}).get("Items", [])
+    teacher_items = teacher_dao.table.scan(FilterExpression="email = :email", ExpressionAttributeValues={":email": email}).get("Items", [])
+    if student_items or teacher_items:
+        return jsonify({'message': 'Email address already in use'}), 409
 
     if register_user(username, password, role, first_name, last_name, email, grade if role == 'student' else None):
         return jsonify({'message': 'User registered successfully'}), 201
@@ -60,9 +68,7 @@ def login():
                 response_data['needs_profile'] = True
         # Set cookie
         resp = make_response(jsonify(response_data), 200)
-        resp.set_cookie('auth_token', access_token, httponly=True, secure=True, samesite='Strict')
+        resp.set_cookie('auth_token', access_token, httponly=False, secure=True, samesite='Strict')
         return resp
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
-
-
