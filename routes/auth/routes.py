@@ -68,7 +68,14 @@ def login():
                 response_data['needs_profile'] = True
         # Set cookie
         resp = make_response(jsonify(response_data), 200)
-        resp.set_cookie('auth_token', access_token, httponly=False, secure=True, samesite='Strict')
+        resp.set_cookie(
+            'auth_token',
+            access_token,
+            httponly=True,         # More secure, prevents JS access
+            secure=True,           # Required for HTTPS
+            samesite='None',       # Allows cross-site cookies
+            domain='.eduquestai.org'  # Set to your root domain (if both frontend and backend use this)
+        )
         return resp
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
