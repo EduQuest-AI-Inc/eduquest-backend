@@ -71,7 +71,7 @@ def login():
         resp.set_cookie(
             'auth_token',
             access_token,
-            httponly=True,         # More secure, prevents JS access
+            httponly=False,         # More secure, prevents JS access
             secure=True,           # Required for HTTPS
             samesite='None',       # Allows cross-site cookies
             domain='.eduquestai.org'  # Set to your root domain (if both frontend and backend use this)
