@@ -1,0 +1,14 @@
+{
+  "Name": "Week 1: Algebra Foundations Quest: Expression Mastery and Order of Operations",
+  "Instructions": "Begin by reviewing the definition and components of algebraic expressions, including terms, coefficients, and constants. Practice applying the order of operations (PEMDAS) rigorously on a series of expressions involving exponents and square roots. Solve at least 10 different problems, ensuring to write out each step in detail. After completing the problems, document your solutions in your portfolio with clear annotations explaining why each step was taken. Reflect on any challenges faced during problem-solving and how you overcame them to enhance your analytical skills and writing clarity.",
+  "Skills_Covered": "Algebraic expressions, order of operations, exponents, square roots; step-by-step documentation in portfolio; analytical breakdown of each problem.",
+  "Rubric": {
+    "Grade_Scale": "A to F based on rubric",
+    "Criteria": {
+      "Criterion A": "Accuracy in solving algebraic expressions using the order of operations",
+      "Criterion B": "Completeness and clarity of step-by-step documentation in portfolio",
+      "Criterion C": "Demonstration of understanding exponents and square roots in context",
+      "Criterion D": "Quality of reflections on problem-solving strategies and challenges"
+    }
+  }
+}

@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import List
 
 class Period(BaseModel):
     period_id: str  # Partition Key
@@ -8,6 +9,8 @@ class Period(BaseModel):
     teacher_id: str
     vector_store_id: str
     course: str
+    file_urls: List[str] = []
+
 
     def to_item(self):
         return self.model_dump()

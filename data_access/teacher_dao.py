@@ -2,7 +2,10 @@ from data_access.base_dao import BaseDAO
 from models.teacher import Teacher
 from data_access.config import DynamoDBConfig
 from boto3.dynamodb.conditions import Key
-from typing import Dict, Any
+from typing import Dict, Any, List
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class TeacherDAO(BaseDAO):
     def __init__(self):
@@ -16,7 +19,8 @@ class TeacherDAO(BaseDAO):
         response = self.table.query(
             KeyConditionExpression=Key("teacher_id").eq(teacher_id)
         )
-        return response["Items"]
+        items = response.get("Items", [])
+        return items[0] if items else None
 
     def update_teacher(self, teacher_id: str, updates: Dict[str, Any]) -> None:
         update_expr = "SET " + ", ".join(f"{k} = :{k}" for k in updates)

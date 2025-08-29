@@ -2,22 +2,27 @@ from pydantic import BaseModel, Field
 from typing import List
 from datetime import datetime, timezone
 
-from models.individual_quest import IndividualQuest
+from models.weekly_quest_item import WeeklyQuestItem
 
 class WeeklyQuest(BaseModel):
-    weekly_quest_id: str  # Partition Key
+    quest_id: str  # Partition Key
     student_id: str
-    year: int
+    period_id: str
+    student_period_key: str = None  # Composite key for GSI: "student_id#period_id"
+    quests: List[WeeklyQuestItem]  # List of 18 individual quests
+    year: int = Field(default_factory=lambda: datetime.now(timezone.utc).year)
+    semester: str = "Fall 2025"  # Default semester
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     last_updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    quests: List[IndividualQuest]
-    student_id: str  # Partition Key
-    created_at: str  # Sort Key
-    semester: int
-    last_updated_at: str
-
 
     def to_item(self):
         item = self.model_dump()
-        # Convert each IndividualQuest to dict
-        item['quests'] = [q.model_dump() for q in self.quests]
+        item['quests'] = [quest.to_dict() for quest in self.quests]
         return item
+
+    @classmethod
+    def from_item(cls, item: dict):
+        quests_data = item.get('quests', [])
+        quests = [WeeklyQuestItem(**quest_data) for quest_data in quests_data]
+        item['quests'] = quests
+        return cls(**item)
