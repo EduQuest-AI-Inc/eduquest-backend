@@ -30,10 +30,10 @@ jwt = JWTManager(app)
 CORS(app, resources={r"/*": {
     "origins": [
         # Production domains
-        "https://eduquestai.org",
-        "http://eduquestai.org", 
-        "http://eduquestai.org.s3-website.us-east-2.amazonaws.com",
-        "https://eduquestai.org.s3-website.us-east-2.amazonaws.com",
+        # "https://eduquestai.org",
+        # "http://eduquestai.org", 
+        # "http://eduquestai.org.s3-website.us-east-2.amazonaws.com",
+        # "https://eduquestai.org.s3-website.us-east-2.amazonaws.com",
         
         # Development domains
         "http://localhost:3000",
