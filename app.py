@@ -11,6 +11,7 @@ from routes.period.routes import period_bp
 from routes.teacher.routes import teacher_bp
 from routes.enrollment.routes import enrollment_bp
 from routes.quest.routes import quest_bp
+from datetime import timedelta
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,7 +21,7 @@ app = Flask(__name__)
 
 # Config
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'fallback-secret')  # Set secret securely
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600  # 1 hour (in seconds)
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
 
 # Initialize JWT
 jwt = JWTManager(app)
