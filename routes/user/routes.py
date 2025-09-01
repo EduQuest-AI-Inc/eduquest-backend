@@ -3,21 +3,30 @@ from .user_service import UserService
 from flask_jwt_extended import jwt_required, get_jwt_identity, decode_token
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
+from data_access.session_dao import SessionDAO
 
 
 user_bp = Blueprint('user', __name__)
 user_service = UserService()
 student_dao = StudentDAO()
 teacher_dao = TeacherDAO()
+session_dao = SessionDAO()
 
 @user_bp.route('/profile', methods=['GET'])
 def get_profile_cookie():
     token = request.cookies.get('auth_token')
+    print(f"Auth token from cookie: {token}")
     if not token:
         return jsonify({'message': 'Missing auth_token cookie'}), 401
     try:
-        decoded = decode_token(token)
-        username = decoded.get('sub')
+        print(f"Decoding token: {token}")
+        session_data = session_dao.get_sessions_by_auth_token(token)
+        print(f"Session data retrieved: {session_data}")
+        username = session_data[0]['user_id'] if session_data else None
+        print(f"Username from session: {username}")
+        if not username:
+            return jsonify({'message': 'Invalid or expired token'}), 401
+        
         # Try student first
         student = student_dao.get_student_by_id(username)
         if student:
