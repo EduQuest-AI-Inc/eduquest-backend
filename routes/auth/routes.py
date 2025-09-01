@@ -74,7 +74,8 @@ def login():
             httponly=False,         # More secure, prevents JS access
             secure=True,           # Required for HTTPS
             samesite='None',       # Allows cross-site cookies
-            domain='.eduquestai.org'  # Set to your root domain (if both frontend and backend use this)
+            domain='eduquestai.org',  # Set to your root domain (if both frontend and backend use this)
+            path="/"  
         )
         return resp
     else:
