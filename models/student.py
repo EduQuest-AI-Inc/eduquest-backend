@@ -7,6 +7,9 @@ class Student(BaseModel):
     first_name: str
     last_name: str
     email: str
+    email_verified: bool = False
+    email_verification_code: Optional[str] = None
+    email_verification_expires_at: Optional[str] = None
     enrollments: Optional[List[str]] = []
     grade: int
     strength: Optional[list] = None

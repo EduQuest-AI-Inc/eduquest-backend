@@ -2,7 +2,7 @@
 
 from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import create_access_token, decode_token
-from .auth_service import register_user, authenticate_user
+from .auth_service import register_user, authenticate_user, verify_email_code, resend_verification_code
 from data_access.session_dao import SessionDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
@@ -57,6 +57,10 @@ def login():
         return jsonify({'message': 'Username, password, and role required'}), 400
 
     if authenticate_user(username, password, role):
+        # Block login for unverified users
+        user = student_dao.get_student_by_id(username) if role == 'student' else teacher_dao.get_teacher_by_id(username)
+        if user and not user.get('email_verified', False):
+            return jsonify({'message': 'Email not verified', 'needs_verification': True}), 403
         access_token = create_access_token(identity=username)
         session = Session(auth_token=access_token, user_id=username, role=role)
         session_dao.add_session(session)
@@ -80,3 +84,34 @@ def login():
         return resp
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
+
+
+@auth_bp.route('/verify-email', methods=['POST'])
+def verify_email():
+    data = request.get_json()
+    if not data:
+        return jsonify({'message': 'Missing JSON body'}), 400
+    username = data.get('username')
+    role = data.get('role')
+    code = data.get('code')
+    if not username or not role or not code:
+        return jsonify({'message': 'username, role, and code required'}), 400
+    ok = verify_email_code(username, role, code)
+    if ok:
+        return jsonify({'message': 'Email verified successfully'}), 200
+    return jsonify({'message': 'Invalid or expired code'}), 400
+
+
+@auth_bp.route('/resend-code', methods=['POST'])
+def resend_code():
+    data = request.get_json()
+    if not data:
+        return jsonify({'message': 'Missing JSON body'}), 400
+    username = data.get('username')
+    role = data.get('role')
+    if not username or not role:
+        return jsonify({'message': 'username and role required'}), 400
+    ok = resend_verification_code(username, role)
+    if ok:
+        return jsonify({'message': 'Verification code resent'}), 200
+    return jsonify({'message': 'User not found'}), 404
