@@ -14,12 +14,14 @@ session_dao = SessionDAO()
 
 @user_bp.route('/profile', methods=['GET'])
 def get_profile_cookie():
-    token = request.cookies.get('auth_token')
+    token = request.headers.get('Authorization', None)
+    if token and token.startswith('Bearer '):
+        token = token.split(' ')[1] # Extract token after 'Bearer '
+
     print(f"Auth token from cookie: {token}")
     if not token:
         return jsonify({'message': 'Missing auth_token cookie'}), 401
     try:
-        print(f"Decoding token: {token}")
         session_data = session_dao.get_sessions_by_auth_token(token)
         print(f"Session data retrieved: {session_data}")
         username = session_data[0]['user_id'] if session_data else None
