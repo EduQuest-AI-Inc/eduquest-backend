@@ -17,18 +17,40 @@ def get_profile_cookie():
     print("get_profile_cookie called")
     print(f"Request headers: {request.headers}")
 
-    token = request.headers.get('Authorization', None)
-    if token and token.startswith('Bearer '):
-        token = token.split(' ')[1] # Extract token after 'Bearer '
+    # Prefer Authorization: Bearer <token>
+    token = None
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header and auth_header.lower().startswith('bearer '):
+        token = auth_header.split(' ', 1)[1].strip()
 
-    print(f"Auth token from cookie: {token}")
+    # Fallback: parse the last auth_token from Cookie header if multiple exist
     if not token:
-        return jsonify({'message': 'Missing auth_token cookie'}), 401
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+
+    print(f"Resolved auth token: {token}")
+    if not token:
+        return jsonify({'message': 'Missing token'}), 401
     try:
-        session_data = session_dao.get_sessions_by_auth_token(token)
-        print(f"Session data retrieved: {session_data}")
-        username = session_data[0]['user_id'] if session_data else None
-        print(f"Username from session: {username}")
+        username = None
+        # Try to decode JWT directly
+        try:
+            claims = decode_token(token)
+            username = claims.get('sub')
+        except Exception as e:
+            print(f"JWT decode failed, will try session lookup: {e}")
+
+        # Fallback to session store lookup
+        if not username:
+            session_data = session_dao.get_sessions_by_auth_token(token)
+            print(f"Session data retrieved: {session_data}")
+            username = session_data[0]['user_id'] if session_data else None
+            print(f"Username from session: {username}")
+
         if not username:
             return jsonify({'message': 'Invalid or expired token'}), 401
         
