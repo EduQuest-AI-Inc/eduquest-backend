@@ -14,6 +14,9 @@ session_dao = SessionDAO()
 
 @user_bp.route('/profile', methods=['GET'])
 def get_profile_cookie():
+    print("get_profile_cookie called")
+    print(f"Request headers: {request.headers}")
+
     token = request.headers.get('Authorization', None)
     if token and token.startswith('Bearer '):
         token = token.split(' ')[1] # Extract token after 'Bearer '
