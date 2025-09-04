@@ -12,16 +12,21 @@ session_dao = SessionDAO()
 def get_weekly_quests(period_id):
     try:
         
-        
+        # Prefer Authorization: Bearer <token>
         auth_token = None
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-            if not auth_token:
-                return jsonify({"error": "auth token missing"}), 401
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+
+
+        # Fallback: parse the last auth_token from Cookie header if multiple exist
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -40,15 +45,21 @@ def get_weekly_quests(period_id):
 @quest_bp.route('/individual-quests', methods=['GET'])
 def get_individual_quests():
     try:
+        # Prefer Authorization: Bearer <token>
         auth_token = None
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-            if not auth_token:
-                return jsonify({"error": "auth token missing"}), 401
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+
+
+        # Fallback: parse the last auth_token from Cookie header if multiple exist
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -82,15 +93,21 @@ def get_student_individual_quests(student_id):
     try:
         
         
+        # Prefer Authorization: Bearer <token>
         auth_token = None
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-            if not auth_token:
-                return jsonify({"error": "auth token missing"}), 401
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+
+
+        # Fallback: parse the last auth_token from Cookie header if multiple exist
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -123,15 +140,21 @@ def update_individual_quest_status(quest_id, individual_quest_id):
     try:
         
         
+        # Prefer Authorization: Bearer <token>
         auth_token = None
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-            if not auth_token:
-                return jsonify({"error": "auth token missing"}), 401
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+
+
+        # Fallback: parse the last auth_token from Cookie header if multiple exist
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -157,15 +180,21 @@ def get_individual_quest(quest_id, individual_quest_id):
     try:
         
         
+        # Prefer Authorization: Bearer <token>
         auth_token = None
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-            if not auth_token:
-                return jsonify({"error": "auth token missing"}), 401
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+
+
+        # Fallback: parse the last auth_token from Cookie header if multiple exist
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -186,15 +215,21 @@ def verify_quest_structure(period_id):
     try:
         
         
+        # Prefer Authorization: Bearer <token>
         auth_token = None
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-            if not auth_token:
-                return jsonify({"error": "auth token missing"}), 401
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+
+
+        # Fallback: parse the last auth_token from Cookie header if multiple exist
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -213,15 +248,21 @@ def get_individual_quest_details(individual_quest_id):
     try:
         
         
+        # Prefer Authorization: Bearer <token>
         auth_token = None
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-            if not auth_token:
-                return jsonify({"error": "auth token missing"}), 401
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+
+
+        # Fallback: parse the last auth_token from Cookie header if multiple exist
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -317,15 +358,21 @@ def grade_individual_quest(individual_quest_id):
     try:
         
         
+        # Prefer Authorization: Bearer <token>
         auth_token = None
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-            if not auth_token:
-                return jsonify({"error": "auth token missing"}), 401
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+
+
+        # Fallback: parse the last auth_token from Cookie header if multiple exist
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:

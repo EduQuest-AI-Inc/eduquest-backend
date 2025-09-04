@@ -9,15 +9,21 @@ def verify_period():
     try:
         
         
+        # Prefer Authorization: Bearer <token>
         auth_token = None
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-            if not auth_token:
-                return jsonify({"error": "auth token missing"}), 401
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+
+
+        # Fallback: parse the last auth_token from Cookie header if multiple exist
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
 
         data = request.json
         period_id = data.get('period_id')
@@ -41,15 +47,21 @@ def initiate_ltg_conversation():
     try:
         
         
+        # Prefer Authorization: Bearer <token>
         auth_token = None
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-            if not auth_token:
-                return jsonify({"error": "auth token missing"}), 401
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+
+
+        # Fallback: parse the last auth_token from Cookie header if multiple exist
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
 
         data = request.json
         period_id = data.get('period_id')
@@ -77,15 +89,21 @@ def continue_ltg_conversation():
         data = request.json
         
         
+        # Prefer Authorization: Bearer <token>
         auth_token = None
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-            if not auth_token:
-                return jsonify({"error": "auth token missing"}), 401
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+
+
+        # Fallback: parse the last auth_token from Cookie header if multiple exist
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
 
         conversation_type = data.get('conversation_type')
         thread_id = data.get('thread_id')
@@ -107,15 +125,21 @@ def continue_ltg_conversation():
 def initiate_schedules_agent():
     try:
         
+        # Prefer Authorization: Bearer <token>
         auth_token = None
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-            if not auth_token:
-                return jsonify({"error": "auth token missing"}), 401
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+
+
+        # Fallback: parse the last auth_token from Cookie header if multiple exist
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
         data = request.json
         
         period_id = data.get('period_id')  
@@ -134,15 +158,21 @@ def initiate_homework_agent():
         
         
             
+        # Prefer Authorization: Bearer <token>
         auth_token = None
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-            if not auth_token:
-                return jsonify({"error": "auth token missing"}), 401
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+
+
+        # Fallback: parse the last auth_token from Cookie header if multiple exist
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
         data = request.json
         period_id = data.get('period_id')
         if not period_id:
