@@ -13,9 +13,15 @@ def get_weekly_quests(period_id):
     try:
         
         
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -34,9 +40,15 @@ def get_weekly_quests(period_id):
 @quest_bp.route('/individual-quests', methods=['GET'])
 def get_individual_quests():
     try:
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -70,9 +82,15 @@ def get_student_individual_quests(student_id):
     try:
         
         
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -105,9 +123,15 @@ def update_individual_quest_status(quest_id, individual_quest_id):
     try:
         
         
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -133,9 +157,15 @@ def get_individual_quest(quest_id, individual_quest_id):
     try:
         
         
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -156,9 +186,15 @@ def verify_quest_structure(period_id):
     try:
         
         
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -177,9 +213,15 @@ def get_individual_quest_details(individual_quest_id):
     try:
         
         
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -275,9 +317,15 @@ def grade_individual_quest(individual_quest_id):
     try:
         
         
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:

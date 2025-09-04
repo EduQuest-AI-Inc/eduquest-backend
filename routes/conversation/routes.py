@@ -41,9 +41,15 @@ def convert_decimals(obj):
 @conversation_bp.route('/initiate-profile-assistant', methods=['POST'])
 def profile_assistant():
     try:
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
 
         result = conversation_service.start_profile_assistant(auth_token)
         #always returns json
@@ -61,9 +67,15 @@ def continue_profile_assistant():
         data = request.json
         print("Received data:", data)  # Debug log
         
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
 
         conversation_type = data.get('conversation_type')
         thread_id = data.get('thread_id')
@@ -95,9 +107,15 @@ def initiate_update():
         
         
 
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
         
         # Check if this is a file upload (FormData) or JSON request
         if request.files:
@@ -216,9 +234,15 @@ def continue_update():
         data = request.json
         print("[DEBUG] Received data:", data)
 
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
         print("[DEBUG] Auth token:", auth_token)
 
         thread_id = data.get('thread_id')
