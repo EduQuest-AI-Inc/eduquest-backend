@@ -43,9 +43,11 @@ def profile_assistant():
     try:
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -56,6 +58,8 @@ def profile_assistant():
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
 
         result = conversation_service.start_profile_assistant(auth_token)
         #always returns json
@@ -75,9 +79,11 @@ def continue_profile_assistant():
         
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -88,6 +94,8 @@ def continue_profile_assistant():
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
 
         conversation_type = data.get('conversation_type')
         thread_id = data.get('thread_id')
@@ -121,9 +129,11 @@ def initiate_update():
 
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -134,6 +144,8 @@ def initiate_update():
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
         
         # Check if this is a file upload (FormData) or JSON request
         if request.files:
@@ -254,9 +266,11 @@ def continue_update():
 
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -267,6 +281,8 @@ def continue_update():
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
         print("[DEBUG] Auth token:", auth_token)
 
         thread_id = data.get('thread_id')

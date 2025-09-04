@@ -11,9 +11,11 @@ def verify_period():
         
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -24,6 +26,8 @@ def verify_period():
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
 
         data = request.json
         period_id = data.get('period_id')
@@ -49,9 +53,11 @@ def initiate_ltg_conversation():
         
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -62,6 +68,8 @@ def initiate_ltg_conversation():
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
 
         data = request.json
         period_id = data.get('period_id')
@@ -91,9 +99,11 @@ def continue_ltg_conversation():
         
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -104,6 +114,8 @@ def continue_ltg_conversation():
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
 
         conversation_type = data.get('conversation_type')
         thread_id = data.get('thread_id')
@@ -127,9 +139,11 @@ def initiate_schedules_agent():
         
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -140,6 +154,8 @@ def initiate_schedules_agent():
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
         data = request.json
         
         period_id = data.get('period_id')  
@@ -160,9 +176,11 @@ def initiate_homework_agent():
             
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -173,6 +191,8 @@ def initiate_homework_agent():
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
         data = request.json
         period_id = data.get('period_id')
         if not period_id:
