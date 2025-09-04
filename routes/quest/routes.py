@@ -14,9 +14,11 @@ def get_weekly_quests(period_id):
         
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -27,6 +29,8 @@ def get_weekly_quests(period_id):
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -47,9 +51,11 @@ def get_individual_quests():
     try:
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -60,6 +66,8 @@ def get_individual_quests():
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -95,9 +103,11 @@ def get_student_individual_quests(student_id):
         
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -108,6 +118,8 @@ def get_student_individual_quests(student_id):
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -142,9 +154,11 @@ def update_individual_quest_status(quest_id, individual_quest_id):
         
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -155,6 +169,8 @@ def update_individual_quest_status(quest_id, individual_quest_id):
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -182,9 +198,11 @@ def get_individual_quest(quest_id, individual_quest_id):
         
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -195,6 +213,8 @@ def get_individual_quest(quest_id, individual_quest_id):
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -217,9 +237,11 @@ def verify_quest_structure(period_id):
         
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -230,6 +252,8 @@ def verify_quest_structure(period_id):
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -250,9 +274,11 @@ def get_individual_quest_details(individual_quest_id):
         
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -263,6 +289,8 @@ def get_individual_quest_details(individual_quest_id):
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -360,9 +388,11 @@ def grade_individual_quest(individual_quest_id):
         
         # Prefer Authorization: Bearer <token>
         auth_token = None
+        token = None
         auth_header = request.headers.get('Authorization', '')
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
 
 
         # Fallback: parse the last auth_token from Cookie header if multiple exist
@@ -373,6 +403,8 @@ def grade_individual_quest(individual_quest_id):
                 auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
+
+        print(f"Auth token for initiate-profile-assistant: {auth_token}")
 
         sessions = session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
