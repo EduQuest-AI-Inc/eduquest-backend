@@ -19,12 +19,9 @@ def get_profile_cookie():
 
     # Prefer Authorization: Bearer <token>
     token = None
-    raw_cookie = request.headers.get('Cookie', '')
-    if 'auth_token=' in raw_cookie:
-        parts = [p.strip() for p in raw_cookie.split(';')]
-        auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-        if auth_tokens:
-            token = auth_tokens[-1]
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header and auth_header.lower().startswith('bearer '):
+        token = auth_header.split(' ', 1)[1].strip()
 
     print(f"Resolved auth token: {token}")
     if not token:
