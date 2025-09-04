@@ -9,9 +9,15 @@ def verify_period():
     try:
         
         
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
 
         data = request.json
         period_id = data.get('period_id')
@@ -35,9 +41,15 @@ def initiate_ltg_conversation():
     try:
         
         
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
 
         data = request.json
         period_id = data.get('period_id')
@@ -65,9 +77,15 @@ def continue_ltg_conversation():
         data = request.json
         
         
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
 
         conversation_type = data.get('conversation_type')
         thread_id = data.get('thread_id')
@@ -89,9 +107,15 @@ def continue_ltg_conversation():
 def initiate_schedules_agent():
     try:
         
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
         data = request.json
         
         period_id = data.get('period_id')  
@@ -110,9 +134,15 @@ def initiate_homework_agent():
         
         
             
-        auth_token = request.cookies.get("auth_token")
-        if not auth_token:
-            return jsonify({"error": "auth token missing"}), 401
+        auth_token = None
+        raw_cookie = request.headers.get('Cookie', '')
+        if 'auth_token=' in raw_cookie:
+            parts = [p.strip() for p in raw_cookie.split(';')]
+            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+            if auth_tokens:
+                token = auth_tokens[-1]
+            if not auth_token:
+                return jsonify({"error": "auth token missing"}), 401
         data = request.json
         period_id = data.get('period_id')
         if not period_id:
