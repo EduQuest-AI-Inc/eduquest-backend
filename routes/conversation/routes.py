@@ -95,7 +95,7 @@ def continue_profile_assistant():
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
 
-        print(f"Auth token for initiate-profile-assistant: {auth_token}")
+        print(f"Auth token for continue-profile-assistant: {auth_token}")
 
         conversation_type = data.get('conversation_type')
         thread_id = data.get('thread_id')
@@ -113,6 +113,9 @@ def continue_profile_assistant():
             return jsonify({"error": "user_message is required"}), 400
 
         result = conversation_service.continue_profile_assistant(auth_token, conversation_type, thread_id, user_message)
+
+        print("Service result:", result)  # Debug log
+
         return result, 200
     except Exception as e:
         print(f"Error in continue-profile-assistant: {str(e)}")  
