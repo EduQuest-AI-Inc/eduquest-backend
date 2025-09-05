@@ -74,7 +74,7 @@ def login():
             httponly=False, 
             secure=True,           # Required for HTTPS
             samesite='None',       # Allows cross-site cookies
-            domain='eduquestai.org',
+            domain='.eduquestai.org',
             path="/"  
         )
         return resp
