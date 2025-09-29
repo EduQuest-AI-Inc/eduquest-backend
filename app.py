@@ -36,6 +36,7 @@ CORS(app, resources={r"/*": {
         "https://eduquestai.org.s3-website.us-east-2.amazonaws.com",
         
         # Development domains
+        "http://localhost:5000",
         "http://localhost:3000",
         "http://localhost:5173", 
         "http://localhost:5174",
