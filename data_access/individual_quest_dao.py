@@ -23,7 +23,38 @@ class IndividualQuestDAO(BaseDAO):
             KeyConditionExpression=Key("individual_quest_id").eq(individual_quest_id)
         )
         items = response.get("Items", [])
-        return items[0] if items else None
+        if items:
+            quest = items[0]
+            # Ensure rubric exists and has content for grading
+            if not quest.get("rubric") or quest.get("rubric") == {}:
+                print(f"WARNING: Quest {individual_quest_id} has empty rubric, adding default grading criteria")
+                quest["rubric"] = {
+                    "Criteria": {
+                        "Content Understanding": {
+                            "Score_1": "Poor understanding of material",
+                            "Score_2": "Basic understanding with some gaps",
+                            "Score_3": "Good understanding of most concepts",
+                            "Score_4": "Strong understanding with minor gaps",
+                            "Score_5": "Excellent understanding of all concepts"
+                        },
+                        "Quality of Work": {
+                            "Score_1": "Work is incomplete or very poor quality",
+                            "Score_2": "Work is basic with several issues",
+                            "Score_3": "Work meets expectations with minor issues",
+                            "Score_4": "High quality work with very minor issues",
+                            "Score_5": "Exceptional quality work"
+                        },
+                        "Presentation": {
+                            "Score_1": "Very poor organization and communication",
+                            "Score_2": "Basic organization with clarity issues",
+                            "Score_3": "Well organized and clearly communicated",
+                            "Score_4": "Very well organized and articulated",
+                            "Score_5": "Exceptionally organized and professional"
+                        }
+                    }
+                }
+            return quest
+        return None
 
     def get_quests_by_week(self, week: int) -> List[Dict[str, Any]]:
         """Get all quests for a specific week."""

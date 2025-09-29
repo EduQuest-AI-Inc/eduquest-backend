@@ -344,7 +344,17 @@ class update:
             )
         elif not self.instructor:
             initial_message = (
-                f'You are grading a quest submission from a student. This is for week {self.week}. Please grade each criterion and provide and overall grade (sum of all criteria scores) and feedback for the quest submission based on the provided quest details and rubric.')
+                f'You are grading a quest submission from a student. This is for week {self.week}. Please grade each criterion and provide an overall grade and feedback for the quest submission based on the provided quest details and rubric.\n\n'
+                f'IMPORTANT GRADING INSTRUCTIONS:\n'
+                f'1. First, search for and examine the quest details to find the rubric information.\n'
+                f'2. If the rubric contains specific criteria (like "Criterion A", "Criterion B", etc.), use those exact criteria for grading.\n'
+                f'3. If the rubric is missing or empty, create a default rubric with these criteria:\n'
+                f'   - "Content Understanding": How well the student demonstrates understanding of the material (0-5 points)\n'
+                f'   - "Quality of Work": Completeness, accuracy, and effort shown (0-5 points)\n'
+                f'   - "Presentation": Organization, clarity, and communication (0-5 points)\n'
+                f'4. Always provide both a detailed grade breakdown AND an overall score.\n'
+                f'5. Grade format should be: {{"detailed_grade": {{"Criterion1": score, "Criterion2": score}}, "overall_score": "X/Y points"}}\n'
+                f'6. Provide constructive feedback explaining the grade.')
             message = openai.beta.threads.messages.create(
                 thread_id=self.thread_id,
                 role="user",

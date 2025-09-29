@@ -251,6 +251,20 @@ Recommended Changes: {response_json.get('recommended_change', 'None')}"""
                 feedback = response_data.get('feedback')
                 change = response_data.get('change')
                 recommended_change = response_data.get('recommended_change')
+                
+                # Handle case where grade might be None but overall_score exists
+                if grade is None and overall_score:
+                    print(f"DEBUG: Grade is None but overall_score exists: {overall_score}")
+                    # Create a basic grade structure
+                    grade = {"overall": overall_score}
+                
+                # If both grade and overall_score are missing, provide helpful error
+                if grade is None and not overall_score:
+                    print(f"❌ WARNING: Both grade and overall_score are missing from assistant response")
+                    print(f"Response data keys: {list(response_data.keys())}")
+                    # Set default values to prevent null errors
+                    grade = {"error": "Grading failed - missing rubric data"}
+                    overall_score = "Error: Could not grade submission"
 
                 # PRIORITY 1: Save grade and feedback immediately (before any agent calls)
                 # This ensures grades are preserved even if quest updates fail

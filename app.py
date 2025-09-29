@@ -37,10 +37,12 @@ CORS(app, resources={r"/*": {
         
         # Development domains
         "http://localhost:5000",
+        "http://localhost:5001",
         "http://localhost:3000",
         "http://localhost:5173", 
         "http://localhost:5174",
         "http://127.0.0.1:3000",
+        "http://127.0.0.1:5001",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174"
     ],
@@ -64,4 +66,4 @@ def hello_world():
     return "helloworld"
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5001, debug=True)

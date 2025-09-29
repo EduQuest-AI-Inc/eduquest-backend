@@ -531,12 +531,26 @@ class QuestService:
         try:
             # Try to parse as new JSON format
             grade_data = json.loads(grade_str)
-            if isinstance(grade_data, dict) and "detailed_grade" in grade_data:
-                return {
-                    "detailed_grade": grade_data.get("detailed_grade"),
-                    "overall_score": grade_data.get("overall_score", "Score not available"),
-                    "display_grade": grade_data.get("overall_score", "Score not available")
-                }
+            if isinstance(grade_data, dict):
+                # Handle structured grade data
+                if "detailed_grade" in grade_data:
+                    overall_score = grade_data.get("overall_score", "Score not available")
+                    # Handle empty overall_score
+                    if not overall_score or overall_score == "":
+                        overall_score = "Pending"
+                        
+                    return {
+                        "detailed_grade": grade_data.get("detailed_grade"),
+                        "overall_score": overall_score,
+                        "display_grade": overall_score
+                    }
+                # Handle error cases
+                elif "error" in grade_data:
+                    return {
+                        "detailed_grade": None,
+                        "overall_score": "Grading Error",
+                        "display_grade": "Grading Error - Missing Rubric"
+                    }
         except (json.JSONDecodeError, TypeError):
             pass
         
