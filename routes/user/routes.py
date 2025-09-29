@@ -58,11 +58,13 @@ def get_profile_cookie():
         # Try student first
         student = student_dao.get_student_by_id(username)
         if student:
-            return jsonify({'user': student}), 200
+            student['role'] = 'student'
+            return jsonify(student), 200
         # Try teacher
         teacher = teacher_dao.get_teacher_by_id(username)
         if teacher:
-            return jsonify({'user': teacher}), 200
+            teacher['role'] = 'teacher'
+            return jsonify(teacher), 200
         return jsonify({'message': 'User not found'}), 404
     except Exception as e:
         print(f"Error in get_profile_cookie: {e}")
