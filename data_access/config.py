@@ -1,8 +1,11 @@
 import os
 import boto3
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+# Ensure we load the .env that lives in the backend directory, even when CWD is project root
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(_BACKEND_DIR / '.env')
 
 class DynamoDBConfig:
     def __init__(self):
