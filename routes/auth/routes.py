@@ -68,15 +68,33 @@ def login():
                 response_data['needs_profile'] = True
         # Set cookie
         resp = make_response(jsonify(response_data), 200)
-        resp.set_cookie(
-            'auth_token',
-            access_token,
-            httponly=False, 
-            secure=True,           # Required for HTTPS
-            samesite='None',       # Allows cross-site cookies
-            domain='eduquestai.org',
-            path="/"  
-        )
+        
+        # Determine if we're in development or production
+        is_development = request.headers.get('Origin', '').startswith('http://localhost') or \
+                        request.headers.get('Host', '').startswith('localhost') or \
+                        request.headers.get('Host', '').startswith('127.0.0.1')
+        
+        if is_development:
+            # Development settings
+            resp.set_cookie(
+                'auth_token',
+                access_token,
+                httponly=False,
+                secure=False,         # No HTTPS in development
+                samesite='Lax',       # More permissive for development
+                path="/"
+            )
+        else:
+            # Production settings
+            resp.set_cookie(
+                'auth_token',
+                access_token,
+                httponly=False,
+                secure=True,          # HTTPS required in production
+                samesite='None',      # Cross-site cookies for production
+                domain='.eduquestai.org',
+                path="/"
+            )
         return resp
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
