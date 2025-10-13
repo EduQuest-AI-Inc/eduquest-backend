@@ -111,7 +111,6 @@ class ini_conv:
 
         while True:
             run_status = openai.beta.threads.runs.retrieve(thread_id=self.thread_id, run_id=run_id)
-            # print(f"Run status: {run_status.status}")
             if run_status.status == 'completed':
                 break
             time.sleep(1)  # Wait for 1 second before checking again
@@ -119,24 +118,56 @@ class ini_conv:
         messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
         last_message = messages.data[0]
         response = last_message.content[0].text.value
-        # self.conversation_log.append({"role": "assistant", "content": response})
-        return_message = json.loads(response)
 
-        strengths = return_message.get('Strengths', [])
-        weaknesses = return_message.get('Weaknesses', [])
-        interests = return_message.get('Interests', [])
-        learning_styles = return_message.get('Learning_Styles', [])
+        # Try to parse the JSON response; if it fails, force a follow-up
+        try:
+            return_message = json.loads(response)
+        except Exception:
+            follow_up = ("Thanks! To finish your profile and redirect you to your student page, "
+                         "I still need your strengths, weaknesses, interests, and learning styles. "
+                         "Please share at least 1–2 items for each. If you're unsure, share your best guess or say 'skip' and I’ll suggest options.")
+            return follow_up, False, None, ["strengths", "weaknesses", "interests", "learning_styles"]
 
-        if not strengths or not weaknesses or not interests or not learning_styles:
-            return return_message['response'], False, None
-        else:
-            profile = {
-                "strength": strengths,
-                "weakness": weaknesses,
-                "interest": interests,
-                "learning_style": learning_styles,
-            }
-            return return_message['response'], True, profile
+        strengths = return_message.get('Strengths', []) or []
+        weaknesses = return_message.get('Weaknesses', []) or []
+        interests = return_message.get('Interests', []) or []
+        learning_styles = return_message.get('Learning_Styles', []) or []
+
+        # Normalize to non-empty strings only
+        def clean(arr):
+            if not isinstance(arr, list):
+                return []
+            return [s for s in (item.strip() for item in arr if isinstance(item, str)) if s]
+
+        strengths = clean(strengths)
+        weaknesses = clean(weaknesses)
+        interests = clean(interests)
+        learning_styles = clean(learning_styles)
+
+        missing = []
+        if not strengths: missing.append("strengths")
+        if not weaknesses: missing.append("weaknesses")
+        if not interests: missing.append("interests")
+        if not learning_styles: missing.append("learning styles")
+
+        if missing:
+            # Construct a clear, directive follow-up that does NOT imply completion
+            missing_list = ", ".join(missing[:-1]) + (" and " + missing[-1] if len(missing) > 1 else missing[0])
+            follow_up = (
+                f"Thanks for the info so far! To finish your profile and redirect you to your student page, "
+                f"I still need your {missing_list}. Please share at least 1–2 items for each. "
+                f"If you're unsure, say 'skip' and I can suggest options to choose from."
+            )
+            return follow_up, False, None, missing
+
+        profile = {
+            "strength": strengths,
+            "weakness": weaknesses,
+            "interest": interests,
+            "learning_style": learning_styles,
+        }
+        # Use the assistant's original message when complete
+        return return_message.get('response', "Your profile is complete."), True, profile, []
 
 
 class ltg:

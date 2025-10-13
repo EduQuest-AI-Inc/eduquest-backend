@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 *.xml
+.venv
+bash.exe.stackdump
