@@ -3,6 +3,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 import os
+import sys
 
 from routes.conversation.routes import conversation_bp
 from routes.auth.routes import auth_bp
@@ -15,6 +16,41 @@ from datetime import timedelta
 
 # Load environment variables from .env file
 load_dotenv()
+
+def validate_environment():
+    """Validate that all required environment variables are set."""
+    required_vars = {
+        # I commented out JWT_SECRET_KEY, not sure if any devs are still using a fallback secret
+        # 'JWT_SECRET_KEY': 'JWT secret key for token signing',
+        'OPENAI_API_KEY': 'OpenAI API key for AI functionality',
+        'AWS_ACCESS_KEY_ID': 'AWS access key for DynamoDB and S3',
+        'AWS_SECRET_ACCESS_KEY': 'AWS secret key for DynamoDB and S3',
+        'AWS_REGION': 'AWS region (defaults to us-east-2 if not set)',
+        # test_aws_setup.py lists bucket name as optional
+        # 'S3_BUCKET_NAME': 'S3 bucket name for file storage'
+    }
+    
+    missing_vars = []
+    for var, description in required_vars.items():
+        if not os.getenv(var):
+            missing_vars.append(f"  - {var}: {description}")
+    
+    if missing_vars:
+        print("ERROR: Missing required environment variables:")
+        print("\n".join(missing_vars))
+        print("\nPlease set these variables in your .env file or environment.")
+        print("See .env.example for reference.")
+        sys.exit(1)
+
+    # Additional validation for JWT_SECRET_KEY strength
+    jwt_secret = os.getenv('JWT_SECRET_KEY', 'fallback-secret')
+    if len(jwt_secret) < 32:
+        print("WARNING: JWT_SECRET_KEY should be at least 32 characters long for security.")
+    
+    print("✓ All required environment variables are set")
+
+# Validate environment variables before initializing the app
+validate_environment()
 
 # Initialize Flask app
 app = Flask(__name__)
