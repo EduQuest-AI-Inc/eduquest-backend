@@ -111,13 +111,12 @@ class ConversationService:
 
         try:
             if conversation_type == "profile":
-                reply, is_complete, updated_profile, missing_fields = conv.cont_conv(message)
+                reply, is_complete, updated_profile = conv.cont_conv(message)
                 if is_complete and updated_profile:
                     self.student_dao.update_student(user_id, updated_profile)
                 return {
                     "response": reply,
-                    "profile_complete": is_complete,
-                    "missing_fields": missing_fields
+                    "profile_complete": is_complete
                 }
             elif conversation_type == "update":
                 reply = conv.cont_conv(message)
