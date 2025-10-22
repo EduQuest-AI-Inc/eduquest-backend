@@ -10,6 +10,7 @@ class Period(BaseModel):
     vector_store_id: str
     course: str
     file_urls: List[str] = []
+    school_id: str
 
 
     def to_item(self):

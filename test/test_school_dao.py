@@ -12,16 +12,13 @@ def test_crud_operations():
     school = School(
         school_id="school001",
         school_name="OpenAI Academy",
-        students=["stu1", "stu2"],
-        teachers=["teach1", "teach2"],
-        periods=["per1", "per2"]
     )
 
     # -------Add-------
     # dao.add_school(school)
 
     # -------Update-------
-    # dao.update_school("school001", {"school_name": "OpenAI Advanced Academy", "students": ["stu1", "stu2", "stu3"]})
+    # dao.update_school("school001", {"school_name": "OpenAI Advanced Academy"})
 
     # -------Get-------
     # result = dao.get_school_by_id("school001")
