@@ -6,7 +6,6 @@ class Student(BaseModel):
     first_name: str
     last_name: str
     email: str
-    enrollments: Optional[List[str]] = []
     grade: int
     strength: Optional[list] = None
     weakness: Optional[list] = None
