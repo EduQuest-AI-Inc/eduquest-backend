@@ -2,6 +2,7 @@ from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
 from data_access.base_dao import BaseDAO
 from data_access.config import DynamoDBConfig
+from datetime import datetime, timezone
 
 class WaitlistDAO(BaseDAO):
     def __init__(self):
@@ -17,6 +18,53 @@ class WaitlistDAO(BaseDAO):
             Limit=1
         ).get("Items") or [None])[0]
 
+    def get_by_code(self, waitlist_code: str):
+        """Get a waitlist entry by its code (waitlistID)"""
+        try:
+            scan_response = self.table.scan()
+            all_items = scan_response.get('Items', [])
+            for item in all_items:
+                if item.get('waitlistID') == waitlist_code:
+                    return item
+            return None
+        except ClientError:
+            return None
+
+    def validate_code(self, waitlist_code: str) -> dict:
+        """
+        Validate a waitlist code.
+        Returns a dict with 'valid' (bool) and 'error' (str) if invalid
+        """
+        if not waitlist_code:
+            return {"valid": False, "error": "Waitlist code is required"}
+
+        entry = self.get_by_code(waitlist_code)
+
+        if not entry:
+            return {"valid": False, "error": "Invalid waitlist code"}
+
+        if entry.get("used", False):
+            return {"valid": False, "error": "Waitlist code has already been used"}
+
+        return {"valid": True, "entry": entry}
+
+    def mark_code_as_used(self, waitlist_code: str, used_by: str) -> bool:
+        """Mark a waitlist code as used"""
+        try:
+            self.table.update_item(
+                Key={"waitlistID": waitlist_code},
+                UpdateExpression="SET #used = :used, usedAt = :usedAt, usedBy = :usedBy",
+                ExpressionAttributeNames={"#used": "used"},
+                ExpressionAttributeValues={
+                    ":used": True,
+                    ":usedAt": datetime.now(timezone.utc).isoformat(),
+                    ":usedBy": used_by,
+                },
+            )
+            return True
+        except ClientError:
+            return False
+
     def put_unique_code(self, waitlist_id: str, email: str, name: str) -> bool:
         try:
             self.table.put_item(
@@ -24,6 +72,7 @@ class WaitlistDAO(BaseDAO):
                     "waitlistID": waitlist_id,
                     "email": email.strip().lower(),
                     "name": name.strip(),
+                    "used": False,
                 },
                 ConditionExpression="attribute_not_exists(waitlistID)"
             )
