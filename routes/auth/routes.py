@@ -92,7 +92,7 @@ def login():
                 httponly=False,
                 secure=True,          # HTTPS required in production
                 samesite='None',      # Cross-site cookies for production
-                domain='.eduquestai.org',
+                domain='eduquestai.org',
                 path="/"
             )
         return resp
