@@ -59,10 +59,9 @@ class PeriodDAO(BaseDAO):
             print(f"Error in get_periods_by_teacher_id: {e}")
             return []
 
-    # TODO: create GSI for school_id
     def get_periods_by_school_id(self, school_id: str) -> List[Dict[str, Any]]:
         response = self.table.query(
-            IndexName="school_id-index",  # Use GSI
+            IndexName="SchoolPeriodIndex",  # Use GSI
             KeyConditionExpression=Key("school_id").eq(school_id)
         )
         return response.get("Items", [])

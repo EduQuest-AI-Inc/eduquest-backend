@@ -14,7 +14,7 @@ from models.enrollment import Enrollment
 @pytest.mark.integration
 def test_get_enrollments_by_student_id_gsi():
     # Ensure your backend points to the test tables (if you use env-based switching)
-    # os.environ['USE_TEST_TABLES'] = 'true'
+    os.environ['USE_TEST_TABLES'] = 'true'
 
     dao = EnrollmentDAO()
 

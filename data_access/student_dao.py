@@ -154,10 +154,9 @@ class StudentDAO(BaseDAO):
         """
         return not self.get_tutorial_status(student_id)
 
-    # TODO: create GSI for school_id
     def get_students_by_school_id(self, school_id: str) -> List[Dict[str, Any]]:
         response = self.table.query(
-            IndexName="school_id-index",  # Use GSI
+            IndexName="SchoolStudentIndex",  # Use GSI
             KeyConditionExpression=Key("school_id").eq(school_id)
         )
         return response.get("Items", [])

@@ -34,10 +34,9 @@ class TeacherDAO(BaseDAO):
     def delete_teacher(self, teacher_id: str) -> None:
         self.table.delete_item(Key={"teacher_id": teacher_id})
 
-    # TODO: create GSI for school_id
     def get_teachers_by_school_id(self, school_id: str) -> List[Dict[str, Any]]:
         response = self.table.query(
-            IndexName="school_id-index",  # Use GSI
+            IndexName="SchoolTeacherIndex",  # Use GSI
             KeyConditionExpression=Key("school_id").eq(school_id)
         )
         return response.get("Items", [])
