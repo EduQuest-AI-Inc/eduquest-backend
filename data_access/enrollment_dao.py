@@ -56,25 +56,14 @@ class EnrollmentDAO(BaseDAO):
         for item in response.get("Items", []):
             print(f" Item: {item}, period_id type: {type(item.get('period_id'))}")
 
-    # Add to data_access/enrollment_dao.py
-def get_enrollments_by_student_id(self, student_id: str) -> List[Dict[str, Any]]:
-    """Get all enrollments for a specific student"""
-    try:
-        response = self.table.scan(
-            FilterExpression=Attr("student_id").eq(student_id)
-        )
-        return response.get("Items", [])
-    except Exception as e:
-        print(f"Error querying enrollments by student_id: {e}")
-        raise
-
-def is_student_enrolled(self, student_id: str, period_id: str) -> bool:
-    """Check if a student is enrolled in a specific period"""
-    try:
-        response = self.table.scan(
-            FilterExpression=Attr("student_id").eq(student_id) & Attr("period_id").eq(period_id)
-        )
-        return len(response.get("Items", [])) > 0
-    except Exception as e:
-        print(f"Error checking enrollment: {e}")
-        return False
+    def get_enrollments_by_student_id(self, student_id: str) -> List[Dict[str, Any]]:
+        """Get all enrollments for a specific student using GSI"""
+        try:
+            response = self.table.query(
+                IndexName='StudentPeriodIndex',  # Your GSI name
+                KeyConditionExpression=Key("student_id").eq(student_id)
+            )
+            return response.get("Items", [])
+        except Exception as e:
+            print(f"Error querying enrollments by student_id: {e}")
+            raise
