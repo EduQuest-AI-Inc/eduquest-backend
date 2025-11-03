@@ -28,20 +28,24 @@ def signup():
     last_name = data.get('last_name')
     email = data.get('email')
     grade = data.get('grade')
+    waitlist_code = data.get('waitlistID')
 
-    if not username or not password or not role or not first_name or not last_name or not email or (role == 'student' and not grade):
-        return jsonify({'message': 'Username, password, role, first_name, last_name, email' + (', and grade' if role == 'student' else '') + ' required'}), 400
+    if not username or not password or not role or not first_name or not last_name or not email or not waitlist_code or (role == 'student' and not grade):
+        return jsonify({'message': 'Username, password, role, first_name, last_name, email, waitlist code' + (', and grade' if role == 'student' else '') + ' required'}), 400
 
-    # Check if email already exists for student or teacher
     student_items = student_dao.table.scan(FilterExpression="email = :email", ExpressionAttributeValues={":email": email}).get("Items", [])
     teacher_items = teacher_dao.table.scan(FilterExpression="email = :email", ExpressionAttributeValues={":email": email}).get("Items", [])
     if student_items or teacher_items:
         return jsonify({'message': 'Email address already in use'}), 409
 
-    if register_user(username, password, role, first_name, last_name, email, grade if role == 'student' else None):
+    result = register_user(username, password, role, first_name, last_name, email, grade if role == 'student' else None, waitlist_code)
+
+    if result.get('success'):
         return jsonify({'message': 'User registered successfully'}), 201
     else:
-        return jsonify({'message': 'Username already exists'}), 409
+        error_message = result.get('error', 'Registration failed')
+        status_code = 409 if 'already exists' in error_message else 400
+        return jsonify({'message': error_message}), status_code
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
