@@ -320,8 +320,14 @@ class update:
                 )
 
     def initiate(self):
+        # Start detailed timing for OpenAI assistant operations
+        assistant_start_time = time.time()
+        print(f"🤖 ASSISTANT TIMER: Creating thread and initiating OpenAI assistant...")
+        
         thread = openai.beta.threads.create()
         self.thread_id = thread.id
+        thread_creation_time = time.time()
+        print(f"🤖 ASSISTANT TIMER: Thread created in {thread_creation_time - assistant_start_time:.2f}s")
 
         # Send the initial message to the thread
         if self.instructor:
@@ -376,12 +382,17 @@ class update:
                 ]
             )
 
+        message_creation_time = time.time()
+        print(f"🤖 ASSISTANT TIMER: Message created in {message_creation_time - thread_creation_time:.2f}s")
+
         # Create a run to get the assistant's response
         run = openai.beta.threads.runs.create(
             thread_id=self.thread_id,
             assistant_id=self.assistant.id
         )
         run_id = run.id
+        run_start_time = time.time()
+        print(f"🤖 ASSISTANT TIMER: Run started, waiting for completion...")
 
         while True:
             run_status = openai.beta.threads.runs.retrieve(thread_id=self.thread_id, run_id=run_id)
@@ -390,10 +401,24 @@ class update:
                 break
             time.sleep(1)  # Wait for 1 second before checking again
 
+        run_completion_time = time.time()
+        run_duration = run_completion_time - run_start_time
+        print(f"🤖 ASSISTANT TIMER: OpenAI run completed in {run_duration:.2f}s")
+
             # Get messages once the run is completed
         messages = openai.beta.threads.messages.list(thread_id=self.thread_id)
         last_message = messages.data[0]
         response = last_message.content[0].text.value
+        
+        response_retrieval_time = time.time()
+        total_assistant_time = response_retrieval_time - assistant_start_time
+        print(f"🤖 ASSISTANT TIMER: Response retrieved in {response_retrieval_time - run_completion_time:.2f}s")
+        print(f"🤖 ASSISTANT TIMER: Total OpenAI assistant time: {total_assistant_time:.2f}s")
+        
+        # Log grading-specific timing information
+        if not self.instructor:
+            print(f"📊 GRADING PERFORMANCE: Quest graded in {total_assistant_time:.2f}s (week {getattr(self, 'week', 'unknown')})")
+        
         # print(f"EduQuest: {messages}")
         # print(f"Response: {response}")
         self.conversation_log.append({"role": "assistant", "content": response})
@@ -419,6 +444,10 @@ class update:
             return response
 
     def cont_conv(self, user_input):
+        # Add timing for continuation conversations as well
+        continue_start_time = time.time()
+        print(f"🔄 CONTINUE TIMER: Starting conversation continuation...")
+        
         self.conversation_log.append({"role": "user", "content": user_input})
         message = openai.beta.threads.messages.create(
             thread_id=self.thread_id,
@@ -443,6 +472,10 @@ class update:
         response = last_message.content[0].text.value
         self.conversation_log.append({"role": "assistant", "content": response})
         
+        continue_end_time = time.time()
+        continue_duration = continue_end_time - continue_start_time
+        print(f"🔄 CONTINUE TIMER: Conversation continuation completed in {continue_duration:.2f}s")
+        
         # Return the raw response so the conversation service can handle parsing
         return response
 
@@ -450,7 +483,10 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class create_class:
     def __init__(self, class_name):
         self.class_name = class_name
-        self.vector_store = client.vector_stores.create(name=self.class_name)
+        self.vector_store = client.vector_stores.create(
+            name=self.class_name,
+            expires_after={"anchor":"last_active_at", "days": 365}
+            )
         self.vector_store_id = self.vector_store.id
 
     #commented this out for now. routes.py and teacher_service.py are handling this.

@@ -11,6 +11,7 @@ from models.conversation import Conversation
 from datetime import datetime, timezone
 from assistants import ini_conv
 from assistants import update as UpdateAssistant
+import time  # Add time import for timing logs
 
 #creating a temp file
 
@@ -227,7 +228,19 @@ class ConversationService:
             submission_file
         )
 
+        # Start timing for grading process
+        grading_start_time = time.time()
+        print(f"🕐 GRADING TIMER: Starting update assistant for {'instructor' if is_instructor else 'student'} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        if not is_instructor and individual_quest_id:
+            print(f"🕐 GRADING TIMER: Grading quest {individual_quest_id} for student {student_id}, week {week}")
+
         raw_response = update_conversation.initiate()
+        
+        # End timing for grading process
+        grading_end_time = time.time()
+        grading_duration = grading_end_time - grading_start_time
+        print(f"⏱️ GRADING TIMER: Update assistant completed in {grading_duration:.2f} seconds ({grading_duration/60:.2f} minutes)")
+        
         if not raw_response:
             raise Exception("Failed to initiate update conversation")
 
@@ -283,12 +296,18 @@ Recommended Changes: {response_json.get('recommended_change', 'None')}"""
                         "overall_score": overall_score
                     }
                     
+                    # Time the database save operation
+                    save_start_time = time.time()
                     quest_dao.update_quest_grade_and_feedback(
                         individual_quest_id,
                         json.dumps(grade_data),  # Store as JSON string
                         feedback
                     )
-                    print(f"✅ SAVED rubric-based grade {overall_score} and feedback for quest {individual_quest_id}")
+                    save_end_time = time.time()
+                    save_duration = save_end_time - save_start_time
+                    total_time_elapsed = save_end_time - grading_start_time
+                    
+                    print(f"✅ SAVED rubric-based grade {overall_score} and feedback for quest {individual_quest_id} (DB save: {save_duration:.3f}s, Total: {total_time_elapsed:.2f}s)")
                 else:
                     # Fallback to old method if individual_quest_id is not provided
                     from routes.quest.quest_service import QuestService
@@ -322,12 +341,18 @@ Recommended Changes: {response_json.get('recommended_change', 'None')}"""
                             "overall_score": overall_score
                         }
                         
+                        # Time the database save operation
+                        save_start_time = time.time()
                         quest_dao.update_quest_grade_and_feedback(
                             target_quest['individual_quest_id'],
                             json.dumps(grade_data),  # Store as JSON string
                             feedback
                         )
-                        print(f"✅ SAVED rubric-based grade {overall_score} and feedback for quest {target_quest['individual_quest_id']}")
+                        save_end_time = time.time()
+                        save_duration = save_end_time - save_start_time
+                        total_time_elapsed = save_end_time - grading_start_time
+                        
+                        print(f"✅ SAVED rubric-based grade {overall_score} and feedback for quest {target_quest['individual_quest_id']} (DB save: {save_duration:.3f}s, Total: {total_time_elapsed:.2f}s)")
                     else:
                         print(f"❌ WARNING: Could not find individual quest for student {student_id}, week {week}, period {period_id}")
                         print(f"Available quests for student: {[(q.get('week'), q.get('period_id'), q.get('individual_quest_id')) for q in individual_quests]}")

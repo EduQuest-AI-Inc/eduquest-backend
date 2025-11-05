@@ -1,13 +1,17 @@
 # auth_service.py
 # Handles user registration and authentication logic
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_jwt_extended import create_access_token
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
+from data_access.session_dao import SessionDAO
 from models.student import Student
 from models.teacher import Teacher
+from models.session import Session
 
 student_dao = StudentDAO()
 teacher_dao = TeacherDAO()
+session_dao = SessionDAO()
 
 def register_user(username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', grade: str = None) -> bool:
     if role == 'teacher':
@@ -38,3 +42,10 @@ def authenticate_user(username: str, password: str, role: str) -> bool:
         if not user:
             return False
         return check_password_hash(user['password'], password)
+
+def create_user_session(username: str, role: str) -> str:
+    """Create JWT token and session for authenticated user"""
+    access_token = create_access_token(identity=username)
+    session = Session(auth_token=access_token, user_id=username, role=role)
+    session_dao.add_session(session)
+    return access_token

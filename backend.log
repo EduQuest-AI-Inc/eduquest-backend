@@ -1,0 +1,205 @@
+Using DynamoDB table: enrollment
+Using DynamoDB table: enrollment
+ * Serving Flask app 'app'
+ * Debug mode: on
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://10.37.228.171:5001
+Press CTRL+C to quit
+ * Restarting with watchdog (fsevents)
+ * Debugger is active!
+ * Debugger PIN: 207-218-504
+127.0.0.1 - - [29/Sep/2025 19:11:17] "OPTIONS /auth/login HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:18] "POST /auth/login HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:18] "OPTIONS /user/profile HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:18] "GET /user/profile HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:18] "OPTIONS /user/profile HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:18] "OPTIONS /user/profile HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:18] "GET /user/profile HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:18] "OPTIONS /quest/individual-quests?period_id=PERSONAL-C84D-7AE1 HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:18] "GET /user/profile HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:19] "GET /quest/individual-quests?period_id=PERSONAL-C84D-7AE1 HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:22] "OPTIONS /quest/individual-quests?period_id=ADVANCED-3685-274B HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:22] "GET /quest/individual-quests?period_id=ADVANCED-3685-274B HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:26] "OPTIONS /user/profile HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:26] "OPTIONS /quest/individual-quests/e5176999-ab03-43ac-814f-28d31c3e232f/details HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:26] "OPTIONS /quest/individual-quests/e5176999-ab03-43ac-814f-28d31c3e232f/details HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:26] "OPTIONS /user/profile HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:26] "GET /user/profile HTTP/1.1" 200 -
+Using DynamoDB table: enrollment
+Using DynamoDB table: enrollment
+get_profile_cookie called
+Request headers: Host: localhost:5001
+Connection: keep-alive
+Sec-Ch-Ua-Platform: "macOS"
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36
+Sec-Ch-Ua: "Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"
+Content-Type: application/json
+Sec-Ch-Ua-Mobile: ?0
+Accept: */*
+Origin: http://localhost:5174
+Sec-Fetch-Site: same-site
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+Referer: http://localhost:5174/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: en-US,en;q=0.9,de-CH;q=0.8,de;q=0.7,zh-CN;q=0.6,zh;q=0.5,de-DE;q=0.4
+
+
+Resolved auth token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+get_profile_cookie called
+Request headers: Host: localhost:5001
+Connection: keep-alive
+Sec-Ch-Ua-Platform: "macOS"
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36
+Sec-Ch-Ua: "Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"
+Content-Type: application/json
+Sec-Ch-Ua-Mobile: ?0
+Accept: */*
+Origin: http://localhost:5174
+Sec-Fetch-Site: same-site
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+Referer: http://localhost:5174/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: en-US,en;q=0.9,de-CH;q=0.8,de;q=0.7,zh-CN;q=0.6,zh;q=0.5,de-DE;q=0.4
+Cookie: auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+
+
+Resolved auth token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+get_profile_cookie called
+Request headers: Host: localhost:5001
+Connection: keep-alive
+Sec-Ch-Ua-Platform: "macOS"
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36
+Sec-Ch-Ua: "Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"
+Content-Type: application/json
+Sec-Ch-Ua-Mobile: ?0
+Accept: */*
+Origin: http://localhost:5174
+Sec-Fetch-Site: same-site
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+Referer: http://localhost:5174/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: en-US,en;q=0.9,de-CH;q=0.8,de;q=0.7,zh-CN;q=0.6,zh;q=0.5,de-DE;q=0.4
+Cookie: auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+
+
+Resolved auth token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+Auth token for initiate-profile-assistant: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+Auth token for initiate-profile-assistant: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+get_profile_cookie called
+Request headers: Host: localhost:5001
+Connection: keep-alive
+Sec-Ch-Ua-Platform: "macOS"
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36
+Sec-Ch-Ua: "Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"
+Content-Type: application/json
+Sec-Ch-Ua-Mobile: ?0
+Accept: */*
+Origin: http://localhost:5174
+Sec-Fetch-Site: same-site
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+Referer: http://localhost:5174/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: en-US,en;q=0.9,de-CH;q=0.8,de;q=0.7,zh-CN;q=0.6,zh;q=0.5,de-DE;q=0.4
+
+
+Resolved auth token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+Auth token for initiate-profile-assistant: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+get_profile_cookie called
+127.0.0.1 - - [29/Sep/2025 19:11:26] "GET /user/profile HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:27] "GET /quest/individual-quests/e5176999-ab03-43ac-814f-28d31c3e232f/details HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:27] "OPTIONS /quest/weekly-quests/8f4fb28b-6bc4-427e-a39c-d5406c481685/individual-quests/e5176999-ab03-43ac-814f-28d31c3e232f HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:27] "OPTIONS /user/profile HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:27] "OPTIONS /quest/weekly-quests/8f4fb28b-6bc4-427e-a39c-d5406c481685/individual-quests/e5176999-ab03-43ac-814f-28d31c3e232f HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:27] "OPTIONS /user/profile HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:27] "GET /user/profile HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:27] "OPTIONS /quest/individual-quests/JohnTest HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:27] "GET /user/profile HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:27] "GET /quest/individual-quests/e5176999-ab03-43ac-814f-28d31c3e232f/details HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:27] "GET /quest/individual-quests/JohnTest HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:27] "GET /quest/individual-quests/e5176999-ab03-43ac-814f-28d31c3e232f/details HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:27] "GET /quest/weekly-quests/8f4fb28b-6bc4-427e-a39c-d5406c481685/individual-quests/e5176999-ab03-43ac-814f-28d31c3e232f HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:27] "GET /quest/weekly-quests/8f4fb28b-6bc4-427e-a39c-d5406c481685/individual-quests/e5176999-ab03-43ac-814f-28d31c3e232f HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:11:28] "GET /quest/individual-quests/e5176999-ab03-43ac-814f-28d31c3e232f/details HTTP/1.1" 200 -
+127.0.0.1 - - [29/Sep/2025 19:12:12] "OPTIONS /conversation/initiate-update-assistant HTTP/1.1" 200 -
+Request headers: Host: localhost:5001
+Connection: keep-alive
+Sec-Ch-Ua-Platform: "macOS"
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36
+Sec-Ch-Ua: "Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"
+Content-Type: application/json
+Sec-Ch-Ua-Mobile: ?0
+Accept: */*
+Origin: http://localhost:5174
+Sec-Fetch-Site: same-site
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+Referer: http://localhost:5174/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: en-US,en;q=0.9,de-CH;q=0.8,de;q=0.7,zh-CN;q=0.6,zh;q=0.5,de-DE;q=0.4
+
+
+Resolved auth token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+Auth token for initiate-profile-assistant: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+Auth token for initiate-profile-assistant: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+get_profile_cookie called
+Request headers: Host: localhost:5001
+Connection: keep-alive
+Sec-Ch-Ua-Platform: "macOS"
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36
+Sec-Ch-Ua: "Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"
+Content-Type: application/json
+Sec-Ch-Ua-Mobile: ?0
+Accept: */*
+Origin: http://localhost:5174
+Sec-Fetch-Site: same-site
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+Referer: http://localhost:5174/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: en-US,en;q=0.9,de-CH;q=0.8,de;q=0.7,zh-CN;q=0.6,zh;q=0.5,de-DE;q=0.4
+Cookie: auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+
+
+Resolved auth token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+get_profile_cookie called
+Request headers: Host: localhost:5001
+Connection: keep-alive
+Sec-Ch-Ua-Platform: "macOS"
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36
+Sec-Ch-Ua: "Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"
+Content-Type: application/json
+Sec-Ch-Ua-Mobile: ?0
+Accept: */*
+Origin: http://localhost:5174
+Sec-Fetch-Site: same-site
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+Referer: http://localhost:5174/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: en-US,en;q=0.9,de-CH;q=0.8,de;q=0.7,zh-CN;q=0.6,zh;q=0.5,de-DE;q=0.4
+Cookie: auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+
+
+Resolved auth token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+Auth token for initiate-profile-assistant: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+Auth token for initiate-profile-assistant: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+Auth token for initiate-profile-assistant: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+Auth token for initiate-profile-assistant: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+Auth token for initiate-profile-assistant: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTE5NDY3NywianRpIjoiOWJmOWVlZjMtZmExOS00YjQwLWFlMjktNjk0Mjc4YWI1ZGYyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IkpvaG5UZXN0IiwibmJmIjoxNzU5MTk0Njc3LCJjc3JmIjoiOTFkNWZmNDAtZTc4Yy00NzcyLWFhNTQtNzllZmRkOGJjYTZmIiwiZXhwIjoxNzU5MTk4Mjc3fQ.OeBIsVI6uiWbDf2GuJyJ1t_Dtmwn9nfl10LyLx9nsHk
+Handling file upload request
+Saved uploaded file to: /var/folders/hc/xttm2w6d2wj0qn2qvsd2szt80000gn/T/tmp3rjl_efs.pdf
+Fetched quest e5176999-ab03-43ac-814f-28d31c3e232f for student JohnTest
+DEBUG user_profile_dict: 127.0.0.1 - - [29/Sep/2025 19:12:36] "POST /conversation/initiate-update-assistant HTTP/1.1" 200 -

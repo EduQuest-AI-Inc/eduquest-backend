@@ -2,7 +2,7 @@
 
 from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import create_access_token, decode_token
-from .auth_service import register_user, authenticate_user
+from .auth_service import register_user, authenticate_user, create_user_session
 from data_access.session_dao import SessionDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
@@ -39,7 +39,48 @@ def signup():
         return jsonify({'message': 'Email address already in use'}), 409
 
     if register_user(username, password, role, first_name, last_name, email, grade if role == 'student' else None):
-        return jsonify({'message': 'User registered successfully'}), 201
+        # Create token and session (same as login)
+        access_token = create_user_session(username, role)
+        
+        response_data = {'token': access_token, 'message': 'User registered successfully'}
+        
+        # If student, check if profile is blank (for new signup it will be)
+        if role == 'student':
+            student = student_dao.get_student_by_id(username)
+            if not student.get('strength') or not student.get('weakness') or not student.get('interest') or not student.get('learning_style'):
+                response_data['needs_profile'] = True
+        
+        # Set cookie (same logic as login)
+        resp = make_response(jsonify(response_data), 201)
+        
+        # Determine if we're in development or production
+        is_development = request.headers.get('Origin', '').startswith('http://localhost') or \
+                        request.headers.get('Host', '').startswith('localhost') or \
+                        request.headers.get('Host', '').startswith('127.0.0.1')
+        
+        if is_development:
+            # Development settings
+            resp.set_cookie(
+                'auth_token',
+                access_token,
+                httponly=False,
+                secure=False,         # No HTTPS in development
+                samesite='Lax',       # More permissive for development
+                path="/"
+            )
+        else:
+            # Production settings
+            resp.set_cookie(
+                'auth_token',
+                access_token,
+                httponly=False,
+                secure=True,          # HTTPS required in production
+                samesite='None',      # Cross-site cookies for production
+                domain='eduquestai.org',
+                path="/"
+            )
+        
+        return resp
     else:
         return jsonify({'message': 'Username already exists'}), 409
 
@@ -57,9 +98,9 @@ def login():
         return jsonify({'message': 'Username, password, and role required'}), 400
 
     if authenticate_user(username, password, role):
-        access_token = create_access_token(identity=username)
-        session = Session(auth_token=access_token, user_id=username, role=role)
-        session_dao.add_session(session)
+        # Use helper function to create session
+        access_token = create_user_session(username, role)
+        
         response_data = {'token': access_token}
         # If student, check if profile is blank
         if role == 'student':
