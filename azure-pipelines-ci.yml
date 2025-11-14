@@ -7,6 +7,18 @@ trigger:
       - README*.md
       - docs/*
       - .gitignore
+
+pr:
+  branches:
+    include:
+      - main
+      - Jason
+  paths:
+    exclude:
+      - README*.md
+      - docs/*
+      - .gitignore
+
 #1234
 variables:
   pythonVersion: '3.11'
