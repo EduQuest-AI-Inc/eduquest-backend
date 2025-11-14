@@ -1,3 +1,9 @@
+resources:
+  repositories:
+    - repository: self
+      type: github
+      endpoint: GitHub-Connection  
+      name: eduquest2024/eduquest-backend 
 trigger:
   branches:
     include:
