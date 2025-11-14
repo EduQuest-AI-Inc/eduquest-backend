@@ -1,0 +1,174 @@
+trigger:
+  branches:
+    include:
+      - '*'
+  paths:
+    exclude:
+      - README*.md
+      - docs/*
+      - .gitignore
+
+pr:
+  branches:
+    include:
+      - '*'
+  paths:
+    exclude:
+      - README*.md
+      - docs/*
+
+variables:
+  pythonVersion: '3.11'
+  vmImageName: 'ubuntu-latest'
+
+stages:
+  - stage: CI
+    displayName: 'Continuous Integration'
+    jobs:
+      - job: BuildAndTest
+        displayName: 'Build, Test, and Create Artifact'
+        pool:
+          vmImage: $(vmImageName)
+
+        steps:
+          - task: UsePythonVersion@0
+            displayName: 'Set Python version to $(pythonVersion)'
+            inputs:
+              versionSpec: '$(pythonVersion)'
+              addToPath: true
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+            displayName: 'Install dependencies'
+
+          - script: |
+              pip install pytest pytest-cov pytest-flask flake8 safety bandit
+            displayName: 'Install test and security dependencies'
+
+          - script: |
+              echo "Running flake8 linting..."
+              flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=venv,__pycache__,.git
+              flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv,__pycache__,.git
+            displayName: 'Run linting checks (flake8)'
+            continueOnError: true
+
+          - script: |
+              if [ -d "tests" ] && [ "$(ls -A tests/*.py 2>/dev/null)" ]; then
+                echo "Running pytest..."
+                pytest tests/ \
+                  --junitxml=junit/test-results.xml \
+                  --cov=. \
+                  --cov-report=xml \
+                  --cov-report=html \
+                  --cov-report=term
+              else
+                echo "No tests found, skipping test execution"
+                mkdir -p junit
+                echo '<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" tests="0" errors="0" failures="0" skipped="0"></testsuite></testsuites>' > junit/test-results.xml
+              fi
+            displayName: 'Run tests (pytest)'
+            continueOnError: false
+
+          - task: PublishTestResults@2
+            displayName: 'Publish test results'
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: '**/test-*.xml'
+              failTaskOnFailedTests: true
+              testRunTitle: 'Python $(pythonVersion) Tests'
+
+          - task: PublishCodeCoverageResults@1
+            displayName: 'Publish code coverage'
+            condition: succeededOrFailed()
+            inputs:
+              codeCoverageTool: Cobertura
+              summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/coverage.xml'
+              reportDirectory: '$(System.DefaultWorkingDirectory)/**/htmlcov'
+              failIfCoverageEmpty: false
+
+          - script: |
+              echo "Running safety check for dependency vulnerabilities..."
+              safety check --json --output safety-report.json || true
+
+              echo "Running bandit for security issues in code..."
+              bandit -r . -f json -o bandit-report.json -x ./venv,./tests || true
+
+              echo "Security scan completed. Check reports for details."
+            displayName: 'Security scanning (safety + bandit)'
+            continueOnError: true
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish security reports'
+            condition: succeededOrFailed()
+            inputs:
+              targetPath: '$(System.DefaultWorkingDirectory)'
+              artifact: 'security-reports'
+              publishLocation: 'pipeline'
+              patterns: |
+                *-report.json
+
+          - script: |
+              echo "Creating build metadata..."
+              cat > build-info.json << EOF
+              {
+                "buildId": "$(Build.BuildId)",
+                "buildNumber": "$(Build.BuildNumber)",
+                "sourceVersion": "$(Build.SourceVersion)",
+                "sourceBranch": "$(Build.SourceBranchName)",
+                "repository": "$(Build.Repository.Name)",
+                "buildDateTime": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+                "triggeredBy": "$(Build.RequestedFor)",
+                "buildReason": "$(Build.Reason)"
+              }
+              EOF
+
+              echo "Build metadata created:"
+              cat build-info.json
+            displayName: 'Create build metadata'
+
+          - task: ArchiveFiles@2
+            displayName: 'Create deployment artifact'
+            inputs:
+              rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/eduquest-backend-$(Build.BuildId).zip'
+              replaceExistingArchive: true
+              verbose: true
+              excludePatterns: |
+                **/.git/**
+                **/__pycache__/**
+                **/*.pyc
+                **/venv/**
+                **/env/**
+                **/.venv/**
+                **/htmlcov/**
+                **/.pytest_cache/**
+                **/.coverage
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish deployment artifact'
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)'
+              artifact: 'deployment-package'
+              publishLocation: 'pipeline'
+
+          - script: |
+              echo "============================================"
+              echo "CI Pipeline Completed Successfully"
+              echo "============================================"
+              echo "Build ID: $(Build.BuildId)"
+              echo "Build Number: $(Build.BuildNumber)"
+              echo "Commit SHA: $(Build.SourceVersion)"
+              echo "Branch: $(Build.SourceBranchName)"
+              echo "============================================"
+              echo ""
+              echo "Next Steps:"
+              echo "1. Review test results and code coverage"
+              echo "2. Check security scan reports"
+              echo "3. To deploy this build, run CD pipeline with:"
+              echo "   Build ID: $(Build.BuildId)"
+              echo "============================================"
+            displayName: 'Build summary'
