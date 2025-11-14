@@ -7,10 +7,7 @@ trigger:
       - README*.md
       - docs/*
       - .gitignore
-
-# For Azure Repos, PR triggers are configured via Branch Policies in Azure DevOps
-# Go to: Repos → Branches → Branch Policies to enable build validation
-
+#1234
 variables:
   pythonVersion: '3.11'
   vmImageName: 'ubuntu-latest'
