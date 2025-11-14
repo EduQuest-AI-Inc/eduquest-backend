@@ -1,0 +1,459 @@
+trigger: none
+pr: none
+
+parameters:
+  - name: ciBuildId
+    displayName: 'CI Build ID to Deploy'
+    type: string
+    default: 'latest'
+
+  - name: environment
+    displayName: 'Target Environment'
+    type: string
+    default: 'dev'
+    values:
+      - dev
+      - prod
+
+  - name: deployInfrastructure
+    displayName: 'Deploy Infrastructure (CloudFormation)'
+    type: boolean
+    default: true
+
+  - name: deployApplication
+    displayName: 'Deploy Application (EC2)'
+    type: boolean
+    default: true
+
+  - name: runSmokeTests
+    displayName: 'Run Smoke Tests'
+    type: boolean
+    default: true
+
+variables:
+  pythonVersion: '3.11'
+  vmImageName: 'ubuntu-latest'
+  awsRegion: 'us-east-2'
+
+  ${{ if eq(parameters.environment, 'prod') }}:
+    awsServiceConnection: 'AWS-Connection-Prod'
+    stackNamePrefix: 'eduquest'
+    ec2InstanceTag: 'eduquest-backend'
+    apiGatewayStackName: 'eduquest-api-gateway-prod'
+    parametersFile: 'parameters-prod.json'
+    stageName: 'prod'
+    azureEnvironment: 'production'
+  ${{ else }}:
+    awsServiceConnection: 'AWS-Connection'
+    stackNamePrefix: 'eduquest'
+    ec2InstanceTag: 'eduquest-backend-dev'
+    apiGatewayStackName: 'eduquest-api-gateway-dev'
+    parametersFile: 'parameters-dev.json'
+    stageName: 'dev'
+    azureEnvironment: 'development'
+
+stages:
+  - stage: ValidateArtifact
+    displayName: 'Validate and Download CI Artifact'
+    jobs:
+      - job: DownloadArtifact
+        displayName: 'Download and Validate Build Artifact'
+        pool:
+          vmImage: $(vmImageName)
+
+        steps:
+          - checkout: none
+
+          - script: |
+              echo "============================================"
+              echo "CD Pipeline Starting"
+              echo "============================================"
+              echo "Target Environment: ${{ parameters.environment }}"
+              echo "CI Build ID: ${{ parameters.ciBuildId }}"
+              echo "Deploy Infrastructure: ${{ parameters.deployInfrastructure }}"
+              echo "Deploy Application: ${{ parameters.deployApplication }}"
+              echo "Run Smoke Tests: ${{ parameters.runSmokeTests }}"
+              echo "============================================"
+            displayName: 'Display deployment parameters'
+
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Download CI artifact'
+            inputs:
+              ${{ if eq(parameters.ciBuildId, 'latest') }}:
+                buildType: 'specific'
+                project: '$(System.TeamProject)'
+                definition: 'CI Pipeline'
+                buildVersionToDownload: 'latest'
+                allowPartiallySucceededBuilds: false
+              ${{ else }}:
+                buildType: 'specific'
+                project: '$(System.TeamProject)'
+                definition: 'CI Pipeline'
+                buildId: '${{ parameters.ciBuildId }}'
+              artifactName: 'deployment-package'
+              targetPath: '$(Pipeline.Workspace)/artifact'
+
+          - task: ExtractFiles@1
+            displayName: 'Extract deployment artifact'
+            inputs:
+              archiveFilePatterns: '$(Pipeline.Workspace)/artifact/*.zip'
+              destinationFolder: '$(Pipeline.Workspace)/app'
+              cleanDestinationFolder: true
+
+          - script: |
+              if [ -f "$(Pipeline.Workspace)/app/build-info.json" ]; then
+                echo "Build information from CI:"
+                cat $(Pipeline.Workspace)/app/build-info.json
+              else
+                echo "Warning: build-info.json not found in artifact"
+              fi
+            displayName: 'Display build information'
+
+          - script: |
+              echo "Validating artifact contents..."
+
+              if [ ! -f "$(Pipeline.Workspace)/app/app.py" ]; then
+                echo "ERROR: app.py not found in artifact"
+                exit 1
+              fi
+
+              if [ ! -f "$(Pipeline.Workspace)/app/requirements.txt" ]; then
+                echo "ERROR: requirements.txt not found in artifact"
+                exit 1
+              fi
+
+              if [ ! -d "$(Pipeline.Workspace)/app/cloudformation" ]; then
+                echo "ERROR: cloudformation directory not found in artifact"
+                exit 1
+              fi
+
+              if [ ! -d "$(Pipeline.Workspace)/app/scripts" ]; then
+                echo "ERROR: scripts directory not found in artifact"
+                exit 1
+              fi
+
+              echo "Artifact validation successful!"
+              echo "Contents:"
+              ls -la $(Pipeline.Workspace)/app/
+            displayName: 'Validate artifact contents'
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish validated artifact'
+            inputs:
+              targetPath: '$(Pipeline.Workspace)/app'
+              artifact: 'validated-deployment'
+              publishLocation: 'pipeline'
+
+  - stage: DeployInfrastructure
+    displayName: 'Deploy Infrastructure to ${{ parameters.environment }}'
+    dependsOn: ValidateArtifact
+    condition: and(succeeded(), eq('${{ parameters.deployInfrastructure }}', 'true'))
+    jobs:
+      - deployment: DeployCloudFormation
+        displayName: 'Deploy CloudFormation Stacks'
+        pool:
+          vmImage: $(vmImageName)
+        environment: $(azureEnvironment)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: none
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: 'Download validated artifact'
+                  inputs:
+                    buildType: 'current'
+                    artifactName: 'validated-deployment'
+                    targetPath: '$(Pipeline.Workspace)/app'
+
+                - task: AWSShellScript@1
+                  displayName: 'Deploy/Update API Gateway Stack'
+                  inputs:
+                    awsCredentials: $(awsServiceConnection)
+                    regionName: $(awsRegion)
+                    scriptType: 'inline'
+                    inlineScript: |
+                      set -e
+
+                      echo "============================================"
+                      echo "Deploying API Gateway Stack"
+                      echo "Stack Name: $(apiGatewayStackName)"
+                      echo "Environment: ${{ parameters.environment }}"
+                      echo "============================================"
+
+                      cd $(Pipeline.Workspace)/app
+
+                      chmod +x scripts/*.sh
+
+                      if aws cloudformation describe-stacks --stack-name $(apiGatewayStackName) --region $(awsRegion) 2>/dev/null; then
+                        echo "Stack exists, updating..."
+                        bash scripts/update-api-gateway.sh ${{ parameters.environment }}
+                      else
+                        echo "Stack does not exist, creating..."
+                        bash scripts/deploy-api-gateway.sh ${{ parameters.environment }}
+                      fi
+
+                      echo "Waiting for stack to complete..."
+                      aws cloudformation wait stack-update-complete \
+                        --stack-name $(apiGatewayStackName) \
+                        --region $(awsRegion) || \
+                      aws cloudformation wait stack-create-complete \
+                        --stack-name $(apiGatewayStackName) \
+                        --region $(awsRegion)
+
+                      echo "Stack deployment completed successfully!"
+
+                      echo "Stack Outputs:"
+                      aws cloudformation describe-stacks \
+                        --stack-name $(apiGatewayStackName) \
+                        --region $(awsRegion) \
+                        --query 'Stacks[0].Outputs' \
+                        --output table
+
+  - stage: DeployApplication
+    displayName: 'Deploy Application to ${{ parameters.environment }}'
+    dependsOn:
+      - ValidateArtifact
+      - DeployInfrastructure
+    condition: |
+      and(
+        in(dependencies.ValidateArtifact.result, 'Succeeded'),
+        or(
+          eq('${{ parameters.deployInfrastructure }}', 'false'),
+          in(dependencies.DeployInfrastructure.result, 'Succeeded')
+        ),
+        eq('${{ parameters.deployApplication }}', 'true')
+      )
+    jobs:
+      - deployment: DeployToEC2
+        displayName: 'Deploy Flask Application to EC2'
+        pool:
+          vmImage: $(vmImageName)
+        environment: $(azureEnvironment)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: none
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: 'Download validated artifact'
+                  inputs:
+                    buildType: 'current'
+                    artifactName: 'validated-deployment'
+                    targetPath: '$(Pipeline.Workspace)/app'
+
+                - task: AWSShellScript@1
+                  displayName: 'Upload artifact to S3'
+                  inputs:
+                    awsCredentials: $(awsServiceConnection)
+                    regionName: $(awsRegion)
+                    scriptType: 'inline'
+                    inlineScript: |
+                      set -e
+
+                      BUCKET_NAME="eduquest-deployments-${{ parameters.environment }}"
+                      BUILD_ID="${{ parameters.ciBuildId }}"
+                      TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+                      S3_KEY="builds/${BUILD_ID}/eduquest-backend-${TIMESTAMP}.zip"
+
+                      echo "Uploading artifact to S3..."
+                      echo "Bucket: $BUCKET_NAME"
+                      echo "Key: $S3_KEY"
+
+                      cd $(Pipeline.Workspace)/app
+                      zip -r deployment.zip . -x "*.git*" "*__pycache__*" "*.pyc" "*venv*" "*htmlcov*"
+
+                      aws s3 cp deployment.zip "s3://${BUCKET_NAME}/${S3_KEY}"
+
+                      echo "##vso[task.setvariable variable=s3ArtifactPath]s3://${BUCKET_NAME}/${S3_KEY}"
+
+                      echo "Upload completed successfully!"
+
+                - task: AWSShellScript@1
+                  displayName: 'Deploy to EC2 via Systems Manager'
+                  inputs:
+                    awsCredentials: $(awsServiceConnection)
+                    regionName: $(awsRegion)
+                    scriptType: 'inline'
+                    inlineScript: |
+                      set -e
+
+                      echo "============================================"
+                      echo "Deploying to EC2 Instance"
+                      echo "Instance Tag: $(ec2InstanceTag)"
+                      echo "Environment: ${{ parameters.environment }}"
+                      echo "============================================"
+
+                      INSTANCE_ID=$(aws ec2 describe-instances \
+                        --region $(awsRegion) \
+                        --filters "Name=tag:Name,Values=$(ec2InstanceTag)" "Name=instance-state-name,Values=running" \
+                        --query 'Reservations[0].Instances[0].InstanceId' \
+                        --output text)
+
+                      if [ "$INSTANCE_ID" == "None" ] || [ -z "$INSTANCE_ID" ]; then
+                        echo "ERROR: Could not find running EC2 instance with tag: $(ec2InstanceTag)"
+                        exit 1
+                      fi
+
+                      echo "Found instance: $INSTANCE_ID"
+
+                      cat > deploy-script.sh << 'DEPLOY_EOF'
+                      #!/bin/bash
+                      set -e
+
+                      APP_DIR="/home/ubuntu/eduquest-backend"
+                      BACKUP_DIR="/home/ubuntu/eduquest-backend-backup-$(date +%Y%m%d-%H%M%S)"
+                      S3_PATH="$(s3ArtifactPath)"
+
+                      echo "Starting deployment..."
+
+                      if [ -d "$APP_DIR" ]; then
+                        echo "Backing up current deployment to $BACKUP_DIR"
+                        cp -r "$APP_DIR" "$BACKUP_DIR"
+                      fi
+
+                      mkdir -p "$APP_DIR"
+                      cd "$APP_DIR"
+
+                      echo "Downloading artifact from S3..."
+                      aws s3 cp "$S3_PATH" deployment.zip
+
+                      echo "Stopping application..."
+                      pkill -f "python.*app.py" || true
+                      systemctl stop eduquest-backend || true
+
+                      echo "Extracting new version..."
+                      unzip -o deployment.zip
+                      rm deployment.zip
+
+                      echo "Installing dependencies..."
+                      if [ ! -d "venv" ]; then
+                        python3 -m venv venv
+                      fi
+                      source venv/bin/activate
+                      pip install --upgrade pip
+                      pip install -r requirements.txt
+
+                      echo "Starting application..."
+                      if systemctl list-unit-files | grep -q eduquest-backend.service; then
+                        systemctl start eduquest-backend
+                        systemctl status eduquest-backend --no-pager
+                      else
+                        nohup python app.py > app.log 2>&1 &
+                      fi
+
+                      echo "Deployment completed successfully!"
+                      DEPLOY_EOF
+
+                      aws s3 cp deploy-script.sh "s3://eduquest-deployments-${{ parameters.environment }}/deploy-script.sh"
+
+                      echo "Executing deployment via Systems Manager..."
+                      COMMAND_ID=$(aws ssm send-command \
+                        --region $(awsRegion) \
+                        --instance-ids "$INSTANCE_ID" \
+                        --document-name "AWS-RunShellScript" \
+                        --parameters "commands=[
+                          'aws s3 cp s3://eduquest-deployments-${{ parameters.environment }}/deploy-script.sh /tmp/deploy-script.sh',
+                          'chmod +x /tmp/deploy-script.sh',
+                          '/tmp/deploy-script.sh'
+                        ]" \
+                        --output text \
+                        --query 'Command.CommandId')
+
+                      echo "Command ID: $COMMAND_ID"
+
+                      echo "Waiting for deployment to complete..."
+                      aws ssm wait command-executed \
+                        --region $(awsRegion) \
+                        --command-id "$COMMAND_ID" \
+                        --instance-id "$INSTANCE_ID"
+
+                      echo "Deployment output:"
+                      aws ssm get-command-invocation \
+                        --region $(awsRegion) \
+                        --command-id "$COMMAND_ID" \
+                        --instance-id "$INSTANCE_ID" \
+                        --query 'StandardOutputContent' \
+                        --output text
+
+                      echo "Application deployed successfully to EC2!"
+
+  - stage: SmokeTests
+    displayName: 'Run Smoke Tests on ${{ parameters.environment }}'
+    dependsOn: DeployApplication
+    condition: |
+      and(
+        succeeded(),
+        eq('${{ parameters.runSmokeTests }}', 'true')
+      )
+    jobs:
+      - job: RunSmokeTests
+        displayName: 'Execute Smoke Tests'
+        pool:
+          vmImage: $(vmImageName)
+
+        steps:
+          - task: AWSShellScript@1
+            displayName: 'Run API smoke tests'
+            inputs:
+              awsCredentials: $(awsServiceConnection)
+              regionName: $(awsRegion)
+              scriptType: 'inline'
+              inlineScript: |
+                set -e
+
+                echo "============================================"
+                echo "Running Smoke Tests"
+                echo "Environment: ${{ parameters.environment }}"
+                echo "============================================"
+
+                API_URL=$(aws cloudformation describe-stacks \
+                  --region $(awsRegion) \
+                  --stack-name $(apiGatewayStackName) \
+                  --query 'Stacks[0].Outputs[?OutputKey==`APIGatewayURL`].OutputValue' \
+                  --output text)
+
+                if [ -z "$API_URL" ]; then
+                  echo "ERROR: Could not retrieve API Gateway URL"
+                  exit 1
+                fi
+
+                echo "API Gateway URL: $API_URL"
+
+                echo "Testing /helloworld endpoint..."
+                RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/helloworld")
+
+                if [ "$RESPONSE" -eq 200 ]; then
+                  echo "✓ Health check passed (HTTP $RESPONSE)"
+                else
+                  echo "✗ Health check failed (HTTP $RESPONSE)"
+                  exit 1
+                fi
+
+                echo "Verifying response content..."
+                CONTENT=$(curl -s "$API_URL/helloworld")
+                echo "Response: $CONTENT"
+
+                if echo "$CONTENT" | grep -q "Hello"; then
+                  echo "✓ Response content validation passed"
+                else
+                  echo "✗ Response content validation failed"
+                  exit 1
+                fi
+
+                echo "============================================"
+                echo "All smoke tests passed!"
+                echo "============================================"
+
+          - script: |
+              echo "============================================"
+              echo "Deployment Completed Successfully!"
+              echo "============================================"
+              echo "Environment: ${{ parameters.environment }}"
+              echo "CI Build ID: ${{ parameters.ciBuildId }}"
+              echo "CD Pipeline Run: $(Build.BuildNumber)"
+              echo "Deployed At: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+              echo "============================================"
+            displayName: 'Deployment summary'

@@ -1,0 +1,40 @@
+[flake8]
+# Flake8 configuration for linting
+
+# Maximum line length
+max-line-length = 127
+
+# Complexity threshold
+max-complexity = 10
+
+# Exclude patterns
+exclude =
+    .git,
+    __pycache__,
+    .pytest_cache,
+    venv,
+    .venv,
+    env,
+    build,
+    dist,
+    *.egg-info,
+    node_modules,
+    .azure
+
+# Error codes to ignore
+ignore =
+    E203,  # whitespace before ':'
+    E501,  # line too long (handled by max-line-length)
+    W503,  # line break before binary operator
+
+# Show source code for errors
+show-source = True
+
+# Show error codes
+show-pep8 = True
+
+# Count errors
+count = True
+
+# Statistics
+statistics = True
