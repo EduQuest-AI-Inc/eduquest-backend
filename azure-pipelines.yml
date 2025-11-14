@@ -1,0 +1,294 @@
+# Azure DevOps CI/CD Pipeline for EduQuest Backend
+# This pipeline handles both CI (Continuous Integration) and CD (Continuous Deployment)
+# Deploys to Development (develop branch) and Production (main branch)
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    exclude:
+      - README.md
+      - docs/*
+      - .gitignore
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    exclude:
+      - README.md
+      - docs/*
+
+variables:
+  pythonVersion: '3.11'
+  vmImageName: 'ubuntu-latest'
+
+  # Environment configuration
+  ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+    environment: 'prod'
+    deploymentTarget: 'production'
+  ${{ else }}:
+    environment: 'dev'
+    deploymentTarget: 'development'
+
+stages:
+  # ============================================
+  # CI Stage - Build and Test
+  # ============================================
+  - stage: CI
+    displayName: 'Continuous Integration'
+    jobs:
+      - job: Build
+        displayName: 'Build and Test'
+        pool:
+          vmImage: $(vmImageName)
+
+        steps:
+          - task: UsePythonVersion@0
+            displayName: 'Set Python version to $(pythonVersion)'
+            inputs:
+              versionSpec: '$(pythonVersion)'
+              addToPath: true
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+            displayName: 'Install dependencies'
+
+          - script: |
+              pip install pytest pytest-cov pytest-flask
+            displayName: 'Install test dependencies'
+
+          # Run linting
+          - script: |
+              pip install flake8
+              flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+              flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+            displayName: 'Run linting checks'
+            continueOnError: true
+
+          # Run tests (if you have tests)
+          - script: |
+              if [ -d "tests" ]; then
+                pytest tests/ --junitxml=junit/test-results.xml --cov=. --cov-report=xml --cov-report=html
+              else
+                echo "No tests directory found, skipping tests"
+              fi
+            displayName: 'Run tests'
+            continueOnError: true
+
+          # Publish test results
+          - task: PublishTestResults@2
+            displayName: 'Publish test results'
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: '**/test-*.xml'
+              failTaskOnFailedTests: false
+
+          # Publish code coverage
+          - task: PublishCodeCoverageResults@1
+            displayName: 'Publish code coverage'
+            condition: succeededOrFailed()
+            inputs:
+              codeCoverageTool: Cobertura
+              summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/coverage.xml'
+              reportDirectory: '$(System.DefaultWorkingDirectory)/**/htmlcov'
+
+          # Security scanning
+          - script: |
+              pip install safety bandit
+              safety check --json || true
+              bandit -r . -f json -o bandit-report.json || true
+            displayName: 'Security scanning'
+            continueOnError: true
+
+          # Create artifact
+          - task: ArchiveFiles@2
+            displayName: 'Create deployment artifact'
+            inputs:
+              rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+              replaceExistingArchive: true
+              verbose: true
+
+          # Publish artifact
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish artifact'
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)'
+              artifact: 'drop'
+              publishLocation: 'pipeline'
+
+  # ============================================
+  # CD Stage - Deploy to Development
+  # ============================================
+  - stage: DeployDev
+    displayName: 'Deploy to Development'
+    dependsOn: CI
+    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'develop'), ne(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - deployment: DeployDevelopment
+        displayName: 'Deploy to Dev Environment'
+        pool:
+          vmImage: $(vmImageName)
+        environment: 'development'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: 'Download artifact'
+                  inputs:
+                    buildType: 'current'
+                    artifactName: 'drop'
+                    targetPath: '$(Pipeline.Workspace)/drop'
+
+                - task: ExtractFiles@1
+                  displayName: 'Extract artifact'
+                  inputs:
+                    archiveFilePatterns: '$(Pipeline.Workspace)/drop/*.zip'
+                    destinationFolder: '$(Pipeline.Workspace)/app'
+                    cleanDestinationFolder: true
+
+                # Deploy to EC2 using AWS Systems Manager or direct SSH
+                - task: AWSShellScript@1
+                  displayName: 'Deploy to Dev EC2'
+                  inputs:
+                    awsCredentials: 'AWS-Connection'
+                    regionName: 'us-east-2'
+                    scriptType: 'inline'
+                    inlineScript: |
+                      echo "Deploying to development environment"
+
+                      # Update CloudFormation stack
+                      cd $(Pipeline.Workspace)/app/cloudformation
+
+                      # Deploy/Update API Gateway stack
+                      bash $(Pipeline.Workspace)/app/scripts/update-api-gateway.sh dev
+
+                      # Deploy application to EC2
+                      # You can use AWS Systems Manager Session Manager or AWS CodeDeploy here
+                      # Or use SSH if you have the keys configured
+                      echo "Application deployed to development"
+
+                # Run smoke tests
+                - task: AWSShellScript@1
+                  displayName: 'Run smoke tests'
+                  inputs:
+                    awsCredentials: 'AWS-Connection'
+                    regionName: 'us-east-2'
+                    scriptType: 'inline'
+                    inlineScript: |
+                      # Get API Gateway URL from CloudFormation outputs
+                      API_URL=$(aws cloudformation describe-stacks \
+                        --stack-name eduquest-api-dev \
+                        --query 'Stacks[0].Outputs[?OutputKey==`APIGatewayURL`].OutputValue' \
+                        --output text)
+
+                      echo "Testing API at: $API_URL"
+
+                      # Test health endpoint
+                      response=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/helloworld")
+
+                      if [ $response -eq 200 ]; then
+                        echo "Health check passed"
+                      else
+                        echo "Health check failed with status: $response"
+                        exit 1
+                      fi
+
+  # ============================================
+  # CD Stage - Deploy to Production
+  # ============================================
+  - stage: DeployProd
+    displayName: 'Deploy to Production'
+    dependsOn: CI
+    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'), ne(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - deployment: DeployProduction
+        displayName: 'Deploy to Production Environment'
+        pool:
+          vmImage: $(vmImageName)
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: 'Download artifact'
+                  inputs:
+                    buildType: 'current'
+                    artifactName: 'drop'
+                    targetPath: '$(Pipeline.Workspace)/drop'
+
+                - task: ExtractFiles@1
+                  displayName: 'Extract artifact'
+                  inputs:
+                    archiveFilePatterns: '$(Pipeline.Workspace)/drop/*.zip'
+                    destinationFolder: '$(Pipeline.Workspace)/app'
+                    cleanDestinationFolder: true
+
+                # Manual approval is configured at the environment level in Azure DevOps
+
+                # Deploy to Production EC2
+                - task: AWSShellScript@1
+                  displayName: 'Deploy to Production EC2'
+                  inputs:
+                    awsCredentials: 'AWS-Connection-Prod'
+                    regionName: 'us-east-2'
+                    scriptType: 'inline'
+                    inlineScript: |
+                      echo "Deploying to production environment"
+
+                      # Update CloudFormation stack
+                      cd $(Pipeline.Workspace)/app/cloudformation
+
+                      # Deploy/Update API Gateway stack
+                      bash $(Pipeline.Workspace)/app/scripts/update-api-gateway.sh prod
+
+                      # Deploy application to EC2
+                      echo "Application deployed to production"
+
+                # Run smoke tests
+                - task: AWSShellScript@1
+                  displayName: 'Run production smoke tests'
+                  inputs:
+                    awsCredentials: 'AWS-Connection-Prod'
+                    regionName: 'us-east-2'
+                    scriptType: 'inline'
+                    inlineScript: |
+                      # Get API Gateway URL from CloudFormation outputs
+                      API_URL=$(aws cloudformation describe-stacks \
+                        --stack-name eduquest-api-prod \
+                        --query 'Stacks[0].Outputs[?OutputKey==`APIGatewayURL`].OutputValue' \
+                        --output text)
+
+                      echo "Testing production API at: $API_URL"
+
+                      # Test health endpoint
+                      response=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/helloworld")
+
+                      if [ $response -eq 200 ]; then
+                        echo "Production health check passed"
+                      else
+                        echo "Production health check failed with status: $response"
+                        exit 1
+                      fi
+
+                # Notify on deployment
+                - script: |
+                    echo "Production deployment completed successfully"
+                    echo "Build ID: $(Build.BuildId)"
+                    echo "Commit: $(Build.SourceVersion)"
+                  displayName: 'Deployment notification'

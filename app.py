@@ -27,24 +27,26 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
 # Initialize JWT
 jwt = JWTManager(app)
 
-# Enable CORS for your frontend
+allowed_origins = [
+    "https://eduquestai.org",
+    "http://eduquestai.org",
+    "http://eduquestai.org.s3-website.us-east-2.amazonaws.com",
+    "https://eduquestai.org.s3-website.us-east-2.amazonaws.com",
+    "http://localhost:5000",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174"
+]
+
+api_gateway_url = os.getenv('API_GATEWAY_URL')
+if api_gateway_url:
+    allowed_origins.append(api_gateway_url)
+
 CORS(app, resources={r"/*": {
-    "origins": [
-        # Production domains
-        "https://eduquestai.org",
-        "http://eduquestai.org", 
-        "http://eduquestai.org.s3-website.us-east-2.amazonaws.com",
-        "https://eduquestai.org.s3-website.us-east-2.amazonaws.com",
-        
-        # Development domains
-        "http://localhost:5000",
-        "http://localhost:3000",
-        "http://localhost:5173", 
-        "http://localhost:5174",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174"
-    ],
+    "origins": allowed_origins,
     "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     "allow_headers": ["Content-Type", "Authorization"],
     "supports_credentials": True
