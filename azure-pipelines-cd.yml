@@ -79,17 +79,12 @@ stages:
           - task: DownloadPipelineArtifact@2
             displayName: 'Download CI artifact'
             inputs:
+              buildType: 'specific'
+              project: '$(System.TeamProject)'
+              definition: 'eduquest-backend-CI'
               ${{ if eq(parameters.ciBuildId, 'latest') }}:
-                buildType: 'specific'
-                project: '$(System.TeamProject)'
-                definition: 'eduquest-backend-CI'
-                buildVersionToDownload: 'latestFromBranch'
-                branchName: 'refs/heads/main'
-                allowPartiallySucceededBuilds: false
+                buildVersionToDownload: 'latest'
               ${{ else }}:
-                buildType: 'specific'
-                project: '$(System.TeamProject)'
-                definition: 'eduquest-backend-CI'
                 buildId: '${{ parameters.ciBuildId }}'
               artifactName: 'deployment-package'
               targetPath: '$(Pipeline.Workspace)/artifact'
