@@ -12,7 +12,6 @@ pr:
   branches:
     include:
       - main
-      - Jason
   paths:
     exclude:
       - README*.md
