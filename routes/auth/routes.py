@@ -14,7 +14,7 @@ session_dao = SessionDAO()
 student_dao = StudentDAO()
 teacher_dao = TeacherDAO()
 conversation_service = ConversationService()
-#sdf1234567890123
+#sdf12345678901234
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
     data = request.get_json()
