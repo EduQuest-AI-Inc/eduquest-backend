@@ -66,7 +66,7 @@ class ini_conv:
 
     def initiate(self):
         thread = openai.beta.threads.create()
-        initial_message = f"Hello, I'm {self.student["first_name"] + " " + self.student["last_name"]}."
+        initial_message = f"Hello, I'm {self.student['first_name'] + ' ' + self.student['last_name']}."
         self.thread_id = thread.id
         # Send the initial message to the thread
         message = openai.beta.threads.messages.create(thread_id=self.thread_id, role="user", content=initial_message)
