@@ -7,4 +7,3 @@ cloudformation/parameters-prod.json
 cloudformation/parameters-dev.json
 
 *.md
-*.sh
