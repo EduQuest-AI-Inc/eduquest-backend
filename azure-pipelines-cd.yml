@@ -193,14 +193,6 @@ stages:
                         bash scripts/deploy-api-gateway.sh ${{ parameters.environment }}
                       fi
 
-                      echo "Waiting for stack to complete..."
-                      aws cloudformation wait stack-update-complete \
-                        --stack-name $(apiGatewayStackName) \
-                        --region $(awsRegion) || \
-                      aws cloudformation wait stack-create-complete \
-                        --stack-name $(apiGatewayStackName) \
-                        --region $(awsRegion)
-
                       echo "Stack deployment completed successfully!"
 
                       echo "Stack Outputs:"
