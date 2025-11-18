@@ -82,13 +82,13 @@ stages:
               ${{ if eq(parameters.ciBuildId, 'latest') }}:
                 buildType: 'specific'
                 project: '$(System.TeamProject)'
-                definition: 'CI Pipeline'
+                definition: 'eduquest-backend-CI'
                 buildVersionToDownload: 'latest'
                 allowPartiallySucceededBuilds: false
               ${{ else }}:
                 buildType: 'specific'
                 project: '$(System.TeamProject)'
-                definition: 'CI Pipeline'
+                definition: 'eduquest-backend-CI'
                 buildId: '${{ parameters.ciBuildId }}'
               artifactName: 'deployment-package'
               targetPath: '$(Pipeline.Workspace)/artifact'
