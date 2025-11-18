@@ -12,6 +12,8 @@ sys.modules['agents'] = MagicMock()
 sys.modules['agents._config'] = MagicMock()
 sys.modules['agents.models'] = MagicMock()
 sys.modules['agents.model_settings'] = MagicMock()
+sys.modules['EQ_agents'] = MagicMock()
+sys.modules['EQ_agents.agent'] = MagicMock()
 
 mock_openai_module = MagicMock()
 mock_openai_client = MagicMock()
