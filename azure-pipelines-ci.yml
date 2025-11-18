@@ -1,3 +1,5 @@
+name: eduquest-backend-CI
+
 trigger:
   branches:
     include:

@@ -1,3 +1,5 @@
+name: eduquest-backend-CD
+
 trigger: none
 pr: none
 
