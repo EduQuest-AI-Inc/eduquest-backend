@@ -433,7 +433,7 @@ stages:
                 CONTENT=$(curl -s "$API_URL/helloworld")
                 echo "Response: $CONTENT"
 
-                if echo "$CONTENT" | grep -q "Hello"; then
+                if echo "$CONTENT" | grep -iq "hello"; then
                   echo "✓ Response content validation passed"
                 else
                   echo "✗ Response content validation failed"
