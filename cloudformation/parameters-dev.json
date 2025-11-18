@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "EC2PublicIP",
+    "ParameterValue": "3.15.42.96"
+  },
+  {
+    "ParameterKey": "FlaskPort",
+    "ParameterValue": "5000"
+  },
+  {
+    "ParameterKey": "StageName",
+    "ParameterValue": "dev"
+  }
+]
