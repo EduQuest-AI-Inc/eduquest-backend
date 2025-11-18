@@ -8,6 +8,11 @@ os.environ['AWS_ACCESS_KEY_ID'] = 'test-aws-key'
 os.environ['AWS_SECRET_ACCESS_KEY'] = 'test-aws-secret'
 os.environ['AWS_REGION'] = 'us-east-2'
 
+sys.modules['agents'] = MagicMock()
+sys.modules['agents._config'] = MagicMock()
+sys.modules['agents.models'] = MagicMock()
+sys.modules['agents.model_settings'] = MagicMock()
+
 mock_openai_module = MagicMock()
 mock_openai_client = MagicMock()
 mock_openai_module.OpenAI = MagicMock(return_value=mock_openai_client)
