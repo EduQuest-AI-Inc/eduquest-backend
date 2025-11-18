@@ -25,6 +25,11 @@ sys.modules['openai.beta.threads'] = MagicMock()
 sys.modules['openai.beta.threads.messages'] = MagicMock()
 sys.modules['openai.beta.threads.runs'] = MagicMock()
 
-sys.modules['boto3'] = MagicMock()
+mock_boto3 = MagicMock()
+mock_boto3.resource = MagicMock(return_value=MagicMock())
+mock_boto3.client = MagicMock(return_value=MagicMock())
+sys.modules['boto3'] = mock_boto3
+sys.modules['boto3.dynamodb'] = MagicMock()
+sys.modules['boto3.dynamodb.conditions'] = MagicMock()
 sys.modules['botocore'] = MagicMock()
 sys.modules['botocore.exceptions'] = MagicMock()
