@@ -72,6 +72,8 @@ stages:
               fi
             displayName: 'Run tests (pytest)'
             continueOnError: false
+            env:
+              OPENAI_API_KEY: $(OPENAI_API_KEY)
 
           - task: PublishTestResults@2
             displayName: 'Publish test results'
