@@ -22,17 +22,13 @@ fi
 
 echo "Updating API Gateway CloudFormation Stack for ${ENV^^} environment..."
 
-aws cloudformation update-stack \
-  --template-body file://$TEMPLATE_FILE \
+aws cloudformation deploy \
+  --template-file $TEMPLATE_FILE \
   --stack-name $STACK_NAME \
-  --parameters file://$PARAMETERS_FILE \
+  --parameter-overrides file://$PARAMETERS_FILE \
   --region $REGION \
-  --capabilities CAPABILITY_IAM
-
-echo "Waiting for stack update to complete..."
-aws cloudformation wait stack-update-complete \
-  --stack-name $STACK_NAME \
-  --region $REGION
+  --capabilities CAPABILITY_IAM \
+  --no-fail-on-empty-changeset
 
 echo ""
 echo "=========================================="
