@@ -178,6 +178,11 @@ stages:
 
                       cd $(Pipeline.Workspace)/app
 
+                      echo "DEBUG: Listing directory contents:"
+                      ls -la
+                      echo "DEBUG: Checking for scripts directory:"
+                      ls -la scripts/ || echo "scripts directory not found"
+
                       chmod +x scripts/*.sh
 
                       if aws cloudformation describe-stacks --stack-name $(apiGatewayStackName) --region $(awsRegion) 2>/dev/null; then
