@@ -344,7 +344,7 @@ Recommended Changes: {response_json.get('recommended_change', 'None')}"""
                             recommended_change
                         )
                         
-                        print(f"DEBUG: Quest update completed: {quest_update_result.get("message", "No message")}")
+                        print(f"DEBUG: Quest update completed: {quest_update_result.get('message', 'No message')}")
                         print(f"DEBUG: Updated {quest_update_result.get('updated_quests', 0)} quests")
                         
                         # Update the response to include quest update information

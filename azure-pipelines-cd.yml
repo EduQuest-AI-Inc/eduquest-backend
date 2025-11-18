@@ -83,7 +83,8 @@ stages:
                 buildType: 'specific'
                 project: '$(System.TeamProject)'
                 definition: 'eduquest-backend-CI'
-                buildVersionToDownload: 'latest'
+                buildVersionToDownload: 'latestFromBranch'
+                branchName: 'refs/heads/main'
                 allowPartiallySucceededBuilds: false
               ${{ else }}:
                 buildType: 'specific'

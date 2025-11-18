@@ -1,9 +1,3 @@
-resources:
-  repositories:
-    - repository: self
-      type: github
-      endpoint: GitHub-Connection  
-      name: eduquest2024/eduquest-backend 
 trigger:
   branches:
     include:
@@ -17,12 +11,14 @@ trigger:
 pr:
   branches:
     include:
-      - '*'
+      - main
   paths:
     exclude:
       - README*.md
       - docs/*
+      - .gitignore
 
+#1234
 variables:
   pythonVersion: '3.11'
   vmImageName: 'ubuntu-latest'
@@ -75,6 +71,8 @@ stages:
               fi
             displayName: 'Run tests (pytest)'
             continueOnError: false
+            env:
+              OPENAI_API_KEY: $(OPENAI_API_KEY)
 
           - task: PublishTestResults@2
             displayName: 'Publish test results'
