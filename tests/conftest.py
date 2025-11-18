@@ -16,6 +16,7 @@ mock_openai_module.api_key = 'test-key'
 sys.modules['openai'] = mock_openai_module
 sys.modules['openai._types'] = MagicMock()
 sys.modules['openai.types'] = MagicMock()
+sys.modules['openai.types.responses'] = MagicMock()
 sys.modules['openai.types.shared'] = MagicMock()
 sys.modules['openai.types.shared.reasoning'] = MagicMock()
 sys.modules['openai.types.shared_params'] = MagicMock()
