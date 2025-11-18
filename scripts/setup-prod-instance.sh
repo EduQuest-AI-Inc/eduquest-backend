@@ -1,6 +1,4 @@
 #!/bin/bash
-# Automated setup script for PROD EC2 instance
-# This script will be executed on the prod instance via SSM
 
 set -e
 
@@ -8,21 +6,17 @@ echo "=========================================="
 echo "Setting up EduQuest PROD Instance"
 echo "=========================================="
 
-# Update system
 echo "Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 
-# Install Python 3.11 and dependencies
 echo "Installing Python 3.11 and dependencies..."
 sudo apt install -y software-properties-common
 sudo add-apt-repository ppa:deadsnakes/ppa -y
 sudo apt update
 sudo apt install -y python3.11 python3-pip unzip awscli curl git
 
-# Verify Python installation
 python3 --version
 
-# Install SSM agent if not already installed
 echo "Checking SSM agent..."
 if ! systemctl is-active --quiet snap.amazon-ssm-agent.amazon-ssm-agent.service 2>/dev/null; then
     echo "Installing SSM agent..."
@@ -33,36 +27,24 @@ else
     echo "SSM agent already running"
 fi
 
-# Create application directory
 echo "Creating application directory..."
 mkdir -p /home/ubuntu/eduquest-backend
 cd /home/ubuntu/eduquest-backend
 
-# Create .env file
 echo "Creating .env file..."
 cat > .env <<'EOF'
-# Environment Configuration
 FLASK_ENV=production
 
-# JWT Configuration
 JWT_SECRET_KEY=prod-secret-key-CHANGE-THIS-TO-SECURE-KEY-DIFFERENT-FROM-DEV
 
-# API Gateway URL
 API_GATEWAY_URL=https://ox6n5yri26.execute-api.us-east-2.amazonaws.com/prod
 
-# Add your other environment variables below:
-# OPENAI_API_KEY=sk-...
-# FIREBASE_CREDENTIALS=...
-# Database URLs, Canvas API keys, etc.
-# Use PRODUCTION values - different from dev!
 EOF
 
-# Set proper permissions
 chmod 600 .env
 
 echo "⚠️  IMPORTANT: Edit /home/ubuntu/eduquest-backend/.env with your actual PRODUCTION secret keys!"
 
-# Create systemd service
 echo "Creating systemd service..."
 sudo tee /etc/systemd/system/eduquest-backend.service > /dev/null <<'EOF'
 [Unit]
@@ -87,7 +69,6 @@ SyslogIdentifier=eduquest-backend
 WantedBy=multi-user.target
 EOF
 
-# Reload systemd
 sudo systemctl daemon-reload
 
 echo ""

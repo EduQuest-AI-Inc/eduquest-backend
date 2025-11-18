@@ -1,13 +1,9 @@
 #!/bin/bash
 
-# Create systemd service for EduQuest Backend
-# Run this script on the EC2 instance to set up the Flask application as a service
-
 set -e
 
 echo "Creating systemd service for EduQuest Backend..."
 
-# Create service file
 sudo tee /etc/systemd/system/eduquest-backend.service > /dev/null <<EOF
 [Unit]
 Description=EduQuest Backend Flask Application
@@ -31,16 +27,12 @@ SyslogIdentifier=eduquest-backend
 WantedBy=multi-user.target
 EOF
 
-# Reload systemd
 sudo systemctl daemon-reload
 
-# Enable service to start on boot
 sudo systemctl enable eduquest-backend
 
-# Start service
 sudo systemctl start eduquest-backend
 
-# Check status
 echo "Service status:"
 sudo systemctl status eduquest-backend --no-pager
 
