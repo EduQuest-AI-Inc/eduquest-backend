@@ -109,20 +109,87 @@ class IndividualQuestDAO(BaseDAO):
 
     def get_quests_by_student(self, student_id: str) -> List[Dict[str, Any]]:
         """Get all individual quests for a specific student."""
+        items = []
         response = self.table.scan(
             FilterExpression=Attr("student_id").eq(student_id)
         )
-        return response.get("Items", [])
-
-    def get_quests_by_quest_id(self, quest_id: str) -> List[Dict[str, Any]]:
-        """Get all individual quests that share the same quest_id (should be 18 quests)."""
-        response = self.table.scan(
-            FilterExpression=Attr("quest_id").eq(quest_id)
-        )
-        return response.get("Items", [])
+        items.extend(response.get("Items", []))
+        
+        # Handle pagination
+        while "LastEvaluatedKey" in response:
+            response = self.table.scan(
+                FilterExpression=Attr("student_id").eq(student_id),
+                ExclusiveStartKey=response["LastEvaluatedKey"]
+            )
+            items.extend(response.get("Items", []))
+        
+        return items
 
     def get_quests_by_student_and_period(self, student_id: str, period_id: str) -> List[Dict[str, Any]]:
+        """Get all individual quests by student_id and period_id."""
+        items = []
         response = self.table.scan(
             FilterExpression=Attr("student_id").eq(student_id) & Attr("period_id").eq(period_id)
         )
-        return response.get("Items", [])
+        items.extend(response.get("Items", []))
+        
+        # Handle pagination
+        while "LastEvaluatedKey" in response:
+            response = self.table.scan(
+                FilterExpression=Attr("student_id").eq(student_id) & Attr("period_id").eq(period_id),
+                ExclusiveStartKey=response["LastEvaluatedKey"]
+            )
+            items.extend(response.get("Items", []))
+        
+        return items
+
+    def get_quests_by_quest_id(self, quest_id: str) -> List[Dict[str, Any]]:
+        """Get all individual quests that share the same quest_id (should be 18 quests)."""
+        items = []
+        response = self.table.scan(
+            FilterExpression=Attr("quest_id").eq(quest_id)
+        )
+        items.extend(response.get("Items", []))
+        
+        # Handle pagination
+        while "LastEvaluatedKey" in response:
+            response = self.table.scan(
+                FilterExpression=Attr("quest_id").eq(quest_id),
+                ExclusiveStartKey=response["LastEvaluatedKey"]
+            )
+            items.extend(response.get("Items", []))
+        
+        return items
+
+    def get_quests_by_quest_id_gsi(self, quest_id: str) -> List[Dict[str, Any]]:
+        """Get all individual quests by quest_id using GSI."""
+        items = []
+        response = self.table.query(
+            IndexName="quest_id-individual_quest_id-index",
+            KeyConditionExpression=Key("quest_id").eq(quest_id)
+        )
+        items.extend(response.get("Items", []))
+        
+        # Handle pagination for GSI queries
+        while "LastEvaluatedKey" in response:
+            response = self.table.query(
+                IndexName="quest_id-individual_quest_id-index",
+                KeyConditionExpression=Key("quest_id").eq(quest_id),
+                ExclusiveStartKey=response["LastEvaluatedKey"]
+            )
+            items.extend(response.get("Items", []))
+        
+        # If GSI doesn't project all attributes, fetch full items
+        # Check if items have all expected attributes (e.g., 'week')
+        if items and "week" not in items[0]:
+            # Fetch full items using individual_quest_id
+            full_items = []
+            for item in items:
+                individual_quest_id = item.get("individual_quest_id")
+                if individual_quest_id:
+                    full_item = self.get_individual_quest_by_id(individual_quest_id)
+                    if full_item:
+                        full_items.append(full_item)
+            return full_items
+        
+        return items

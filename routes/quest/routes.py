@@ -39,7 +39,7 @@ def get_weekly_quests(period_id):
 
         weekly_quest = quest_service.get_weekly_quests_for_student(user_id, period_id)
         if weekly_quest:
-            return jsonify(weekly_quest.model_dump()), 200
+            return jsonify(weekly_quest), 200
         else:
             return jsonify({"message": "No weekly quests found for this period"}), 404
     except Exception as e:
@@ -222,7 +222,7 @@ def get_individual_quest(quest_id, individual_quest_id):
 
         quest = quest_service.get_individual_quest_by_id(quest_id, individual_quest_id)
         if quest:
-            return jsonify(quest.model_dump()), 200
+            return jsonify(quest), 200
         else:
             return jsonify({"error": "Individual quest not found"}), 404
     except Exception as e:
