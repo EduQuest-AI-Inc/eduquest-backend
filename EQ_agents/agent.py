@@ -290,7 +290,15 @@ class HWAgent:
 
     def run(self) -> list[IndividualQuest]:
         """Process all quests in the schedule"""
-        return asyncio.run(self._run_async())
+        try:
+            return asyncio.run(
+                asyncio.wait_for(
+                    self._run_async(),
+                    timeout=self.timeout_seconds
+                )
+            )
+        except asyncio.TimeoutError:
+            raise Exception(f"Homework generation timed out after {self.timeout_seconds} seconds")
 
 # def run_agent(student, period_id):
 #     period = Period.get_period(period_id)
