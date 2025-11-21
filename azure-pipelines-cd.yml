@@ -290,13 +290,16 @@ stages:
 
                       echo "Found instance: $INSTANCE_ID"
 
-                      cat > deploy-script.sh << 'DEPLOY_EOF'
+                      S3_ARTIFACT_PATH="$(s3ArtifactPath)"
+                      echo "Using S3 artifact: $S3_ARTIFACT_PATH"
+
+                      cat > deploy-script.sh << DEPLOY_EOF
                       #!/bin/bash
                       set -e
 
                       APP_DIR="/home/ubuntu/eduquest-backend"
-                      BACKUP_DIR="/home/ubuntu/eduquest-backend-backup-$(date +%Y%m%d-%H%M%S)"
-                      S3_PATH="$(s3ArtifactPath)"
+                      BACKUP_DIR="/home/ubuntu/eduquest-backend-backup-\$(date +%Y%m%d-%H%M%S)"
+                      S3_PATH="$S3_ARTIFACT_PATH"
 
                       echo "Starting deployment..."
 
