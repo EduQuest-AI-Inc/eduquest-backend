@@ -405,7 +405,7 @@ stages:
                         --region $(awsRegion) \
                         --instance-ids "$INSTANCE_ID" \
                         --document-name "AWS-RunShellScript" \
-                        --parameters commands="echo 'SSM Test: Connection OK'" \
+                        --parameters commands="echo SSM_Test_Connection_OK" \
                         --output text \
                         --query 'Command.CommandId')
 
@@ -426,7 +426,7 @@ stages:
                         --instance-ids "$INSTANCE_ID" \
                         --document-name "AWS-RunShellScript" \
                         --comment "Deploy eduquest-backend to ${{ parameters.environment }}" \
-                        --parameters commands="echo '=== SSM Deploy Starting ==='","echo 'Download script from S3...'","aws s3 cp $S3_DEPLOY_SCRIPT /tmp/deploy-script.sh","ls -lh /tmp/deploy-script.sh","chmod +x /tmp/deploy-script.sh","echo '=== Run deploy script ==='","bash -x /tmp/deploy-script.sh 2>&1" \
+                        --parameters commands="echo SSM_Deploy_Starting","echo Download_script_from_S3","aws s3 cp $S3_DEPLOY_SCRIPT /tmp/deploy-script.sh","ls -lh /tmp/deploy-script.sh","chmod +x /tmp/deploy-script.sh","echo Run_deploy_script","bash -x /tmp/deploy-script.sh 2>&1" \
                         --timeout-seconds 600 \
                         --output text \
                         --query 'Command.CommandId')
