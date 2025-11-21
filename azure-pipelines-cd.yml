@@ -396,20 +396,37 @@ stages:
                       aws s3 cp deploy-script.sh "s3://eduquest-deployments-${{ parameters.environment }}/deploy-script.sh"
 
                       echo "Executing deployment via Systems Manager..."
+
+                      # Build the commands array properly to avoid quoting issues
+                      S3_DEPLOY_SCRIPT="s3://eduquest-deployments-${{ parameters.environment }}/deploy-script.sh"
+
+                      echo "Testing SSM connectivity first..."
+                      TEST_CMD=$(aws ssm send-command \
+                        --region $(awsRegion) \
+                        --instance-ids "$INSTANCE_ID" \
+                        --document-name "AWS-RunShellScript" \
+                        --parameters commands="echo 'SSM Test: Connection OK'" \
+                        --output text \
+                        --query 'Command.CommandId')
+
+                      echo "Test Command ID: $TEST_CMD"
+                      sleep 5
+
+                      echo "Test command output:"
+                      aws ssm get-command-invocation \
+                        --region $(awsRegion) \
+                        --command-id "$TEST_CMD" \
+                        --instance-id "$INSTANCE_ID" \
+                        --query '[Status,StandardOutputContent]' \
+                        --output text
+
+                      echo "Starting actual deployment..."
                       COMMAND_ID=$(aws ssm send-command \
                         --region $(awsRegion) \
                         --instance-ids "$INSTANCE_ID" \
                         --document-name "AWS-RunShellScript" \
                         --comment "Deploy eduquest-backend to ${{ parameters.environment }}" \
-                        --parameters '{
-                          "commands": [
-                            "echo \"=== SSM Command Starting ===\"",
-                            "aws s3 cp s3://eduquest-deployments-${{ parameters.environment }}/deploy-script.sh /tmp/deploy-script.sh",
-                            "chmod +x /tmp/deploy-script.sh",
-                            "echo \"=== Executing deploy script with bash -x ===\"",
-                            "bash -x /tmp/deploy-script.sh 2>&1"
-                          ]
-                        }' \
+                        --parameters commands="echo '=== SSM Deploy Starting ==='","echo 'Download script from S3...'","aws s3 cp $S3_DEPLOY_SCRIPT /tmp/deploy-script.sh","ls -lh /tmp/deploy-script.sh","chmod +x /tmp/deploy-script.sh","echo '=== Run deploy script ==='","bash -x /tmp/deploy-script.sh 2>&1" \
                         --timeout-seconds 600 \
                         --output text \
                         --query 'Command.CommandId')
