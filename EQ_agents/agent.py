@@ -265,32 +265,35 @@ class HWAgent:
     async def _run_async(self) -> list[IndividualQuest]:
         """Process all quests in the schedule asynchronously"""
         with trace("homework_generation"):
-            detailed_quests = []
             total_quests = len(self.schedule)
+            print(f"Starting HWAgent - Processing {total_quests} quests in parallel")
             
-            print(f"Starting HWAgent - Processing {total_quests} quests")
+            # Process all quests in parallel
+            tasks = [self.process_quest(quest) for quest in self.schedule]
+            detailed_quests = await asyncio.gather(*tasks, return_exceptions=True)
             
-            for i, quest in enumerate(self.schedule, 1):
-                print(f"\nProgress: {i}/{total_quests}")
-                try:
-                    detailed_quest = await self.process_quest(quest)
-                    detailed_quests.append(detailed_quest)
+            # Filter out exceptions and log errors
+            successful_quests = []
+            for i, result in enumerate(detailed_quests, 1):
+                if isinstance(result, Exception):
+                    print(f"✗ Error processing quest {i}: {str(result)}")
+                else:
+                    successful_quests.append(result)
                     print(f"✓ Completed quest {i}")
-                    
-                    # For testing, just process the first quest
-                    # if i == 1:
-                    #     break
-                        
-                except Exception as e:
-                    print(f"✗ Error processing quest {i}: {str(e)}")
-                    continue
             
-            print(f"\nHWAgent completed - Processed {len(detailed_quests)} quests successfully")
-            return detailed_quests
+            print(f"\nHWAgent completed - Processed {len(successful_quests)}/{total_quests} quests successfully")
+            return successful_quests
 
     def run(self) -> list[IndividualQuest]:
-        """Process all quests in the schedule"""
-        return asyncio.run(self._run_async())
+        try:
+            return asyncio.run(
+                asyncio.wait_for(
+                    self._run_async(),
+                    timeout=self.timeout_seconds
+                )
+            )
+        except asyncio.TimeoutError:
+            raise Exception(f"Homework generation timed out after {self.timeout_seconds} seconds")
 
 # def run_agent(student, period_id):
 #     period = Period.get_period(period_id)
