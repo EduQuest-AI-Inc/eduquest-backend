@@ -365,12 +365,17 @@ stages:
                       echo "Command ID: $COMMAND_ID"
 
                       echo "Waiting for deployment to complete..."
+                      set +e
                       aws ssm wait command-executed \
                         --region $(awsRegion) \
                         --command-id "$COMMAND_ID" \
                         --instance-id "$INSTANCE_ID"
+                      WAIT_EXIT_CODE=$?
+                      set -e
 
-                      echo "Deployment output:"
+                      echo "============================================"
+                      echo "Deployment Command Output:"
+                      echo "============================================"
                       aws ssm get-command-invocation \
                         --region $(awsRegion) \
                         --command-id "$COMMAND_ID" \
@@ -378,7 +383,33 @@ stages:
                         --query 'StandardOutputContent' \
                         --output text
 
+                      if [ $WAIT_EXIT_CODE -ne 0 ]; then
+                        echo "============================================"
+                        echo "Deployment Command Errors:"
+                        echo "============================================"
+                        aws ssm get-command-invocation \
+                          --region $(awsRegion) \
+                          --command-id "$COMMAND_ID" \
+                          --instance-id "$INSTANCE_ID" \
+                          --query 'StandardErrorContent' \
+                          --output text
+
+                        echo "============================================"
+                        echo "Command Status:"
+                        aws ssm get-command-invocation \
+                          --region $(awsRegion) \
+                          --command-id "$COMMAND_ID" \
+                          --instance-id "$INSTANCE_ID" \
+                          --query 'Status' \
+                          --output text
+                        echo "============================================"
+
+                        exit 1
+                      fi
+
+                      echo "============================================"
                       echo "Application deployed successfully to EC2!"
+                      echo "============================================"
 
   - stage: SmokeTests
     displayName: 'Run Smoke Tests on ${{ parameters.environment }}'
