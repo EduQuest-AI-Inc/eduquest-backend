@@ -354,11 +354,7 @@ stages:
                         --region $(awsRegion) \
                         --instance-ids "$INSTANCE_ID" \
                         --document-name "AWS-RunShellScript" \
-                        --parameters "commands=[
-                          'aws s3 cp s3://eduquest-deployments-${{ parameters.environment }}/deploy-script.sh /tmp/deploy-script.sh',
-                          'chmod +x /tmp/deploy-script.sh',
-                          '/tmp/deploy-script.sh'
-                        ]" \
+                        --parameters commands="aws s3 cp s3://eduquest-deployments-${{ parameters.environment }}/deploy-script.sh /tmp/deploy-script.sh","chmod +x /tmp/deploy-script.sh","/tmp/deploy-script.sh" \
                         --output text \
                         --query 'Command.CommandId')
 
