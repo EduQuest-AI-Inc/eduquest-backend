@@ -295,56 +295,102 @@ stages:
 
                       cat > deploy-script.sh << DEPLOY_EOF
                       #!/bin/bash
-                      set -e
+                      set -euo pipefail
+
+                      echo "============================================"
+                      echo "=== Starting deploy-script.sh ==="
+                      echo "============================================"
+                      echo "Script started at: \$(date)"
+                      echo "Current user: \$(whoami)"
+                      echo "Current directory: \$(pwd)"
+                      echo "============================================"
 
                       APP_DIR="/home/ubuntu/eduquest-backend"
                       BACKUP_DIR="/home/ubuntu/eduquest-backend-backup-\$(date +%Y%m%d-%H%M%S)"
                       S3_PATH="$S3_ARTIFACT_PATH"
 
+                      echo "Configuration:"
+                      echo "  APP_DIR: \$APP_DIR"
+                      echo "  BACKUP_DIR: \$BACKUP_DIR"
+                      echo "  S3_PATH: \$S3_PATH"
+                      echo "============================================"
+
                       echo "Starting deployment..."
 
-                      if [ -d "$APP_DIR" ]; then
-                        echo "Backing up current deployment to $BACKUP_DIR"
-                        cp -r "$APP_DIR" "$BACKUP_DIR"
+                      if [ -d "\$APP_DIR" ]; then
+                        echo "Backing up current deployment to \$BACKUP_DIR"
+                        cp -r "\$APP_DIR" "\$BACKUP_DIR"
+                        echo "Backup completed successfully"
+                      else
+                        echo "No existing deployment to backup"
                       fi
 
-                      mkdir -p "$APP_DIR"
-                      cd "$APP_DIR"
+                      echo "Creating app directory: \$APP_DIR"
+                      mkdir -p "\$APP_DIR"
+                      cd "\$APP_DIR"
+                      echo "Changed to directory: \$(pwd)"
 
-                      echo "Downloading artifact from S3..."
-                      aws s3 cp "$S3_PATH" deployment.zip
+                      echo "Downloading artifact from S3: \$S3_PATH"
+                      aws s3 cp "\$S3_PATH" deployment.zip
+                      echo "Download completed. File size: \$(ls -lh deployment.zip | awk '{print \$5}')"
 
                       echo "Stopping application..."
                       pkill -f "python.*app.py" || true
-                      systemctl stop eduquest-backend || true
+                      systemctl stop eduquest-backend 2>&1 || echo "Service not running or doesn't exist"
+                      echo "Application stopped"
 
                       if ! command -v unzip >/dev/null 2>&1; then
                         echo "unzip not found, installing..."
                         sudo apt-get update -y
                         sudo apt-get install -y unzip
+                        echo "unzip installed successfully"
+                      else
+                        echo "unzip is already installed"
                       fi
 
                       echo "Extracting new version..."
                       unzip -o deployment.zip
                       rm deployment.zip
+                      echo "Extraction completed. Contents:"
+                      ls -la
 
                       echo "Installing dependencies..."
                       if [ ! -d "venv" ]; then
+                        echo "Creating new virtual environment..."
                         python3 -m venv venv
+                      else
+                        echo "Using existing virtual environment"
                       fi
+
+                      echo "Activating virtual environment..."
                       source venv/bin/activate
+                      echo "Python location: \$(which python)"
+                      echo "Python version: \$(python --version)"
+
+                      echo "Upgrading pip..."
                       pip install --upgrade pip
+
+                      echo "Installing requirements..."
                       pip install -r requirements.txt
+                      echo "Dependencies installed successfully"
 
                       echo "Starting application..."
                       if systemctl list-unit-files | grep -q eduquest-backend.service; then
+                        echo "Starting systemd service..."
                         systemctl start eduquest-backend
+                        sleep 3
+                        echo "Service status:"
                         systemctl status eduquest-backend --no-pager
                       else
+                        echo "No systemd service found, starting with nohup..."
                         nohup python app.py > app.log 2>&1 &
+                        echo "Application started with PID: \$!"
                       fi
 
+                      echo "============================================"
                       echo "Deployment completed successfully!"
+                      echo "Completed at: \$(date)"
+                      echo "============================================"
                       DEPLOY_EOF
 
                       aws s3 cp deploy-script.sh "s3://eduquest-deployments-${{ parameters.environment }}/deploy-script.sh"
@@ -354,7 +400,17 @@ stages:
                         --region $(awsRegion) \
                         --instance-ids "$INSTANCE_ID" \
                         --document-name "AWS-RunShellScript" \
-                        --parameters commands="aws s3 cp s3://eduquest-deployments-${{ parameters.environment }}/deploy-script.sh /tmp/deploy-script.sh","chmod +x /tmp/deploy-script.sh","/tmp/deploy-script.sh" \
+                        --comment "Deploy eduquest-backend to ${{ parameters.environment }}" \
+                        --parameters '{
+                          "commands": [
+                            "echo \"=== SSM Command Starting ===\"",
+                            "aws s3 cp s3://eduquest-deployments-${{ parameters.environment }}/deploy-script.sh /tmp/deploy-script.sh",
+                            "chmod +x /tmp/deploy-script.sh",
+                            "echo \"=== Executing deploy script with bash -x ===\"",
+                            "bash -x /tmp/deploy-script.sh 2>&1"
+                          ]
+                        }' \
+                        --timeout-seconds 600 \
                         --output text \
                         --query 'Command.CommandId')
 
