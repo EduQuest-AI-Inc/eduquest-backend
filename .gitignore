@@ -2,9 +2,5 @@
 __pycache__/
 *.pyc
 *.xml
-cloudformation/parameters.json
-cloudformation/parameters-prod.json
-cloudformation/parameters-dev.json
 
 *.md
-*.sh
