@@ -11,6 +11,7 @@ from routes.period.routes import period_bp
 from routes.teacher.routes import teacher_bp
 from routes.enrollment.routes import enrollment_bp
 from routes.quest.routes import quest_bp
+from routes.waitlist.routes import waitlist_bp
 from datetime import timedelta
 
 # Load environment variables from .env file
@@ -26,7 +27,24 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
 # Initialize JWT
 jwt = JWTManager(app)
 
-# Enable CORS for your frontend
+allowed_origins = [
+    "https://eduquestai.org",
+    "http://eduquestai.org",
+    "http://eduquestai.org.s3-website.us-east-2.amazonaws.com",
+    "https://eduquestai.org.s3-website.us-east-2.amazonaws.com",
+    "http://localhost:5000",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174"
+]
+
+api_gateway_url = os.getenv('API_GATEWAY_URL')
+if api_gateway_url:
+    allowed_origins.append(api_gateway_url)
+
 CORS(app, resources={r"/*": {
     "origins": [
         # Production domains
@@ -57,6 +75,7 @@ app.register_blueprint(period_bp, url_prefix='/period')
 app.register_blueprint(teacher_bp, url_prefix = '/teacher')
 app.register_blueprint(enrollment_bp, url_prefix = '/enrollment')
 app.register_blueprint(quest_bp, url_prefix = '/quest')
+app.register_blueprint(waitlist_bp, url_prefix = '/waitlist')
 
 # Add helloworld route for testing connection
 @app.route('/helloworld', methods=['GET'])
