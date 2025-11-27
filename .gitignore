@@ -2,9 +2,6 @@
 __pycache__/
 *.pyc
 *.xml
-<<<<<<< Updated upstream
-
-*.md
-=======
+.DS_Store
 *.cursor
->>>>>>> Stashed changes
+*.claude
