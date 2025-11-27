@@ -1,3 +1,4 @@
+# Updated data_access/config.py
 import os
 import boto3
 from dotenv import load_dotenv
@@ -15,6 +16,11 @@ class DynamoDBConfig:
             aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
             aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
         )
+        
+        # Table name mappings - use test tables if environment variable is set
+        self.use_test_tables = os.getenv('USE_TEST_TABLES', 'false').lower() == 'true'
+        self.table_prefix = 'test_' if self.use_test_tables else ''
 
     def get_table(self, table_name: str):
-        return self.dynamodb.Table(table_name)
+        full_table_name = f"{self.table_prefix}{table_name}"
+        return self.dynamodb.Table(full_table_name)

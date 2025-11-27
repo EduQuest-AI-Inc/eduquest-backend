@@ -153,3 +153,10 @@ class StudentDAO(BaseDAO):
             True if student needs tutorial, False otherwise
         """
         return not self.get_tutorial_status(student_id)
+
+    def get_students_by_school_id(self, school_id: str) -> List[Dict[str, Any]]:
+        response = self.table.query(
+            IndexName="SchoolStudentIndex",  # Use GSI
+            KeyConditionExpression=Key("school_id").eq(school_id)
+        )
+        return response.get("Items", [])

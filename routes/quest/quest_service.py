@@ -1,7 +1,6 @@
 from data_access.weekly_quest_dao import WeeklyQuestDAO
 from data_access.individual_quest_dao import IndividualQuestDAO
 from models.weekly_quest import WeeklyQuest
-from models.weekly_quest_item import WeeklyQuestItem
 from models.individual_quest import IndividualQuest
 from datetime import datetime, timezone
 import uuid
@@ -13,24 +12,14 @@ class QuestService:
         self.individual_quest_dao = IndividualQuestDAO()
 
     def save_schedule_to_weekly_quests(self, schedule_data: dict, student_id: str, period_id: str) -> dict:
-        """Save the schedule from SchedulesAgent to both weekly_quest table and individual_quest table."""
+        """Save the schedule from SchedulesAgent to weekly_quest table (metadata) and individual_quest table."""
         try:
             quest_id = str(uuid.uuid4())
             
-            quest_items = []
             individual_quests = []
             
             for quest_data in schedule_data.get("list_of_quests", []):
                 individual_quest_id = str(uuid.uuid4())
-                
-                quest_item = WeeklyQuestItem(
-                    individual_quest_id=individual_quest_id,
-                    name=quest_data.get("Name", ""),
-                    skills=quest_data.get("Skills", ""),
-                    week=quest_data.get("Week", 1),
-                    status="not_started"
-                )
-                quest_items.append(quest_item)
                 
                 individual_quest = IndividualQuest(
                     individual_quest_id=individual_quest_id,
@@ -46,12 +35,12 @@ class QuestService:
                 )
                 individual_quests.append(individual_quest)
             
+            # Create lightweight weekly quest metadata record
             weekly_quest = WeeklyQuest(
                 quest_id=quest_id,
                 student_id=student_id,
                 period_id=period_id,
-                student_period_key=f"{student_id}#{period_id}",
-                quests=quest_items
+                student_period_key=f"{student_id}#{period_id}"
             )
             
             print(f"DEBUG: Saving weekly quest with quest_id={quest_id}, student_id={student_id}, period_id={period_id}")
@@ -62,9 +51,9 @@ class QuestService:
                 self.individual_quest_dao.add_individual_quest(individual_quest)
             
             return {
-                "message": f"Successfully saved weekly quest list with {len(quest_items)} individual quests",
+                "message": f"Successfully saved weekly quest list with {len(individual_quests)} individual quests",
                 "quest_id": quest_id,
-                "individual_quest_count": len(quest_items),
+                "individual_quest_count": len(individual_quests),
                 "individual_quest_ids": [quest.individual_quest_id for quest in individual_quests]
             }
             
@@ -114,7 +103,7 @@ class QuestService:
             raise Exception(f"Failed to save homework: {str(e)}")
 
     def update_weekly_quest_with_homework(self, homework_data: dict, student_id: str, period_id: str) -> dict:
-        """Update both weekly quest table and individual quest table with detailed homework information from HomeworkAgent."""
+        """Update individual quest table with detailed homework information from HomeworkAgent."""
         try:
             print(f"DEBUG: Updating weekly quest with homework_data: {homework_data}")
             
@@ -123,7 +112,10 @@ class QuestService:
                 raise Exception(f"No weekly quest found for student {student_id} and period {period_id}")
             
             print(f"DEBUG: Found existing weekly quest: {weekly_quest.quest_id}")
-            print(f"DEBUG: Existing quests count: {len(weekly_quest.quests)}")
+            
+            # Get all individual quests for this quest_id
+            individual_quests = self.individual_quest_dao.get_quests_by_quest_id_gsi(weekly_quest.quest_id)
+            print(f"DEBUG: Found {len(individual_quests)} individual quests")
             
             homework_by_week = {}
             for quest_data in homework_data.get("list_of_quests", []):
@@ -133,69 +125,75 @@ class QuestService:
             print(f"DEBUG: Homework data by week: {homework_by_week}")
             
             updated_count = 0
-            for quest_item in weekly_quest.quests:
-                week = quest_item.week
+            for individual_quest in individual_quests:
+                week = individual_quest.get("week", 1)
                 if week in homework_by_week:
                     homework_quest = homework_by_week[week]
-                    
-                    # Update the weekly quest item
-                    quest_item.description = homework_quest.get("Name", quest_item.name)
-                    quest_item.instructions = homework_quest.get("instructions", "")
-                    quest_item.rubric = homework_quest.get("rubric", {})
-                    quest_item.last_updated_at = datetime.now(timezone.utc).isoformat()
+                    individual_quest_id = individual_quest.get("individual_quest_id")
                     
                     # Update the individual quest in the database
                     try:
                         self.individual_quest_dao.update_individual_quest_by_individual_id(
-                            quest_item.individual_quest_id,
+                            individual_quest_id,
                             {
-                                "description": homework_quest.get("Name", quest_item.name),
+                                "description": homework_quest.get("Name", individual_quest.get("description", "")),
                                 "instructions": homework_quest.get("instructions", ""),
                                 "rubric": homework_quest.get("rubric", {})
                             }
                         )
-                        print(f"DEBUG: Successfully updated individual quest {quest_item.individual_quest_id} for week {week}")
+                        print(f"DEBUG: Successfully updated individual quest {individual_quest_id} for week {week}")
+                        updated_count += 1
                     except Exception as e:
-                        print(f"DEBUG: Error updating individual quest {quest_item.individual_quest_id}: {str(e)}")
+                        print(f"DEBUG: Error updating individual quest {individual_quest_id}: {str(e)}")
                         # Try to create a new individual quest if update fails
                         try:
-                            individual_quest = IndividualQuest(
-                                individual_quest_id=quest_item.individual_quest_id,
+                            new_individual_quest = IndividualQuest(
+                                individual_quest_id=individual_quest_id,
                                 quest_id=weekly_quest.quest_id,
                                 student_id=student_id,
                                 period_id=period_id,
-                                description=homework_quest.get("Name", quest_item.name),
-                                skills=quest_item.skills,
+                                description=homework_quest.get("Name", ""),
+                                skills=individual_quest.get("skills", ""),
                                 week=week,
                                 instructions=homework_quest.get("instructions", ""),
                                 rubric=homework_quest.get("rubric", {}),
                                 status="not_started"
                             )
-                            self.individual_quest_dao.add_individual_quest(individual_quest)
-                            print(f"DEBUG: Created new individual quest {quest_item.individual_quest_id} for week {week}")
+                            self.individual_quest_dao.add_individual_quest(new_individual_quest)
+                            print(f"DEBUG: Created new individual quest {individual_quest_id} for week {week}")
+                            updated_count += 1
                         except Exception as create_error:
-                            print(f"DEBUG: Error creating individual quest {quest_item.individual_quest_id}: {str(create_error)}")
-                    
-                    updated_count += 1
-                    print(f"DEBUG: Updated quest for week {week}")
+                            print(f"DEBUG: Error creating individual quest {individual_quest_id}: {str(create_error)}")
             
-            # Save the updated weekly quest
-            self.weekly_quest_dao.add_weekly_quest(weekly_quest)
+            # Update weekly quest metadata timestamp
+            # self.weekly_quest_dao.update_weekly_quest(weekly_quest.quest_id, {
+            #     "last_updated_at": datetime.now(timezone.utc).isoformat()
+            # })
             
             return {
-                "message": f"Successfully updated {updated_count} quests in both weekly quest list and individual quest table",
+                "message": f"Successfully updated {updated_count} quests in individual quest table",
                 "quest_id": weekly_quest.quest_id,
                 "updated_quests_count": updated_count,
-                "total_quests": len(weekly_quest.quests)
+                "total_quests": len(individual_quests)
             }
             
         except Exception as e:
             print(f"Error updating weekly quest with homework: {str(e)}")
             raise Exception(f"Failed to update weekly quest: {str(e)}")
 
-    def get_weekly_quests_for_student(self, student_id: str, period_id: str) -> WeeklyQuest:
+    def get_weekly_quests_for_student(self, student_id: str, period_id: str) -> dict:
         """Get the weekly quest list for a student in a specific period."""
-        return self.weekly_quest_dao.get_weekly_quest_by_student_and_period(student_id, period_id)
+        weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_student_and_period(student_id, period_id)
+        if not weekly_quest:
+            return None
+        
+        # Get all individual quests for this quest_id using GSI
+        individual_quests = self.individual_quest_dao.get_quests_by_quest_id_gsi(weekly_quest.quest_id)
+        
+        # Return weekly quest metadata with individual quests
+        result = weekly_quest.model_dump()
+        result["quests"] = individual_quests
+        return result
 
     def get_individual_quests_for_student(self, student_id: str) -> list:
         """Get all individual quests for a student."""
@@ -205,13 +203,9 @@ class QuestService:
         return self.individual_quest_dao.get_quests_by_student_and_period(student_id, period_id)
 
     def update_individual_quest_status(self, quest_id: str, individual_quest_id: str, status: str) -> dict:
-        """Update the status of a specific individual quest within a weekly quest list."""
+        """Update the status of a specific individual quest."""
         try:
-            self.weekly_quest_dao.update_individual_quest_in_weekly_quest(
-                quest_id, 
-                individual_quest_id, 
-                {"status": status}
-            )
+            self.individual_quest_dao.update_individual_quest(individual_quest_id, {"status": status})
             
             return {
                 "message": f"Successfully updated individual quest {individual_quest_id} status to {status}",
@@ -224,35 +218,37 @@ class QuestService:
             print(f"Error updating individual quest status: {str(e)}")
             raise Exception(f"Failed to update quest status: {str(e)}")
 
-    def get_individual_quest_by_id(self, quest_id: str, individual_quest_id: str) -> WeeklyQuestItem:
-        """Get a specific individual quest from a weekly quest list."""
-        weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_id(quest_id)
-        if not weekly_quest:
+    def get_individual_quest_by_id(self, quest_id: str, individual_quest_id: str) -> dict:
+        """Get a specific individual quest by its ID."""
+        individual_quest = self.individual_quest_dao.get_individual_quest_by_id(individual_quest_id)
+        if not individual_quest:
             return None
         
-        for quest in weekly_quest.quests:
-            if quest.individual_quest_id == individual_quest_id:
-                return quest
+        # Verify it belongs to the specified quest_id
+        if individual_quest.get("quest_id") != quest_id:
+            return None
         
-        return None
+        return individual_quest
 
     def verify_quest_structure(self, student_id: str, period_id: str) -> dict:
-        """Verify that quests are saved correctly in both tables."""
+        """Verify that quests are saved correctly."""
         try:
             weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_student_and_period(student_id, period_id)
             if not weekly_quest:
                 return {"error": "No weekly quest found"}
             
-            individual_quests = self.individual_quest_dao.get_quests_by_quest_id(weekly_quest.quest_id)
+            # Get individual quests using GSI
+            individual_quests = self.individual_quest_dao.get_quests_by_quest_id_gsi(weekly_quest.quest_id)
+            
+            # Also get by student and period for verification
+            individual_quests_by_student_period = self.individual_quest_dao.get_quests_by_student_and_period(student_id, period_id)
             
             #verifying
             verification = {
                 "weekly_quest": {
                     "quest_id": weekly_quest.quest_id,
                     "student_id": weekly_quest.student_id,
-                    "period_id": weekly_quest.period_id,
-                    "quests_count": len(weekly_quest.quests),
-                    "individual_quest_ids": [quest.individual_quest_id for quest in weekly_quest.quests]
+                    "period_id": weekly_quest.period_id
                 },
                 "individual_quests": {
                     "total_count": len(individual_quests),
@@ -261,11 +257,10 @@ class QuestService:
                     "weeks": [quest["week"] for quest in individual_quests]
                 },
                 "verification": {
-                    "weekly_quest_count": len(weekly_quest.quests),
                     "individual_quest_count": len(individual_quests),
-                    "counts_match": len(weekly_quest.quests) == len(individual_quests),
                     "all_share_same_quest_id": all(quest["quest_id"] == weekly_quest.quest_id for quest in individual_quests),
-                    "individual_ids_match": set(quest.individual_quest_id for quest in weekly_quest.quests) == set(quest["individual_quest_id"] for quest in individual_quests)
+                    "all_match_student_period": all(quest["student_id"] == student_id and quest["period_id"] == period_id for quest in individual_quests),
+                    "gsi_and_scan_match": len(individual_quests) == len([q for q in individual_quests_by_student_period if q["quest_id"] == weekly_quest.quest_id])
                 }
             }
             
@@ -344,36 +339,21 @@ class QuestService:
             # Get weekly quest
             weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_student_and_period(student_id, period_id)
             if not weekly_quest and existing_quests:
-                # Create a weekly quest structure from existing individual quests
-                print("DEBUG: No weekly quest found but individual quests exist - creating weekly quest structure")
+                # Create a weekly quest metadata record from existing individual quests
+                print("DEBUG: No weekly quest found but individual quests exist - creating weekly quest metadata")
                 
                 # Use the quest_id from the first existing quest (they should all have the same quest_id)
                 quest_id = existing_quests[0]['quest_id']
                 
-                # Create weekly quest items from existing quests
-                quest_items = []
-                for quest in existing_quests:
-                    quest_item = WeeklyQuestItem(
-                        individual_quest_id=quest['individual_quest_id'],
-                        name=quest.get('description', ''),
-                        skills=quest.get('skills', ''),
-                        week=quest['week'],
-                        status=quest.get('status', 'not_started'),
-                        description=quest.get('description', ''),
-                        instructions=quest.get('instructions', ''),
-                        rubric=quest.get('rubric', {})
-                    )
-                    quest_items.append(quest_item)
-                
-                # Create and save weekly quest
+                # Create and save weekly quest metadata
                 weekly_quest = WeeklyQuest(
                     quest_id=quest_id,
                     student_id=student_id,
                     period_id=period_id,
-                    quests=quest_items
+                    student_period_key=f"{student_id}#{period_id}"
                 )
                 self.weekly_quest_dao.add_weekly_quest(weekly_quest)
-                print(f"DEBUG: Created weekly quest structure with {len(quest_items)} existing quests")
+                print(f"DEBUG: Created weekly quest metadata for {len(existing_quests)} existing quests")
                 
             elif not weekly_quest:
                 # If no weekly quest exists and no individual quests, use the regular save method
@@ -473,28 +453,13 @@ class QuestService:
                     self.individual_quest_dao.add_individual_quest(individual_quest)
                     created_count += 1
             
-            # Update weekly quest structure if needed
-            # We'll rebuild the weekly quest items from current individual quests
+            # Update weekly quest metadata timestamp
+            # self.weekly_quest_dao.update_weekly_quest(weekly_quest.quest_id, {
+            #     "last_updated_at": datetime.now(timezone.utc).isoformat()
+            # })
+            
+            # Get updated count
             updated_individual_quests = self.get_individual_quests_for_student_and_period(student_id, period_id)
-            quest_items = []
-            
-            for quest in updated_individual_quests:
-                quest_item = WeeklyQuestItem(
-                    individual_quest_id=quest['individual_quest_id'],
-                    name=quest.get('description', ''),
-                    skills=quest.get('skills', ''),
-                    week=quest['week'],
-                    status=quest.get('status', 'not_started'),
-                    description=quest.get('description', ''),
-                    instructions=quest.get('instructions', ''),
-                    rubric=quest.get('rubric', {})
-                )
-                quest_items.append(quest_item)
-            
-            # Update weekly quest with new structure
-            weekly_quest.quests = quest_items
-            weekly_quest.last_updated_at = datetime.now(timezone.utc).isoformat()
-            self.weekly_quest_dao.add_weekly_quest(weekly_quest)
             
             return {
                 "message": f"Successfully updated quests preserving completed data",
@@ -531,12 +496,21 @@ class QuestService:
         try:
             # Try to parse as new JSON format
             grade_data = json.loads(grade_str)
-            if isinstance(grade_data, dict) and "detailed_grade" in grade_data:
-                return {
-                    "detailed_grade": grade_data.get("detailed_grade"),
-                    "overall_score": grade_data.get("overall_score", "Score not available"),
-                    "display_grade": grade_data.get("overall_score", "Score not available")
-                }
+            if isinstance(grade_data, dict):
+                # Handle both new format (with detailed_grade) and simplified format (just overall_score)
+                if "detailed_grade" in grade_data:
+                    return {
+                        "detailed_grade": grade_data.get("detailed_grade"),
+                        "overall_score": grade_data.get("overall_score", "Score not available"),
+                        "display_grade": grade_data.get("overall_score", "Score not available")
+                    }
+                elif "overall_score" in grade_data:
+                    # Simplified JSON format with just overall_score
+                    return {
+                        "detailed_grade": None,
+                        "overall_score": grade_data.get("overall_score"),
+                        "display_grade": grade_data.get("overall_score")
+                    }
         except (json.JSONDecodeError, TypeError):
             pass
         

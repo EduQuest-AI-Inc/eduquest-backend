@@ -7,6 +7,7 @@ class Teacher(BaseModel):
     email: str
     last_login: str = None
     password: str
+    school_id: str
 
     def to_item(self):
         return self.model_dump()

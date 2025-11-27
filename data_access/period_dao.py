@@ -3,7 +3,7 @@ from models.period import Period
 from data_access.config import DynamoDBConfig
 from boto3.dynamodb.conditions import Key
 from boto3.dynamodb.conditions import Attr
-from typing import Dict, Any
+from typing import Dict, Any, List
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -58,3 +58,10 @@ class PeriodDAO(BaseDAO):
         except Exception as e:
             print(f"Error in get_periods_by_teacher_id: {e}")
             return []
+
+    def get_periods_by_school_id(self, school_id: str) -> List[Dict[str, Any]]:
+        response = self.table.query(
+            IndexName="SchoolPeriodIndex",  # Use GSI
+            KeyConditionExpression=Key("school_id").eq(school_id)
+        )
+        return response.get("Items", [])
