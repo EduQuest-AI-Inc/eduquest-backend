@@ -1,0 +1,221 @@
+trigger: none
+pr: none
+
+parameters:
+  - name: stopOldInstance
+    displayName: 'Stop old dev instance (i-02c46d8036081b9df)'
+    type: boolean
+    default: false
+
+variables:
+  awsRegion: 'us-east-2'
+  awsServiceConnection: 'AWS-Connection'
+  instanceProfile: 'EduQuest-EC2-InstanceProfile'
+
+stages:
+  - stage: CreateDevInstance
+    displayName: 'Create New Dev EC2 Instance'
+    jobs:
+      - job: CreateInstance
+        displayName: 'Launch New Instance'
+        pool:
+          vmImage: 'ubuntu-latest'
+
+        steps:
+          - task: AWSShellScript@1
+            displayName: 'Create new dev EC2 instance'
+            inputs:
+              awsCredentials: $(awsServiceConnection)
+              regionName: $(awsRegion)
+              scriptType: 'inline'
+              inlineScript: |
+                set -e
+
+                echo "============================================"
+                echo "Creating New Dev EC2 Instance"
+                echo "============================================"
+
+                # Get latest Ubuntu 24.04 LTS AMI
+                echo "Finding latest Ubuntu 24.04 LTS AMI..."
+                AMI_ID=$(aws ec2 describe-images \
+                  --region $(awsRegion) \
+                  --owners 099720109477 \
+                  --filters \
+                    "Name=name,Values=ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*" \
+                    "Name=state,Values=available" \
+                  --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
+                  --output text)
+
+                echo "Using AMI: $AMI_ID"
+
+                # Get configuration from old instance
+                echo "Getting configuration from old dev instance..."
+                OLD_INSTANCE_ID="i-02c46d8036081b9df"
+
+                SUBNET_ID=$(aws ec2 describe-instances \
+                  --region $(awsRegion) \
+                  --instance-ids $OLD_INSTANCE_ID \
+                  --query 'Reservations[0].Instances[0].SubnetId' \
+                  --output text)
+
+                SECURITY_GROUP_ID=$(aws ec2 describe-instances \
+                  --region $(awsRegion) \
+                  --instance-ids $OLD_INSTANCE_ID \
+                  --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' \
+                  --output text)
+
+                KEY_NAME=$(aws ec2 describe-instances \
+                  --region $(awsRegion) \
+                  --instance-ids $OLD_INSTANCE_ID \
+                  --query 'Reservations[0].Instances[0].KeyName' \
+                  --output text)
+
+                echo "Configuration:"
+                echo "  AMI ID: $AMI_ID"
+                echo "  Instance Type: t2.micro"
+                echo "  Subnet ID: $SUBNET_ID"
+                echo "  Security Group: $SECURITY_GROUP_ID"
+                echo "  Key Name: $KEY_NAME"
+                echo "  IAM Instance Profile: $(instanceProfile)"
+
+                # Create User Data script
+                USER_DATA=$(cat <<'USERDATA_EOF'
+                #!/bin/bash
+                set -e
+                echo "Starting instance initialization..."
+
+                # Update system
+                apt-get update -y
+
+                # Install/Update SSM Agent
+                snap install amazon-ssm-agent --classic
+                snap start amazon-ssm-agent
+
+                # Install required packages
+                apt-get install -y python3-pip python3-venv unzip awscli
+
+                # Create app directory
+                mkdir -p /home/ubuntu/eduquest-backend
+                chown ubuntu:ubuntu /home/ubuntu/eduquest-backend
+
+                echo "Instance setup complete!"
+                USERDATA_EOF
+                )
+
+                # Launch instance
+                echo "Launching new instance..."
+                if [ "$KEY_NAME" != "None" ] && [ -n "$KEY_NAME" ]; then
+                  INSTANCE_ID=$(aws ec2 run-instances \
+                    --region $(awsRegion) \
+                    --image-id $AMI_ID \
+                    --instance-type t2.micro \
+                    --subnet-id $SUBNET_ID \
+                    --security-group-ids $SECURITY_GROUP_ID \
+                    --iam-instance-profile Name=$(instanceProfile) \
+                    --key-name "$KEY_NAME" \
+                    --user-data "$USER_DATA" \
+                    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=eduquest-backend-dev},{Key=Environment,Value=dev}]' \
+                    --query 'Instances[0].InstanceId' \
+                    --output text)
+                else
+                  INSTANCE_ID=$(aws ec2 run-instances \
+                    --region $(awsRegion) \
+                    --image-id $AMI_ID \
+                    --instance-type t2.micro \
+                    --subnet-id $SUBNET_ID \
+                    --security-group-ids $SECURITY_GROUP_ID \
+                    --iam-instance-profile Name=$(instanceProfile) \
+                    --user-data "$USER_DATA" \
+                    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=eduquest-backend-dev},{Key=Environment,Value=dev}]' \
+                    --query 'Instances[0].InstanceId' \
+                    --output text)
+                fi
+
+                echo "============================================"
+                echo "Instance created successfully!"
+                echo "Instance ID: $INSTANCE_ID"
+                echo "============================================"
+
+                # Wait for instance to be running
+                echo "Waiting for instance to be running..."
+                aws ec2 wait instance-running --region $(awsRegion) --instance-ids $INSTANCE_ID
+
+                # Get instance details
+                echo "Instance details:"
+                aws ec2 describe-instances \
+                  --region $(awsRegion) \
+                  --instance-ids $INSTANCE_ID \
+                  --query 'Reservations[0].Instances[0].{InstanceId:InstanceId,State:State.Name,PrivateIP:PrivateIpAddress,PublicIP:PublicIpAddress}' \
+                  --output table
+
+                # Wait for SSM Agent
+                echo ""
+                echo "Waiting for SSM Agent to come online (up to 5 minutes)..."
+                for i in {1..30}; do
+                  SSM_STATUS=$(aws ssm describe-instance-information \
+                    --region $(awsRegion) \
+                    --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+                    --query 'InstanceInformationList[0].PingStatus' \
+                    --output text 2>/dev/null || echo "None")
+
+                  if [ "$SSM_STATUS" = "Online" ]; then
+                    echo "✓ SSM Agent is online!"
+                    break
+                  fi
+
+                  echo "  Waiting for SSM Agent... ($i/30)"
+                  sleep 10
+                done
+
+                if [ "$SSM_STATUS" != "Online" ]; then
+                  echo "⚠ Warning: SSM Agent not online yet. It may need a few more minutes."
+                  echo "   You can check status with:"
+                  echo "   aws ssm describe-instance-information --instance-ids $INSTANCE_ID --region $(awsRegion)"
+                else
+                  # Test SSM command
+                  echo ""
+                  echo "Testing SSM Run Command..."
+                  TEST_CMD=$(aws ssm send-command \
+                    --region $(awsRegion) \
+                    --instance-ids $INSTANCE_ID \
+                    --document-name "AWS-RunShellScript" \
+                    --parameters commands="echo SSM_Test_Successful" \
+                    --output text \
+                    --query 'Command.CommandId')
+
+                  sleep 5
+
+                  TEST_RESULT=$(aws ssm get-command-invocation \
+                    --region $(awsRegion) \
+                    --command-id $TEST_CMD \
+                    --instance-id $INSTANCE_ID \
+                    --query 'StandardOutputContent' \
+                    --output text 2>/dev/null || echo "Pending")
+
+                  if echo "$TEST_RESULT" | grep -q "SSM_Test_Successful"; then
+                    echo "✓ SSM Run Command test successful!"
+                  else
+                    echo "⚠ SSM test result: $TEST_RESULT"
+                  fi
+                fi
+
+                echo ""
+                echo "============================================"
+                echo "Setup Complete!"
+                echo "============================================"
+                echo "New Dev Instance ID: $INSTANCE_ID"
+                echo "Old Dev Instance ID: $OLD_INSTANCE_ID"
+                echo ""
+                echo "You can now deploy to the new instance using your CD pipeline."
+
+          - ${{ if eq(parameters.stopOldInstance, true) }}:
+            - task: AWSShellScript@1
+              displayName: 'Stop old dev instance'
+              inputs:
+                awsCredentials: $(awsServiceConnection)
+                regionName: $(awsRegion)
+                scriptType: 'inline'
+                inlineScript: |
+                  echo "Stopping old dev instance: i-02c46d8036081b9df"
+                  aws ec2 stop-instances --instance-ids i-02c46d8036081b9df --region $(awsRegion)
+                  echo "Old instance stopped"

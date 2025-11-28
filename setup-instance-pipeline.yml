@@ -1,0 +1,106 @@
+trigger: none
+pr: none
+
+variables:
+  awsRegion: 'us-east-2'
+  awsServiceConnection: 'AWS-Connection'
+  instanceId: 'i-039f228cef7663944'
+
+stages:
+  - stage: SetupInstance
+    displayName: 'Setup New Instance'
+    jobs:
+      - job: InstallPackages
+        displayName: 'Install Required Packages'
+        pool:
+          vmImage: 'ubuntu-latest'
+
+        steps:
+          - task: AWSShellScript@1
+            displayName: 'Install AWS CLI and dependencies'
+            inputs:
+              awsCredentials: $(awsServiceConnection)
+              regionName: $(awsRegion)
+              scriptType: 'inline'
+              inlineScript: |
+                set -e
+
+                echo "============================================"
+                echo "Installing packages on instance: $(instanceId)"
+                echo "============================================"
+
+                COMMAND_ID=$(aws ssm send-command \
+                  --region $(awsRegion) \
+                  --instance-ids $(instanceId) \
+                  --document-name "AWS-RunShellScript" \
+                  --comment "Install required packages" \
+                  --parameters commands="sudo apt-get update -y","sudo apt-get install -y awscli python3-pip python3-venv unzip","mkdir -p /home/ubuntu/eduquest-backend","sudo chown ubuntu:ubuntu /home/ubuntu/eduquest-backend","echo Setup_complete" \
+                  --timeout-seconds 600 \
+                  --output text \
+                  --query 'Command.CommandId')
+
+                echo "Command ID: $COMMAND_ID"
+                echo "Waiting for installation..."
+
+                # Wait for command to complete
+                aws ssm wait command-executed \
+                  --region $(awsRegion) \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id $(instanceId)
+
+                # Get result
+                STATUS=$(aws ssm get-command-invocation \
+                  --region $(awsRegion) \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id $(instanceId) \
+                  --query 'Status' \
+                  --output text)
+
+                echo "Status: $STATUS"
+
+                if [ "$STATUS" = "Success" ]; then
+                  echo "✓ Installation successful!"
+
+                  echo "Output:"
+                  aws ssm get-command-invocation \
+                    --region $(awsRegion) \
+                    --command-id "$COMMAND_ID" \
+                    --instance-id $(instanceId) \
+                    --query 'StandardOutputContent' \
+                    --output text
+
+                  # Verify installation
+                  echo ""
+                  echo "Verifying packages..."
+                  TEST_CMD=$(aws ssm send-command \
+                    --region $(awsRegion) \
+                    --instance-ids $(instanceId) \
+                    --document-name "AWS-RunShellScript" \
+                    --parameters commands="aws --version","python3 --version","which unzip" \
+                    --output text \
+                    --query 'Command.CommandId')
+
+                  sleep 5
+
+                  aws ssm get-command-invocation \
+                    --region $(awsRegion) \
+                    --command-id "$TEST_CMD" \
+                    --instance-id $(instanceId) \
+                    --query 'StandardOutputContent' \
+                    --output text
+
+                  echo ""
+                  echo "============================================"
+                  echo "Instance is ready for deployment!"
+                  echo "============================================"
+
+                else
+                  echo "✗ Installation failed"
+                  aws ssm get-command-invocation \
+                    --region $(awsRegion) \
+                    --command-id "$COMMAND_ID" \
+                    --instance-id $(instanceId) \
+                    --query 'StandardErrorContent' \
+                    --output text
+                  exit 1
+                fi

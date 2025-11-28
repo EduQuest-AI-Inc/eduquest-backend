@@ -1,0 +1,95 @@
+trigger: none
+pr: none
+
+variables:
+  awsRegion: 'us-east-2'
+  awsServiceConnection: 'AWS-Connection'
+  instanceId: 'i-039f228cef7663944'
+
+stages:
+  - stage: InstallAWSCLI
+    displayName: 'Install AWS CLI v2'
+    jobs:
+      - job: Install
+        displayName: 'Install AWS CLI v2 and verify'
+        pool:
+          vmImage: 'ubuntu-latest'
+
+        steps:
+          - task: AWSShellScript@1
+            displayName: 'Install AWS CLI v2 on instance'
+            inputs:
+              awsCredentials: $(awsServiceConnection)
+              regionName: $(awsRegion)
+              scriptType: 'inline'
+              inlineScript: |
+                set -e
+
+                echo "============================================"
+                echo "Installing AWS CLI v2"
+                echo "Instance: $(instanceId)"
+                echo "============================================"
+
+                # Install AWS CLI v2 using the official method
+                COMMAND_ID=$(aws ssm send-command \
+                  --region $(awsRegion) \
+                  --instance-ids $(instanceId) \
+                  --document-name "AWS-RunShellScript" \
+                  --comment "Install AWS CLI v2" \
+                  --parameters commands="cd /tmp","curl -s https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip","unzip -q awscliv2.zip","sudo ./aws/install","rm -rf aws awscliv2.zip","aws --version","which aws","python3 --version","which unzip","echo Installation_complete" \
+                  --timeout-seconds 600 \
+                  --output text \
+                  --query 'Command.CommandId')
+
+                echo "Command ID: $COMMAND_ID"
+                echo "Waiting for installation..."
+
+                # Wait for command
+                aws ssm wait command-executed \
+                  --region $(awsRegion) \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id $(instanceId)
+
+                # Get status
+                STATUS=$(aws ssm get-command-invocation \
+                  --region $(awsRegion) \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id $(instanceId) \
+                  --query 'Status' \
+                  --output text)
+
+                echo ""
+                echo "Status: $STATUS"
+
+                if [ "$STATUS" = "Success" ]; then
+                  echo "============================================"
+                  echo "✓ Installation successful!"
+                  echo "============================================"
+                  echo ""
+                  echo "Output:"
+                  aws ssm get-command-invocation \
+                    --region $(awsRegion) \
+                    --command-id "$COMMAND_ID" \
+                    --instance-id $(instanceId) \
+                    --query 'StandardOutputContent' \
+                    --output text
+
+                  echo ""
+                  echo "============================================"
+                  echo "Instance is ready for deployment!"
+                  echo "Run your CD pipeline now."
+                  echo "============================================"
+
+                else
+                  echo "✗ Installation failed!"
+                  echo ""
+                  echo "Error output:"
+                  aws ssm get-command-invocation \
+                    --region $(awsRegion) \
+                    --command-id "$COMMAND_ID" \
+                    --instance-id $(instanceId) \
+                    --query 'StandardErrorContent' \
+                    --output text
+
+                  exit 1
+                fi

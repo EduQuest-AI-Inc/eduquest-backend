@@ -1,0 +1,257 @@
+trigger: none
+pr: none
+
+parameters:
+  - name: ciBuildId
+    displayName: 'CI Build ID to Deploy'
+    type: string
+    default: 'latest'
+
+variables:
+  awsRegion: 'us-east-2'
+  awsServiceConnection: 'AWS-Connection'
+  instanceProfile: 'EduQuest-EC2-InstanceProfile'
+  brokenInstanceId: 'i-039f228cef7663944'
+  pythonVersion: '3.11'
+
+stages:
+  - stage: CreateFreshInstance
+    displayName: 'Create Fresh Dev Instance'
+    jobs:
+      - job: CreateAndSetup
+        displayName: 'Create and Setup Instance'
+        pool:
+          vmImage: 'ubuntu-latest'
+
+        steps:
+          - task: AWSShellScript@1
+            displayName: 'Terminate old broken instance'
+            inputs:
+              awsCredentials: $(awsServiceConnection)
+              regionName: $(awsRegion)
+              scriptType: 'inline'
+              inlineScript: |
+                echo "Terminating broken instance: $(brokenInstanceId)"
+                aws ec2 terminate-instances --instance-ids $(brokenInstanceId) --region $(awsRegion) || echo "Instance already terminated"
+                echo "Old instance terminated"
+
+          - task: AWSShellScript@1
+            displayName: 'Create new instance with complete setup'
+            inputs:
+              awsCredentials: $(awsServiceConnection)
+              regionName: $(awsRegion)
+              scriptType: 'inline'
+              inlineScript: |
+                set -e
+
+                echo "============================================"
+                echo "Creating Fresh Dev Instance"
+                echo "============================================"
+
+                # Get latest Ubuntu 24.04 AMI
+                AMI_ID=$(aws ec2 describe-images \
+                  --region $(awsRegion) \
+                  --owners 099720109477 \
+                  --filters "Name=name,Values=ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*" "Name=state,Values=available" \
+                  --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
+                  --output text)
+
+                echo "Using AMI: $AMI_ID"
+
+                # Get default VPC configuration
+                DEFAULT_VPC=$(aws ec2 describe-vpcs --region $(awsRegion) --filters "Name=is-default,Values=true" --query 'Vpcs[0].VpcId' --output text)
+                SUBNET_ID=$(aws ec2 describe-subnets --region $(awsRegion) --filters "Name=vpc-id,Values=$DEFAULT_VPC" --query 'Subnets[0].SubnetId' --output text)
+                SG_ID=$(aws ec2 describe-security-groups --region $(awsRegion) --filters "Name=vpc-id,Values=$DEFAULT_VPC" --query 'SecurityGroups[0].GroupId' --output text)
+
+                echo "Network Config: VPC=$DEFAULT_VPC, Subnet=$SUBNET_ID, SG=$SG_ID"
+
+                # Create User Data with complete initialization
+                cat > user-data.sh << 'EOF'
+                #!/bin/bash
+                set -x
+                exec > /var/log/user-data.log 2>&1
+
+                echo "===== User Data Start: $(date) ====="
+
+                # Update system
+                apt-get update -y
+                apt-get upgrade -y
+
+                # Install AWS CLI v2
+                cd /tmp
+                curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                apt-get install -y unzip
+                unzip -q awscliv2.zip
+                ./aws/install
+                rm -rf aws awscliv2.zip
+
+                # Verify AWS CLI
+                /usr/local/bin/aws --version
+
+                # Install Python and tools
+                apt-get install -y python3-pip python3-venv
+
+                # Create app directory
+                mkdir -p /home/ubuntu/eduquest-backend
+                chown -R ubuntu:ubuntu /home/ubuntu/eduquest-backend
+
+                # Install and configure SSM Agent
+                snap refresh amazon-ssm-agent || snap install amazon-ssm-agent --classic
+                systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service
+                systemctl restart snap.amazon-ssm-agent.amazon-ssm-agent.service
+
+                echo "===== User Data Complete: $(date) ====="
+                EOF
+
+                # Launch instance
+                echo "Launching new instance..."
+                NEW_INSTANCE_ID=$(aws ec2 run-instances \
+                  --region $(awsRegion) \
+                  --image-id $AMI_ID \
+                  --instance-type t2.micro \
+                  --subnet-id $SUBNET_ID \
+                  --security-group-ids $SG_ID \
+                  --iam-instance-profile Name=$(instanceProfile) \
+                  --user-data file://user-data.sh \
+                  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=eduquest-backend-dev},{Key=Environment,Value=dev},{Key=CreatedBy,Value=FreshStartPipeline}]' \
+                  --query 'Instances[0].InstanceId' \
+                  --output text)
+
+                echo "============================================"
+                echo "New Instance Created: $NEW_INSTANCE_ID"
+                echo "============================================"
+
+                # Save for next stage
+                echo "##vso[task.setvariable variable=newInstanceId;isOutput=true]$NEW_INSTANCE_ID"
+
+                # Wait for instance
+                echo "Waiting for instance to start..."
+                aws ec2 wait instance-running --region $(awsRegion) --instance-ids $NEW_INSTANCE_ID
+
+                echo "Instance running. Waiting for initialization (3 minutes for User Data)..."
+                sleep 180
+
+                # Wait for SSM
+                echo "Waiting for SSM Agent..."
+                for i in {1..20}; do
+                  SSM_STATUS=$(aws ssm describe-instance-information \
+                    --region $(awsRegion) \
+                    --filters "Key=InstanceIds,Values=$NEW_INSTANCE_ID" \
+                    --query 'InstanceInformationList[0].PingStatus' \
+                    --output text 2>/dev/null || echo "None")
+
+                  if [ "$SSM_STATUS" = "Online" ]; then
+                    echo "✓ SSM Agent online!"
+                    sleep 30  # Extra time for User Data to complete
+
+                    # Verify setup
+                    echo "Verifying installation..."
+                    VERIFY_CMD=$(aws ssm send-command \
+                      --region $(awsRegion) \
+                      --instance-ids $NEW_INSTANCE_ID \
+                      --document-name "AWS-RunShellScript" \
+                      --parameters commands="/usr/local/bin/aws --version","python3 --version","which unzip","cat /var/log/user-data.log | tail -20" \
+                      --output text \
+                      --query 'Command.CommandId')
+
+                    sleep 5
+
+                    aws ssm get-command-invocation \
+                      --region $(awsRegion) \
+                      --command-id $VERIFY_CMD \
+                      --instance-id $NEW_INSTANCE_ID \
+                      --query 'StandardOutputContent' \
+                      --output text
+
+                    break
+                  fi
+
+                  echo "Waiting for SSM ($i/20)..."
+                  sleep 10
+                done
+
+                echo "============================================"
+                echo "Instance Ready: $NEW_INSTANCE_ID"
+                echo "============================================"
+
+  - stage: DeployApplication
+    displayName: 'Deploy Application'
+    dependsOn: CreateFreshInstance
+    condition: succeeded()
+    variables:
+      newInstanceId: $[ stageDependencies.CreateFreshInstance.CreateAndSetup.outputs['newInstanceId'] ]
+    jobs:
+      - job: Deploy
+        displayName: 'Deploy to New Instance'
+        pool:
+          vmImage: 'ubuntu-latest'
+
+        steps:
+          - checkout: none
+
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Download CI artifact'
+            inputs:
+              buildType: 'specific'
+              project: '$(System.TeamProject)'
+              definition: 'eduquest-backend-CI'
+              buildVersionToDownload: 'specific'
+              buildId: '${{ parameters.ciBuildId }}'
+              artifactName: 'deployment-package'
+              targetPath: '$(Pipeline.Workspace)/app'
+
+          - task: AWSShellScript@1
+            displayName: 'Deploy application'
+            inputs:
+              awsCredentials: $(awsServiceConnection)
+              regionName: $(awsRegion)
+              scriptType: 'inline'
+              inlineScript: |
+                set -e
+
+                echo "============================================"
+                echo "Deploying to new instance"
+                echo "Instance: $(newInstanceId)"
+                echo "============================================"
+
+                # Upload artifact to S3
+                cd $(Pipeline.Workspace)/app
+                TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+                S3_KEY="builds/${{ parameters.ciBuildId }}/eduquest-backend-${TIMESTAMP}.zip"
+
+                echo "Creating deployment package..."
+                zip -r deployment.zip . -x "*.git*" "*__pycache__*" "*.pyc"
+
+                echo "Uploading to S3..."
+                aws s3 cp deployment.zip "s3://eduquest-deployments-dev/${S3_KEY}"
+                S3_PATH="s3://eduquest-deployments-dev/${S3_KEY}"
+
+                echo "Deploying via SSM..."
+                DEPLOY_CMD=$(aws ssm send-command \
+                  --region $(awsRegion) \
+                  --instance-ids $(newInstanceId) \
+                  --document-name "AWS-RunShellScript" \
+                  --parameters commands="export PATH=/usr/local/bin:\$PATH","cd /home/ubuntu/eduquest-backend","/usr/local/bin/aws s3 cp $S3_PATH deployment.zip","unzip -o deployment.zip","rm deployment.zip","python3 -m venv venv || true","source venv/bin/activate","pip install --upgrade pip","pip install -r requirements.txt","echo Deployment_complete" \
+                  --timeout-seconds 600 \
+                  --output text \
+                  --query 'Command.CommandId')
+
+                echo "Deploy Command ID: $DEPLOY_CMD"
+
+                aws ssm wait command-executed \
+                  --region $(awsRegion) \
+                  --command-id $DEPLOY_CMD \
+                  --instance-id $(newInstanceId) || true
+
+                echo "Deployment output:"
+                aws ssm get-command-invocation \
+                  --region $(awsRegion) \
+                  --command-id $DEPLOY_CMD \
+                  --instance-id $(newInstanceId) \
+                  --query '[Status,StandardOutputContent]' \
+                  --output text
+
+                echo "============================================"
+                echo "Deployment Complete!"
+                echo "New Instance: $(newInstanceId)"
+                echo "============================================"
