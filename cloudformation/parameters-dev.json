@@ -1,7 +1,7 @@
 [
   {
     "ParameterKey": "EC2PublicIP",
-    "ParameterValue": "3.15.42.96"
+    "ParameterValue": "3.145.33.133"
   },
   {
     "ParameterKey": "FlaskPort",
