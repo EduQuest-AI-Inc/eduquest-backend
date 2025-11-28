@@ -33,7 +33,7 @@ stages:
                   --region $(awsRegion) \
                   --instance-ids $(instanceId) \
                   --document-name "AWS-RunShellScript" \
-                  --parameters commands="echo Checking_AWS_CLI","which aws || echo AWS_CLI_not_in_PATH","find /usr -name aws 2>/dev/null || echo Not_in_usr","ls -la /usr/local/bin/ 2>/dev/null || echo No_usr_local_bin","ls -la /usr/bin/aws* 2>/dev/null || echo No_aws_in_usr_bin","echo PATH=$PATH","echo ---","cat /var/log/user-data.log 2>/dev/null | tail -100 || echo No_user_data_log" \
+                  --parameters commands="echo Checking_AWS_CLI","which aws || echo AWS_CLI_not_in_PATH","find /usr -name aws 2>/dev/null || echo Not_in_usr","ls -la /usr/local/bin/ 2>/dev/null || echo No_usr_local_bin","ls -la /usr/bin/aws* 2>/dev/null || echo No_aws_in_usr_bin","echo Current_PATH_is_below","printenv PATH","echo ---","cat /var/log/user-data.log 2>/dev/null | tail -100 || echo No_user_data_log" \
                   --timeout-seconds 120 \
                   --output text \
                   --query 'Command.CommandId')
