@@ -1,0 +1,49 @@
+trigger: none
+pr: none
+
+variables:
+  awsRegion: 'us-east-2'
+  awsServiceConnection: 'AWS-Connection'
+  instanceId: 'i-039f228cef7663944'
+
+stages:
+  - stage: VerifyAWSCLI
+    displayName: 'Verify AWS CLI Location'
+    jobs:
+      - job: Verify
+        displayName: 'Check AWS CLI Installation'
+        pool:
+          vmImage: 'ubuntu-latest'
+
+        steps:
+          - task: AWSShellScript@1
+            displayName: 'Find AWS CLI'
+            inputs:
+              awsCredentials: $(awsServiceConnection)
+              regionName: $(awsRegion)
+              scriptType: 'inline'
+              inlineScript: |
+                set -e
+
+                echo "============================================"
+                echo "Checking AWS CLI Installation"
+                echo "============================================"
+
+                COMMAND_ID=$(aws ssm send-command \
+                  --region $(awsRegion) \
+                  --instance-ids $(instanceId) \
+                  --document-name "AWS-RunShellScript" \
+                  --parameters commands="echo Checking_AWS_CLI","which aws || echo AWS_CLI_not_in_PATH","find /usr -name aws 2>/dev/null || echo Not_in_usr","ls -la /usr/local/bin/ 2>/dev/null || echo No_usr_local_bin","ls -la /usr/bin/aws* 2>/dev/null || echo No_aws_in_usr_bin","echo PATH=$PATH","echo ---","cat /var/log/user-data.log 2>/dev/null | tail -100 || echo No_user_data_log" \
+                  --timeout-seconds 120 \
+                  --output text \
+                  --query 'Command.CommandId')
+
+                echo "Command ID: $COMMAND_ID"
+                sleep 8
+
+                aws ssm get-command-invocation \
+                  --region $(awsRegion) \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id $(instanceId) \
+                  --query '{Status:Status,Output:StandardOutputContent}' \
+                  --output json
