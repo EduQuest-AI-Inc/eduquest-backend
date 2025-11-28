@@ -1,0 +1,148 @@
+trigger: none
+pr: none
+
+variables:
+  awsRegion: 'us-east-2'
+  awsServiceConnection: 'AWS-Connection'
+  instanceId: 'i-039f228cef7663944'
+
+stages:
+  - stage: InstallAWSCLI
+    displayName: 'Properly Install AWS CLI v2'
+    jobs:
+      - job: Install
+        displayName: 'Install Step by Step'
+        pool:
+          vmImage: 'ubuntu-latest'
+
+        steps:
+          - task: AWSShellScript@1
+            displayName: 'Download and install AWS CLI v2'
+            inputs:
+              awsCredentials: $(awsServiceConnection)
+              regionName: $(awsRegion)
+              scriptType: 'inline'
+              inlineScript: |
+                set -e
+
+                echo "============================================"
+                echo "Installing AWS CLI v2 (Step by Step)"
+                echo "============================================"
+
+                # Step 1: Download
+                echo "Step 1: Downloading AWS CLI installer..."
+                DOWNLOAD_CMD=$(aws ssm send-command \
+                  --region $(awsRegion) \
+                  --instance-ids $(instanceId) \
+                  --document-name "AWS-RunShellScript" \
+                  --parameters commands="cd /tmp","curl -v https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip","ls -lh awscliv2.zip","echo Download_complete" \
+                  --timeout-seconds 300 \
+                  --output text \
+                  --query 'Command.CommandId')
+
+                echo "Download Command ID: $DOWNLOAD_CMD"
+                sleep 10
+
+                DOWNLOAD_STATUS=$(aws ssm get-command-invocation \
+                  --region $(awsRegion) \
+                  --command-id "$DOWNLOAD_CMD" \
+                  --instance-id $(instanceId) \
+                  --query 'Status' \
+                  --output text)
+
+                echo "Download Status: $DOWNLOAD_STATUS"
+
+                if [ "$DOWNLOAD_STATUS" != "Success" ]; then
+                  echo "Download failed!"
+                  aws ssm get-command-invocation \
+                    --region $(awsRegion) \
+                    --command-id "$DOWNLOAD_CMD" \
+                    --instance-id $(instanceId) \
+                    --query 'StandardErrorContent' \
+                    --output text
+                  exit 1
+                fi
+
+                echo "✓ Download successful"
+                echo ""
+
+                # Step 2: Unzip
+                echo "Step 2: Extracting..."
+                UNZIP_CMD=$(aws ssm send-command \
+                  --region $(awsRegion) \
+                  --instance-ids $(instanceId) \
+                  --document-name "AWS-RunShellScript" \
+                  --parameters commands="cd /tmp","unzip -o awscliv2.zip","ls -la aws/","echo Unzip_complete" \
+                  --timeout-seconds 120 \
+                  --output text \
+                  --query 'Command.CommandId')
+
+                echo "Unzip Command ID: $UNZIP_CMD"
+                sleep 5
+
+                UNZIP_STATUS=$(aws ssm get-command-invocation \
+                  --region $(awsRegion) \
+                  --command-id "$UNZIP_CMD" \
+                  --instance-id $(instanceId) \
+                  --query 'Status' \
+                  --output text)
+
+                echo "Unzip Status: $UNZIP_STATUS"
+
+                if [ "$UNZIP_STATUS" != "Success" ]; then
+                  echo "Unzip failed!"
+                  exit 1
+                fi
+
+                echo "✓ Unzip successful"
+                echo ""
+
+                # Step 3: Install
+                echo "Step 3: Installing..."
+                INSTALL_CMD=$(aws ssm send-command \
+                  --region $(awsRegion) \
+                  --instance-ids $(instanceId) \
+                  --document-name "AWS-RunShellScript" \
+                  --parameters commands="cd /tmp","sudo ./aws/install --update","which aws","aws --version","echo Install_complete" \
+                  --timeout-seconds 120 \
+                  --output text \
+                  --query 'Command.CommandId')
+
+                echo "Install Command ID: $INSTALL_CMD"
+                sleep 8
+
+                INSTALL_STATUS=$(aws ssm get-command-invocation \
+                  --region $(awsRegion) \
+                  --command-id "$INSTALL_CMD" \
+                  --instance-id $(instanceId) \
+                  --query 'Status' \
+                  --output text)
+
+                echo "Install Status: $INSTALL_STATUS"
+                echo ""
+
+                if [ "$INSTALL_STATUS" = "Success" ]; then
+                  echo "============================================"
+                  echo "✓ Installation Complete!"
+                  echo "============================================"
+                  echo ""
+                  echo "Output:"
+                  aws ssm get-command-invocation \
+                    --region $(awsRegion) \
+                    --command-id "$INSTALL_CMD" \
+                    --instance-id $(instanceId) \
+                    --query 'StandardOutputContent' \
+                    --output text
+
+                  echo ""
+                  echo "Instance is ready for deployment!"
+                else
+                  echo "Installation failed!"
+                  aws ssm get-command-invocation \
+                    --region $(awsRegion) \
+                    --command-id "$INSTALL_CMD" \
+                    --instance-id $(instanceId) \
+                    --query '[StandardOutputContent,StandardErrorContent]' \
+                    --output text
+                  exit 1
+                fi
