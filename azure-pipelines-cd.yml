@@ -297,12 +297,17 @@ stages:
                       #!/bin/bash
                       set -euo pipefail
 
+                      # Set PATH to include AWS CLI v2 installation
+                      export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
+
                       echo "============================================"
                       echo "=== Starting deploy-script.sh ==="
                       echo "============================================"
                       echo "Script started at: \$(date)"
                       echo "Current user: \$(whoami)"
                       echo "Current directory: \$(pwd)"
+                      echo "AWS CLI: \$(which aws 2>/dev/null || echo 'not in PATH')"
+                      echo "AWS CLI version: \$(aws --version 2>&1 || echo 'not available')"
                       echo "============================================"
 
                       APP_DIR="/home/ubuntu/eduquest-backend"
@@ -426,7 +431,7 @@ stages:
                         --instance-ids "$INSTANCE_ID" \
                         --document-name "AWS-RunShellScript" \
                         --comment "Deploy eduquest-backend to ${{ parameters.environment }}" \
-                        --parameters commands="echo SSM_Deploy_Starting","echo Download_script_from_S3","aws s3 cp $S3_DEPLOY_SCRIPT /tmp/deploy-script.sh","ls -lh /tmp/deploy-script.sh","chmod +x /tmp/deploy-script.sh","echo Run_deploy_script","bash -x /tmp/deploy-script.sh 2>&1" \
+                        --parameters commands="export PATH=/usr/local/bin:/usr/bin:/bin","echo SSM_Deploy_Starting","echo Download_script_from_S3","/usr/local/bin/aws s3 cp $S3_DEPLOY_SCRIPT /tmp/deploy-script.sh","ls -lh /tmp/deploy-script.sh","chmod +x /tmp/deploy-script.sh","echo Run_deploy_script","bash -x /tmp/deploy-script.sh 2>&1" \
                         --timeout-seconds 600 \
                         --output text \
                         --query 'Command.CommandId')
