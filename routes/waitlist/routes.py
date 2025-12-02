@@ -12,14 +12,8 @@ def join_waitlist():
         data = request.get_json(silent=True) or {}
         email = data.get('email', '')
         name  = data.get('name', '')
-        result = svc.join(email, name)  
-        resp = jsonify(result)
-        origin = request.headers.get('Origin')
-        if origin:
-            resp.headers['Access-Control-Allow-Origin'] = origin
-            resp.headers['Vary'] = 'Origin'
-            resp.headers['Access-Control-Allow-Credentials'] = 'true'
-        return resp, 200
+        result = svc.join(email, name)
+        return jsonify(result), 200
     except ValueError as ve:
         return jsonify({"message": str(ve)}), 400
     except Exception:
