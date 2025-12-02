@@ -12,6 +12,7 @@ from routes.teacher.routes import teacher_bp
 from routes.enrollment.routes import enrollment_bp
 from routes.quest.routes import quest_bp
 from routes.waitlist.routes import waitlist_bp
+from routes.admin.routes import admin_bp
 from datetime import timedelta
 
 # Load environment variables from .env file
@@ -76,6 +77,7 @@ app.register_blueprint(teacher_bp, url_prefix = '/teacher')
 app.register_blueprint(enrollment_bp, url_prefix = '/enrollment')
 app.register_blueprint(quest_bp, url_prefix = '/quest')
 app.register_blueprint(waitlist_bp, url_prefix = '/waitlist')
+app.register_blueprint(admin_bp, url_prefix = '/admin')
 
 # Add helloworld route for testing connection
 @app.route('/helloworld', methods=['GET'])
