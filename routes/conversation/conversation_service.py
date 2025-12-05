@@ -111,7 +111,12 @@ class ConversationService:
 
         try:
             if conversation_type == "profile":
-                reply, is_complete, updated_profile = conv.cont_conv(message)
+                conv = ini_conv(student, thread_id)
+                reply, is_complete, updated_profile = await conv.cont_conv(
+                    message, 
+                    student_id=user_id,
+                    period_id=conversation.get('period_id')  # If period_id is stored in conversation
+                )
                 if is_complete and updated_profile:
                     self.student_dao.update_student(user_id, updated_profile)
                 return {

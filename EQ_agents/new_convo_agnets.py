@@ -54,7 +54,7 @@ student_input_guardrails_config = {
 def student_guardrails_has_tripwire(results):
     return any((hasattr(r, "tripwire_triggered") and (r.tripwire_triggered is True)) for r in (results or []))
 
-async def check_student_input_with_guardrails(input_text: str) -> dict:
+async def check_student_input_with_guardrails(input_text: str, student_id: str = None, period_id: str = None) -> dict:
     """Run input guardrails on student text and return results"""
     results = await run_guardrails(
         guardrails_ctx, 
@@ -65,7 +65,35 @@ async def check_student_input_with_guardrails(input_text: str) -> dict:
         raise_guardrail_errors=True
     )
     has_tripwire = student_guardrails_has_tripwire(results)
-    return {"results": results, "has_tripwire": has_tripwire}
+    
+    # Check if the "Custom Prompt Check" (abuse detection) guardrail was triggered
+    abuse_detected = False
+    if results:
+        for result in results:
+            # Check if this is the abuse detection guardrail
+            if hasattr(result, 'guardrail_name') and 'Custom Prompt Check' in str(result.guardrail_name):
+                if hasattr(result, 'tripwire_triggered') and result.tripwire_triggered:
+                    abuse_detected = True
+                    break
+            # Also check by looking for abuse-related keywords in the result
+            elif hasattr(result, 'tripwire_triggered') and result.tripwire_triggered:
+                # Check if this result indicates abuse (you may need to adjust based on actual guardrail response)
+                if 'abuse' in str(result).lower() or 'Custom Prompt Check' in str(result):
+                    abuse_detected = True
+                    break
+    
+    # If abuse is detected and we have student_id, notify teacher
+    if abuse_detected and student_id:
+        try:
+            from routes.abuse_report.abuse_report_service import AbuseReportService
+            abuse_service = AbuseReportService()
+            abuse_service.handle_abuse_detection(student_id, input_text, period_id)
+        except Exception as e:
+            print(f"Error notifying teacher about abuse detection: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    return {"results": results, "has_tripwire": has_tripwire, "abuse_detected": abuse_detected}
 
 # Pydantic models for structured outputs
 class StudentProfile(BaseModel):
@@ -211,7 +239,11 @@ class ini_conv:
         print(f"User input: {user_input}")
         
         # Check input with guardrails
-        guardrail_result = await check_student_input_with_guardrails(user_input)
+        guardrail_result = await check_student_input_with_guardrails(
+            user_input, 
+            student_id=student_id if student_id else self.student.get('student_id'),
+            period_id=period_id
+        )
         if guardrail_result["has_tripwire"]:
             return "I'm sorry, but I cannot process this request due to safety concerns.", False, None
         
