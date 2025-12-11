@@ -112,7 +112,7 @@ class ConversationService:
         try:
             if conversation_type == "profile":
                 conv = ini_conv(student, thread_id)
-                reply, is_complete, updated_profile = await conv.cont_conv(
+                reply, is_complete, updated_profile = conv.cont_conv(
                     message, 
                     student_id=user_id,
                     period_id=conversation.get('period_id')  # If period_id is stored in conversation
