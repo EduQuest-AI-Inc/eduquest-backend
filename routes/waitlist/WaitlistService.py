@@ -1,40 +1,114 @@
-import os, base64, re
 from typing import Dict, Optional
 from data_access.waitlist_dao import WaitlistDAO
+from data_access.teacher_dao import TeacherDAO
 
-EMAIL_REGEX = re.compile(r"^\S+@\S+\.\S+$")
-
-def _gen_code(n: int = 8) -> str:
-    import os, base64
-    return base64.urlsafe_b64encode(os.urandom(6)).decode("ascii").rstrip("=")[:n]
 
 class WaitlistService:
-    def __init__(self, dao: Optional[WaitlistDAO] = None):
+    """
+    Service layer for pilot study waitlist operations.
+    Handles business logic for joining waitlist and checking status.
+    """
+
+    def __init__(self, dao: Optional[WaitlistDAO] = None, teacher_dao: Optional[TeacherDAO] = None):
         self.dao = dao or WaitlistDAO()
+        self.teacher_dao = teacher_dao or TeacherDAO()
 
-    def join(self, email_raw: str, name_raw: str) -> Dict[str, str]:
-        email = (email_raw or "").strip().lower()
-        name  = (name_raw or "").strip()
-        if not EMAIL_REGEX.match(email):
-            raise ValueError("Invalid email")
-        if len(name) < 2:
-            raise ValueError("Invalid name")
+    def join(self, teacher_id: str, referral_code: Optional[str] = None) -> Dict:
+        """
+        Add a teacher to the pilot study waitlist.
+        
+        Args:
+            teacher_id: The teacher's username/ID
+            referral_code: Optional referral code from another teacher
+            
+        Returns:
+            Dict with waitlist entry details including position and referral code
+        """
+        # Validate teacher exists and get their email
+        teacher = self.teacher_dao.get_teacher_by_id(teacher_id)
+        if not teacher:
+            raise ValueError("Teacher not found")
 
-        existing = self.dao.get_by_email(email)
-        if existing:
-            if "name" not in existing or not (existing.get("name") or "").strip():
-                self.dao.update_name_if_missing(existing["waitlistID"], name)
-                existing["name"] = name
-            return {"waitlistID": existing["waitlistID"], "email": existing["email"], "name": existing.get("name", name)}
+        teacher_email = teacher.get("email")
+        if not teacher_email:
+            raise ValueError("Teacher email not found")
 
-        for _ in range(5):
-            code = _gen_code(8)
-            if self.dao.put_unique_code(code, email, name):
-                try:
-                    from utils.emailer_ses import send_waitlist_code
-                    send_waitlist_code(email, code, name=name)
-                except Exception:
-                    pass
-                return {"waitlistID": code, "email": email, "name": name}
+        # Check if teacher is already approved
+        if teacher.get("pilot_approved"):
+            return {
+                "already_approved": True,
+                "message": "You are already approved for the pilot study"
+            }
 
-        raise RuntimeError("Could not allocate a unique waitlist code, please retry.")
+        # Validate referral code if provided
+        referred_by = None
+        if referral_code:
+            validation = self.dao.validate_referral_code(referral_code)
+            if validation.get("valid"):
+                referred_by = validation.get("referrer_id")
+                # Don't allow self-referral
+                if referred_by == teacher_id:
+                    referred_by = None
+
+        # Join the waitlist (pass teacher_email for DynamoDB sort key)
+        entry = self.dao.join_waitlist(teacher_id, teacher_email, referred_by)
+
+        return {
+            "success": True,
+            "position": entry.get("position"),
+            "referral_code": entry.get("referralCode"),
+            "status": entry.get("status"),
+            "joined_at": entry.get("joinedAt"),
+            "referred_by": entry.get("referredBy"),
+        }
+
+    def get_status(self, teacher_id: str) -> Dict:
+        """
+        Get the waitlist status for a teacher.
+        
+        Args:
+            teacher_id: The teacher's username/ID
+            
+        Returns:
+            Dict with waitlist status details
+        """
+        # Check if teacher is already approved via the teacher record
+        teacher = self.teacher_dao.get_teacher_by_id(teacher_id)
+        if teacher and teacher.get("pilot_approved"):
+            return {
+                "on_waitlist": False,
+                "approved": True,
+                "position": None,
+                "referral_code": None,
+                "status": "approved",
+            }
+
+        # Get waitlist entry status
+        return self.dao.get_status(teacher_id)
+
+    def approve(self, teacher_id: str) -> Dict:
+        """
+        Approve a teacher for pilot study access.
+        Updates both the waitlist entry and the teacher record.
+        
+        Args:
+            teacher_id: The teacher's username/ID
+            
+        Returns:
+            Dict with approval result
+        """
+        # Approve in waitlist
+        waitlist_success = self.dao.approve_teacher(teacher_id)
+
+        # Update teacher record
+        try:
+            self.teacher_dao.update_teacher(teacher_id, {"pilot_approved": True})
+            teacher_success = True
+        except Exception:
+            teacher_success = False
+
+        return {
+            "success": waitlist_success and teacher_success,
+            "waitlist_updated": waitlist_success,
+            "teacher_updated": teacher_success,
+        }
