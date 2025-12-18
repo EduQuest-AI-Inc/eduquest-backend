@@ -60,7 +60,7 @@ app.register_blueprint(period_bp, url_prefix='/period')
 app.register_blueprint(teacher_bp, url_prefix = '/teacher')
 app.register_blueprint(enrollment_bp, url_prefix = '/enrollment')
 app.register_blueprint(quest_bp, url_prefix = '/quest')
-app.register_blueprint(waitlist_bp, url_prefix = '/waitlist')
+app.register_blueprint(waitlist_bp, url_prefix='/pilot-waitlist')
 
 # Add helloworld route for testing connection
 @app.route('/helloworld', methods=['GET'])
