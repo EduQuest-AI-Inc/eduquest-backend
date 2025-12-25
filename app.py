@@ -29,6 +29,7 @@ jwt = JWTManager(app)
 
 allowed_origins = [
     "https://eduquestai.org",
+    "https://www.eduquestai.org",
     "http://eduquestai.org",
     "http://eduquestai.org.s3-website.us-east-2.amazonaws.com",
     "https://eduquestai.org.s3-website.us-east-2.amazonaws.com",
@@ -45,12 +46,13 @@ api_gateway_url = os.getenv('API_GATEWAY_URL')
 if api_gateway_url:
     allowed_origins.append(api_gateway_url)
 
-CORS(app, resources={r"/*": {
-    "origins": allowed_origins,
-    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    "allow_headers": ["Content-Type", "Authorization"],
-    "supports_credentials": True
-}})
+CORS(
+    app,
+    resources={r"/*": {"origins": allowed_origins}},
+    supports_credentials=True,
+    allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+)
 
 # Register Blueprints
 app.register_blueprint(conversation_bp, url_prefix='/conversation')
