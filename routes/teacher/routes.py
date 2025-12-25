@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from routes.teacher.teacher_service import TeacherService
+from routes.waitlist.WaitlistService import WaitlistService
+from data_access.teacher_dao import TeacherDAO
 from openai import OpenAI
 import boto3
 import shutil
@@ -10,6 +12,8 @@ from s3 import upload_file_to_s3
 
 teacher_bp = Blueprint("teacher", __name__)
 teacher_service = TeacherService()
+teacher_dao = TeacherDAO()
+waitlist_service = WaitlistService()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
@@ -17,13 +21,23 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 @jwt_required()
 def create_period():
     try:
+        teacher_id = get_jwt_identity()
+        
+        # Check if teacher is approved for pilot study
+        teacher = teacher_dao.get_teacher_by_id(teacher_id)
+        if not teacher or not teacher.get("pilot_approved", False):
+            waitlist_status = waitlist_service.get_status(teacher_id)
+            return jsonify({
+                "error": "Pilot access required to create a class. Please join the pilot waitlist.",
+                "code": "PILOT_WAITLIST_REQUIRED",
+                "waitlist": waitlist_status,
+            }), 403
+        
         course = request.form.get("course")
         files = request.files.getlist("files")
         
         if not course:
             return jsonify({"error": "Course name is required"}), 400
-
-        teacher_id = get_jwt_identity()
 
         temp_dir = tempfile.mkdtemp()
         file_paths = []
