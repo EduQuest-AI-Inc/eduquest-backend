@@ -5,16 +5,23 @@ from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
 from models.student import Student
 from models.teacher import Teacher
+from .password_policy import validate_password
 
 student_dao = StudentDAO()
 teacher_dao = TeacherDAO()
 
 
-def register_user(username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', grade: str = None) -> dict:
+def register_user(username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', email_lc: str = '', grade: str = None) -> dict:
     """
     Register a new user (student or teacher).
     Teachers are created with pilot_approved=False by default.
+    email_lc is the canonical lowercase email for consistent lookups.
     """
+    # Validate password against policy
+    is_valid, error_msg = validate_password(password)
+    if not is_valid:
+        return {"success": False, "error": error_msg}
+    
     if role == 'teacher':
         existing = teacher_dao.get_teacher_by_id(username)
         if existing:
@@ -26,6 +33,7 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
             first_name=first_name,
             last_name=last_name,
             email=email,
+            email_lc=email_lc,
             pilot_approved=False  # Teachers start unapproved for pilot study
         )
         teacher_dao.add_teacher(teacher)
@@ -41,6 +49,7 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
             first_name=first_name,
             last_name=last_name,
             email=email,
+            email_lc=email_lc,
             grade=grade
         )
         student_dao.add_student(student)

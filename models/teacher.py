@@ -7,6 +7,7 @@ class Teacher(BaseModel):
     first_name: str
     last_name: str
     email: str
+    email_lc: Optional[str] = None  # Canonical lowercase email for lookups
     password: str
     last_login: Optional[str] = None
     pilot_approved: bool = False  # Whether teacher is approved for pilot study
