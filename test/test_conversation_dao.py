@@ -12,7 +12,7 @@ def test_crud_operations():
 
     now = datetime.now(timezone.utc).isoformat()
     conversation = Conversation(
-        thread_id="thread_test",
+        conversation_id="conv_test",
         user_id="student_test",
         role="student",
         conversation_type="initial",
@@ -24,18 +24,17 @@ def test_crud_operations():
 
     # -------Update-------
     # dao.update_conversation(
-    #     thread_id=conversation.thread_id,
-    #     last_updated_at="2025-05-17T19:05:43.525528+00:00",
+    #     conversation_id=conversation.conversation_id,
     #     updates={"conversation_type": "updated"}
     # )
 
     # -------Get-------
-    result = dao.get_conversations_by_thread("thread_test")
+    result = dao.get_conversations_by_id("conv_test")
     print(result)
 
     # -------Delete-------
-    # dao.delete_conversation(conversation.thread_id, "2025-05-17T19:10:40.189374+00:00")
-    # final = dao.get_conversations_by_thread("thread_test")
+    # dao.delete_conversation(conversation.conversation_id)
+    # final = dao.get_conversations_by_id("conv_test")
     # assert not any(c["student_id"] == "student_test" for c in final)
 
 test_crud_operations()

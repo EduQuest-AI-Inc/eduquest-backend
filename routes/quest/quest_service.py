@@ -13,7 +13,7 @@ class QuestService:
         self.individual_quest_dao = IndividualQuestDAO()
 
     def save_schedule_to_weekly_quests(self, schedule_data: dict, student_id: str, period_id: str) -> dict:
-        """Save the schedule from SchedulesAgent to both weekly_quest table and individual_quest table."""
+        """Save a schedule to both weekly_quest table and individual_quest table."""
         try:
             quest_id = str(uuid.uuid4())
             
@@ -324,7 +324,7 @@ class QuestService:
         This method is designed for use when recommended changes trigger quest updates.
         
         Args:
-            schedule_data: New schedule data from SchedulesAgent
+            schedule_data: New schedule data (list of quest definitions)
             homework_data: New homework data from HWAgent  
             student_id: Student ID
             period_id: Period ID

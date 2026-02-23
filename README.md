@@ -1,3 +1,27 @@
+## Pilot Waitlist Feature Flag
+
+The pilot study waitlist can be temporarily disabled to allow all teachers to create classes without approval.
+
+### Environment Variable
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PILOT_WAITLIST_ENABLED` | `true` | When `true`, teachers must be approved (`pilot_approved=true`) to create classes. When `false`, any authenticated teacher can create classes. |
+
+### Usage
+
+```bash
+# To disable waitlist enforcement (allow all teachers to create classes)
+export PILOT_WAITLIST_ENABLED=false
+
+# To re-enable waitlist enforcement (default behavior)
+export PILOT_WAITLIST_ENABLED=true
+# or simply unset it (defaults to true)
+unset PILOT_WAITLIST_ENABLED
+```
+
+---
+
 ## 🔐 Password Reset Feature Setup
 
 ### DynamoDB Tables (Manual Creation Required)

@@ -115,58 +115,30 @@ def continue_ltg_conversation():
                 if auth_tokens:
                     auth_token = auth_tokens[-1]
 
-        print(f"Auth token for initiate-profile-assistant: {auth_token}")
+        print(f"Auth token for continue-ltg-conversation: {auth_token}")
 
         conversation_type = data.get('conversation_type')
-        thread_id = data.get('thread_id')
+        conversation_id = data.get('conversation_id')
         user_message = data.get('message')
+        period_id = data.get('period_id')  # Optional, helps with lookup
 
         if not conversation_type:
             return jsonify({"error": "conversation_type is required"}), 400
-        if not thread_id:
-            return jsonify({"error": "thread_id is required"}), 400
+        if not conversation_id:
+            return jsonify({"error": "conversation_id is required"}), 400
         if not user_message:
             return jsonify({"error": "message is required"}), 400
 
-        result = period_service.continue_ltg_conversation(auth_token, conversation_type, thread_id, user_message)
+        result = period_service.continue_ltg_conversation(
+            auth_token, conversation_type, conversation_id, user_message, period_id
+        )
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
-@period_bp.route('/initiate-schedules-agent', methods=['POST'])
-def initiate_schedules_agent():
-    try:
-        
-        # Prefer Authorization: Bearer <token>
-        auth_token = None
-        token = None
-        auth_header = request.headers.get('Authorization', '')
-        if auth_header and auth_header.lower().startswith('bearer '):
-            token = auth_header.split(' ', 1)[1].strip()
-            auth_token = token
 
-
-        # Fallback: parse the last auth_token from Cookie header if multiple exist
-        if not token:
-            raw_cookie = request.headers.get('Cookie', '')
-            if 'auth_token=' in raw_cookie:
-                parts = [p.strip() for p in raw_cookie.split(';')]
-                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-                if auth_tokens:
-                    auth_token = auth_tokens[-1]
-
-        print(f"Auth token for initiate-profile-assistant: {auth_token}")
-        data = request.json
-        
-        period_id = data.get('period_id')  
-        if not period_id:
-            return jsonify({"error": "period_id is required"}), 400
-        
-        result = period_service.start_schedules_agent(auth_token, period_id)
-        return jsonify(result), 200
-    except Exception as e:
-        print(f"Error in initiate-schedules-agent: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+# Note: /initiate-schedules-agent has been removed. 
+# Quest generation now uses the centralized period_schedule with teacher-selected quest_enabled_weeks.
+# The /initiate-homework-agent endpoint handles both creating quest placeholders and generating homework.
     
 @period_bp.route('/initiate-homework-agent', methods=['POST'])
 def initiate_homework_agent():

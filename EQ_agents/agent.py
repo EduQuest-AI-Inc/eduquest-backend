@@ -1,3 +1,10 @@
+"""
+Homework (HW) Agent for generating quest instructions and rubrics.
+
+Note: SchedulesAgent has been removed - quest weeks now come from the centralized
+period_schedule table (teacher-selected quest weeks). The HWAgent is called directly
+with the list of enabled quest weeks.
+"""
 import sys
 import os
 
@@ -8,148 +15,63 @@ from agents import (
     Agent,
     Runner,
     FileSearchTool,
-    output_guardrail,
-    GuardrailFunctionOutput,
-    OutputGuardrailTripwireTriggered,
-    RunContextWrapper,
+    OpenAIConversationsSession,
     trace,
-    guardrail_span
-
 )
-from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
-import json
-from openai import vector_stores
 from pydantic import BaseModel, Field
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import asyncio
-from models.period import Period
 from models.rubric import Rubric, Scale
 
+
 class IndividualQuest(BaseModel):
+    """Schema for a quest with full details including instructions and rubric."""
     Name: str = Field(description="Name of the quest")
     Skills: str = Field(description="Skills the student will practice through this quest")
     Week: int = Field(description="Week the student will work on this quest")
     instructions: str = Field(description="Detailed instructions for completing the quest")
     rubric: Dict[str, Any] = Field(description="Grading criteria and expectations for the quest")
 
-class BaseQuest(BaseModel):
-    Name: str = Field(description="Name of the quest")
-    Skills: str = Field(description="Skills the student will practice through this quest")
-    Week: int = Field(description="Week the student will work on this quest")
-
-class schedule(BaseModel):
-    list_of_quests: list[BaseQuest] = Field(description="List of quests for the student")
 
 class detailed_schedule(BaseModel):
+    """Schema for a list of fully detailed quests."""
     list_of_quests: list[IndividualQuest] = Field(description="List of quests for the student")
 
-class SchedulesAgent:
-    def __init__(self, student, period, recommended_change=None):
-        self.student = student
-        self.period = period
-        self.vector_store = period["vector_store_id"]
-        
-        # Base input for the agent
-        base_input = f"""I'm {self.student["first_name"]} {self.student["last_name"]}. My strengths are {self.student["strength"]}, my weaknesses are {self.student["weakness"]}, my interests are {self.student["interest"]}, and my learning style is {self.student["learning_style"]}. My long-term goal is {self.student["long_term_goal"]}. I am in grade {self.student["grade"]}."""
-
-        # Add recommended change context if provided
-        if recommended_change:
-            base_input += f"\n\nIMPORTANT: Based on recent feedback, the following adjustments should be made to future quests: {recommended_change}"
-            self.input = base_input
-        else:
-            self.input = base_input
-
-        # Enhanced instructions to consider recommended changes
-        instructions = """
-                You specialize in breaking down the long-term goal into manageable weekly quests to replace homework. You link the weekly skills students need to learn in the class (found in the course schedule) to their interests while accommodating their capabilities and learning preferences. 
-                First, you will determine and/or decide what the students are required to learn in the class each week based on the course modules items from file search. There are 18 weeks in total.
-                Based on that, you will create a weekly quest for the student that aligns with their long-term goal, interests, strengths, weaknesses, and learning style.
-                Each quest should be a thorough practice of the skills and knowledge learned in class that week and help the student to master these skills and knowledge.
-                You will return the homework schedule for the duration of the course, including the weekly quests and their due dates.
-                By the 18th week, the student will have accomplished their long term goal.
-        """
-        
-        # Add specific instructions for recommended changes
-        if recommended_change:
-            instructions += f"""
-            
-            IMPORTANT: Pay special attention to the recommended changes provided in the student context. Incorporate these suggestions into the quest design to address any identified weaknesses or areas for improvement. The recommended changes should influence the difficulty, focus, or approach of future quests.
-            """
-
-        self.schedules_agent = Agent(
-            name="Schedules Agent",
-            instructions=instructions,
-            model="gpt-4.1",
-            tools=[
-                FileSearchTool(
-                    vector_store_ids=[self.vector_store]
-                )
-            ],
-            output_type=schedule
-        )
-
-        self.guardrial_agent = Agent(
-            name="Guardrial Agent",
-            handoff_description="You check if the weekly quests align with the materials taught in class accurately and timely. If not, you will handoff to the Schedules Agent.",
-            instructions="You check if the weekly quests align with the materials taught in class for that corresponding week accurately and timely. If not, you will handoff to the Schedules Agent.",
-            model="gpt-4.1",
-            tools=[
-                FileSearchTool(
-                    vector_store_ids=[self.vector_store]
-                )
-            ]
-        )
-
-    @output_guardrail()
-    async def guardrail(self, ctx: RunContextWrapper, agent: Agent, output: schedule) -> GuardrailFunctionOutput:
-        try:
-            result = await Runner.run(
-                self.guardrial_agent,
-                output.model_dump_json(),
-                context=ctx.context
-            )
-            if "approved" in result.response.lower():
-                return GuardrailFunctionOutput(output=output)
-
-            new_schedule = await Runner.run(
-                self.schedules_agent,
-                self.input,
-                context=ctx.context
-            )
-            if isinstance(new_schedule.output, schedule):
-                return GuardrailFunctionOutput(output=new_schedule.output)
-
-            raise OutputGuardrailTripwireTriggered(
-                message="Failed to regenerate aligned schedule",
-                original_output=output
-            )
-        except Exception as e:
-            raise OutputGuardrailTripwireTriggered(
-                message=f"Error in guardrail check: {str(e)}",
-                original_output=output
-            )
-
-    async def _run_async(self) -> schedule:
-        with trace("schedule_generation") as span:
-            with guardrail_span("schedule_guardrail"):
-                result = await Runner.run(
-                    self.schedules_agent,
-                    self.input
-                )
-        return result.final_output
-
-    def run(self) -> schedule:
-        return asyncio.run(self._run_async())
 
 class HWAgent:
-    """A simpler homework agent that generates instructions and rubrics directly"""
+    """
+    Homework agent that generates quest instructions and rubrics.
     
-    def __init__(self, student, period, schedule, timeout_seconds=300):
+    Uses OpenAIConversationsSession to maintain memory of student's LTG conversation,
+    so generated homework can reference what the student discussed during goal selection.
+    """
+    
+    def __init__(self, student, period, schedule, conversation_id: Optional[str] = None, timeout_seconds=300):
+        """
+        Initialize the HWAgent.
+        
+        Args:
+            student: Student data dict.
+            period: Period data dict (must contain vector_store_id).
+            schedule: List of quest dicts with Name, Skills, Week.
+            conversation_id: Optional OpenAI conversation_id to use for memory.
+                             If provided, all Runner.run calls will share this session.
+            timeout_seconds: Maximum time for homework generation.
+        """
         self.student = student
         self.period = period
         self.schedule = schedule
         self.vector_store = period["vector_store_id"]
         self.timeout_seconds = timeout_seconds
+        self.conversation_id = conversation_id
+        
+        # Create a session for conversation memory if conversation_id is provided
+        if conversation_id:
+            self.session = OpenAIConversationsSession(conversation_id=conversation_id)
+            print(f"HWAgent using conversation memory: {conversation_id}")
+        else:
+            self.session = None
+            print("HWAgent running without conversation memory (stateless)")
         
     async def generate_instructions(self, quest) -> str:
         """Generate detailed instructions for a quest"""
@@ -183,9 +105,12 @@ class HWAgent:
                 model="gpt-4o"
             )
             
+            # Pass session for conversation memory if available
+            run_kwargs = {"session": self.session} if self.session else {}
             result = await Runner.run(
                 instruction_agent,
-                f"Create detailed instructions for this quest: {quest_name} - Skills: {quest_skills}"
+                f"Create detailed instructions for this quest: {quest_name} - Skills: {quest_skills}",
+                **run_kwargs
             )
             
             return result.final_output
@@ -225,9 +150,12 @@ class HWAgent:
                 output_type=Rubric
             )
             
+            # Pass session for conversation memory if available
+            run_kwargs = {"session": self.session} if self.session else {}
             result = await Runner.run(
                 rubric_agent,
-                f"Create a rubric for: {quest_name}"
+                f"Create a rubric for: {quest_name}",
+                **run_kwargs
             )
             
             return result.final_output
@@ -242,11 +170,18 @@ class HWAgent:
             
             print(f"Processing quest: {quest_name}")
             
-            # Generate instructions and rubric in parallel
-            instructions, rubric = await asyncio.gather(
-                self.generate_instructions(quest),
-                self.generate_rubric(quest)
-            )
+            # When using a shared session, run sequentially to avoid concurrent writes
+            # Otherwise, run in parallel for speed
+            if self.session:
+                # Sequential execution for session safety
+                instructions = await self.generate_instructions(quest)
+                rubric = await self.generate_rubric(quest)
+            else:
+                # Parallel execution when stateless
+                instructions, rubric = await asyncio.gather(
+                    self.generate_instructions(quest),
+                    self.generate_rubric(quest)
+                )
             
             # Convert rubric to dict format
             rubric_dict = rubric.to_dict_format()
@@ -266,20 +201,34 @@ class HWAgent:
         """Process all quests in the schedule asynchronously"""
         with trace("homework_generation"):
             total_quests = len(self.schedule)
-            print(f"Starting HWAgent - Processing {total_quests} quests in parallel")
-            
-            # Process all quests in parallel
-            tasks = [self.process_quest(quest) for quest in self.schedule]
-            detailed_quests = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            # Filter out exceptions and log errors
             successful_quests = []
-            for i, result in enumerate(detailed_quests, 1):
-                if isinstance(result, Exception):
-                    print(f"✗ Error processing quest {i}: {str(result)}")
-                else:
-                    successful_quests.append(result)
-                    print(f"✓ Completed quest {i}")
+            
+            if self.session:
+                # Sequential processing when using shared conversation session
+                # This avoids concurrent writes to the same conversation
+                print(f"Starting HWAgent - Processing {total_quests} quests sequentially (using conversation memory)")
+                
+                for i, quest in enumerate(self.schedule, 1):
+                    try:
+                        result = await self.process_quest(quest)
+                        successful_quests.append(result)
+                        print(f"✓ Completed quest {i}/{total_quests}")
+                    except Exception as e:
+                        print(f"✗ Error processing quest {i}: {str(e)}")
+            else:
+                # Parallel processing when stateless (no session)
+                print(f"Starting HWAgent - Processing {total_quests} quests in parallel (stateless)")
+                
+                tasks = [self.process_quest(quest) for quest in self.schedule]
+                detailed_quests = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Filter out exceptions and log errors
+                for i, result in enumerate(detailed_quests, 1):
+                    if isinstance(result, Exception):
+                        print(f"✗ Error processing quest {i}: {str(result)}")
+                    else:
+                        successful_quests.append(result)
+                        print(f"✓ Completed quest {i}")
             
             print(f"\nHWAgent completed - Processed {len(successful_quests)}/{total_quests} quests successfully")
             return successful_quests
@@ -294,13 +243,3 @@ class HWAgent:
             )
         except asyncio.TimeoutError:
             raise Exception(f"Homework generation timed out after {self.timeout_seconds} seconds")
-
-# def run_agent(student, period_id):
-#     period = Period.get_period(period_id)
-#     schedule = SchedulesAgent(student, period).run()
-#     homework = HWAgent(student, period, schedule).run()
-#     return homework
-
-"""
-1. call schedules agent -> get 
-"""
