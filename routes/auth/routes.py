@@ -3,6 +3,7 @@
 from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import create_access_token, decode_token
 from .auth_service import register_user, authenticate_user
+from .password_reset_service import get_password_reset_service
 from data_access.session_dao import SessionDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
@@ -14,6 +15,7 @@ session_dao = SessionDAO()
 student_dao = StudentDAO()
 teacher_dao = TeacherDAO()
 conversation_service = ConversationService()
+password_reset_service = get_password_reset_service()
 #sdf1234567890123456
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
@@ -28,17 +30,20 @@ def signup():
     last_name = data.get('last_name')
     email = data.get('email')
     grade = data.get('grade')
-    waitlist_code = data.get('waitlistID')
 
-    if not username or not password or not role or not first_name or not last_name or not email or not waitlist_code or (role == 'student' and not grade):
-        return jsonify({'message': 'Username, password, role, first_name, last_name, email, waitlist code' + (', and grade' if role == 'student' else '') + ' required'}), 400
+    if not username or not password or not role or not first_name or not last_name or not email or (role == 'student' and not grade):
+        return jsonify({'message': 'Username, password, role, first_name, last_name, email' + (', and grade' if role == 'student' else '') + ' required'}), 400
 
-    student_items = student_dao.table.scan(FilterExpression="email = :email", ExpressionAttributeValues={":email": email}).get("Items", [])
-    teacher_items = teacher_dao.table.scan(FilterExpression="email = :email", ExpressionAttributeValues={":email": email}).get("Items", [])
+    # Canonical lowercase email for consistent lookups
+    email_lc = email.strip().lower()
+
+    # Check uniqueness using email_lc to prevent case-based duplicates
+    student_items = student_dao.table.scan(FilterExpression="email_lc = :email_lc", ExpressionAttributeValues={":email_lc": email_lc}).get("Items", [])
+    teacher_items = teacher_dao.table.scan(FilterExpression="email_lc = :email_lc", ExpressionAttributeValues={":email_lc": email_lc}).get("Items", [])
     if student_items or teacher_items:
         return jsonify({'message': 'Email address already in use'}), 409
 
-    result = register_user(username, password, role, first_name, last_name, email, grade if role == 'student' else None, waitlist_code)
+    result = register_user(username, password, role, first_name, last_name, email, email_lc, grade if role == 'student' else None)
 
     if result.get('success'):
         return jsonify({'message': 'User registered successfully'}), 201
@@ -102,3 +107,81 @@ def login():
         return resp
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
+
+
+def _get_client_ip():
+    """Get the client's IP address, handling proxies."""
+    # Check X-Forwarded-For header (set by load balancers/proxies)
+    if request.headers.get('X-Forwarded-For'):
+        # Take the first IP in the chain (original client)
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    # Check X-Real-IP header (alternative proxy header)
+    if request.headers.get('X-Real-IP'):
+        return request.headers.get('X-Real-IP').strip()
+    # Fall back to remote_addr
+    return request.remote_addr or '0.0.0.0'
+
+
+@auth_bp.route('/password-reset/request', methods=['POST'])
+def password_reset_request():
+    """
+    Request a password reset email.
+    Always returns a neutral success message to prevent email enumeration.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'message': 'Missing JSON body'}), 400
+    
+    email = data.get('email', '').strip()
+    
+    if not email:
+        return jsonify({'message': 'Email is required'}), 400
+    
+    # Get client info
+    ip_address = _get_client_ip()
+    user_agent = request.headers.get('User-Agent', '')
+    
+    # Process the request
+    result = password_reset_service.request_password_reset(
+        email=email,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    
+    # Always return 200 with neutral message
+    return jsonify({'message': result['message']}), 200
+
+
+@auth_bp.route('/password-reset/confirm', methods=['POST'])
+def password_reset_confirm():
+    """
+    Confirm a password reset and set a new password.
+    Uses a token from the reset email.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'message': 'Missing JSON body'}), 400
+    
+    token = data.get('token', '').strip()
+    new_password = data.get('new_password', '')
+    
+    if not token:
+        return jsonify({'message': 'Reset token is required'}), 400
+    
+    if not new_password:
+        return jsonify({'message': 'New password is required'}), 400
+    
+    # Get client IP
+    ip_address = _get_client_ip()
+    
+    # Process the confirmation
+    success, message = password_reset_service.confirm_password_reset(
+        token=token,
+        new_password=new_password,
+        ip_address=ip_address
+    )
+    
+    if success:
+        return jsonify({'message': message}), 200
+    else:
+        return jsonify({'message': message}), 400

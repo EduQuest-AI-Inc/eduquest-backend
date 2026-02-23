@@ -149,6 +149,20 @@ Resources:
       ParentId: !Ref WaitlistResource
       PathPart: '{proxy+}'
 
+  PilotWaitlistResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref EduQuestAPI
+      ParentId: !GetAtt EduQuestAPI.RootResourceId
+      PathPart: pilot-waitlist
+
+  PilotWaitlistProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref EduQuestAPI
+      ParentId: !Ref PilotWaitlistResource
+      PathPart: '{proxy+}'
+
   HelloworldResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -346,6 +360,31 @@ Resources:
         Type: HTTP_PROXY
         IntegrationHttpMethod: ANY
         Uri: !Sub 'http://${EC2PublicIP}:${FlaskPort}/waitlist/{proxy}'
+        RequestParameters:
+          integration.request.path.proxy: method.request.path.proxy
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+
+  PilotWaitlistProxyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EduQuestAPI
+      ResourceId: !Ref PilotWaitlistProxyResource
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: HTTP_PROXY
+        IntegrationHttpMethod: ANY
+        Uri: !Sub 'http://${EC2PublicIP}:${FlaskPort}/pilot-waitlist/{proxy}'
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
         PassthroughBehavior: WHEN_NO_MATCH
@@ -599,6 +638,34 @@ Resources:
           ResponseModels:
             application/json: Empty
 
+  PilotWaitlistProxyOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EduQuestAPI
+      ResourceId: !Ref PilotWaitlistProxyResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          ResponseModels:
+            application/json: Empty
+
   APIDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -610,6 +677,7 @@ Resources:
       - TeacherProxyMethod
       - EnrollmentProxyMethod
       - WaitlistProxyMethod
+      - PilotWaitlistProxyMethod
       - HelloworldMethod
       - AuthProxyOptionsMethod
       - UserProxyOptionsMethod
@@ -619,6 +687,7 @@ Resources:
       - TeacherProxyOptionsMethod
       - EnrollmentProxyOptionsMethod
       - WaitlistProxyOptionsMethod
+      - PilotWaitlistProxyOptionsMethod
     Properties:
       RestApiId: !Ref EduQuestAPI
       Description: !Sub 'Deployment for ${StageName} stage'

@@ -3,7 +3,7 @@ from typing import Literal
 from datetime import datetime, timezone
 
 class Conversation(BaseModel):
-    thread_id: str
+    conversation_id: str
     user_id: str
     role: Literal["student", "teacher"]
     conversation_type: str

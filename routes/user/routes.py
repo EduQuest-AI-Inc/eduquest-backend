@@ -64,6 +64,9 @@ def get_profile_cookie():
         teacher = teacher_dao.get_teacher_by_id(username)
         if teacher:
             teacher['role'] = 'teacher'
+            # Ensure pilot_approved is included (default False for existing teachers)
+            if 'pilot_approved' not in teacher:
+                teacher['pilot_approved'] = False
             return jsonify(teacher), 200
         return jsonify({'message': 'User not found'}), 404
     except Exception as e:

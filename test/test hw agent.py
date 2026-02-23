@@ -13,9 +13,8 @@ from data_access.enrollment_dao import EnrollmentDAO
 from models.conversation import Conversation
 from models.enrollment import Enrollment
 from models.session import Session
-from assistants import ltg
 from datetime import datetime, timezone
-from EQ_agents.agent import SchedulesAgent, HWAgent
+from EQ_agents.agent import HWAgent  # SchedulesAgent has been removed
 from routes.quest.quest_service import QuestService
 import json
 from dotenv import load_dotenv

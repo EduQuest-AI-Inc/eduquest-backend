@@ -1,0 +1,213 @@
+"""
+Email service for EduQuest using AWS SES.
+Handles sending password reset emails and other transactional emails.
+"""
+
+import os
+import logging
+from datetime import datetime, timezone
+from typing import Optional
+
+import boto3
+from botocore.exceptions import ClientError
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+
+class EmailService:
+    """
+    Email service using AWS SES.
+    """
+    
+    def __init__(self):
+        self.ses_client = boto3.client(
+            'ses',
+            region_name=os.getenv('AWS_REGION', 'us-east-2'),
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+        )
+        self.from_email = os.getenv('SES_FROM_EMAIL', 'noreply@eduquestai.org')
+        self.frontend_base_url = os.getenv('FRONTEND_BASE_URL', 'https://eduquestai.org')
+    
+    def send_password_reset_email(
+        self,
+        to_email: str,
+        reset_token: str,
+        user_first_name: Optional[str] = None
+    ) -> dict:
+        """
+        Send a password reset email.
+        
+        Args:
+            to_email: Recipient email address
+            reset_token: The raw (unhashed) reset token
+            user_first_name: User's first name for personalization
+        
+        Returns:
+            dict with 'success', 'message_id' (if sent), and 'error' (if failed)
+        """
+        reset_link = f"{self.frontend_base_url}/reset-password?token={reset_token}"
+        request_time = datetime.now(timezone.utc).strftime("%B %d, %Y at %H:%M UTC")
+        expiry_minutes = 45
+        
+        # Personalize greeting
+        greeting = f"Hi {user_first_name}," if user_first_name else "Hi,"
+        
+        # Plain text version
+        text_body = f"""{greeting}
+
+We received a request to reset your EduQuest password.
+
+Click the link below to set a new password:
+{reset_link}
+
+This link will expire in {expiry_minutes} minutes.
+
+Request time: {request_time}
+
+If you didn't request this password reset, you can safely ignore this email. Your password will remain unchanged.
+
+Need help? Contact us at support@eduquestai.org
+
+— The EduQuest Team
+"""
+
+        # HTML version
+        html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Your EduQuest Password</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #FAF3DD;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="min-height: 100vh;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" width="100%" style="max-width: 500px; background-color: #ffffff; border-radius: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                    <tr>
+                        <td style="padding: 40px 30px; text-align: center;">
+                            <!-- Logo / Brand -->
+                            <h1 style="margin: 0 0 10px 0; font-size: 28px; color: #9A031E; font-weight: 600;">EduQuest</h1>
+                            <p style="margin: 0 0 30px 0; font-size: 14px; color: #666;">Your personalized learning journey</p>
+                            
+                            <!-- Content -->
+                            <p style="margin: 0 0 20px 0; font-size: 16px; color: #333; text-align: left;">
+                                {greeting}
+                            </p>
+                            <p style="margin: 0 0 20px 0; font-size: 16px; color: #333; text-align: left;">
+                                We received a request to reset your EduQuest password.
+                            </p>
+                            
+                            <!-- CTA Button -->
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    <td align="center" style="padding: 20px 0;">
+                                        <a href="{reset_link}" 
+                                           style="display: inline-block; background-color: #9A031E; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; padding: 14px 40px; border-radius: 9999px;">
+                                            Reset Password
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Expiry notice -->
+                            <p style="margin: 0 0 20px 0; font-size: 14px; color: #666; text-align: center;">
+                                This link expires in <strong>{expiry_minutes} minutes</strong>
+                            </p>
+                            
+                            <!-- Request time -->
+                            <p style="margin: 0 0 20px 0; font-size: 13px; color: #999; text-align: center;">
+                                Requested: {request_time}
+                            </p>
+                            
+                            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                            
+                            <!-- Security notice -->
+                            <p style="margin: 0 0 10px 0; font-size: 13px; color: #666; text-align: left;">
+                                <strong>Didn't request this?</strong>
+                            </p>
+                            <p style="margin: 0; font-size: 13px; color: #666; text-align: left;">
+                                If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 20px 30px; background-color: #f9f9f9; border-radius: 0 0 20px 20px; text-align: center;">
+                            <p style="margin: 0; font-size: 12px; color: #999;">
+                                &copy; {datetime.now().year} EduQuest. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
+
+        try:
+            response = self.ses_client.send_email(
+                Source=self.from_email,
+                Destination={
+                    'ToAddresses': [to_email]
+                },
+                Message={
+                    'Subject': {
+                        'Data': 'Reset Your EduQuest Password',
+                        'Charset': 'UTF-8'
+                    },
+                    'Body': {
+                        'Text': {
+                            'Data': text_body,
+                            'Charset': 'UTF-8'
+                        },
+                        'Html': {
+                            'Data': html_body,
+                            'Charset': 'UTF-8'
+                        }
+                    }
+                }
+            )
+            
+            message_id = response.get('MessageId', '')
+            logger.info(f"Password reset email sent to {to_email}, MessageId: {message_id}")
+            
+            return {
+                'success': True,
+                'message_id': message_id
+            }
+            
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            error_message = e.response.get('Error', {}).get('Message', str(e))
+            logger.error(f"Failed to send password reset email to {to_email}: {error_code} - {error_message}")
+            
+            return {
+                'success': False,
+                'error': f"{error_code}: {error_message}"
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error sending password reset email to {to_email}: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+
+# Singleton instance
+_email_service = None
+
+
+def get_email_service() -> EmailService:
+    """Get the singleton email service instance."""
+    global _email_service
+    if _email_service is None:
+        _email_service = EmailService()
+    return _email_service
+
