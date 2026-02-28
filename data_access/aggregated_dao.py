@@ -1,10 +1,11 @@
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from data_access.base_dao import BaseDAO
 from data_access.config import DynamoDBConfig
 from dotenv import load_dotenv
+from models.aggregated_metrics import AggregatedMetrics, WeekMetrics
 
 load_dotenv()
 
@@ -16,27 +17,45 @@ class AggregatedMetricsDAO(BaseDAO):
         config = DynamoDBConfig()
         self.table = config.get_table(AGGREGATED_METRICS_TABLE)
 
-    def add_aggregated_metrics(self, item: Dict[str, Any]) -> None:
-        """Create or replace an aggregated metrics record."""
+    def add_aggregated_metrics(self, metrics: AggregatedMetrics) -> None:
+        """
+        Create or replace an aggregated metrics record from an AggregatedMetrics model.
+        """
+        item = metrics.to_dynamo_item()
         if "course-week" not in item:
             raise ValueError("Aggregated metrics item must include 'course-week'")
 
         self.table.put_item(Item=item)
 
-    def get_aggregated_metrics_by_course_week(self, course_week: str) -> Optional[Dict[str, Any]]:
-        """Fetch a single aggregated metrics record by its partition key."""
+    def get_aggregated_metrics_by_course_week(self, course_week: str) -> Optional[AggregatedMetrics]:
+        """
+        Fetch a single aggregated metrics record by its partition key and return
+        it as an AggregatedMetrics model.
+        """
         response = self.table.get_item(Key={"course-week": course_week})
-        return response.get("Item")
-
-    def get_skills_by_course_week(self, course_week: str) -> Dict[str, Any]:
-        """Return the nested skills map for a course-week, or an empty dict when absent."""
-        item = self.get_aggregated_metrics_by_course_week(course_week)
+        item = response.get("Item")
         if not item:
-            return {}
-        return item.get("skills", {})
+            return None
+        return AggregatedMetrics.from_dynamo_item(item)
+
+    def get_skills_by_course_week(self, course_week: str) -> List[WeekMetrics]:
+        """
+        Return the list of WeekMetrics (per-week skill metrics) for a course-week.
+        Returns an empty list when the record is absent.
+        """
+        metrics = self.get_aggregated_metrics_by_course_week(course_week)
+        if not metrics:
+            return []
+        return metrics.weeks
 
     def update_aggregated_metrics(self, course_week: str, updates: Dict[str, Any]) -> None:
-        """Update one or more attributes on an aggregated metrics record."""
+        """
+        Update one or more attributes on an aggregated metrics record.
+
+        The `updates` dict should use the raw DynamoDB attribute names, e.g.
+        {"Weeks": [...]} to replace the stored weeks structure. A `last_updated_at`
+        ISO8601 timestamp is always added.
+        """
         if not updates:
             raise ValueError("updates cannot be empty")
 
