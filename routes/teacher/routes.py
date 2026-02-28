@@ -4,6 +4,7 @@ from routes.teacher.teacher_service import TeacherService
 from routes.teacher.period_schedule_service import PeriodScheduleService
 from routes.waitlist.WaitlistService import WaitlistService
 from data_access.teacher_dao import TeacherDAO
+from data_access.aggregated_dao import AggregatedMetricsDAO
 from openai import OpenAI
 from canvasapi import Canvas
 import boto3
@@ -18,6 +19,7 @@ teacher_service = TeacherService()
 period_schedule_service = PeriodScheduleService()
 teacher_dao = TeacherDAO()
 waitlist_service = WaitlistService()
+aggregated_dao = AggregatedMetricsDAO()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
@@ -291,6 +293,41 @@ def list_canvas_courses():
     except Exception as e:
         print(f"Error listing Canvas courses: {e}")
         return jsonify({"error": f"Failed to connect to Canvas: {str(e)}"}), 400
+
+
+# ============ Aggregated Metrics Endpoints ============
+
+@teacher_bp.route("/skill-mastery", methods=["GET"])
+@jwt_required()
+def get_skill_mastery():
+    """
+    Return aggregated skill-mastery data for a period.
+    Query params: period_id
+    """
+    try:
+        period_id = request.args.get("period_id")
+        if not period_id:
+            return jsonify({"error": "period_id is required"}), 400
+
+        metrics = aggregated_dao.get_aggregated_metrics_by_course_week(period_id)
+        if not metrics:
+            return jsonify({"weeks": []}), 200
+
+        weeks_out = []
+        for idx, week in enumerate(metrics.weeks):
+            weeks_out.append({
+                "week": idx + 1,
+                "skills": [
+                    {"skill_name": s.skill_name, "percentage": s.percentage}
+                    for s in week.skills
+                ],
+            })
+
+        return jsonify({"weeks": weeks_out}), 200
+
+    except Exception as e:
+        print(f"Error fetching skill mastery: {e}")
+        return jsonify({"error": "Failed to fetch skill mastery data"}), 500
 
 
 # ============ Period Schedule Endpoints ============

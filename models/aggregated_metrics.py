@@ -1,94 +1,55 @@
-from typing import Any, Dict, List
-
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import List
+from decimal import Decimal
 
 
 class SkillMetric(BaseModel):
-    percentage: float
-    skill_name: str
+    skill_name: str = Field(description="Name of the skill")
+    percentage: int = Field(description="Mastery percentage (0-100)")
 
 
 class WeekMetrics(BaseModel):
-    skills: List[SkillMetric]
+    skills: List[SkillMetric] = Field(
+        default_factory=list,
+        description="Skills assessed during this week",
+    )
 
 
 class AggregatedMetrics(BaseModel):
-    """
-    Pydantic representation of an item in the aggregated-metrics DynamoDB table.
+    course_week: str = Field(description="Partition key (same as period_id)")
+    weeks: List[WeekMetrics] = Field(
+        default_factory=list,
+        description="Per-week skill metrics, ordered by week number",
+    )
 
-    DynamoDB (as shown in the console) represents an item like:
-
-    {
-      "course-week": { "S": "aksdjn;asdjnf" },
-      "Weeks": {
-        "L": [
-          {
-            "L": [
-              { "M": { "percentage": { "N": "95" }, "skill name": { "S": "can do integrals" } } },
-              ...
-            ]
-          },
-          ...
-        ]
-      }
-    }
-
-    At the Python level (what the DAO reads/writes), this is treated as:
-
-    {
-      "course-week": "aksdjn;asdjnf",
-      "Weeks": [
-        [
-          {"percentage": 95, "skill name": "can do integrals"},
-          ...
-        ],
-        ...
-      ]
-    }
-    """
-
-    course_week: str
-    weeks: List[WeekMetrics]
-
-    @classmethod
-    def from_dynamo_item(cls, item: Dict[str, Any]) -> "AggregatedMetrics":
-        """
-        Convert a raw DynamoDB item (using the attribute names actually stored
-        in the table) into the structured AggregatedMetrics model.
-        """
-        course_week = item["course-week"]
-        weeks_raw = item.get("Weeks", [])
-
-        weeks: List[WeekMetrics] = []
-        for week_list in weeks_raw:
-            skills: List[SkillMetric] = []
-            for skill_raw in week_list:
-                skills.append(
-                    SkillMetric(
-                        percentage=skill_raw["percentage"],
-                        skill_name=skill_raw["skill name"],
-                    )
-                )
-            weeks.append(WeekMetrics(skills=skills))
-
-        return cls(course_week=course_week, weeks=weeks)
-
-    def to_dynamo_item(self) -> Dict[str, Any]:
-        """
-        Convert this AggregatedMetrics instance into the shape expected by the
-        aggregated-metrics DynamoDB table.
-        """
+    def to_dynamo_item(self) -> dict:
         return {
             "course-week": self.course_week,
             "Weeks": [
                 [
-                    {
-                        "percentage": skill.percentage,
-                        "skill name": skill.skill_name,
-                    }
-                    for skill in week.skills
+                    {"skill name": s.skill_name, "percentage": s.percentage}
+                    for s in week.skills
                 ]
                 for week in self.weeks
             ],
         }
 
+    @classmethod
+    def from_dynamo_item(cls, item: dict) -> "AggregatedMetrics":
+        raw_weeks = item.get("Weeks", [])
+        weeks: List[WeekMetrics] = []
+        for raw_week in raw_weeks:
+            skills = []
+            for raw_skill in raw_week:
+                pct = raw_skill.get("percentage", 0)
+                if isinstance(pct, Decimal):
+                    pct = int(pct)
+                skills.append(SkillMetric(
+                    skill_name=raw_skill.get("skill name", ""),
+                    percentage=int(pct),
+                ))
+            weeks.append(WeekMetrics(skills=skills))
+        return cls(
+            course_week=item["course-week"],
+            weeks=weeks,
+        )
