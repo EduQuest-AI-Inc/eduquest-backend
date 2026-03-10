@@ -21,7 +21,7 @@ class ScheduleWeekItem(BaseModel):
     start_date: str = Field(description="Start date of the week (or 'Not specified' if unknown)")
     end_date: str = Field(description="End date of the week (or 'Not specified' if unknown)")
     lessons: List[str] = Field(description="List of lesson titles and short descriptions for this week")
-    skills: List[str] = Field(description="List of measurable skills students will learn (e.g., 'Students can solve...')")
+    skills: List[str] = Field(description="List of measurable skills students will learn")
 
 
 class PeriodScheduleSchema(BaseModel):
@@ -55,7 +55,7 @@ Transform course inputs into a weekly schedule with:
 - Week start date (from teacher's calendar, or "Not specified" if not provided)
 - Week end date (or "Not specified" if not provided)
 - Lessons (list of what is taught that week)
-- Skills (list of measurable outcomes: "Students can...")
+- Skills (list of measurable outcomes)
 
 Your output must be accurate to the provided materials and must not invent content not present in the inputs.
 
@@ -71,7 +71,7 @@ Return a JSON object with a "weeks" array. Each week has:
 - start_date: string (date or "Not specified")
 - end_date: string (date or "Not specified")
 - lessons: list of strings (3-8 lesson titles/descriptions per week)
-- skills: list of strings (3-6 "Students can..." statements per week)
+- skills: list of strings
 
 PROCESS
 1. Search the course materials to understand the curriculum structure.
@@ -88,7 +88,7 @@ HANDLING MISSING INFO
         self.agent = Agent(
             name="Period Schedule Agent",
             instructions=instructions,
-            model="gpt-4.1",
+            model="gpt-5.2",
             tools=[
                 FileSearchTool(
                     vector_store_ids=[self.vector_store_id]

@@ -5,6 +5,8 @@ from data_access.student_dao import StudentDAO
 from data_access.conversation_dao import ConversationDAO
 from data_access.enrollment_dao import EnrollmentDAO
 from data_access.period_schedule_dao import PeriodScheduleDAO
+from data_access.weekly_quest_dao import WeeklyQuestDAO
+from data_access.individual_quest_dao import IndividualQuestDAO
 from models.conversation import Conversation
 from models.enrollment import Enrollment
 from datetime import datetime, timezone
@@ -27,6 +29,8 @@ class PeriodService:
         self.conversation_dao = ConversationDAO()
         self.enrollment_dao = EnrollmentDAO()
         self.period_schedule_dao = PeriodScheduleDAO()
+        self.weekly_quest_dao = WeeklyQuestDAO()
+        self.individual_quest_dao = IndividualQuestDAO()
         self.quest_service = QuestService()
 
     def verify_period_id(self, auth_token: str, period_id: str) -> Any:
@@ -85,6 +89,98 @@ class PeriodService:
             self._cleanup_tutorial_periods(user_id)
 
         return period
+
+    def unenroll_from_period(self, auth_token: str, period_id: str) -> Dict[str, Any]:
+        """
+        Remove the authenticated student from a class and delete all
+        student-scoped data tied to that period (enrollment row,
+        LTG conversation, long-term goal, weekly & individual quests).
+
+        Shared class resources (period, period_schedule) are untouched.
+        """
+        if not period_id:
+            raise ValueError("Missing period ID")
+
+        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
+        if not sessions:
+            raise Exception("Invalid auth token")
+        user_id = sessions[0]['user_id']
+
+        student = self.student_dao.get_student_by_id(user_id)
+        if not student:
+            raise Exception("Student not found")
+
+        current_enrollments = student.get('enrollments', [])
+        if period_id not in current_enrollments:
+            raise ValueError(f"You are not enrolled in period {period_id}")
+
+        # 1. Remove period from denormalized student.enrollments list
+        updated_enrollments = [p for p in current_enrollments if p != period_id]
+        self.student_dao.update_student(user_id, {'enrollments': updated_enrollments})
+        print(f"Removed period {period_id} from student {user_id}'s enrollments")
+
+        # 2. Delete the enrollment table row (keyed by period_id + enrolled_at)
+        try:
+            enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
+            for enrollment in enrollments:
+                if enrollment.get('student_id') == user_id:
+                    self.enrollment_dao.delete_enrollment(
+                        period_id,
+                        enrollment.get('enrolled_at')
+                    )
+                    print(f"Deleted enrollment row for student {user_id} in period {period_id}")
+                    break
+        except Exception as e:
+            print(f"Warning: could not delete enrollment row: {e}")
+
+        # 3. Clean up LTG conversation for this period
+        ltg_conversation_ids = student.get('ltg_conversation_ids', {})
+        if isinstance(ltg_conversation_ids, list):
+            ltg_conversation_ids = {}
+        conversation_id = ltg_conversation_ids.pop(period_id, None)
+        self.student_dao.update_student(user_id, {'ltg_conversation_ids': ltg_conversation_ids})
+
+        if conversation_id:
+            try:
+                self.conversation_dao.delete_conversation(conversation_id)
+                print(f"Deleted LTG conversation {conversation_id}")
+            except Exception as e:
+                print(f"Warning: could not delete conversation {conversation_id}: {e}")
+
+        # 4. Remove long-term goal entry for this period
+        period_obj = self.period_dao.get_period_by_id(period_id)
+        period_name = period_obj.get('course', period_id) if period_obj else period_id
+        long_term_goals = student.get('long_term_goal', {})
+        if isinstance(long_term_goals, list):
+            long_term_goals = {}
+        goal_removed = False
+        if period_name in long_term_goals:
+            long_term_goals.pop(period_name)
+            goal_removed = True
+        if period_id in long_term_goals:
+            long_term_goals.pop(period_id)
+            goal_removed = True
+        if goal_removed:
+            self.student_dao.update_student(user_id, {'long_term_goal': long_term_goals})
+            print(f"Removed long-term goal for period {period_id}")
+
+        # 5. Delete weekly quests for this student+period
+        weekly_quests = self.weekly_quest_dao.get_quests_by_student_and_period(user_id, period_id)
+        for wq in weekly_quests:
+            self.weekly_quest_dao.delete_weekly_quest(wq.quest_id)
+            print(f"Deleted weekly quest {wq.quest_id}")
+
+        # 6. Delete individual quests for this student+period
+        individual_quests = self.individual_quest_dao.get_quests_by_student_and_period(user_id, period_id)
+        for iq in individual_quests:
+            self.individual_quest_dao.delete_individual_quest(iq['individual_quest_id'])
+            print(f"Deleted individual quest {iq['individual_quest_id']}")
+
+        return {
+            "message": f"Successfully unenrolled from period {period_id}",
+            "period_id": period_id,
+            "remaining_enrollments": updated_enrollments,
+        }
 
     def initiate_ltg_conversation(self, auth_token: str, period_id: str) -> Any:
         """

@@ -46,6 +46,40 @@ def verify_period():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "An unexpected error occurred"}), 500
 
+@period_bp.route('/unenroll', methods=['POST'])
+def unenroll():
+    try:
+        auth_token = None
+        token = None
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
+            auth_token = token
+
+        if not token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
+
+        data = request.json
+        period_id = data.get('period_id')
+        if not period_id:
+            return jsonify({"error": "period_id is required"}), 400
+
+        result = period_service.unenroll_from_period(auth_token, period_id)
+        return jsonify(result), 200
+
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except LookupError as le:
+        return jsonify({"error": str(le)}), 404
+    except Exception as e:
+        print(f"Unexpected error in unenroll: {e}")
+        return jsonify({"error": "An unexpected error occurred"}), 500
+
 @period_bp.route('/initiate-ltg-conversation', methods=['POST'])
 def initiate_ltg_conversation():
     try:

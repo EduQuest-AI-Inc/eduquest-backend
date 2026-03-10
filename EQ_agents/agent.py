@@ -46,7 +46,7 @@ class HWAgent:
     so generated homework can reference what the student discussed during goal selection.
     """
     
-    def __init__(self, student, period, schedule, conversation_id: Optional[str] = None, timeout_seconds=300):
+    def __init__(self, student, period, schedule, conversation_id: Optional[str] = None):
         """
         Initialize the HWAgent.
         
@@ -56,13 +56,11 @@ class HWAgent:
             schedule: List of quest dicts with Name, Skills, Week.
             conversation_id: Optional OpenAI conversation_id to use for memory.
                              If provided, all Runner.run calls will share this session.
-            timeout_seconds: Maximum time for homework generation.
         """
         self.student = student
         self.period = period
         self.schedule = schedule
         self.vector_store = period["vector_store_id"]
-        self.timeout_seconds = timeout_seconds
         self.conversation_id = conversation_id
         
         # Create a session for conversation memory if conversation_id is provided
@@ -234,12 +232,4 @@ class HWAgent:
             return successful_quests
 
     def run(self) -> list[IndividualQuest]:
-        try:
-            return asyncio.run(
-                asyncio.wait_for(
-                    self._run_async(),
-                    timeout=self.timeout_seconds
-                )
-            )
-        except asyncio.TimeoutError:
-            raise Exception(f"Homework generation timed out after {self.timeout_seconds} seconds")
+        return asyncio.run(self._run_async())
