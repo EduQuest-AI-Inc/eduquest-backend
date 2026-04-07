@@ -1,8 +1,12 @@
 from flask import Blueprint, request, jsonify
 from routes.quest.quest_service import QuestService
-from data_access.session_dao import SessionDAO
 import boto3
 import os
+
+if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+    from data_access.supabase.session_dao import SessionDAO
+else:
+    from data_access.session_dao import SessionDAO
 
 quest_bp = Blueprint('quest', __name__)
 quest_service = QuestService()
@@ -297,7 +301,11 @@ def get_individual_quest_details(individual_quest_id):
             return jsonify({"error": "Invalid auth token"}), 401
 
         # Get the individual quest directly from the individual_quest table
-        from data_access.individual_quest_dao import IndividualQuestDAO
+        import os as _os
+        if _os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+            from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+        else:
+            from data_access.individual_quest_dao import IndividualQuestDAO
         quest_dao = IndividualQuestDAO()
         quest = quest_dao.get_individual_quest_by_id(individual_quest_id)
         
@@ -421,7 +429,11 @@ def grade_individual_quest(individual_quest_id):
             return jsonify({"error": "feedback is required"}), 400
 
         # Update the individual quest with grade and feedback
-        from data_access.individual_quest_dao import IndividualQuestDAO
+        import os as _os
+        if _os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+            from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+        else:
+            from data_access.individual_quest_dao import IndividualQuestDAO
         quest_dao = IndividualQuestDAO()
         quest_dao.update_quest_grade_and_feedback(individual_quest_id, grade, feedback)
         

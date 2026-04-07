@@ -1,4 +1,8 @@
-from data_access.period_dao import PeriodDAO
+import os
+if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+    from data_access.supabase.period_dao import PeriodDAO
+else:
+    from data_access.period_dao import PeriodDAO
 from models.period import Period
 import uuid
 import re

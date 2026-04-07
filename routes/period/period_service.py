@@ -1,12 +1,23 @@
 from typing import Dict, Any
-from data_access.period_dao import PeriodDAO
-from data_access.session_dao import SessionDAO
-from data_access.student_dao import StudentDAO
-from data_access.conversation_dao import ConversationDAO
-from data_access.enrollment_dao import EnrollmentDAO
-from data_access.period_schedule_dao import PeriodScheduleDAO
-from data_access.weekly_quest_dao import WeeklyQuestDAO
-from data_access.individual_quest_dao import IndividualQuestDAO
+import os
+if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+    from data_access.supabase.period_dao import PeriodDAO
+    from data_access.supabase.session_dao import SessionDAO
+    from data_access.supabase.student_dao import StudentDAO
+    from data_access.supabase.conversation_dao import ConversationDAO
+    from data_access.supabase.enrollment_dao import EnrollmentDAO
+    from data_access.supabase.period_schedule_dao import PeriodScheduleDAO
+    from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
+    from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+else:
+    from data_access.period_dao import PeriodDAO
+    from data_access.session_dao import SessionDAO
+    from data_access.student_dao import StudentDAO
+    from data_access.conversation_dao import ConversationDAO
+    from data_access.enrollment_dao import EnrollmentDAO
+    from data_access.period_schedule_dao import PeriodScheduleDAO
+    from data_access.weekly_quest_dao import WeeklyQuestDAO
+    from data_access.individual_quest_dao import IndividualQuestDAO
 from models.conversation import Conversation
 from models.enrollment import Enrollment
 from datetime import datetime, timezone

@@ -4,9 +4,15 @@ from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import create_access_token, decode_token
 from .auth_service import register_user, authenticate_user
 from .password_reset_service import get_password_reset_service
-from data_access.session_dao import SessionDAO
-from data_access.student_dao import StudentDAO
-from data_access.teacher_dao import TeacherDAO
+import os
+if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+    from data_access.supabase.session_dao import SessionDAO
+    from data_access.supabase.student_dao import StudentDAO
+    from data_access.supabase.teacher_dao import TeacherDAO
+else:
+    from data_access.session_dao import SessionDAO
+    from data_access.student_dao import StudentDAO
+    from data_access.teacher_dao import TeacherDAO
 from models.session import Session
 from routes.conversation.conversation_service import ConversationService
 
@@ -38,8 +44,12 @@ def signup():
     email_lc = email.strip().lower()
 
     # Check uniqueness using email_lc to prevent case-based duplicates
-    student_items = student_dao.table.scan(FilterExpression="email_lc = :email_lc", ExpressionAttributeValues={":email_lc": email_lc}).get("Items", [])
-    teacher_items = teacher_dao.table.scan(FilterExpression="email_lc = :email_lc", ExpressionAttributeValues={":email_lc": email_lc}).get("Items", [])
+    if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+        student_items = student_dao.get_student_by_email_lc(email_lc)
+        teacher_items = teacher_dao.get_teacher_by_email_lc(email_lc)
+    else:
+        student_items = student_dao.table.scan(FilterExpression="email_lc = :email_lc", ExpressionAttributeValues={":email_lc": email_lc}).get("Items", [])
+        teacher_items = teacher_dao.table.scan(FilterExpression="email_lc = :email_lc", ExpressionAttributeValues={":email_lc": email_lc}).get("Items", [])
     if student_items or teacher_items:
         return jsonify({'message': 'Email address already in use'}), 409
 

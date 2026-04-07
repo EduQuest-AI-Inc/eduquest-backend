@@ -12,10 +12,17 @@ from typing import Optional, Tuple
 
 from werkzeug.security import generate_password_hash
 
-from data_access.student_dao import StudentDAO
-from data_access.teacher_dao import TeacherDAO
-from data_access.password_reset_token_dao import PasswordResetTokenDAO
-from data_access.password_reset_rate_limit_dao import PasswordResetRateLimitDAO
+import os
+if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+    from data_access.supabase.student_dao import StudentDAO
+    from data_access.supabase.teacher_dao import TeacherDAO
+    from data_access.supabase.password_reset_token_dao import PasswordResetTokenDAO
+    from data_access.supabase.password_reset_rate_limit_dao import PasswordResetRateLimitDAO
+else:
+    from data_access.student_dao import StudentDAO
+    from data_access.teacher_dao import TeacherDAO
+    from data_access.password_reset_token_dao import PasswordResetTokenDAO
+    from data_access.password_reset_rate_limit_dao import PasswordResetRateLimitDAO
 from models.password_reset_token import PasswordResetToken
 from services.email_service import get_email_service
 from .password_policy import validate_password
@@ -312,23 +319,29 @@ class PasswordResetService:
             (user_data, role) or (None, None) if not found
         """
         # Check students first
-        student_items = self.student_dao.table.scan(
-            FilterExpression="email_lc = :email_lc",
-            ExpressionAttributeValues={":email_lc": email_lc}
-        ).get("Items", [])
-        
+        if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+            student_items = self.student_dao.get_student_by_email_lc(email_lc)
+        else:
+            student_items = self.student_dao.table.scan(
+                FilterExpression="email_lc = :email_lc",
+                ExpressionAttributeValues={":email_lc": email_lc}
+            ).get("Items", [])
+
         if student_items:
-            return student_items[0], "student"
-        
+            return student_items[0] if isinstance(student_items, list) else student_items, "student"
+
         # Check teachers
-        teacher_items = self.teacher_dao.table.scan(
-            FilterExpression="email_lc = :email_lc",
-            ExpressionAttributeValues={":email_lc": email_lc}
-        ).get("Items", [])
-        
+        if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+            teacher_items = self.teacher_dao.get_teacher_by_email_lc(email_lc)
+        else:
+            teacher_items = self.teacher_dao.table.scan(
+                FilterExpression="email_lc = :email_lc",
+                ExpressionAttributeValues={":email_lc": email_lc}
+            ).get("Items", [])
+
         if teacher_items:
-            return teacher_items[0], "teacher"
-        
+            return teacher_items[0] if isinstance(teacher_items, list) else teacher_items, "teacher"
+
         return None, None
     
     def _log_event(
