@@ -33,6 +33,12 @@ class EnrollmentDAO(BaseDAO):
             print("Error querying by period_id:", e)
             raise
 
+    def get_enrollments_by_student(self, student_id: str) -> List[Dict[str, Any]]:
+        response = self.table.scan(
+            FilterExpression=Key("student_id").eq(student_id)
+        )
+        return response.get("Items", [])
+
     def update_enrollment(self, period_id: str, enrolled_at: str, updates: Dict[str, Any]) -> None:
         update_expr = "SET " + ", ".join(f"{k} = :{k}" for k in updates)
         expr_attr_vals = {f":{k}": v for k, v in updates.items()}

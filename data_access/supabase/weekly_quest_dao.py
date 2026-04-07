@@ -13,9 +13,8 @@ class WeeklyQuestDAO(SupabaseBaseDAO):
             'quest_id': quest.quest_id,
             'student_id': quest.student_id,
             'period_id': quest.period_id,
-            'week': quest.week,
             'year': getattr(quest, 'year', None),
-            'status': getattr(quest, 'status', 'pending'),
+            'semester': getattr(quest, 'semester', 'Fall 2025'),
         })
 
     def get_weekly_quest_by_id(self, quest_id: str) -> Optional[Dict[str, Any]]:

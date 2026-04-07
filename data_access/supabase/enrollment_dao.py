@@ -18,6 +18,9 @@ class EnrollmentDAO(SupabaseBaseDAO):
     def get_enrollments_by_period(self, period_id: str) -> List[Dict[str, Any]]:
         return self._select_eq('period_id', period_id)
 
+    def get_enrollments_by_student(self, student_id: str) -> List[Dict[str, Any]]:
+        return self._select_eq('student_id', student_id)
+
     def update_enrollment(self, student_id: str, period_id: str, updates: Dict[str, Any]) -> None:
         """Update an enrollment by its composite PK (student_id, period_id).
 

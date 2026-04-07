@@ -58,8 +58,8 @@ class TeacherService:
         periods = self.period_dao.get_periods_by_teacher_id(teacher_id)
         return [
             {
-                "period_id": p.period_id,
-                "course": p.course,
+                "period_id": p['period_id'],
+                "course": p['course'],
             }
             for p in periods
         ]

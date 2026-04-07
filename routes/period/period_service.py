@@ -9,6 +9,7 @@ if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
     from data_access.supabase.period_schedule_dao import PeriodScheduleDAO
     from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
     from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+    from data_access.supabase.ltg_conversation_dao import LtgConversationDAO
 else:
     from data_access.period_dao import PeriodDAO
     from data_access.session_dao import SessionDAO
@@ -42,6 +43,7 @@ class PeriodService:
         self.period_schedule_dao = PeriodScheduleDAO()
         self.weekly_quest_dao = WeeklyQuestDAO()
         self.individual_quest_dao = IndividualQuestDAO()
+        self.ltg_conversation_dao = LtgConversationDAO()
         self.quest_service = QuestService()
 
     def verify_period_id(self, auth_token: str, period_id: str) -> Any:
@@ -68,29 +70,23 @@ class PeriodService:
         if not period:
             raise LookupError("Invalid period ID")
         
-        # Get current student data
+        # Verify student exists
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
             raise Exception("Student not found")
-            
-        # Get current enrollments or initialize empty list
-        current_enrollments = student.get('enrollments', [])
-        
-        # Check if student is already enrolled in this period
-        if period_id in current_enrollments:
-            raise ValueError(f"You are already enrolled in period {period_id}")
-        
-        # Add period to enrollments
-        current_enrollments.append(period_id)
-        # Update student record with new enrollments
-        self.student_dao.update_student(user_id, {'enrollments': current_enrollments})
-        print(f"Added period {period_id} to student {user_id}'s enrollments")
 
-        # Create enrollment record
+        # Check enrollment via the enrollment table (not student document)
+        existing_enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)
+        enrolled_period_ids = [e['period_id'] for e in existing_enrollments]
+
+        if period_id in enrolled_period_ids:
+            raise ValueError(f"You are already enrolled in period {period_id}")
+
+        # Create enrollment record in the enrollment table
         enrollment = Enrollment(
             period_id=period_id,
             student_id=user_id,
-            semester="2024-spring"  # You might want to make this configurable
+            semester="2024-spring"
         )
         self.enrollment_dao.add_enrollment(enrollment)
         print(f"Created enrollment record for student {user_id} in period {period_id}")
@@ -121,35 +117,23 @@ class PeriodService:
         if not student:
             raise Exception("Student not found")
 
-        current_enrollments = student.get('enrollments', [])
-        if period_id not in current_enrollments:
+        # Check enrollment via the enrollment table
+        existing_enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)
+        enrolled_period_ids = [e['period_id'] for e in existing_enrollments]
+        if period_id not in enrolled_period_ids:
             raise ValueError(f"You are not enrolled in period {period_id}")
 
-        # 1. Remove period from denormalized student.enrollments list
-        updated_enrollments = [p for p in current_enrollments if p != period_id]
-        self.student_dao.update_student(user_id, {'enrollments': updated_enrollments})
-        print(f"Removed period {period_id} from student {user_id}'s enrollments")
-
-        # 2. Delete the enrollment table row (keyed by period_id + enrolled_at)
+        # 1. Delete the enrollment table row
         try:
-            enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
-            for enrollment in enrollments:
-                if enrollment.get('student_id') == user_id:
-                    self.enrollment_dao.delete_enrollment(
-                        period_id,
-                        enrollment.get('enrolled_at')
-                    )
-                    print(f"Deleted enrollment row for student {user_id} in period {period_id}")
-                    break
+            self.enrollment_dao.delete_enrollment(user_id, period_id)
+            print(f"Deleted enrollment row for student {user_id} in period {period_id}")
         except Exception as e:
             print(f"Warning: could not delete enrollment row: {e}")
 
+        updated_enrollments = [p for p in enrolled_period_ids if p != period_id]
+
         # 3. Clean up LTG conversation for this period
-        ltg_conversation_ids = student.get('ltg_conversation_ids', {})
-        if isinstance(ltg_conversation_ids, list):
-            ltg_conversation_ids = {}
-        conversation_id = ltg_conversation_ids.pop(period_id, None)
-        self.student_dao.update_student(user_id, {'ltg_conversation_ids': ltg_conversation_ids})
+        conversation_id = self.ltg_conversation_dao.delete_conversation(user_id, period_id)
 
         if conversation_id:
             try:
@@ -230,12 +214,8 @@ class PeriodService:
             raise Exception("Period does not have a vector store configured")
 
         # Check if student already has a conversation for this period
-        ltg_conversation_ids = student.get("ltg_conversation_ids", {})
-        if isinstance(ltg_conversation_ids, list):
-            ltg_conversation_ids = {}
-        
-        existing_conversation_id = ltg_conversation_ids.get(period_id)
-        
+        existing_conversation_id = self.ltg_conversation_dao.get_conversation_id(user_id, period_id)
+
         if existing_conversation_id:
             # Resume existing conversation - return the conversation_id for frontend to continue
             print(f"Resuming existing LTG conversation: {existing_conversation_id}")
@@ -273,9 +253,8 @@ class PeriodService:
         if not conversation_id:
             raise Exception("Failed to create LTG conversation - no conversation_id returned")
         
-        # Persist conversation_id on student record
-        ltg_conversation_ids[period_id] = conversation_id
-        self.student_dao.update_student(user_id, {"ltg_conversation_ids": ltg_conversation_ids})
+        # Persist conversation_id in ltg_conversation table
+        self.ltg_conversation_dao.upsert_conversation(user_id, period_id, conversation_id)
         print(f"Saved conversation_id {conversation_id} for student {user_id}, period {period_id}")
 
         return {
@@ -320,16 +299,9 @@ class PeriodService:
             print("Error: Student not found")
             raise Exception("Student not found")
 
-        # Find the period_id from student's ltg_conversation_ids if not provided
+        # Find the period_id from ltg_conversation table if not provided
         if not period_id:
-            ltg_conversation_ids = student.get("ltg_conversation_ids", {})
-            if isinstance(ltg_conversation_ids, list):
-                ltg_conversation_ids = {}
-            # Find which period this conversation_id belongs to
-            for pid, cid in ltg_conversation_ids.items():
-                if cid == conversation_id:
-                    period_id = pid
-                    break
+            period_id = self.ltg_conversation_dao.find_period_for_conversation(user_id, conversation_id)
         
         if not period_id:
             print("Error: Could not determine period for conversation")
@@ -364,13 +336,10 @@ class PeriodService:
 
             # If a goal was chosen, save it to the student's record
             if goal_chosen and chosen_goal:
-                # Use course name as period name, fallback to period_id
-                period_name = period.get('course', period_id)
                 print(f"\nSaving goal:")
-                print(f"Period: {period_name}")
+                print(f"Period ID: {period_id}")
                 print(f"Goal: {chosen_goal}")
-                # Update the student's long-term goal for this period
-                self.student_dao.update_long_term_goal(user_id, period_name, chosen_goal)
+                self.student_dao.update_long_term_goal(user_id, period_id, chosen_goal)
                 print("Goal saved successfully")
             else:
                 print("No goal was chosen or reply was empty")
@@ -454,12 +423,8 @@ class PeriodService:
             
             print(f"DEBUG: Building {len(schedule_quests)} quests for enabled weeks")
             
-            # Get conversation_id from student's LTG conversation for this period
-            # This allows HWAgent to use the student's conversation memory
-            ltg_conversation_ids = student.get("ltg_conversation_ids", {})
-            if isinstance(ltg_conversation_ids, list):
-                ltg_conversation_ids = {}
-            conversation_id = ltg_conversation_ids.get(period_id)
+            # Get conversation_id from ltg_conversation table for this period
+            conversation_id = self.ltg_conversation_dao.get_conversation_id(user_id, period_id)
             
             if not conversation_id:
                 raise Exception(
@@ -620,10 +585,7 @@ class PeriodService:
             print(f"DEBUG: {len(incomplete_quests)} incomplete quests can be updated")
             
             # Get conversation_id for HWAgent memory
-            ltg_conversation_ids = student.get("ltg_conversation_ids", {})
-            if isinstance(ltg_conversation_ids, list):
-                ltg_conversation_ids = {}
-            conversation_id = ltg_conversation_ids.get(period_id)
+            conversation_id = self.ltg_conversation_dao.get_conversation_id(target_student_id, period_id)
             
             if not conversation_id:
                 print("WARNING: No conversation_id found, HWAgent will run without conversation memory")
@@ -697,35 +659,18 @@ class PeriodService:
 
     def _cleanup_tutorial_periods(self, student_id: str):
         """Remove tutorial periods when student adds their first real period"""
-        student = self.student_dao.get_student_by_id(student_id)
-        if not student:
-            return
-        
-        current_enrollments = student.get('enrollments', [])
-        
-        # Check if student has tutorial period enrolled
-        if TUTORIAL_PERIOD_ID in current_enrollments:
-            # Remove tutorial period from enrollments
-            updated_enrollments = [p for p in current_enrollments if p != TUTORIAL_PERIOD_ID]
-            self.student_dao.update_student(student_id, {'enrollments': updated_enrollments})
-            
-            # Remove tutorial enrollment record
+        existing_enrollments = self.enrollment_dao.get_enrollments_by_student(student_id)
+        enrolled_period_ids = [e['period_id'] for e in existing_enrollments]
+
+        if TUTORIAL_PERIOD_ID in enrolled_period_ids:
             self._remove_tutorial_enrollment(student_id)
-            
             print(f"Cleaned up tutorial period for student {student_id}")
 
     def _remove_tutorial_enrollment(self, student_id: str):
         """Remove tutorial enrollment record"""
         try:
-            enrollments = self.enrollment_dao.get_enrollments_by_period(TUTORIAL_PERIOD_ID)
-            for enrollment in enrollments:
-                if enrollment.get('student_id') == student_id:
-                    self.enrollment_dao.delete_enrollment(
-                        TUTORIAL_PERIOD_ID, 
-                        enrollment.get('enrolled_at')
-                    )
-                    print(f"Removed tutorial enrollment for student {student_id}")
-                    break
+            self.enrollment_dao.delete_enrollment(student_id, TUTORIAL_PERIOD_ID)
+            print(f"Removed tutorial enrollment for student {student_id}")
         except Exception as e:
             print(f"Error removing tutorial enrollment: {e}")
 

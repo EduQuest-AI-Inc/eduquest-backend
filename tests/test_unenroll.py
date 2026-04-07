@@ -41,19 +41,21 @@ def _make_service():
     svc.period_schedule_dao = MagicMock()
     svc.weekly_quest_dao = MagicMock()
     svc.individual_quest_dao = MagicMock()
+    svc.ltg_conversation_dao = MagicMock()
     svc.quest_service = MagicMock()
     return svc
 
 
-def _setup_service(student, period, enrollments=None, weekly_quests=None, individual_quests=None):
+def _setup_service(student, period, enrollments=None, weekly_quests=None, individual_quests=None, conversation_id="conv-abc"):
     svc = _make_service()
 
     svc.session_dao.get_sessions_by_auth_token.return_value = [{"user_id": student["student_id"]}]
     svc.student_dao.get_student_by_id.return_value = student
     svc.period_dao.get_period_by_id.return_value = period
-    svc.enrollment_dao.get_enrollments_by_period.return_value = enrollments or [
-        {"student_id": student["student_id"], "enrolled_at": "2025-01-01T00:00:00Z"}
+    svc.enrollment_dao.get_enrollments_by_student.return_value = enrollments or [
+        {"student_id": student["student_id"], "period_id": period["period_id"]}
     ]
+    svc.ltg_conversation_dao.delete_conversation.return_value = conversation_id
     svc.weekly_quest_dao.get_quests_by_student_and_period.return_value = weekly_quests or []
     svc.individual_quest_dao.get_quests_by_student_and_period.return_value = individual_quests or []
 
