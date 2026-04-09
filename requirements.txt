@@ -1,6 +1,5 @@
 python-dotenv==1.0.1
 openai
-firebase_admin==6.6.0
 pandas
 flask==3.0.3
 flask_cors==5.0.1

@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, List
 import os
 if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
     from data_access.supabase.period_dao import PeriodDAO
@@ -45,6 +45,42 @@ class PeriodService:
         self.individual_quest_dao = IndividualQuestDAO()
         self.ltg_conversation_dao = LtgConversationDAO()
         self.quest_service = QuestService()
+
+    def get_my_periods(self, auth_token: str) -> List[Dict[str, Any]]:
+        """
+        Return the authenticated student's enrolled periods with course names
+        and long-term goals.
+        """
+        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
+        if not sessions:
+            raise Exception("Invalid auth token")
+        user_id = sessions[0]['user_id']
+
+        enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)
+        period_ids = [e['period_id'] for e in enrollments]
+
+        # Batch-fetch LTGs for this student
+        ltg_rows = (
+            self.student_dao.client
+            .table('student_long_term_goal')
+            .select('period_id, goal_text')
+            .eq('student_id', user_id)
+            .execute()
+        )
+        ltg_map = {r['period_id']: r['goal_text'] for r in (ltg_rows.data or [])}
+
+        result = []
+        for pid in period_ids:
+            period = self.period_dao.get_period_by_id(pid)
+            if not period:
+                continue
+            result.append({
+                'period_id': pid,
+                'course_name': period.get('course', pid),
+                'long_term_goal': ltg_map.get(pid),
+            })
+
+        return result
 
     def verify_period_id(self, auth_token: str, period_id: str) -> Any:
         """
