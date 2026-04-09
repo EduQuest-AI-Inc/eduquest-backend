@@ -110,7 +110,11 @@ def initiate_update():
                 return jsonify({"error": "week is required for student submissions"}), 400
 
             try:
-                from data_access.individual_quest_dao import IndividualQuestDAO
+                import os as _os
+                if _os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+                    from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+                else:
+                    from data_access.individual_quest_dao import IndividualQuestDAO
                 quest_data = IndividualQuestDAO().get_individual_quest_by_id(individual_quest_id)
                 if not quest_data:
                     return jsonify({"error": "Quest not found"}), 404

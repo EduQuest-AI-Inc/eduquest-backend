@@ -1,8 +1,13 @@
 # auth_service.py
 # Handles user registration and authentication logic
 from werkzeug.security import generate_password_hash, check_password_hash
-from data_access.student_dao import StudentDAO
-from data_access.teacher_dao import TeacherDAO
+import os
+if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+    from data_access.supabase.student_dao import StudentDAO
+    from data_access.supabase.teacher_dao import TeacherDAO
+else:
+    from data_access.student_dao import StudentDAO
+    from data_access.teacher_dao import TeacherDAO
 from models.student import Student
 from models.teacher import Teacher
 from .password_policy import validate_password

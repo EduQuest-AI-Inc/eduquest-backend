@@ -9,11 +9,18 @@ import tempfile
 
 from dotenv import load_dotenv
 
-from data_access.session_dao import SessionDAO
-from data_access.period_dao import PeriodDAO
-from data_access.student_dao import StudentDAO
-from data_access.conversation_dao import ConversationDAO
-from data_access.teacher_dao import TeacherDAO
+if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+    from data_access.supabase.session_dao import SessionDAO
+    from data_access.supabase.period_dao import PeriodDAO
+    from data_access.supabase.student_dao import StudentDAO
+    from data_access.supabase.conversation_dao import ConversationDAO
+    from data_access.supabase.teacher_dao import TeacherDAO
+else:
+    from data_access.session_dao import SessionDAO
+    from data_access.period_dao import PeriodDAO
+    from data_access.student_dao import StudentDAO
+    from data_access.conversation_dao import ConversationDAO
+    from data_access.teacher_dao import TeacherDAO
 from models.conversation import Conversation
 from s3 import upload_file_to_s3
 
@@ -280,7 +287,11 @@ class ConversationService:
                 "detailed_grade": grade,
                 "overall_score": overall_score,
             }
-            from data_access.individual_quest_dao import IndividualQuestDAO
+            import os as _os
+            if _os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+                from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+            else:
+                from data_access.individual_quest_dao import IndividualQuestDAO
             quest_dao = IndividualQuestDAO()
 
             if individual_quest_id:

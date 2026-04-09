@@ -4,6 +4,32 @@ from .period_service import PeriodService
 period_bp = Blueprint('period', __name__)
 period_service = PeriodService()
 
+@period_bp.route('/my-periods', methods=['GET'])
+def my_periods():
+    try:
+        auth_token = None
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header and auth_header.lower().startswith('bearer '):
+            auth_token = auth_header.split(' ', 1)[1].strip()
+
+        if not auth_token:
+            raw_cookie = request.headers.get('Cookie', '')
+            if 'auth_token=' in raw_cookie:
+                parts = [p.strip() for p in raw_cookie.split(';')]
+                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
+                if auth_tokens:
+                    auth_token = auth_tokens[-1]
+
+        if not auth_token:
+            return jsonify({"error": "Missing auth token"}), 401
+
+        result = period_service.get_my_periods(auth_token)
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"Unexpected error in my-periods: {e}")
+        return jsonify({"error": "An unexpected error occurred"}), 500
+
 @period_bp.route('/verify-period', methods=['POST'])
 def verify_period():
     try:

@@ -1,6 +1,5 @@
 python-dotenv==1.0.1
 openai
-firebase_admin==6.6.0
 pandas
 flask==3.0.3
 flask_cors==5.0.1
@@ -10,3 +9,4 @@ flask_jwt_extended==4.7.1
 boto3==1.38.17
 openai-agents
 pydantic
+supabase>=2.0.0

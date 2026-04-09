@@ -1,15 +1,22 @@
+import os
+import json
+import shutil
+import tempfile
+
+import boto3
 from flask import Blueprint, request, jsonify, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from openai import OpenAI
+from canvasapi import Canvas
+
 from routes.teacher.teacher_service import TeacherService
 from routes.teacher.period_schedule_service import PeriodScheduleService
 from routes.waitlist.WaitlistService import WaitlistService
-from data_access.teacher_dao import TeacherDAO
-from openai import OpenAI
-from canvasapi import Canvas
-import boto3
-import shutil
-import tempfile, os
-import json
+
+if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+    from data_access.supabase.teacher_dao import TeacherDAO
+else:
+    from data_access.teacher_dao import TeacherDAO
 from s3 import upload_file_to_s3
 from canvas.canvas import Course as CanvasCourse, course_to_json
 
