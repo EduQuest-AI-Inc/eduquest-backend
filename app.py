@@ -1,7 +1,12 @@
+from dotenv import load_dotenv
+
+# Load environment variables BEFORE any other imports so feature flags
+# (e.g. USE_SUPABASE) are available at module import time.
+load_dotenv()
+
 from flask import Flask
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
-from dotenv import load_dotenv
 import os
 
 from routes.conversation.routes import conversation_bp
@@ -13,9 +18,6 @@ from routes.enrollment.routes import enrollment_bp
 from routes.quest.routes import quest_bp
 from routes.waitlist.routes import waitlist_bp
 from datetime import timedelta
-
-# Load environment variables from .env file
-load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
