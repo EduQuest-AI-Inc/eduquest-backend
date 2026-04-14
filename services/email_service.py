@@ -200,6 +200,108 @@ Need help? Contact us at support@eduquestai.org
             }
 
 
+    def send_parent_waitlist_confirmation(
+        self,
+        to_email: str,
+        first_name: Optional[str] = None,
+    ) -> dict:
+        """Send a confirmation email after a parent joins the home waitlist.
+
+        Mirrors the return shape of send_password_reset_email so callers
+        can handle success/failure the same way.
+        """
+        greeting = f"Hi {first_name}," if first_name else "Hi there,"
+        privacy_url = f"{self.frontend_base_url}/privacy"
+
+        text_body = f"""{greeting}
+
+Thanks for joining the EduQuest home waitlist! We're building EduQuest for homeschool families, and your signup helps us shape what we build next.
+
+If you opted in to a 20-minute interview, someone from our team may reach out to schedule a chat — we'd love to hear about what you're working on with your kids.
+
+Privacy Policy: {privacy_url}
+
+Talk soon,
+— The EduQuest Team
+"""
+
+        html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to the EduQuest home waitlist</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #FAF3DD;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="min-height: 100vh;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" width="100%" style="max-width: 500px; background-color: #ffffff; border-radius: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <h1 style="margin: 0 0 10px 0; font-size: 28px; color: #9A031E; font-weight: 600; text-align: center;">EduQuest</h1>
+                            <p style="margin: 0 0 30px 0; font-size: 14px; color: #666; text-align: center;">Personalized learning for home</p>
+
+                            <p style="margin: 0 0 20px 0; font-size: 16px; color: #333;">
+                                {greeting}
+                            </p>
+                            <p style="margin: 0 0 20px 0; font-size: 16px; color: #333;">
+                                Thanks for joining the EduQuest home waitlist. We're building EduQuest for homeschool families, and your signup helps us shape what we build next.
+                            </p>
+                            <p style="margin: 0 0 20px 0; font-size: 16px; color: #333;">
+                                If you opted in to a 20-minute interview, someone from our team may reach out to schedule a chat — we'd love to hear what you're working on with your kids.
+                            </p>
+
+                            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+                            <p style="margin: 0; font-size: 13px; color: #666; text-align: center;">
+                                <a href="{privacy_url}" style="color: #0047AB; text-decoration: none;">Privacy Policy</a>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 20px 30px; background-color: #f9f9f9; border-radius: 0 0 20px 20px; text-align: center;">
+                            <p style="margin: 0; font-size: 12px; color: #999;">
+                                &copy; {datetime.now().year} EduQuest. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
+
+        try:
+            response = self.ses_client.send_email(
+                Source=self.from_email,
+                Destination={'ToAddresses': [to_email]},
+                Message={
+                    'Subject': {
+                        'Data': 'Welcome to the EduQuest home waitlist',
+                        'Charset': 'UTF-8'
+                    },
+                    'Body': {
+                        'Text': {'Data': text_body, 'Charset': 'UTF-8'},
+                        'Html': {'Data': html_body, 'Charset': 'UTF-8'},
+                    }
+                }
+            )
+            message_id = response.get('MessageId', '')
+            logger.info(f"Parent waitlist confirmation sent to {to_email}, MessageId: {message_id}")
+            return {'success': True, 'message_id': message_id}
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            error_message = e.response.get('Error', {}).get('Message', str(e))
+            logger.error(f"Failed to send parent waitlist confirmation to {to_email}: {error_code} - {error_message}")
+            return {'success': False, 'error': f"{error_code}: {error_message}"}
+        except Exception as e:
+            logger.error(f"Unexpected error sending parent waitlist confirmation to {to_email}: {e}")
+            return {'success': False, 'error': str(e)}
+
+
 # Singleton instance
 _email_service = None
 
