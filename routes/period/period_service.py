@@ -1,14 +1,32 @@
-from typing import Dict, Any
-from data_access.period_dao import PeriodDAO
-from data_access.session_dao import SessionDAO
-from data_access.student_dao import StudentDAO
-from data_access.conversation_dao import ConversationDAO
-from data_access.enrollment_dao import EnrollmentDAO
+from typing import Dict, Any, List
+import os
+if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+    from data_access.supabase.period_dao import PeriodDAO
+    from data_access.supabase.session_dao import SessionDAO
+    from data_access.supabase.student_dao import StudentDAO
+    from data_access.supabase.conversation_dao import ConversationDAO
+    from data_access.supabase.enrollment_dao import EnrollmentDAO
+    from data_access.supabase.period_schedule_dao import PeriodScheduleDAO
+    from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
+    from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+    from data_access.supabase.ltg_conversation_dao import LtgConversationDAO
+else:
+    from data_access.period_dao import PeriodDAO
+    from data_access.session_dao import SessionDAO
+    from data_access.student_dao import StudentDAO
+    from data_access.conversation_dao import ConversationDAO
+    from data_access.enrollment_dao import EnrollmentDAO
+    from data_access.period_schedule_dao import PeriodScheduleDAO
+    from data_access.weekly_quest_dao import WeeklyQuestDAO
+    from data_access.individual_quest_dao import IndividualQuestDAO
 from models.conversation import Conversation
 from models.enrollment import Enrollment
-from assistants import ltg
 from datetime import datetime, timezone
-from EQ_agents.agent import SchedulesAgent, HWAgent
+from EQ_agents.agent import HWAgent
+from routes.conversation.ltg_service import (
+    initiate_ltg_conversation as ltg_initiate,
+    continue_ltg_conversation as ltg_continue,
+)
 from routes.quest.quest_service import QuestService
 
 # Tutorial period constant
@@ -22,7 +40,47 @@ class PeriodService:
         self.student_dao = StudentDAO()
         self.conversation_dao = ConversationDAO()
         self.enrollment_dao = EnrollmentDAO()
+        self.period_schedule_dao = PeriodScheduleDAO()
+        self.weekly_quest_dao = WeeklyQuestDAO()
+        self.individual_quest_dao = IndividualQuestDAO()
+        self.ltg_conversation_dao = LtgConversationDAO()
         self.quest_service = QuestService()
+
+    def get_my_periods(self, auth_token: str) -> List[Dict[str, Any]]:
+        """
+        Return the authenticated student's enrolled periods with course names
+        and long-term goals.
+        """
+        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
+        if not sessions:
+            raise Exception("Invalid auth token")
+        user_id = sessions[0]['user_id']
+
+        enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)
+        period_ids = [e['period_id'] for e in enrollments]
+
+        # Batch-fetch LTGs for this student
+        ltg_rows = (
+            self.student_dao.client
+            .table('student_long_term_goal')
+            .select('period_id, goal_text')
+            .eq('student_id', user_id)
+            .execute()
+        )
+        ltg_map = {r['period_id']: r['goal_text'] for r in (ltg_rows.data or [])}
+
+        result = []
+        for pid in period_ids:
+            period = self.period_dao.get_period_by_id(pid)
+            if not period:
+                continue
+            result.append({
+                'period_id': pid,
+                'course_name': period.get('course', pid),
+                'long_term_goal': ltg_map.get(pid),
+            })
+
+        return result
 
     def verify_period_id(self, auth_token: str, period_id: str) -> Any:
         """
@@ -48,29 +106,23 @@ class PeriodService:
         if not period:
             raise LookupError("Invalid period ID")
         
-        # Get current student data
+        # Verify student exists
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
             raise Exception("Student not found")
-            
-        # Get current enrollments or initialize empty list
-        current_enrollments = student.get('enrollments', [])
-        
-        # Check if student is already enrolled in this period
-        if period_id in current_enrollments:
-            raise ValueError(f"You are already enrolled in period {period_id}")
-        
-        # Add period to enrollments
-        current_enrollments.append(period_id)
-        # Update student record with new enrollments
-        self.student_dao.update_student(user_id, {'enrollments': current_enrollments})
-        print(f"Added period {period_id} to student {user_id}'s enrollments")
 
-        # Create enrollment record
+        # Check enrollment via the enrollment table (not student document)
+        existing_enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)
+        enrolled_period_ids = [e['period_id'] for e in existing_enrollments]
+
+        if period_id in enrolled_period_ids:
+            raise ValueError(f"You are already enrolled in period {period_id}")
+
+        # Create enrollment record in the enrollment table
         enrollment = Enrollment(
             period_id=period_id,
             student_id=user_id,
-            semester="2024-spring"  # You might want to make this configurable
+            semester="2024-spring"
         )
         self.enrollment_dao.add_enrollment(enrollment)
         print(f"Created enrollment record for student {user_id} in period {period_id}")
@@ -81,14 +133,98 @@ class PeriodService:
 
         return period
 
+    def unenroll_from_period(self, auth_token: str, period_id: str) -> Dict[str, Any]:
+        """
+        Remove the authenticated student from a class and delete all
+        student-scoped data tied to that period (enrollment row,
+        LTG conversation, long-term goal, weekly & individual quests).
+
+        Shared class resources (period, period_schedule) are untouched.
+        """
+        if not period_id:
+            raise ValueError("Missing period ID")
+
+        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
+        if not sessions:
+            raise Exception("Invalid auth token")
+        user_id = sessions[0]['user_id']
+
+        student = self.student_dao.get_student_by_id(user_id)
+        if not student:
+            raise Exception("Student not found")
+
+        # Check enrollment via the enrollment table
+        existing_enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)
+        enrolled_period_ids = [e['period_id'] for e in existing_enrollments]
+        if period_id not in enrolled_period_ids:
+            raise ValueError(f"You are not enrolled in period {period_id}")
+
+        # 1. Delete the enrollment table row
+        try:
+            self.enrollment_dao.delete_enrollment(user_id, period_id)
+            print(f"Deleted enrollment row for student {user_id} in period {period_id}")
+        except Exception as e:
+            print(f"Warning: could not delete enrollment row: {e}")
+
+        updated_enrollments = [p for p in enrolled_period_ids if p != period_id]
+
+        # 3. Clean up LTG conversation for this period
+        conversation_id = self.ltg_conversation_dao.delete_conversation(user_id, period_id)
+
+        if conversation_id:
+            try:
+                self.conversation_dao.delete_conversation(conversation_id)
+                print(f"Deleted LTG conversation {conversation_id}")
+            except Exception as e:
+                print(f"Warning: could not delete conversation {conversation_id}: {e}")
+
+        # 4. Remove long-term goal entry for this period
+        period_obj = self.period_dao.get_period_by_id(period_id)
+        period_name = period_obj.get('course', period_id) if period_obj else period_id
+        long_term_goals = student.get('long_term_goal', {})
+        if isinstance(long_term_goals, list):
+            long_term_goals = {}
+        goal_removed = False
+        if period_name in long_term_goals:
+            long_term_goals.pop(period_name)
+            goal_removed = True
+        if period_id in long_term_goals:
+            long_term_goals.pop(period_id)
+            goal_removed = True
+        if goal_removed:
+            self.student_dao.update_student(user_id, {'long_term_goal': long_term_goals})
+            print(f"Removed long-term goal for period {period_id}")
+
+        # 5. Delete weekly quests for this student+period
+        weekly_quests = self.weekly_quest_dao.get_quests_by_student_and_period(user_id, period_id)
+        for wq in weekly_quests:
+            self.weekly_quest_dao.delete_weekly_quest(wq.quest_id)
+            print(f"Deleted weekly quest {wq.quest_id}")
+
+        # 6. Delete individual quests for this student+period
+        individual_quests = self.individual_quest_dao.get_quests_by_student_and_period(user_id, period_id)
+        for iq in individual_quests:
+            self.individual_quest_dao.delete_individual_quest(iq['individual_quest_id'])
+            print(f"Deleted individual quest {iq['individual_quest_id']}")
+
+        return {
+            "message": f"Successfully unenrolled from period {period_id}",
+            "period_id": period_id,
+            "remaining_enrollments": updated_enrollments,
+        }
+
     def initiate_ltg_conversation(self, auth_token: str, period_id: str) -> Any:
         """
-        Initiate a long-term goal (LTG) conversation for a given period.
+        Initiate or resume a long-term goal (LTG) conversation for a given period.
+        
+        Uses OpenAI Conversations API via OpenAIConversationsSession. Each student gets
+        one conversation_id per class (period), persisted on student.ltg_conversation_ids.
+        
         Args:
             auth_token (str): The user's authentication token.
             period_id (str): The period ID.
         Returns:
-            dict: Information about the LTG conversation.
+            dict: Information about the LTG conversation including conversation_id.
         """
         if not period_id:
             raise ValueError("Missing period ID")
@@ -104,7 +240,30 @@ class PeriodService:
         if not student:
             raise Exception("Student not found")
 
-        # Ensure student data has all required fields
+        # Fetch period info for vector store
+        period = self.period_dao.get_period_by_id(period_id)
+        if not period:
+            raise LookupError("Invalid period ID")
+        
+        vector_store_id = period.get("vector_store_id")
+        if not vector_store_id:
+            raise Exception("Period does not have a vector store configured")
+
+        # Check if student already has a conversation for this period
+        existing_conversation_id = self.ltg_conversation_dao.get_conversation_id(user_id, period_id)
+
+        if existing_conversation_id:
+            # Resume existing conversation - return the conversation_id for frontend to continue
+            print(f"Resuming existing LTG conversation: {existing_conversation_id}")
+            return {
+                "conversation_id": existing_conversation_id,
+                "response": {
+                    "message": "Welcome back! Let's continue working on your long-term goal."
+                },
+                "resumed": True
+            }
+
+        # Prepare student data for LTG initiation
         student_data = {
             "first_name": student.get("first_name", ""),
             "last_name": student.get("last_name", ""),
@@ -115,40 +274,51 @@ class PeriodService:
             "learning_style": student.get("learning_style", [])
         }
 
-        # Fetch period info (optional, for validation or context)
-        period = self.period_dao.get_period_by_id(period_id)
-        if not period:
-            raise LookupError("Invalid period ID")
+        # Start new LTG conversation using Conversations API
+        print(f"Starting new LTG conversation for student {user_id} in period {period_id}")
+        try:
+            result = ltg_initiate(
+                vector_store_id=vector_store_id,
+                student=student_data,
+                conversation_id=None  # Create new conversation
+            )
+        except Exception as ltg_err:
+            raise
         
-        ltg_assistant_id = period.get("ltg_assistant_id")
-        if not ltg_assistant_id:
-            ltg_assistant_id = 'asst_1NnTwxp3tBgFWPp2sMjHU3Or'  # Default assistant ID
-
-        # Start LTG conversation
-        ltg_conversation = ltg(student_data, assistant_id=ltg_assistant_id)
-        response = ltg_conversation.initiate()
-
-        thread_id = response.get('thread_id')
-
-        # Save conversation to DB
-        conversation = Conversation(
-            thread_id=thread_id,
-            user_id=user_id,
-            role="student",
-            conversation_type="longterm",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            period_id=period_id
-        )
-        self.conversation_dao.add_conversation(conversation)
+        conversation_id = result.get("conversation_id")
+        if not conversation_id:
+            raise Exception("Failed to create LTG conversation - no conversation_id returned")
+        
+        # Persist conversation_id in ltg_conversation table
+        self.ltg_conversation_dao.upsert_conversation(user_id, period_id, conversation_id)
+        print(f"Saved conversation_id {conversation_id} for student {user_id}, period {period_id}")
 
         return {
-            "thread_id": thread_id,
-            "response": response
+            "conversation_id": conversation_id,
+            "response": {
+                "message": result.get("message", ""),
+                "goal_1": result.get("goal_1"),
+                "goal_2": result.get("goal_2"),
+                "goal_3": result.get("goal_3"),
+            },
+            "resumed": False
         }
 
-    def continue_ltg_conversation(self, auth_token: str, conversation_type: str, thread_id: str, message: str) -> Any:
-        print(f"\n=== Starting LTG Conversation ===")
-        print(f"Thread ID: {thread_id}")
+    def continue_ltg_conversation(self, auth_token: str, conversation_type: str, conversation_id: str, message: str, period_id: str = None) -> Any:
+        """
+        Continue an LTG conversation using OpenAI Conversations API.
+        
+        Args:
+            auth_token (str): The user's authentication token.
+            conversation_type (str): Type of conversation (expected "longterm").
+            conversation_id (str): The OpenAI conversation ID.
+            message (str): The user's message.
+            period_id (str, optional): The period ID (used to look up vector store).
+        Returns:
+            dict: Response with message and goal_chosen flag.
+        """
+        print(f"\n=== Continuing LTG Conversation ===")
+        print(f"Conversation ID: {conversation_id}")
         print(f"Message: {message}")
         
         # Validate session and get user_id
@@ -159,57 +329,54 @@ class PeriodService:
         user_id = sessions[0]['user_id']
         print(f"User ID: {user_id}")
 
-        # Retrieve conversation
-        conversation = self.conversation_dao.get_conversation_by_thread_user_conversation_type(
-            thread_id, user_id, conversation_type
-        )
-        if not conversation:
-            print("Error: Conversation not found")
-            raise Exception("Conversation not found")
-        print(f"Found conversation: {conversation}")
-
         # Fetch student info
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
             print("Error: Student not found")
+            raise Exception("Student not found")
 
-        # Get the assistant id from the period if available, else use default
-        period_id = conversation.get('period_id')
-        print(f"Period ID: {period_id}")
+        # Find the period_id from ltg_conversation table if not provided
+        if not period_id:
+            period_id = self.ltg_conversation_dao.find_period_for_conversation(user_id, conversation_id)
         
-        ltg_assistant_id = None
-        if period_id:
-            period_items = self.period_dao.get_period_by_id(period_id)
-            if period_items:
-                ltg_assistant_id = period_items.get('ltg_assistant_id')
-        if not ltg_assistant_id:
-            ltg_assistant_id = 'asst_1NnTwxp3tBgFWPp2sMjHU3Or' # Default assistant ID
-        print(f"Using assistant ID: {ltg_assistant_id}")
+        if not period_id:
+            print("Error: Could not determine period for conversation")
+            raise Exception("Could not determine period for conversation")
+        
+        print(f"Period ID: {period_id}")
 
-        # Continue conversation
-        conv = ltg(student, assistant_id=ltg_assistant_id)
-        conv.thread_id = thread_id
+        # Get period for vector store
+        period = self.period_dao.get_period_by_id(period_id)
+        if not period:
+            raise Exception("Period not found")
+        
+        vector_store_id = period.get("vector_store_id")
+        if not vector_store_id:
+            raise Exception("Period does not have a vector store configured")
+
+        # Continue conversation using Conversations API
         try:
-            reply, goal_chosen = conv.cont_conv(message)
+            result = ltg_continue(
+                vector_store_id=vector_store_id,
+                conversation_id=conversation_id,
+                user_message=message
+            )
+            
+            reply = result.get("message", "")
+            goal_chosen = result.get("goal_chosen", False)
+            chosen_goal = result.get("chosen_goal")
+            
             print(f"\nLTG Assistant Response:")
             print(f"Reply: {reply}")
             print(f"Goal chosen: {goal_chosen}")
 
             # If a goal was chosen, save it to the student's record
-            if goal_chosen and reply:
-                # Get the period name from the period record
-                period_data = self.period_dao.get_period_by_id(period_id)
-                if period_data:
-                    # Use course name as period name, fallback to period_id
-                    period_name = period_data.get('course', period_id)
-                    print(f"\nSaving goal:")
-                    print(f"Period: {period_name}")
-                    print(f"Goal: {reply}")
-                    # Update the student's long-term goal for this period
-                    self.student_dao.update_long_term_goal(user_id, period_name, reply)
-                    print("Goal saved successfully")
-                else:
-                    print(f"Warning: Could not find period with ID {period_id}")
+            if goal_chosen and chosen_goal:
+                print(f"\nSaving goal:")
+                print(f"Period ID: {period_id}")
+                print(f"Goal: {chosen_goal}")
+                self.student_dao.update_long_term_goal(user_id, period_id, chosen_goal)
+                print("Goal saved successfully")
             else:
                 print("No goal was chosen or reply was empty")
 
@@ -220,42 +387,20 @@ class PeriodService:
         except Exception as e:
             print(f"\nError in continue_ltg_conversation: {str(e)}")
             return {"error": str(e)}
-        
-    def start_schedules_agent(self, auth_token: str, period_id: str):
-        try:
-            sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-            if not sessions:
-                raise Exception("Invalid auth token")
-            user_id = sessions[0]['user_id']
 
-            student = self.student_dao.get_student_by_id(user_id)
-            if not student:
-                raise Exception("Student not found")
-            
-            period = self.period_dao.get_period_by_id(period_id)
-            if not period:
-                raise Exception("Period not found")
-
-            schedules_agent = SchedulesAgent(student, period)
-            schedule = schedules_agent.run()
-            print(schedule)
-            print(type(schedule))
-            print(schedule.model_dump_json())
-            
-            # Save schedule to database
-            schedule_dict = schedule.model_dump()
-            save_result = self.quest_service.save_schedule_to_weekly_quests(schedule_dict, user_id, period_id)
-            
-            return {
-                "schedule": schedule_dict,
-                "message": "Schedule generated and saved successfully",
-                "saved_quests": save_result
-            }
-        except Exception as e:
-            print(f"Error in start_schedules_agent: {str(e)}")
-            raise Exception(f"Failed to generate schedule: {str(e)}")
+    # Note: start_schedules_agent has been removed.
+    # Quest generation now uses period_schedule.quest_enabled_weeks directly in start_homework_agent.
     
     def start_homework_agent(self, auth_token: str, period_id: str):
+        """
+        Generate homework/quests for teacher-enabled quest weeks.
+        
+        This method reads from period_schedule to get:
+        - schedule_json.weeks[] - the centralized class schedule
+        - quest_enabled_weeks[] - which weeks the teacher enabled for quests
+        
+        It then creates/updates quests only for those enabled weeks.
+        """
         try:
             sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
             if not sessions:
@@ -270,31 +415,78 @@ class PeriodService:
             if not period:
                 raise Exception("Period not found")
             
-            # Get the existing schedule from the weekly quest table
-            print(f"DEBUG: Looking for weekly quest for user_id={user_id}, period_id={period_id}")
-            weekly_quest = self.quest_service.get_weekly_quests_for_student(user_id, period_id)
-            if not weekly_quest:
-                raise Exception("No weekly quest found. Please run the schedules agent first.")
+            # Get period schedule (centralized, teacher-defined)
+            period_schedule = self.period_schedule_dao.get_by_period_id(period_id)
+            if not period_schedule:
+                raise Exception("No period schedule found. Teacher must generate a schedule first.")
             
-            print(f"DEBUG: Found weekly quest with {len(weekly_quest.quests)} quests")
+            quest_enabled_weeks = period_schedule.quest_enabled_weeks or []
+            if not quest_enabled_weeks:
+                raise Exception("No quest weeks enabled by teacher. Teacher must select which weeks have quests.")
             
-            # Convert weekly quest to schedule format for homework agent
+            print(f"DEBUG: Quest enabled weeks: {quest_enabled_weeks}")
+            
+            # Get the schedule JSON (stored in period_schedule)
+            schedule_json = period_schedule.schedule_json or {}
+            schedule_weeks = schedule_json.get("weeks", [])
+            
+            if not schedule_weeks:
+                raise Exception("Period schedule has no weeks data. Teacher must generate a schedule.")
+            
+            print(f"DEBUG: Total weeks in schedule: {len(schedule_weeks)}")
+            
+            # Build schedule_quests only for enabled weeks
             schedule_quests = []
-            for quest_item in weekly_quest.quests:
-                schedule_quests.append({
-                    "Name": quest_item.name,
-                    "Skills": quest_item.skills,
-                    "Week": quest_item.week
-                })
+            for week_data in schedule_weeks:
+                week_num = week_data.get("week_number")
+                if week_num in quest_enabled_weeks:
+                    # Combine lessons into a name, skills into a skills string
+                    lessons = week_data.get("lessons", [])
+                    skills = week_data.get("skills", [])
+                    
+                    quest_name = f"Week {week_num}: " + "; ".join(lessons[:3]) if lessons else f"Week {week_num} Quest"
+                    quest_skills = "; ".join(skills) if skills else "Practice skills from this week"
+                    
+                    schedule_quests.append({
+                        "Name": quest_name,
+                        "Skills": quest_skills,
+                        "Week": week_num
+                    })
+                    print(f"DEBUG: Added quest for week {week_num}")
             
-            # schedule_dict = {"list_of_quests": schedule_quests}
-            # print(f"DEBUG: Schedule dict for homework agent: {schedule_dict}")
+            if not schedule_quests:
+                raise Exception("No quests could be built from enabled weeks. Check period schedule data.")
             
-            # Use improved HWAgent with timeout and error handling
+            print(f"DEBUG: Building {len(schedule_quests)} quests for enabled weeks")
+            
+            # Get conversation_id from ltg_conversation table for this period
+            conversation_id = self.ltg_conversation_dao.get_conversation_id(user_id, period_id)
+            
+            if not conversation_id:
+                raise Exception(
+                    "No LTG conversation found for this period. "
+                    "Student must complete the Long-Term Goal conversation before generating quests."
+                )
+            
+            print(f"DEBUG: Using conversation_id for HWAgent memory: {conversation_id}")
+            
+            # Check if student already has weekly quest for this period
+            existing_weekly_quest = self.quest_service.get_weekly_quests_for_student(user_id, period_id)
+            
+            if not existing_weekly_quest:
+                # Create initial quest placeholders
+                print("DEBUG: No existing weekly quest, creating placeholders")
+                schedule_dict = {"list_of_quests": schedule_quests}
+                self.quest_service.save_schedule_to_weekly_quests(schedule_dict, user_id, period_id)
+            
+            # Run HWAgent to generate detailed instructions and rubrics
+            # Pass conversation_id so HWAgent can use the student's LTG conversation memory
+            print(f"DEBUG: Running HWAgent for {len(schedule_quests)} quests with conversation memory")
             homework_agent = HWAgent(
                 student, 
                 period, 
-                schedule_quests
+                schedule_quests,
+                conversation_id=conversation_id
             )
             homework = homework_agent.run()
             
@@ -303,17 +495,13 @@ class PeriodService:
             
             # Handle list of IndividualQuest objects
             if isinstance(homework, list):
-                # Convert list of IndividualQuest objects to the expected dict format
-                homework_dict = {
-                    "list_of_quests": []
-                }
+                homework_dict = {"list_of_quests": []}
                 for quest in homework:
                     if hasattr(quest, 'model_dump'):
                         homework_dict["list_of_quests"].append(quest.model_dump())
                     elif isinstance(quest, dict):
                         homework_dict["list_of_quests"].append(quest)
                     else:
-                        # Try to convert to dict manually if it's an IndividualQuest object
                         quest_dict = {
                             "Name": getattr(quest, 'Name', ''),
                             "Skills": getattr(quest, 'Skills', ''),
@@ -329,13 +517,12 @@ class PeriodService:
             else:
                 raise Exception(f"Invalid homework format: {type(homework)}")
             
-            print(f"Homework dict: {homework_dict}")
             print(f"DEBUG: Homework quests count: {len(homework_dict.get('list_of_quests', []))}")
             
             # Update the weekly quest with detailed homework information
             save_result = self.quest_service.update_weekly_quest_with_homework(homework_dict, user_id, period_id)
             
-            # Check if individual quests were created, if not create them
+            # Ensure individual quests exist
             individual_quests = self.quest_service.get_individual_quests_for_student_and_period(user_id, period_id)
             if not individual_quests:
                 print("DEBUG: No individual quests found, creating them from homework data")
@@ -344,8 +531,9 @@ class PeriodService:
             
             return {
                 "homework": homework_dict,
-                "message": "Homework generated and saved successfully",
-                "saved_quests": save_result
+                "message": f"Homework generated successfully for {len(schedule_quests)} quest weeks",
+                "saved_quests": save_result,
+                "quest_weeks": quest_enabled_weeks
             }
         except Exception as e:
             print(f"Error in start_homework_agent: {str(e)}")
@@ -356,8 +544,11 @@ class PeriodService:
     def update_quests_with_recommended_change(self, auth_token: str, period_id: str, recommended_change: str, student_id: str = None):
         """
         Update student quests based on recommended changes from the update assistant.
-        This method identifies which quests are affected by the recommended change
-        and only updates those specific quests, preserving all other quest data.
+        Re-generates homework (instructions + rubric) for incomplete quests only,
+        preserving completed/graded quests.
+        
+        Note: This method no longer regenerates the schedule - it uses existing quest
+        structure from period_schedule and re-runs HWAgent with the recommended change context.
         
         Args:
             auth_token: The user's authentication token
@@ -376,15 +567,12 @@ class PeriodService:
             if not sessions:
                 raise Exception("Invalid auth token")
             session_user_id = sessions[0]['user_id']
-            session_role = sessions[0].get('role', 'student')
 
             # Determine the target student ID
             if student_id:
-                # Teacher specifying a student to update
                 target_student_id = student_id
                 print(f"DEBUG: Teacher ({session_user_id}) updating quests for student {target_student_id}")
             else:
-                # Student updating their own quests
                 target_student_id = session_user_id
                 print(f"DEBUG: Student ({session_user_id}) updating their own quests")
 
@@ -396,138 +584,104 @@ class PeriodService:
             if not period:
                 raise Exception("Period not found")
 
-            # Get existing quests to understand current structure
+            # Get existing quests
             existing_quests = self.quest_service.get_individual_quests_for_student_and_period(target_student_id, period_id)
             if not existing_quests:
                 raise Exception("No existing quests found. Cannot update without existing quest structure.")
             
             print(f"DEBUG: Found {len(existing_quests)} existing quests")
 
-            # Step 1: Generate new schedule with recommended changes
-            print("DEBUG: Generating new schedule with recommended changes...")
-            schedules_agent = SchedulesAgent(student, period, recommended_change)
-            new_schedule = schedules_agent.run()
-            new_schedule_dict = new_schedule.model_dump()
-            
-            # Step 2: Compare schedules to identify affected quests
-            print("DEBUG: Identifying which quests were affected by the recommended change...")
-            existing_by_week = {quest['week']: quest for quest in existing_quests}
-            affected_weeks = []
-            
-            for new_quest_data in new_schedule_dict.get("list_of_quests", []):
-                week = new_quest_data.get("Week", 1)
-                existing_quest = existing_by_week.get(week)
+            # Identify incomplete quests that can be updated
+            incomplete_quests = []
+            for quest in existing_quests:
+                has_grade = quest.get('grade') is not None
+                is_completed = quest.get('status') == 'completed'
                 
-                if not existing_quest:
-                    # New quest week - needs homework generation
-                    affected_weeks.append(week)
-                    print(f"DEBUG: Week {week} is new, needs homework generation")
+                if not has_grade and not is_completed:
+                    incomplete_quests.append({
+                        "Name": quest.get('description', ''),
+                        "Skills": quest.get('skills', ''),
+                        "Week": quest.get('week', 1)
+                    })
+                    print(f"DEBUG: Week {quest.get('week')} quest is incomplete, can be updated")
                 else:
-                    # Check if quest details changed significantly
-                    new_name = new_quest_data.get("Name", "")
-                    new_skills = new_quest_data.get("Skills", "")
-                    existing_name = existing_quest.get('description', '')
-                    existing_skills = existing_quest.get('skills', '')
-                    
-                    # Consider quest affected if name or skills changed significantly
-                    if new_name != existing_name or new_skills != existing_skills:
-                        # Only update if quest is not completed/graded
-                        has_grade = existing_quest.get('grade') is not None
-                        is_completed = existing_quest.get('status') == 'completed'
-                        
-                        if not has_grade and not is_completed:
-                            affected_weeks.append(week)
-                            print(f"DEBUG: Week {week} quest changed and is incomplete, needs homework regeneration")
-                        else:
-                            print(f"DEBUG: Week {week} quest changed but is completed/graded, preserving existing data")
+                    print(f"DEBUG: Week {quest.get('week')} quest is completed/graded, preserving")
             
-            if not affected_weeks:
-                print("DEBUG: No quests need updating based on recommended change")
+            if not incomplete_quests:
+                print("DEBUG: No incomplete quests to update")
                 return {
-                    "message": "No quests need updating - recommended change does not affect any incomplete quests",
+                    "message": "No incomplete quests to update - all quests are completed or graded",
                     "recommended_change": recommended_change,
                     "affected_quests": 0,
                     "preserved_quests": len(existing_quests),
                     "updated_quests": 0,
-                    "created_quests": 0,
                     "total_quests": len(existing_quests)
                 }
             
-            print(f"DEBUG: {len(affected_weeks)} quests need updating: weeks {affected_weeks}")
+            print(f"DEBUG: {len(incomplete_quests)} incomplete quests can be updated")
             
-            # Step 3: Generate homework ONLY for affected quests
-            print("DEBUG: Generating homework only for affected quests...")
+            # Get conversation_id for HWAgent memory
+            conversation_id = self.ltg_conversation_dao.get_conversation_id(target_student_id, period_id)
             
-            # Create a minimal schedule containing only affected quests
-            affected_schedule_quests = []
-            for new_quest_data in new_schedule_dict.get("list_of_quests", []):
-                week = new_quest_data.get("Week", 1)
-                if week in affected_weeks:
-                    affected_schedule_quests.append({
-                        "Name": new_quest_data.get("Name", ""),
-                        "Skills": new_quest_data.get("Skills", ""),
-                        "Week": week
-                    })
-            
-            if affected_schedule_quests:
-                # Generate homework only for the affected quests
-                homework_agent = HWAgent(student, period, affected_schedule_quests)
-                homework = homework_agent.run()
-                
-                # Convert homework to expected dict format
-                if isinstance(homework, list):
-                    homework_dict = {"list_of_quests": []}
-                    for quest in homework:
-                        if hasattr(quest, 'model_dump'):
-                            homework_dict["list_of_quests"].append(quest.model_dump())
-                        elif isinstance(quest, dict):
-                            homework_dict["list_of_quests"].append(quest)
-                        else:
-                            quest_dict = {
-                                "Name": getattr(quest, 'Name', ''),
-                                "Skills": getattr(quest, 'Skills', ''),
-                                "Week": getattr(quest, 'Week', 1),
-                                "instructions": getattr(quest, 'instructions', ''),
-                                "rubric": getattr(quest, 'rubric', {})
-                            }
-                            homework_dict["list_of_quests"].append(quest_dict)
-                else:
-                    homework_dict = homework if isinstance(homework, dict) else homework.model_dump()
-                
-                print(f"DEBUG: Generated homework for {len(homework_dict.get('list_of_quests', []))} affected quests")
+            if not conversation_id:
+                print("WARNING: No conversation_id found, HWAgent will run without conversation memory")
             else:
+                print(f"DEBUG: Using conversation_id for HWAgent memory: {conversation_id}")
+            
+            # Re-run HWAgent for incomplete quests with recommended change context
+            # The recommended change is added to student context for HWAgent to consider
+            student_with_context = dict(student)
+            student_with_context['recommended_change'] = recommended_change
+            
+            homework_agent = HWAgent(
+                student_with_context, 
+                period, 
+                incomplete_quests,
+                conversation_id=conversation_id
+            )
+            homework = homework_agent.run()
+            
+            # Convert homework to expected dict format
+            if isinstance(homework, list):
                 homework_dict = {"list_of_quests": []}
+                for quest in homework:
+                    if hasattr(quest, 'model_dump'):
+                        homework_dict["list_of_quests"].append(quest.model_dump())
+                    elif isinstance(quest, dict):
+                        homework_dict["list_of_quests"].append(quest)
+                    else:
+                        quest_dict = {
+                            "Name": getattr(quest, 'Name', ''),
+                            "Skills": getattr(quest, 'Skills', ''),
+                            "Week": getattr(quest, 'Week', 1),
+                            "instructions": getattr(quest, 'instructions', ''),
+                            "rubric": getattr(quest, 'rubric', {})
+                        }
+                        homework_dict["list_of_quests"].append(quest_dict)
+            else:
+                homework_dict = homework if isinstance(homework, dict) else homework.model_dump()
             
-            # Step 4: Apply targeted updates preserving completed data
-            print("DEBUG: Applying targeted updates while preserving completed data...")
+            print(f"DEBUG: Generated updated homework for {len(homework_dict.get('list_of_quests', []))} quests")
             
-            # Create a combined schedule that includes both unchanged and changed quests
-            combined_schedule_dict = {"list_of_quests": []}
-            
-            # Add all quests from new schedule
-            for new_quest_data in new_schedule_dict.get("list_of_quests", []):
-                combined_schedule_dict["list_of_quests"].append(new_quest_data)
-            
-            # Use the targeted update method
-            update_result = self.quest_service.update_quests_preserving_completed_data(
-                combined_schedule_dict, 
+            # Update the weekly quest with the new homework
+            update_result = self.quest_service.update_weekly_quest_with_homework(
                 homework_dict, 
                 target_student_id, 
                 period_id
             )
             
-            print(f"DEBUG: Targeted quest update completed: {update_result.get('message', 'No message')}")
+            print(f"DEBUG: Quest update completed: {update_result.get('message', 'No message')}")
             
+            affected_weeks = [q.get("Week") for q in incomplete_quests]
             return {
-                "message": f"Successfully updated {len(affected_weeks)} quests based on recommended changes while preserving completed work",
+                "message": f"Successfully updated {len(incomplete_quests)} incomplete quests based on recommended changes",
                 "recommended_change": recommended_change,
                 "affected_weeks": affected_weeks,
                 "quest_update_details": update_result,
-                "affected_quests": len(affected_weeks),
-                "preserved_quests": update_result.get("preserved_quests", 0),
-                "updated_quests": update_result.get("updated_quests", 0),
-                "created_quests": update_result.get("created_quests", 0),
-                "total_quests": update_result.get("total_quests", 0)
+                "affected_quests": len(incomplete_quests),
+                "preserved_quests": len(existing_quests) - len(incomplete_quests),
+                "updated_quests": len(incomplete_quests),
+                "total_quests": len(existing_quests)
             }
             
         except Exception as e:
@@ -536,86 +690,23 @@ class PeriodService:
             traceback.print_exc()
             raise Exception(f"Failed to update quests with recommended change: {str(e)}")
 
-    def start_schedules_agent_with_changes(self, auth_token: str, period_id: str, recommended_change: str = None):
-        """
-        Start the schedules agent with optional recommended changes.
-        
-        Args:
-            auth_token: The user's authentication token
-            period_id: The period ID
-            recommended_change: Optional recommended change text
-            
-        Returns:
-            dict: Results of the schedule generation
-        """
-        try:
-            sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-            if not sessions:
-                raise Exception("Invalid auth token")
-            user_id = sessions[0]['user_id']
-
-            student = self.student_dao.get_student_by_id(user_id)
-            if not student:
-                raise Exception("Student not found")
-            
-            period = self.period_dao.get_period_by_id(period_id)
-            if not period:
-                raise Exception("Period not found")
-
-            # Use the enhanced SchedulesAgent with recommended changes
-            schedules_agent = SchedulesAgent(student, period, recommended_change)
-            schedule = schedules_agent.run()
-            print(schedule)
-            print(type(schedule))
-            print(schedule.model_dump_json())
-            
-            # Save schedule to database
-            schedule_dict = schedule.model_dump()
-            save_result = self.quest_service.save_schedule_to_weekly_quests(schedule_dict, user_id, period_id)
-            
-            change_message = f" with recommended changes: {recommended_change}" if recommended_change else ""
-            
-            return {
-                "schedule": schedule_dict,
-                "message": f"Schedule generated and saved successfully{change_message}",
-                "saved_quests": save_result,
-                "recommended_change_applied": bool(recommended_change)
-            }
-        except Exception as e:
-            print(f"Error in start_schedules_agent_with_changes: {str(e)}")
-            raise Exception(f"Failed to generate schedule with changes: {str(e)}")
+    # Note: start_schedules_agent_with_changes has been removed.
+    # Quest generation now uses period_schedule.quest_enabled_weeks directly.
 
     def _cleanup_tutorial_periods(self, student_id: str):
         """Remove tutorial periods when student adds their first real period"""
-        student = self.student_dao.get_student_by_id(student_id)
-        if not student:
-            return
-        
-        current_enrollments = student.get('enrollments', [])
-        
-        # Check if student has tutorial period enrolled
-        if TUTORIAL_PERIOD_ID in current_enrollments:
-            # Remove tutorial period from enrollments
-            updated_enrollments = [p for p in current_enrollments if p != TUTORIAL_PERIOD_ID]
-            self.student_dao.update_student(student_id, {'enrollments': updated_enrollments})
-            
-            # Remove tutorial enrollment record
+        existing_enrollments = self.enrollment_dao.get_enrollments_by_student(student_id)
+        enrolled_period_ids = [e['period_id'] for e in existing_enrollments]
+
+        if TUTORIAL_PERIOD_ID in enrolled_period_ids:
             self._remove_tutorial_enrollment(student_id)
-            
             print(f"Cleaned up tutorial period for student {student_id}")
 
     def _remove_tutorial_enrollment(self, student_id: str):
         """Remove tutorial enrollment record"""
         try:
-            enrollments = self.enrollment_dao.get_enrollments_by_period(TUTORIAL_PERIOD_ID)
-            for enrollment in enrollments:
-                if enrollment.get('student_id') == student_id:
-                    self.enrollment_dao.delete_enrollment(
-                        TUTORIAL_PERIOD_ID, 
-                        enrollment.get('enrolled_at')
-                    )
-                    print(f"Removed tutorial enrollment for student {student_id}")
-                    break
+            self.enrollment_dao.delete_enrollment(student_id, TUTORIAL_PERIOD_ID)
+            print(f"Removed tutorial enrollment for student {student_id}")
         except Exception as e:
             print(f"Error removing tutorial enrollment: {e}")
 

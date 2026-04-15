@@ -20,20 +20,21 @@ def join_pilot_waitlist():
         - referralCode: Optional referral code from another teacher
     
     Returns:
+        - success: Whether the join was successful
         - position: Position in the waitlist queue
         - referral_code: Teacher's referral code to share with others
         - status: Current status (pending/approved)
+        - joined_at: Timestamp when joined
     """
     try:
         teacher_id = get_jwt_identity()
         data = request.get_json(silent=True) or {}
-
-        referral_code = data.get('referralCode', '').strip() or None
-
+        
+        # Accept referralCode or referral_code from request body
+        referral_code = data.get('referralCode') or data.get('referral_code')
+        
         result = svc.join(teacher_id, referral_code)
         return jsonify(result), 200
-
-
     except ValueError as ve:
         return jsonify({"message": str(ve)}), 400
     except Exception:

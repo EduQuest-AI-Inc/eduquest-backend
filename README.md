@@ -1,3 +1,91 @@
+## Pilot Waitlist Feature Flag
+
+The pilot study waitlist can be temporarily disabled to allow all teachers to create classes without approval.
+
+### Environment Variable
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PILOT_WAITLIST_ENABLED` | `true` | When `true`, teachers must be approved (`pilot_approved=true`) to create classes. When `false`, any authenticated teacher can create classes. |
+
+### Usage
+
+```bash
+# To disable waitlist enforcement (allow all teachers to create classes)
+export PILOT_WAITLIST_ENABLED=false
+
+# To re-enable waitlist enforcement (default behavior)
+export PILOT_WAITLIST_ENABLED=true
+# or simply unset it (defaults to true)
+unset PILOT_WAITLIST_ENABLED
+```
+
+---
+
+## 🔐 Password Reset Feature Setup
+
+### DynamoDB Tables (Manual Creation Required)
+
+Before using the password reset feature, create the following DynamoDB tables in AWS Console:
+
+#### 1. `password_reset_token` Table
+
+| Setting | Value |
+| --- | --- |
+| **Table name** | `password_reset_token` |
+| **Partition key** | `token_hash` (String) |
+| **Sort key** | None |
+
+**Enable TTL:**
+- Attribute name: `expires_at_epoch`
+
+#### 2. `password_reset_rate_limit` Table
+
+| Setting | Value |
+| --- | --- |
+| **Table name** | `password_reset_rate_limit` |
+| **Partition key** | `key` (String) |
+| **Sort key** | None |
+
+**Enable TTL:**
+- Attribute name: `expires_at_epoch`
+
+### Environment Variables
+
+Add these to your `.env` file:
+
+```bash
+# SES Configuration (required for password reset emails)
+SES_FROM_EMAIL=noreply@eduquestai.org  # Must be verified in SES
+FRONTEND_BASE_URL=https://eduquestai.org  # Or http://localhost:5173 for dev
+```
+
+### SES Setup
+
+1. **Verify sender email/domain** in AWS SES Console
+2. **Move out of sandbox** (for production) or verify recipient emails (for testing)
+3. Ensure the IAM user/role has `ses:SendEmail` permission
+
+### Backfill `email_lc` for Existing Users
+
+Run the backfill script to populate `email_lc` for existing users:
+
+```bash
+cd eduquest-backend
+python scripts/backfill_email_lc.py
+```
+
+This is a one-time operation required before the password reset feature can find existing users.
+
+### Password Reset Endpoints
+
+| Endpoint | Method | Description |
+| --- | --- | --- |
+| `/auth/password-reset/request` | POST | Request a password reset email |
+| `/auth/password-reset/confirm` | POST | Confirm reset with token and new password |
+
+---
+
 ## 📘 HTTP Status Codes Reference
 
 This API uses standard HTTP status codes to indicate the success or failure of an API request.

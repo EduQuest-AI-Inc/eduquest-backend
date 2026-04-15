@@ -1,9 +1,15 @@
 from flask import Blueprint, jsonify, request
 from .user_service import UserService
 from flask_jwt_extended import jwt_required, get_jwt_identity, decode_token
-from data_access.student_dao import StudentDAO
-from data_access.teacher_dao import TeacherDAO
-from data_access.session_dao import SessionDAO
+import os
+if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+    from data_access.supabase.student_dao import StudentDAO
+    from data_access.supabase.teacher_dao import TeacherDAO
+    from data_access.supabase.session_dao import SessionDAO
+else:
+    from data_access.student_dao import StudentDAO
+    from data_access.teacher_dao import TeacherDAO
+    from data_access.session_dao import SessionDAO
 
 
 user_bp = Blueprint('user', __name__)

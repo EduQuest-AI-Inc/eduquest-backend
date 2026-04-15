@@ -1,7 +1,12 @@
+from dotenv import load_dotenv
+
+# Load environment variables BEFORE any other imports so feature flags
+# (e.g. USE_SUPABASE) are available at module import time.
+load_dotenv()
+
 from flask import Flask
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
-from dotenv import load_dotenv
 import os
 
 from routes.conversation.routes import conversation_bp
@@ -12,10 +17,8 @@ from routes.teacher.routes import teacher_bp
 from routes.enrollment.routes import enrollment_bp
 from routes.quest.routes import quest_bp
 from routes.waitlist.routes import waitlist_bp
+from routes.parent_waitlist import parent_waitlist_bp
 from datetime import timedelta
-
-# Load environment variables from .env file
-load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -29,6 +32,7 @@ jwt = JWTManager(app)
 
 allowed_origins = [
     "https://eduquestai.org",
+    "https://www.eduquestai.org",
     "http://eduquestai.org",
     "http://eduquestai.org.s3-website.us-east-2.amazonaws.com",
     "https://eduquestai.org.s3-website.us-east-2.amazonaws.com",
@@ -45,12 +49,13 @@ api_gateway_url = os.getenv('API_GATEWAY_URL')
 if api_gateway_url:
     allowed_origins.append(api_gateway_url)
 
-CORS(app, resources={r"/*": {
-    "origins": allowed_origins,
-    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    "allow_headers": ["Content-Type", "Authorization"],
-    "supports_credentials": True
-}})
+CORS(
+    app,
+    resources={r"/*": {"origins": allowed_origins}},
+    supports_credentials=True,
+    allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+)
 
 # Register Blueprints
 app.register_blueprint(conversation_bp, url_prefix='/conversation')
@@ -61,6 +66,7 @@ app.register_blueprint(teacher_bp, url_prefix = '/teacher')
 app.register_blueprint(enrollment_bp, url_prefix = '/enrollment')
 app.register_blueprint(quest_bp, url_prefix = '/quest')
 app.register_blueprint(waitlist_bp, url_prefix='/pilot-waitlist')
+app.register_blueprint(parent_waitlist_bp, url_prefix='/parent-waitlist')
 
 # Add helloworld route for testing connection
 @app.route('/helloworld', methods=['GET'])

@@ -16,6 +16,10 @@ def upload_to_s3(file_obj, filename=None, folder=None):
     Uploads a file-like object to S3 and returns its key (not URL).
     """
     try:
+        if not BUCKET_NAME:
+            print("S3 upload skipped: S3_BUCKET_NAME environment variable not set")
+            return None
+            
         key = f"{folder}/{filename or file_obj.filename}" if folder else (filename or file_obj.filename)
         
         s3.upload_fileobj(
@@ -37,6 +41,10 @@ def upload_file_to_s3(file_path, filename=None, folder=None):
     Uploads a file from a file path to S3 and returns its key (not URL).
     """
     try:
+        if not BUCKET_NAME:
+            print("S3 upload skipped: S3_BUCKET_NAME environment variable not set")
+            return None
+            
         key = f"{folder}/{filename or os.path.basename(file_path)}" if folder else (filename or os.path.basename(file_path))
         
         s3.upload_file(

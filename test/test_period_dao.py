@@ -13,18 +13,16 @@ def test_crud_operations():
 
     period = Period(
         period_id="per001",
-        initial_conversation_assistant_id="conv_init_123",
-        update_assistant_id="conv_upd_456",
         teacher_id="teach001",
         vector_store_id="vs_789",
-        course= json.dumps(data, indent=2)
+        course=json.dumps(data, indent=2),
     )
 
     # -------Add-------
     # dao.add_period(period)
 
     # -------Update-------
-    # dao.update_period("per001", {"course": "Advanced Math", "update_assistant_id": "conv_upd_999"})
+    # dao.update_period("per001", {"course": "Advanced Math"})
 
     # -------Get-------
     # result = dao.get_period_by_id("per001")

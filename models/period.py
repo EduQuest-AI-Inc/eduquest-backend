@@ -1,16 +1,16 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class Period(BaseModel):
     period_id: str  # Partition Key
-    initial_conversation_assistant_id: str
-    update_assistant_id: str
-    ltg_assistant_id: str
     teacher_id: str
     vector_store_id: str
     course: str
     file_urls: List[str] = []
-
+    canvas_api_url: Optional[str] = None
+    canvas_api_key: Optional[str] = None
+    canvas_course_id: Optional[int] = None
+    canvas_course_name: Optional[str] = None
 
     def to_item(self):
         return self.model_dump()

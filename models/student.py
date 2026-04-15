@@ -7,6 +7,7 @@ class Student(BaseModel):
     first_name: str
     last_name: str
     email: str
+    email_lc: Optional[str] = None  # Canonical lowercase email for lookups
     enrollments: Optional[List[str]] = []
     grade: int
     strength: Optional[list] = None
