@@ -1,11 +1,12 @@
 python-dotenv==1.0.1
 openai
 pandas
-flask==3.0.3
-flask_cors==5.0.1
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+PyJWT>=2.8.0
 canvasapi
 bs4
-flask_jwt_extended==4.7.1
 boto3==1.38.17
 openai-agents
 pydantic
