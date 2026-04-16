@@ -219,7 +219,7 @@ def add_files_to_period():
         if not period:
             return jsonify({"error": "Period not found"}), 404
 
-        if period.get('teacher_id') != teacher_id:
+        if period.get('owner_id', period.get('teacher_id')) != teacher_id:
             return jsonify({"error": "Unauthorized"}), 403
 
         course = period.get('course', 'unknown')

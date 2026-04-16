@@ -10,7 +10,9 @@ class PeriodDAO(SupabaseBaseDAO):
     def add_period(self, period) -> None:
         self._insert({
             'period_id': period.period_id,
-            'teacher_id': period.teacher_id,
+            'owner_id': period.owner_id,
+            'owner_type': getattr(period, 'owner_type', 'teacher'),
+            'teacher_id': getattr(period, 'teacher_id', None),
             'vector_store_id': period.vector_store_id,
             'course': period.course,
             'file_urls': getattr(period, 'file_urls', []),
@@ -18,6 +20,7 @@ class PeriodDAO(SupabaseBaseDAO):
             'canvas_api_key': getattr(period, 'canvas_api_key', None),
             'canvas_course_id': getattr(period, 'canvas_course_id', None),
             'canvas_course_name': getattr(period, 'canvas_course_name', None),
+            'parent_id': getattr(period, 'parent_id', None),
         })
 
     def get_period_by_id(self, period_id: str) -> Optional[Dict[str, Any]]:
@@ -29,6 +32,11 @@ class PeriodDAO(SupabaseBaseDAO):
     def delete_period(self, period_id: str) -> None:
         self._delete({'period_id': period_id})
 
+    def get_periods_by_owner_id(self, owner_id: str) -> List:
+        return self._select_eq('owner_id', owner_id)
+
     def get_periods_by_teacher_id(self, teacher_id: str) -> List:
-        # DynamoDB version used a full table scan; Postgres uses the teacher_id index
-        return self._select_eq('teacher_id', teacher_id)
+        return self._select_eq('owner_id', teacher_id)
+
+    def get_periods_by_parent_id(self, parent_id: str) -> List:
+        return self._select_eq('owner_id', parent_id)

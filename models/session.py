@@ -8,7 +8,7 @@ def default_expiry():
 class Session(BaseModel):
     auth_token: str  # Partition key
     user_id: str     # Sort key
-    role: Literal["student", "teacher"]
+    role: Literal["student", "teacher", "parent"]
     expires_at: int = Field(default_factory=default_expiry)  # Defaults to 12 hours
 
     def to_item(self):

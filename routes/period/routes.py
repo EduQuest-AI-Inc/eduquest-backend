@@ -1,8 +1,21 @@
+import os
+from datetime import datetime, timezone
+
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from .period_service import PeriodService
+
+if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
+    from data_access.supabase.parent_dao import ParentDAO
+    from data_access.supabase.parent_invite_dao import ParentInviteDAO
+else:
+    from data_access.parent_dao import ParentDAO
+    from data_access.parent_invite_dao import ParentInviteDAO
 
 period_bp = Blueprint('period', __name__)
 period_service = PeriodService()
+_parent_dao = ParentDAO()
+_invite_dao = ParentInviteDAO()
 
 @period_bp.route('/my-periods', methods=['GET'])
 def my_periods():
@@ -235,3 +248,67 @@ def initiate_homework_agent():
     except Exception as e:
         print(f"Error in initiate-homework-agent: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+
+@period_bp.route('/accept-parent-invite', methods=['POST'])
+@jwt_required()
+def accept_parent_invite():
+    """
+    Student endpoint — accepts a parent invite code.
+    Links the authenticated student to the parent who generated the code.
+    Records vpc_verified_at for COPPA 2025 homeschool consent tracking.
+    """
+    try:
+        student_id = get_jwt_identity()
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        code = data.get("code", "").strip().upper()
+        if not code:
+            return jsonify({"error": "Invite code is required"}), 400
+
+        invite = _invite_dao.get_invite_by_code(code)
+        if not invite:
+            return jsonify({"error": "Invalid invite code"}), 404
+
+        if invite.get("used"):
+            return jsonify({"error": "Invite code has already been used"}), 410
+
+        expires_at_str = invite.get("expires_at", "")
+        try:
+            expires_at = datetime.fromisoformat(expires_at_str)
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            return jsonify({"error": "Invalid invite data"}), 500
+
+        if datetime.now(timezone.utc) > expires_at:
+            return jsonify({"error": "Invite code has expired"}), 410
+
+        parent_id = invite.get("parent_id")
+        parent = _parent_dao.get_parent_by_id(parent_id)
+        if not parent:
+            return jsonify({"error": "Parent account not found"}), 404
+
+        linked_ids = parent.get("linked_student_ids") or []
+        if student_id in linked_ids:
+            return jsonify({"message": "Already linked to this parent"}), 200
+
+        linked_ids.append(student_id)
+        vpc_verified_at = datetime.now(timezone.utc).isoformat()
+        _parent_dao.update_parent(parent_id, {
+            "linked_student_ids": linked_ids,
+            "vpc_verified_at": vpc_verified_at,  # COPPA 2025 homeschool VPC record
+        })
+        _invite_dao.mark_used(code)
+
+        return jsonify({
+            "message": "Successfully linked to parent account",
+            "parent_id": parent_id,
+            "vpc_verified_at": vpc_verified_at,
+        }), 200
+
+    except Exception as e:
+        print(f"Error in accept-parent-invite: {e}")
+        return jsonify({"error": "Internal server error"}), 500
