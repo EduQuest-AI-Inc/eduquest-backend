@@ -1,4 +1,7 @@
 python-dotenv==1.0.1
+flask
+flask-cors
+flask-jwt-extended
 openai
 pandas
 fastapi>=0.111.0
