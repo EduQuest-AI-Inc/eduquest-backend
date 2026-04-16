@@ -18,6 +18,7 @@ from routes.enrollment.routes import enrollment_bp
 from routes.quest.routes import quest_bp
 from routes.waitlist.routes import waitlist_bp
 from routes.parent_waitlist import parent_waitlist_bp
+from routes.parent.routes import parent_bp
 from datetime import timedelta
 
 # Initialize Flask app
@@ -67,6 +68,7 @@ app.register_blueprint(enrollment_bp, url_prefix = '/enrollment')
 app.register_blueprint(quest_bp, url_prefix = '/quest')
 app.register_blueprint(waitlist_bp, url_prefix='/pilot-waitlist')
 app.register_blueprint(parent_waitlist_bp, url_prefix='/parent-waitlist')
+app.register_blueprint(parent_bp, url_prefix='/parent')
 
 # Add helloworld route for testing connection
 @app.route('/helloworld', methods=['GET'])

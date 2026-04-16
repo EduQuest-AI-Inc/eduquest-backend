@@ -41,6 +41,8 @@ class TeacherService:
         new_period = Period(
             period_id=period_id,
             course=course,
+            owner_id=teacher_id,
+            owner_type="teacher",
             vector_store_id=vector_store_id,
             teacher_id=teacher_id,
             file_urls=file_urls,

@@ -48,13 +48,19 @@ class PeriodDAO(BaseDAO):
     def delete_period(self, period_id: str) -> None:
         self.table.delete_item(Key={"period_id": period_id})
 
-    def get_periods_by_teacher_id(self, teacher_id):
+    def get_periods_by_owner_id(self, owner_id):
         try:
             response = self.table.scan(
-            FilterExpression=Attr("teacher_id").eq(teacher_id)
-        )
+                FilterExpression=Attr("owner_id").eq(owner_id)
+            )
             items = response.get("Items", [])
             return [Period(**item) for item in items]
         except Exception as e:
-            print(f"Error in get_periods_by_teacher_id: {e}")
+            print(f"Error in get_periods_by_owner_id: {e}")
             return []
+
+    def get_periods_by_teacher_id(self, teacher_id):
+        return self.get_periods_by_owner_id(teacher_id)
+
+    def get_periods_by_parent_id(self, parent_id):
+        return self.get_periods_by_owner_id(parent_id)

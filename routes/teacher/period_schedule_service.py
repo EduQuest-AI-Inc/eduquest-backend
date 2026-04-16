@@ -38,7 +38,7 @@ class PeriodScheduleService:
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
             raise ValueError("Period not found")
-        if period.get("teacher_id") != teacher_id:
+        if period.get("owner_id", period.get("teacher_id")) != teacher_id:
             raise PermissionError("Not authorized to access this period")
 
         vector_store_id = period.get("vector_store_id")
@@ -107,7 +107,7 @@ class PeriodScheduleService:
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
             raise ValueError("Period not found")
-        if period.get("teacher_id") != teacher_id:
+        if period.get("owner_id", period.get("teacher_id")) != teacher_id:
             raise PermissionError("Not authorized to access this period")
 
         # Get period schedule record
@@ -151,7 +151,7 @@ class PeriodScheduleService:
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
             raise ValueError("Period not found")
-        if period.get("teacher_id") != teacher_id:
+        if period.get("owner_id", period.get("teacher_id")) != teacher_id:
             raise PermissionError("Not authorized to access this period")
 
         vector_store_id = period.get("vector_store_id")
@@ -202,7 +202,7 @@ class PeriodScheduleService:
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
             raise ValueError("Period not found")
-        if period.get("teacher_id") != teacher_id:
+        if period.get("owner_id", period.get("teacher_id")) != teacher_id:
             raise PermissionError("Not authorized to access this period")
 
         # Normalize to unique sorted ints (frontend can send strings)
