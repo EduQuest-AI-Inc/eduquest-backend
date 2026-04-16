@@ -5,3 +5,9 @@ __pycache__/
 .DS_Store
 *.cursor
 *.claude
+node_modules/
+venv/
+AccountKey.json
+*.egg-info/
+.pytest_cache/
+htmlcov/
