@@ -502,51 +502,25 @@ class PeriodService:
             traceback.print_exc()
             raise Exception(f"Failed to generate homework: {str(e)}")
 
-    def update_quests_with_recommended_change(self, auth_token: str, period_id: str, recommended_change: str, student_id: str = None):
+    def update_quests_with_recommended_change(self, student_id: str, period_id: str, recommended_change: str):
         """
         Update student quests based on recommended changes from the update assistant.
         Re-generates homework (instructions + rubric) for incomplete quests only,
-        preserving completed/graded quests.
-        
-        Note: This method no longer regenerates the schedule - it uses existing quest
-        structure from period_schedule and re-runs HWAgent with the recommended change context.
-        
-        Args:
-            auth_token: The user's authentication token
-            period_id: The period ID for the student
-            recommended_change: The recommended change text from the update assistant
-            student_id: Optional student ID (used when teacher makes recommendations)
-            
-        Returns:
-            dict: Results of the quest update process
+        preserving completed/graded quests. Auth/authz is handled by the caller.
         """
         try:
             print(f"DEBUG: Starting targeted quest update with recommended change: {recommended_change}")
-            
-            # Validate session and get student_id
-            sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-            if not sessions:
-                raise Exception("Invalid auth token")
-            session_student_id = sessions[0]['user_id']
 
-            # Determine the target student ID
-            if student_id:
-                target_student_id = student_id
-                print(f"DEBUG: Teacher ({session_student_id}) updating quests for student {target_student_id}")
-            else:
-                target_student_id = session_student_id
-                print(f"DEBUG: Student ({session_student_id}) updating their own quests")
-
-            student = self.student_dao.get_student_by_id(target_student_id)
+            student = self.student_dao.get_student_by_id(student_id)
             if not student:
-                raise Exception(f"Student not found: {target_student_id}")
+                raise Exception(f"Student not found: {student_id}")
             
             period = self.period_dao.get_period_by_id(period_id)
             if not period:
                 raise Exception("Period not found")
 
             # Get existing quests
-            existing_quests = self.quest_service.get_individual_quests_for_student_and_period(target_student_id, period_id)
+            existing_quests = self.quest_service.get_individual_quests_for_student_and_period(student_id, period_id)
             if not existing_quests:
                 raise Exception("No existing quests found. Cannot update without existing quest structure.")
             
@@ -582,7 +556,7 @@ class PeriodService:
             print(f"DEBUG: {len(incomplete_quests)} incomplete quests can be updated")
             
             # Get conversation_id for HWAgent memory
-            conversation_id = self.ltg_conversation_dao.get_conversation_id(target_student_id, period_id)
+            conversation_id = self.ltg_conversation_dao.get_conversation_id(student_id, period_id)
             
             if not conversation_id:
                 print("WARNING: No conversation_id found, HWAgent will run without conversation memory")
@@ -626,8 +600,8 @@ class PeriodService:
             
             # Update the weekly quest with the new homework
             update_result = self.quest_service.update_weekly_quest_with_homework(
-                homework_dict, 
-                target_student_id, 
+                homework_dict,
+                student_id,
                 period_id
             )
             

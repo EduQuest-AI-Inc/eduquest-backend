@@ -183,7 +183,7 @@ class ConversationService:
             raw_response = result.get("response", "")
             suggested_change = result.get("suggested_change")
             if suggested_change and period_id:
-                self._apply_quest_change(auth_token, period_id, suggested_change, student_id)
+                self._apply_quest_change(student_id, period_id, suggested_change)
 
             return {
                 "conversation_id": conversation_id,
@@ -224,7 +224,7 @@ class ConversationService:
 
         # PRIORITY 2: apply recommended quest changes
         if change and recommended_change and period_id:
-            self._apply_quest_change(auth_token, period_id, recommended_change)
+            self._apply_quest_change(student_id or user_id, period_id, recommended_change)
 
         # Save a conversation record for auditing
         conversation_id = str(uuid.uuid4())
@@ -269,7 +269,7 @@ class ConversationService:
 
         suggested_change = result.get("suggested_change")
         if suggested_change and period_id:
-            self._apply_quest_change(auth_token, period_id, suggested_change, target_user_id)
+            self._apply_quest_change(target_user_id, period_id, suggested_change)
 
         return {"response": result.get("response", "")}
 
@@ -325,13 +325,13 @@ class ConversationService:
         except Exception as e:
             print(f"Error saving grade: {e}")
 
-    def _apply_quest_change(self, auth_token, period_id, recommended_change, student_id=None):
+    def _apply_quest_change(self, student_id, period_id, recommended_change):
         """Delegate recommended changes to PeriodService."""
         try:
             from routes.period.period_service import PeriodService
             period_service = PeriodService()
             quest_update_result = period_service.update_quests_with_recommended_change(
-                auth_token, period_id, recommended_change, student_id,
+                student_id, period_id, recommended_change,
             )
             print(f"Quest update: {quest_update_result.get('message', '')}")
         except Exception as e:
