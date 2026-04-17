@@ -59,15 +59,17 @@ class ConversationService:
 
         result = initiate_profile_conversation(student)
 
-        conversation_id = result.get("conversation_id")
-        if not conversation_id:
-            raise Exception("Failed to obtain conversation_id from profile agent")
+        response_id = result.get("response_id")
+        if not response_id:
+            raise Exception("Failed to obtain response_id from profile agent")
 
+        conversation_id = str(uuid.uuid4())
         self.conversation_dao.add_conversation(Conversation(
             conversation_id=conversation_id,
             user_id=user_id,
             role="student",
             conversation_type="profile",
+            last_response_id=response_id,
         ))
 
         return {
@@ -84,7 +86,14 @@ class ConversationService:
         if not conversation:
             raise Exception("Conversation not found")
 
-        result = continue_profile_conversation(conversation_id, message)
+        last_response_id = conversation.get("last_response_id")
+        result = continue_profile_conversation(last_response_id, message)
+
+        new_response_id = result.get("response_id")
+        if new_response_id:
+            self.conversation_dao.update_conversation(
+                conversation_id, {"last_response_id": new_response_id}
+            )
 
         if result.get("profile_complete") and result.get("profile"):
             self.student_dao.update_student(user_id, result["profile"])

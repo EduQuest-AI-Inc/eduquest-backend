@@ -1,3 +1,4 @@
+import uuid
 from typing import Dict, Any, List
 from routes.auth_utils import require_auth
 import os
@@ -207,8 +208,8 @@ class PeriodService:
         """
         Initiate or resume a long-term goal (LTG) conversation for a given period.
         
-        Uses OpenAI Conversations API via OpenAIConversationsSession. Each student gets
-        one conversation_id per class (period), persisted on student.ltg_conversation_ids.
+        Uses previous_response_id tracking via the Responses API. Each student gets
+        one conversation_id (UUID) per class (period), persisted in the ltg_conversation table.
         
         Args:
             auth_token (str): The user's authentication token.
@@ -260,23 +261,26 @@ class PeriodService:
             "learning_style": student.get("learning_style", [])
         }
 
-        # Start new LTG conversation using Conversations API
+        # Start new LTG conversation using Responses API (previous_response_id tracking)
         print(f"Starting new LTG conversation for student {student_id} in period {period_id}")
         try:
             result = ltg_initiate(
                 vector_store_id=vector_store_id,
                 student=student_data,
-                conversation_id=None  # Create new conversation
             )
         except Exception:
             raise
-        
-        conversation_id = result.get("conversation_id")
-        if not conversation_id:
-            raise Exception("Failed to create LTG conversation - no conversation_id returned")
-        
-        # Persist conversation_id in ltg_conversation table
-        self.ltg_conversation_dao.upsert_conversation(student_id, period_id, conversation_id)
+
+        response_id = result.get("response_id")
+        if not response_id:
+            raise Exception("Failed to create LTG conversation - no response_id returned")
+
+        conversation_id = str(uuid.uuid4())
+
+        # Persist in ltg_conversation table
+        self.ltg_conversation_dao.upsert_conversation(
+            student_id, period_id, conversation_id, last_response_id=response_id
+        )
         print(f"Saved conversation_id {conversation_id} for student {student_id}, period {period_id}")
 
         return {
@@ -335,14 +339,21 @@ class PeriodService:
         if not vector_store_id:
             raise Exception("Period does not have a vector store configured")
 
-        # Continue conversation using Conversations API
+        # Retrieve previous_response_id for stateful continuation
+        last_response_id = self.ltg_conversation_dao.get_last_response_id(student_id, period_id)
+
+        # Continue conversation using Responses API
         try:
             result = ltg_continue(
                 vector_store_id=vector_store_id,
-                conversation_id=conversation_id,
+                previous_response_id=last_response_id,
                 user_message=message
             )
-            
+
+            new_response_id = result.get("response_id")
+            if new_response_id:
+                self.ltg_conversation_dao.update_last_response_id(student_id, period_id, new_response_id)
+
             reply = result.get("message", "")
             goal_chosen = result.get("goal_chosen", False)
             chosen_goal = result.get("chosen_goal")
@@ -433,14 +444,15 @@ class PeriodService:
 
             print(f"DEBUG: Building {len(schedule_quests)} quests for enabled weeks")
 
-            conversation_id = self.ltg_conversation_dao.get_conversation_id(student_id, period_id)
-            if not conversation_id:
+            ltg_conv_id = self.ltg_conversation_dao.get_conversation_id(student_id, period_id)
+            if not ltg_conv_id:
                 raise Exception(
                     "No LTG conversation found for this period. "
                     "Student must complete the Long-Term Goal conversation before generating quests."
                 )
 
-            print(f"DEBUG: Using conversation_id for HWAgent memory: {conversation_id}")
+            ltg_response_id = self.ltg_conversation_dao.get_last_response_id(student_id, period_id)
+            print(f"DEBUG: Using LTG previous_response_id for HWAgent context: {ltg_response_id}")
 
             existing_weekly_quest = self.quest_service.get_weekly_quests_for_student(student_id, period_id)
             if not existing_weekly_quest:
@@ -448,8 +460,8 @@ class PeriodService:
                 schedule_dict = {"list_of_quests": schedule_quests}
                 self.quest_service.save_schedule_to_weekly_quests(schedule_dict, student_id, period_id)
 
-            print(f"DEBUG: Running HWAgent for {len(schedule_quests)} quests with conversation memory")
-            homework_agent = HWAgent(student, period, schedule_quests, conversation_id=conversation_id)
+            print(f"DEBUG: Running HWAgent for {len(schedule_quests)} quests")
+            homework_agent = HWAgent(student, period, schedule_quests, previous_response_id=ltg_response_id)
             homework = homework_agent.run()
 
             print(f"Homework type: {type(homework)}")
@@ -563,24 +575,20 @@ class PeriodService:
             
             print(f"DEBUG: {len(incomplete_quests)} incomplete quests can be updated")
             
-            # Get conversation_id for HWAgent memory
-            conversation_id = self.ltg_conversation_dao.get_conversation_id(student_id, period_id)
-            
-            if not conversation_id:
-                print("WARNING: No conversation_id found, HWAgent will run without conversation memory")
+            ltg_response_id = self.ltg_conversation_dao.get_last_response_id(student_id, period_id)
+            if not ltg_response_id:
+                print("WARNING: No LTG previous_response_id found, HWAgent will run without LTG context")
             else:
-                print(f"DEBUG: Using conversation_id for HWAgent memory: {conversation_id}")
-            
-            # Re-run HWAgent for incomplete quests with recommended change context
-            # The recommended change is added to student context for HWAgent to consider
+                print(f"DEBUG: Using LTG previous_response_id for HWAgent context: {ltg_response_id}")
+
             student_with_context = dict(student)
             student_with_context['recommended_change'] = recommended_change
-            
+
             homework_agent = HWAgent(
-                student_with_context, 
-                period, 
+                student_with_context,
+                period,
                 incomplete_quests,
-                conversation_id=conversation_id
+                previous_response_id=ltg_response_id,
             )
             homework = homework_agent.run()
             

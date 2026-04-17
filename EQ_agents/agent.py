@@ -15,7 +15,6 @@ from agents import (
     Agent,
     Runner,
     FileSearchTool,
-    OpenAIConversationsSession,
     trace,
 )
 from pydantic import BaseModel, Field
@@ -41,35 +40,34 @@ class detailed_schedule(BaseModel):
 class HWAgent:
     """
     Homework agent that generates quest instructions and rubrics.
-    
-    Uses OpenAIConversationsSession to maintain memory of student's LTG conversation,
-    so generated homework can reference what the student discussed during goal selection.
+
+    Accepts an optional previous_response_id (the last response ID from the
+    student's LTG conversation) so the title-generation call gets LTG context.
     """
-    
-    def __init__(self, student, period, schedule, conversation_id: Optional[str] = None):
+
+    def __init__(self, student, period, schedule, conversation_id: Optional[str] = None, previous_response_id: Optional[str] = None):
         """
         Initialize the HWAgent.
-        
+
         Args:
             student: Student data dict.
             period: Period data dict (must contain vector_store_id).
             schedule: List of quest dicts with Name, Skills, Week.
-            conversation_id: Optional OpenAI conversation_id to use for memory.
-                             If provided, all Runner.run calls will share this session.
+            conversation_id: Ignored (kept for backwards-compat call sites).
+            previous_response_id: Optional last_response_id from the LTG conversation
+                                   for passing context to the title-generation call.
         """
         self.student = student
         self.period = period
         self.schedule = schedule
         self.vector_store = period["vector_store_id"]
-        self.conversation_id = conversation_id
-        
-        # Create a session for conversation memory if conversation_id is provided
-        if conversation_id:
-            self.session = OpenAIConversationsSession(conversation_id=conversation_id)
-            print(f"HWAgent using conversation memory: {conversation_id}")
+        self.previous_response_id = previous_response_id
+        self.session = None  # No longer using OpenAIConversationsSession
+
+        if previous_response_id:
+            print(f"HWAgent using LTG previous_response_id for context: {previous_response_id}")
         else:
-            self.session = None
-            print("HWAgent running without conversation memory (stateless)")
+            print("HWAgent running without LTG conversation context (stateless)")
         
     async def generate_title(self, quest) -> str:
         """Generate a short, student-personalized quest title (max 12 words)."""
@@ -101,7 +99,9 @@ class HWAgent:
                 model="gpt-4o"
             )
 
-            run_kwargs = {"session": self.session} if self.session else {}
+            run_kwargs = {}
+            if self.previous_response_id:
+                run_kwargs["previous_response_id"] = self.previous_response_id
             result = await Runner.run(
                 title_agent,
                 f"Generate a quest title for week covering: {quest_skills}",
@@ -141,14 +141,11 @@ class HWAgent:
                 model="gpt-4o"
             )
             
-            # Pass session for conversation memory if available
-            run_kwargs = {"session": self.session} if self.session else {}
             result = await Runner.run(
                 instruction_agent,
                 f"Create detailed instructions for this quest: {quest_name} - Skills: {quest_skills}",
-                **run_kwargs
             )
-            
+
             return result.final_output
     
     async def generate_rubric(self, quest) -> Rubric:
@@ -186,14 +183,11 @@ class HWAgent:
                 output_type=Rubric
             )
             
-            # Pass session for conversation memory if available
-            run_kwargs = {"session": self.session} if self.session else {}
             result = await Runner.run(
                 rubric_agent,
                 f"Create a rubric for: {quest_name}",
-                **run_kwargs
             )
-            
+
             return result.final_output
     
     async def process_quest(self, quest) -> IndividualQuest:
@@ -206,20 +200,11 @@ class HWAgent:
 
             print(f"Processing quest: {teacher_plan}")
 
-            # When using a shared session, run sequentially to avoid concurrent writes
-            # Otherwise, run in parallel for speed
-            if self.session:
-                # Sequential execution for session safety
-                quest_description = await self.generate_title(quest)
-                instructions = await self.generate_instructions(quest)
-                rubric = await self.generate_rubric(quest)
-            else:
-                # Parallel execution when stateless
-                quest_description, instructions, rubric = await asyncio.gather(
-                    self.generate_title(quest),
-                    self.generate_instructions(quest),
-                    self.generate_rubric(quest)
-                )
+            quest_description, instructions, rubric = await asyncio.gather(
+                self.generate_title(quest),
+                self.generate_instructions(quest),
+                self.generate_rubric(quest),
+            )
 
             # Convert rubric to dict format
             rubric_dict = rubric.to_dict_format()
@@ -241,32 +226,17 @@ class HWAgent:
             total_quests = len(self.schedule)
             successful_quests = []
             
-            if self.session:
-                # Sequential processing when using shared conversation session
-                # This avoids concurrent writes to the same conversation
-                print(f"Starting HWAgent - Processing {total_quests} quests sequentially (using conversation memory)")
-                
-                for i, quest in enumerate(self.schedule, 1):
-                    try:
-                        result = await self.process_quest(quest)
-                        successful_quests.append(result)
-                        print(f"✓ Completed quest {i}/{total_quests}")
-                    except Exception as e:
-                        print(f"✗ Error processing quest {i}: {str(e)}")
-            else:
-                # Parallel processing when stateless (no session)
-                print(f"Starting HWAgent - Processing {total_quests} quests in parallel (stateless)")
-                
-                tasks = [self.process_quest(quest) for quest in self.schedule]
-                detailed_quests = await asyncio.gather(*tasks, return_exceptions=True)
-                
-                # Filter out exceptions and log errors
-                for i, result in enumerate(detailed_quests, 1):
-                    if isinstance(result, Exception):
-                        print(f"✗ Error processing quest {i}: {str(result)}")
-                    else:
-                        successful_quests.append(result)
-                        print(f"✓ Completed quest {i}")
+            print(f"Starting HWAgent - Processing {total_quests} quests in parallel")
+
+            tasks = [self.process_quest(quest) for quest in self.schedule]
+            detailed_quests = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for i, result in enumerate(detailed_quests, 1):
+                if isinstance(result, Exception):
+                    print(f"✗ Error processing quest {i}: {str(result)}")
+                else:
+                    successful_quests.append(result)
+                    print(f"✓ Completed quest {i}")
             
             print(f"\nHWAgent completed - Processed {len(successful_quests)}/{total_quests} quests successfully")
             return successful_quests
