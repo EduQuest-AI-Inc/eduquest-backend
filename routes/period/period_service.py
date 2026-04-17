@@ -391,9 +391,16 @@ class PeriodService:
     # Note: start_schedules_agent has been removed.
     # Quest generation now uses period_schedule.quest_enabled_weeks directly in start_homework_agent.
     
+    def _assert_enrolled(self, student_id: str, period_id: str) -> None:
+        enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
+        if not any(e['student_id'] == student_id for e in enrollments):
+            raise Exception(f"Student {student_id} is not enrolled in period {period_id}")
+
     def start_homework_agent(self, student_id: str, period_id: str):
         """Generate quests for a student in a period. Auth/authz is handled by the route."""
         try:
+            self._assert_enrolled(student_id, period_id)
+
             student = self.student_dao.get_student_by_id(student_id)
             if not student:
                 raise Exception("Student not found")
@@ -510,6 +517,8 @@ class PeriodService:
         """
         try:
             print(f"DEBUG: Starting targeted quest update with recommended change: {recommended_change}")
+
+            self._assert_enrolled(student_id, period_id)
 
             student = self.student_dao.get_student_by_id(student_id)
             if not student:
