@@ -71,6 +71,44 @@ class HWAgent:
             self.session = None
             print("HWAgent running without conversation memory (stateless)")
         
+    async def generate_title(self, quest) -> str:
+        """Generate a short, student-personalized quest title (max 12 words)."""
+        with trace("generate_title"):
+            teacher_plan = quest.get("Name") if isinstance(quest, dict) else getattr(quest, "name", "")
+            quest_skills = quest.get("Skills") if isinstance(quest, dict) else getattr(quest, "skills", "")
+
+            title_agent = Agent(
+                name="Quest Title Generator",
+                instructions=f"""
+                You write short, personalized quest titles for students.
+
+                Student Information:
+                - Name: {self.student["first_name"]}
+                - Interests: {self.student["interest"]}
+                - Learning Style: {self.student["learning_style"]}
+
+                This week the teacher has planned: {teacher_plan}
+                Skills to practice: {quest_skills}
+
+                Write ONE quest title (maximum 12 words) that:
+                - Sounds like a personal challenge for this student, not a lesson plan
+                - Connects the student's interests/goal to this week's learning objectives
+                - Uses active, engaging language (e.g. "Craft...", "Explore...", "Build...")
+                - Does NOT repeat "Week X" or reference the teacher's plan literally
+
+                Return ONLY the title text. No quotes, no punctuation at the end.
+                """,
+                model="gpt-4o"
+            )
+
+            run_kwargs = {"session": self.session} if self.session else {}
+            result = await Runner.run(
+                title_agent,
+                f"Generate a quest title for week covering: {quest_skills}",
+                **run_kwargs
+            )
+            return result.final_output.strip()
+
     async def generate_instructions(self, quest) -> str:
         """Generate detailed instructions for a quest"""
         with trace("generate_instructions"):
@@ -159,34 +197,36 @@ class HWAgent:
             return result.final_output
     
     async def process_quest(self, quest) -> IndividualQuest:
-        """Process a single quest to generate instructions and rubric"""
+        """Process a single quest to generate title, instructions and rubric"""
         with trace("process_quest"):
             # Handle both dict and object formats
-            quest_name = quest.get("Name") if isinstance(quest, dict) else getattr(quest, "name", "")
+            teacher_plan = quest.get("Name") if isinstance(quest, dict) else getattr(quest, "name", "")
             quest_skills = quest.get("Skills") if isinstance(quest, dict) else getattr(quest, "skills", "")
             quest_week = quest.get("Week") if isinstance(quest, dict) else getattr(quest, "week", 1)
-            
-            print(f"Processing quest: {quest_name}")
-            
+
+            print(f"Processing quest: {teacher_plan}")
+
             # When using a shared session, run sequentially to avoid concurrent writes
             # Otherwise, run in parallel for speed
             if self.session:
                 # Sequential execution for session safety
+                quest_description = await self.generate_title(quest)
                 instructions = await self.generate_instructions(quest)
                 rubric = await self.generate_rubric(quest)
             else:
                 # Parallel execution when stateless
-                instructions, rubric = await asyncio.gather(
+                quest_description, instructions, rubric = await asyncio.gather(
+                    self.generate_title(quest),
                     self.generate_instructions(quest),
                     self.generate_rubric(quest)
                 )
-            
+
             # Convert rubric to dict format
             rubric_dict = rubric.to_dict_format()
-            
+
             # Create the IndividualQuest object
             individual_quest = IndividualQuest(
-                Name=quest_name,
+                Name=quest_description,   # AI-generated title → stored as individual_quest.description in DB
                 Skills=quest_skills,
                 Week=quest_week,
                 instructions=instructions,
