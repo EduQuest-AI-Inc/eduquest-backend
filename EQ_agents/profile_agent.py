@@ -6,9 +6,8 @@ through a conversational interview to build a student profile.
 """
 from typing import Optional, List
 from pydantic import BaseModel, Field
-from openai.types.shared import Reasoning
 
-from agents import Agent, ModelSettings
+from agents import Agent
 
 from EQ_agents.guardrails import check_student_output_safety
 
@@ -61,10 +60,6 @@ Here's how you will interact with users and gain information about the student:
         name="Initial Conversation Agent",
         instructions=instructions,
         model="gpt-5",
-        model_settings=ModelSettings(
-            reasoning=Reasoning(effort="low"),
-            verbosity="medium",
-        ),
         output_type=ProfileResponse,
         output_guardrails=[check_student_output_safety],
     )
