@@ -238,12 +238,29 @@ def initiate_homework_agent():
                     auth_token = auth_tokens[-1]
 
         print(f"Auth token for initiate-profile-assistant: {auth_token}")
+
+        sessions = period_service.session_dao.get_sessions_by_auth_token(auth_token)
+        if not sessions:
+            return jsonify({"error": "Invalid auth token"}), 401
+        caller_id = sessions[0]['user_id']
+
         data = request.json
         period_id = data.get('period_id')
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
-        
-        result = period_service.start_homework_agent(auth_token, period_id)
+
+        student_id = data.get('student_id')
+        if student_id:
+            # Parent/teacher path — verify caller owns the period
+            period = period_service.period_dao.get_period_by_id(period_id)
+            if not period:
+                return jsonify({"error": "Period not found"}), 404
+            if period.get("owner_id", period.get("teacher_id")) != caller_id:
+                return jsonify({"error": "Not authorized to generate quests for this period"}), 403
+        else:
+            student_id = caller_id
+
+        result = period_service.start_homework_agent(auth_token, student_id, period_id)
         return jsonify(result), 200
     except Exception as e:
         print(f"Error in initiate-homework-agent: {str(e)}")

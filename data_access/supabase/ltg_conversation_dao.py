@@ -26,18 +26,46 @@ class LtgConversationDAO(SupabaseBaseDAO):
             return response.data['conversation_id']
         return None
 
+    def get_last_response_id(self, student_id: str, period_id: str) -> Optional[str]:
+        response = (
+            self._table()
+            .select('last_response_id')
+            .eq('student_id', student_id)
+            .eq('period_id', period_id)
+            .maybe_single()
+            .execute()
+        )
+        if response is not None and response.data:
+            return response.data.get('last_response_id')
+        return None
+
+    def update_last_response_id(self, student_id: str, period_id: str, response_id: str) -> None:
+        self._update(
+            {'student_id': student_id, 'period_id': period_id},
+            {'last_response_id': response_id},
+        )
+
     def get_all_for_student(self, student_id: str) -> dict[str, str]:
         """Return {period_id: conversation_id} for a student."""
         rows = self._select_eq('student_id', student_id)
         return {r['period_id']: r['conversation_id'] for r in rows}
 
-    def upsert_conversation(self, student_id: str, period_id: str, conversation_id: str) -> None:
-        self._upsert({
+    def upsert_conversation(
+        self,
+        student_id: str,
+        period_id: str,
+        conversation_id: str,
+        last_response_id: Optional[str] = None,
+    ) -> None:
+        data = {
             'student_id': student_id,
             'period_id': period_id,
             'conversation_id': conversation_id,
             'created_at': datetime.now(timezone.utc).isoformat(),
-        })
+        }
+        if last_response_id is not None:
+            data['last_response_id'] = last_response_id
+        self._upsert(data)
 
     def delete_conversation(self, student_id: str, period_id: str) -> Optional[str]:
         """Delete the mapping and return the conversation_id that was removed, or None."""

@@ -23,6 +23,7 @@ class ContinueLTGRequest(BaseModel):
 
 class InitiateHomeworkRequest(BaseModel):
     period_id: str
+    student_id: str | None = None
 
 
 @router.post("/initiate-ltg-conversation")
@@ -67,7 +68,8 @@ def initiate_homework_agent(
     auth: AuthPayload = Depends(get_auth),
 ):
     try:
-        return period_service.start_homework_agent(auth.token, body.period_id)
+        student_id = body.student_id or auth.sub
+        return period_service.start_homework_agent(auth.token, student_id, body.period_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except LookupError as e:
