@@ -29,6 +29,7 @@ from routes.conversation.profile_service import (
     continue_profile_conversation,
 )
 from routes.conversation.grading_service import grade_student_submission
+from routes.auth_utils import require_auth
 from routes.conversation.teacher_feedback_service import (
     initiate_teacher_feedback,
     continue_teacher_feedback,
@@ -50,10 +51,7 @@ class ConversationService:
     # ------------------------------------------------------------------
 
     def start_profile_assistant(self, auth_token: str):
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-        user_id = sessions[0]["user_id"]
+        user_id = require_auth(self.session_dao, auth_token, ["student"])
 
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
@@ -78,10 +76,7 @@ class ConversationService:
         }
 
     def continue_profile_assistant(self, auth_token, conversation_type, conversation_id, message):
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-        user_id = sessions[0]["user_id"]
+        user_id = require_auth(self.session_dao, auth_token, ["student"])
 
         conversation = self.conversation_dao.get_conversation_by_id_user_type(
             conversation_id, user_id, conversation_type

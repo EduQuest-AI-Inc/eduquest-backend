@@ -1,4 +1,5 @@
 from typing import Dict, Any, List
+from routes.auth_utils import require_auth
 import os
 if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
     from data_access.supabase.period_dao import PeriodDAO
@@ -51,11 +52,7 @@ class PeriodService:
         Return the authenticated student's enrolled periods with course names
         and long-term goals.
         """
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-        student_id = sessions[0]['user_id']
-
+        student_id = require_auth(self.session_dao, auth_token, ["student"])
         enrollments = self.enrollment_dao.get_enrollments_by_student(student_id)
         period_ids = [e['period_id'] for e in enrollments]
 
@@ -95,11 +92,7 @@ class PeriodService:
         if not period_id:
             raise ValueError("Missing period ID")
 
-        # Validate session and get student_id
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-        student_id = sessions[0]['user_id']
+        student_id = require_auth(self.session_dao, auth_token, ["student"])
 
         # Verify period exists
         period = self.period_dao.get_period_by_id(period_id)
@@ -144,10 +137,7 @@ class PeriodService:
         if not period_id:
             raise ValueError("Missing period ID")
 
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-        student_id = sessions[0]['user_id']
+        student_id = require_auth(self.session_dao, auth_token, ["student"])
 
         student = self.student_dao.get_student_by_id(student_id)
         if not student:
@@ -229,11 +219,7 @@ class PeriodService:
         if not period_id:
             raise ValueError("Missing period ID")
 
-        # Validate session and get student_id
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-        student_id = sessions[0]['user_id']
+        student_id = require_auth(self.session_dao, auth_token, ["student"])
 
         # Fetch student info
         student = self.student_dao.get_student_by_id(student_id)
@@ -321,12 +307,7 @@ class PeriodService:
         print(f"Conversation ID: {conversation_id}")
         print(f"Message: {message}")
         
-        # Validate session and get student_id
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            print("Error: Invalid auth token")
-            raise Exception("Invalid auth token")
-        student_id = sessions[0]['user_id']
+        student_id = require_auth(self.session_dao, auth_token, ["student"])
         print(f"User ID: {student_id}")
 
         # Fetch student info
