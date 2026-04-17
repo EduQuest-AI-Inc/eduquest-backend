@@ -10,26 +10,6 @@ from routes.parent.parent_service import ParentService
 from routes.teacher.period_schedule_service import PeriodScheduleService
 from s3 import upload_file_to_s3
 
-# #region debug log
-import json as _dbg_json
-import time as _dbg_time
-import traceback as _dbg_tb
-_DBG_PATH = "/Users/goldenhuang/Desktop/EduQuest/.cursor/debug-f19ec3.log"
-def _dbg(hypothesis_id, location, message, data):
-    try:
-        with open(_DBG_PATH, "a") as _f:
-            _f.write(_dbg_json.dumps({
-                "sessionId": "f19ec3",
-                "hypothesisId": hypothesis_id,
-                "location": location,
-                "message": message,
-                "data": data,
-                "timestamp": int(_dbg_time.time() * 1000),
-            }) + "\n")
-    except Exception:
-        pass
-# #endregion
-
 parent_bp = Blueprint("parent", __name__)
 parent_service = ParentService()
 period_schedule_service = PeriodScheduleService()
@@ -172,11 +152,6 @@ def generate_period_schedule():
         parent_id = get_jwt_identity()
         body = request.get_json(silent=True) or {}
         period_id = body.get("period_id")
-        # #region debug log
-        _dbg("H2", "routes/parent/routes.py:generate_period_schedule", "entry", {
-            "parent_id": parent_id, "period_id": period_id, "body_keys": list(body.keys()),
-        })
-        # #endregion
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
 
@@ -191,13 +166,6 @@ def generate_period_schedule():
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404
     except Exception as e:
-        # #region debug log
-        _dbg("H2", "routes/parent/routes.py:generate_period_schedule", "exception", {
-            "exc_type": type(e).__name__,
-            "exc_str": str(e),
-            "traceback_tail": _dbg_tb.format_exc()[-2000:],
-        })
-        # #endregion
         print(f"Error generating parent schedule: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
@@ -209,16 +177,6 @@ def get_period_schedule():
     try:
         parent_id = get_jwt_identity()
         period_id = request.args.get("period_id")
-        # #region debug log
-        _dbg("H1", "routes/parent/routes.py:get_period_schedule", "entry", {
-            "parent_id": parent_id,
-            "request_url": request.url,
-            "request_path": request.path,
-            "request_query_string": request.query_string.decode("utf-8", errors="replace"),
-            "arg_period_id": period_id,
-            "all_args": dict(request.args),
-        })
-        # #endregion
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
 
