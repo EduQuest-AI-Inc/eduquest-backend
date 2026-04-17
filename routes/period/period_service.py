@@ -396,9 +396,18 @@ class PeriodService:
         if not any(e['student_id'] == student_id for e in enrollments):
             raise Exception(f"Student {student_id} is not enrolled in period {period_id}")
 
-    def start_homework_agent(self, student_id: str, period_id: str):
-        """Generate quests for a student in a period. Auth/authz is handled by the route."""
+    def start_homework_agent(self, auth_token: str, student_id: str, period_id: str):
+        """Generate quests for a student in a period."""
         try:
+            sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
+            if not sessions:
+                raise Exception("Invalid auth token")
+            caller_id = sessions[0]["user_id"]
+            caller_role = sessions[0].get("role", "student")
+
+            if caller_role not in ("teacher", "parent") and caller_id != student_id:
+                raise Exception("Unauthorized: caller must be the target student, a teacher, or a parent")
+
             self._assert_enrolled(student_id, period_id)
 
             student = self.student_dao.get_student_by_id(student_id)
@@ -509,14 +518,23 @@ class PeriodService:
             traceback.print_exc()
             raise Exception(f"Failed to generate homework: {str(e)}")
 
-    def update_quests_with_recommended_change(self, student_id: str, period_id: str, recommended_change: str):
+    def update_quests_with_recommended_change(self, auth_token: str, student_id: str, period_id: str, recommended_change: str):
         """
         Update student quests based on recommended changes from the update assistant.
         Re-generates homework (instructions + rubric) for incomplete quests only,
-        preserving completed/graded quests. Auth/authz is handled by the caller.
+        preserving completed/graded quests.
         """
         try:
             print(f"DEBUG: Starting targeted quest update with recommended change: {recommended_change}")
+
+            sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
+            if not sessions:
+                raise Exception("Invalid auth token")
+            caller_id = sessions[0]["user_id"]
+            caller_role = sessions[0].get("role", "student")
+
+            if caller_role not in ("teacher", "parent") and caller_id != student_id:
+                raise Exception("Unauthorized: caller must be the target student, a teacher, or a parent")
 
             self._assert_enrolled(student_id, period_id)
 

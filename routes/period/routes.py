@@ -260,7 +260,7 @@ def initiate_homework_agent():
         else:
             student_id = caller_id
 
-        result = period_service.start_homework_agent(student_id, period_id)
+        result = period_service.start_homework_agent(auth_token, student_id, period_id)
         return jsonify(result), 200
     except Exception as e:
         print(f"Error in initiate-homework-agent: {str(e)}")
