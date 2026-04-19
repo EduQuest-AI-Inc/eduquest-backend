@@ -1,6 +1,11 @@
+import logging
 import os
 from typing import Dict, Any, List
 from routes.auth_utils import require_auth
+from exceptions.validation_error import ValidationError
+from exceptions.not_found_error import NotFoundError
+
+logger = logging.getLogger(__name__)
 
 if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
     from data_access.supabase.period_dao import PeriodDAO
@@ -65,13 +70,13 @@ class PeriodEnrollmentService:
 
     def verify_period_id(self, auth_token: str, period_id: str) -> Any:
         if not period_id:
-            raise ValueError("Missing period ID")
+            raise ValidationError("Missing period ID")
 
         student_id = require_auth(self.session_dao, auth_token, ["student"])
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
-            raise LookupError("Invalid period ID")
+            raise NotFoundError("Invalid period ID")
 
         student = self.student_dao.get_student_by_id(student_id)
         if not student:
@@ -81,7 +86,7 @@ class PeriodEnrollmentService:
         enrolled_period_ids = [e['period_id'] for e in existing_enrollments]
 
         if period_id in enrolled_period_ids:
-            raise ValueError(f"You are already enrolled in period {period_id}")
+            raise ValidationError(f"You are already enrolled in period {period_id}")
 
         enrollment = Enrollment(period_id=period_id, student_id=student_id, semester="2024-spring")
         self.enrollment_dao.add_enrollment(enrollment)
@@ -93,7 +98,7 @@ class PeriodEnrollmentService:
 
     def unenroll_from_period(self, auth_token: str, period_id: str) -> Dict[str, Any]:
         if not period_id:
-            raise ValueError("Missing period ID")
+            raise ValidationError("Missing period ID")
 
         student_id = require_auth(self.session_dao, auth_token, ["student"])
 
@@ -104,12 +109,12 @@ class PeriodEnrollmentService:
         existing_enrollments = self.enrollment_dao.get_enrollments_by_student(student_id)
         enrolled_period_ids = [e['period_id'] for e in existing_enrollments]
         if period_id not in enrolled_period_ids:
-            raise ValueError(f"You are not enrolled in period {period_id}")
+            raise ValidationError(f"You are not enrolled in period {period_id}")
 
         try:
             self.enrollment_dao.delete_enrollment(student_id, period_id)
         except Exception as e:
-            print(f"Warning: could not delete enrollment row: {e}")
+            logger.warning("Could not delete enrollment row: %s", e)
 
         updated_enrollments = [p for p in enrolled_period_ids if p != period_id]
 
@@ -118,7 +123,7 @@ class PeriodEnrollmentService:
             try:
                 self.conversation_dao.delete_conversation(conversation_id)
             except Exception as e:
-                print(f"Warning: could not delete conversation {conversation_id}: {e}")
+                logger.warning("Could not delete conversation %s: %s", conversation_id, e)
 
         period_obj = self.period_dao.get_period_by_id(period_id)
         period_name = period_obj.get('course', period_id) if period_obj else period_id
@@ -159,4 +164,4 @@ class PeriodEnrollmentService:
             try:
                 self.enrollment_dao.delete_enrollment(student_id, TUTORIAL_PERIOD_ID)
             except Exception as e:
-                print(f"Error removing tutorial enrollment: {e}")
+                logger.error("Error removing tutorial enrollment: %s", e)

@@ -2,6 +2,8 @@ import uuid
 import os
 from typing import Any
 from routes.auth_utils import require_auth
+from exceptions.validation_error import ValidationError
+from exceptions.not_found_error import NotFoundError
 
 if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
     from data_access.supabase.period_dao import PeriodDAO
@@ -29,7 +31,7 @@ class PeriodLTGService:
 
     def initiate_ltg_conversation(self, auth_token: str, period_id: str) -> Any:
         if not period_id:
-            raise ValueError("Missing period ID")
+            raise ValidationError("Missing period ID")
 
         student_id = require_auth(self.session_dao, auth_token, ["student"])
 
@@ -39,7 +41,7 @@ class PeriodLTGService:
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
-            raise LookupError("Invalid period ID")
+            raise NotFoundError("Invalid period ID")
 
         vector_store_id = period.get("vector_store_id")
         if not vector_store_id:

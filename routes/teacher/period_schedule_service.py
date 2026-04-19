@@ -1,8 +1,11 @@
 import json
+import logging
 import tempfile
 import os
 from datetime import datetime, timezone
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
     from data_access.supabase.period_schedule_dao import PeriodScheduleDAO
     from data_access.supabase.period_dao import PeriodDAO
@@ -277,7 +280,7 @@ class PeriodScheduleService:
             parsed = json.loads(content)
             return parsed
         except Exception as e:
-            print(f"Error fetching schedule from S3: {e}")
+            logger.error("Error fetching schedule from S3: %s", e, exc_info=True)
             return {}
 
     def _upload_schedule_to_vector_store(self, vector_store_id: str, schedule_dict: dict) -> str:
@@ -310,4 +313,4 @@ class PeriodScheduleService:
                 file_id=file_id
             )
         except Exception as e:
-            print(f"Warning: Failed to delete file {file_id} from vector store: {e}")
+            logger.warning("Failed to delete file %s from vector store: %s", file_id, e)

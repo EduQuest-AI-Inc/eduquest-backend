@@ -1,4 +1,6 @@
+import logging
 import os
+
 if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
     from data_access.supabase.enrollment_dao import EnrollmentDAO
     from data_access.supabase.student_dao import StudentDAO
@@ -7,8 +9,12 @@ else:
     from data_access.enrollment_dao import EnrollmentDAO
     from data_access.student_dao import StudentDAO
     from data_access.period_dao import PeriodDAO
+
 from models.enrollment import Enrollment
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
 
 class EnrollmentService:
     def __init__(self):
@@ -17,44 +23,31 @@ class EnrollmentService:
         self.period_dao = PeriodDAO()
 
     def enroll_student(self, student_id: str, period_id: str, semester: str = "Fall 2025") -> dict:
-        print("Starting enrollment process")
         student = self.student_dao.get_student_by_id(student_id)
         if not student:
             raise Exception(f"Student {student_id} not found")
 
         period = self.period_dao.get_period_by_id(period_id)
-
-        print(f"ENROLLMENT DEBUG — student_id={student_id}, period_id={period_id}")
-        print(f"Period fetched: {period}")
-
         if not period:
             raise Exception(f"Period {period_id} not found")
 
-        # Create enrollment record
         enrollment = Enrollment(
             student_id=student_id,
             period_id=period_id,
             semester=semester,
             enrolled_at=datetime.utcnow().isoformat()
         )
-
         self.enrollment_dao.add_enrollment(enrollment)
-
         return {"message": f"Student {student_id} enrolled in {period_id} successfully"}
-    
+
     def get_enrollments_for_period(self, period_id: str):
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
         period = self.period_dao.get_period_by_id(period_id)
-        
-        print(f"DEBUG: Period ID: {period_id}")
-        print(f"DEBUG: Period data: {period}")
-        print(f"DEBUG: Period file_urls: {period.get('file_urls', []) if period else 'No period found'}")
-
         return {
             "students": enrollments,
             "file_urls": period.get("file_urls", []) if period else []
         }
-    
+
     def get_enrollment_by_id(self, enrollment_id: str):
         return self.enrollment_dao.get_enrollment_by_id(enrollment_id)
 
@@ -69,17 +62,14 @@ class EnrollmentService:
         try:
             enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
             if not enrollments:
-                print(f"No enrollments found for period {period_id}")
                 return None
 
             matched_enrollment = next((e for e in enrollments if e.get("student_id") == student_id), None)
             if not matched_enrollment:
-                print(f"Student ID {student_id} not found in period {period_id}")
                 return None
 
             student = self.student_dao.get_student_by_id(student_id)
             if not student:
-                print(f"No student found with ID {student_id}")
                 return None
 
             return {
@@ -88,7 +78,6 @@ class EnrollmentService:
                 "weakness": student.get("weakness"),
                 "learning_style": student.get("learning_style"),
             }
-
         except Exception as e:
-            print("Error in get_student_profile:", str(e))
+            logger.error("Error in get_student_profile: %s", e, exc_info=True)
             return None

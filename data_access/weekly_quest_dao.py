@@ -1,8 +1,11 @@
+import logging
 from data_access.base_dao import BaseDAO
 from models.weekly_quest import WeeklyQuest
 from data_access.config import DynamoDBConfig
 from boto3.dynamodb.conditions import Key, Attr
 from typing import Dict, Any, List
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
@@ -91,25 +94,16 @@ class WeeklyQuestDAO(BaseDAO):
         """Get the weekly quest for a student in a specific period (should be only one)."""
         import time
         
-        print(f"DEBUG: Searching for weekly quest with student_id={student_id}, period_id={period_id}")
-        
-        # Implement retry logic with exponential backoff for eventual consistency on GSI
+        # Retry with exponential backoff for eventual consistency on GSI
         max_retries = 3
-        base_delay = 0.5  # Start with 500ms
-        
+        base_delay = 0.5
+
         for attempt in range(max_retries + 1):
             weekly_quests = self.get_quests_by_student_and_period(student_id, period_id)
-            print(f"DEBUG: Attempt {attempt + 1}: Found {len(weekly_quests)} weekly quests")
-            
             if weekly_quests:
-                print(f"DEBUG: Returning first weekly quest with quest_id={weekly_quests[0].quest_id}")
                 return weekly_quests[0]
-            
-            # If not found and we have retries left, wait with exponential backoff
             if attempt < max_retries:
                 delay = base_delay * (2 ** attempt)
-                print(f"DEBUG: No weekly quest found on attempt {attempt + 1}, waiting {delay}s before retry...")
                 time.sleep(delay)
-        
-        print("DEBUG: No weekly quests found after all retries, returning None")
+
         return None

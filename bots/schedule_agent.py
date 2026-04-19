@@ -1,5 +1,8 @@
+import logging
 import sys
 import os
+
+logger = logging.getLogger(__name__)
 
 # Add the parent directory to Python path so we can import from eduquest-backend
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -207,7 +210,7 @@ class PeriodScheduleService:
                     file_id=old_file_id
                 )
             except Exception as e:
-                print(f"Warning: Failed to delete old schedule file {old_file_id}: {e}")
+                logger.warning("Failed to delete old schedule file %s: %s", old_file_id, e)
 
         # Upload new schedule
         return self.upload_schedule_to_vector_store(schedule_dict)

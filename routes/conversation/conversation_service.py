@@ -2,10 +2,13 @@
 Conversation service — orchestrates profile gathering, grading, and
 teacher-feedback flows by delegating to specialised agent services.
 """
+import logging
 import uuid
 import os
 import json
 import tempfile
+
+logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 
@@ -302,7 +305,7 @@ class ConversationService:
                 quest_dao.update_quest_grade_and_feedback(
                     individual_quest_id, json.dumps(grade_data), feedback
                 )
-                print(f"Saved grade {overall_score} for quest {individual_quest_id}")
+                logger.info("Saved grade %s for quest %s", overall_score, individual_quest_id)
                 return
 
             from routes.quest.quest_service import QuestService
@@ -323,11 +326,11 @@ class ConversationService:
                     json.dumps(grade_data),
                     feedback,
                 )
-                print(f"Saved grade {overall_score} for quest {target_quest['individual_quest_id']}")
+                logger.info("Saved grade %s for quest %s", overall_score, target_quest['individual_quest_id'])
             else:
-                print(f"WARNING: Could not find quest for student {student_id}, week {week}")
+                logger.warning("Could not find quest for student %s, week %s", student_id, week)
         except Exception as e:
-            print(f"Error saving grade: {e}")
+            logger.error("Error saving grade: %s", e, exc_info=True)
 
     def _apply_quest_change(self, auth_token, student_id, period_id, recommended_change):
         """Delegate recommended changes to PeriodService."""
@@ -337,8 +340,6 @@ class ConversationService:
             quest_update_result = period_service.update_quests_with_recommended_change(
                 auth_token, student_id, period_id, recommended_change,
             )
-            print(f"Quest update: {quest_update_result.get('message', '')}")
+            logger.info("Quest update: %s", quest_update_result.get('message', ''))
         except Exception as e:
-            print(f"ERROR applying quest change: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Error applying quest change: %s", e, exc_info=True)

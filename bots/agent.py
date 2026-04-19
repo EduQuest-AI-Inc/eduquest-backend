@@ -5,11 +5,14 @@ Note: SchedulesAgent has been removed - quest weeks now come from the centralize
 period_schedule table (teacher-selected quest weeks). The HWAgent is called directly
 with the list of enabled quest weeks.
 """
+import logging
 import sys
 import os
 
 # Add the parent directory to Python path so we can import from eduquest-backend
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+logger = logging.getLogger(__name__)
 
 from agents import (
     Agent,
@@ -65,9 +68,9 @@ class HWAgent:
         self.session = None  # No longer using OpenAIConversationsSession
 
         if previous_response_id:
-            print(f"HWAgent using LTG previous_response_id for context: {previous_response_id}")
+            logger.debug("HWAgent using LTG previous_response_id for context: %s", previous_response_id)
         else:
-            print("HWAgent running without LTG conversation context (stateless)")
+            logger.debug("HWAgent running without LTG conversation context (stateless)")
         
     async def generate_title(self, quest) -> str:
         """Generate a short, student-personalized quest title (max 12 words)."""
@@ -198,7 +201,7 @@ class HWAgent:
             quest_skills = quest.get("Skills") if isinstance(quest, dict) else getattr(quest, "skills", "")
             quest_week = quest.get("Week") if isinstance(quest, dict) else getattr(quest, "week", 1)
 
-            print(f"Processing quest: {teacher_plan}")
+            logger.debug("Processing quest: %s", teacher_plan)
 
             quest_description, instructions, rubric = await asyncio.gather(
                 self.generate_title(quest),
@@ -226,19 +229,19 @@ class HWAgent:
             total_quests = len(self.schedule)
             successful_quests = []
             
-            print(f"Starting HWAgent - Processing {total_quests} quests in parallel")
+            logger.info("Starting HWAgent - Processing %d quests in parallel", total_quests)
 
             tasks = [self.process_quest(quest) for quest in self.schedule]
             detailed_quests = await asyncio.gather(*tasks, return_exceptions=True)
 
             for i, result in enumerate(detailed_quests, 1):
                 if isinstance(result, Exception):
-                    print(f"✗ Error processing quest {i}: {str(result)}")
+                    logger.error("Error processing quest %d: %s", i, result)
                 else:
                     successful_quests.append(result)
-                    print(f"✓ Completed quest {i}")
-            
-            print(f"\nHWAgent completed - Processed {len(successful_quests)}/{total_quests} quests successfully")
+                    logger.debug("Completed quest %d", i)
+
+            logger.info("HWAgent completed - Processed %d/%d quests successfully", len(successful_quests), total_quests)
             return successful_quests
 
     def run(self) -> list[IndividualQuest]:

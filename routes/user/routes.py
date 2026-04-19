@@ -1,7 +1,11 @@
-from flask import Blueprint, jsonify, request
-from .user_service import UserService
-from flask_jwt_extended import jwt_required, get_jwt_identity, decode_token
+import logging
 import os
+
+from flask import Blueprint, jsonify, request
+from flask_jwt_extended import jwt_required, get_jwt_identity, decode_token
+from .user_service import UserService
+from utils.token_utils import extract_auth_token
+
 if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
     from data_access.supabase.student_dao import StudentDAO
     from data_access.supabase.teacher_dao import TeacherDAO
@@ -11,73 +15,49 @@ else:
     from data_access.teacher_dao import TeacherDAO
     from data_access.session_dao import SessionDAO
 
-
+logger = logging.getLogger(__name__)
 user_bp = Blueprint('user', __name__)
 user_service = UserService()
 student_dao = StudentDAO()
 teacher_dao = TeacherDAO()
 session_dao = SessionDAO()
 
+
 @user_bp.route('/profile', methods=['GET'])
 def get_profile_cookie():
-    print("get_profile_cookie called")
-    print(f"Request headers: {request.headers}")
-
-    # Prefer Authorization: Bearer <token>
-    token = None
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header and auth_header.lower().startswith('bearer '):
-        token = auth_header.split(' ', 1)[1].strip()
-
-
-    # Fallback: parse the last auth_token from Cookie header if multiple exist
-    if not token:
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-
-    print(f"Resolved auth token: {token}")
+    token = extract_auth_token(request)
     if not token:
         return jsonify({'message': 'Missing token'}), 401
     try:
         username = None
-        # Try to decode JWT directly
         try:
             claims = decode_token(token)
             username = claims.get('sub')
         except Exception as e:
-            print(f"JWT decode failed, will try session lookup: {e}")
+            logger.debug("JWT decode failed, falling back to session lookup: %s", e)
 
-        # Fallback to session store lookup
         if not username:
             session_data = session_dao.get_sessions_by_auth_token(token)
-            print(f"Session data retrieved: {session_data}")
             username = session_data[0]['user_id'] if session_data else None
-            print(f"Username from session: {username}")
 
         if not username:
             return jsonify({'message': 'Invalid or expired token'}), 401
-        
-        # Try student first
+
         student = student_dao.get_student_by_id(username)
         if student:
             student['role'] = 'student'
             return jsonify(student), 200
-        # Try teacher
         teacher = teacher_dao.get_teacher_by_id(username)
         if teacher:
             teacher['role'] = 'teacher'
-            # Ensure pilot_approved is included (default False for existing teachers)
             if 'pilot_approved' not in teacher:
                 teacher['pilot_approved'] = False
             return jsonify(teacher), 200
         return jsonify({'message': 'User not found'}), 404
     except Exception as e:
-        print(f"Error in get_profile_cookie: {e}")
+        logger.error("Error in get_profile_cookie: %s", e, exc_info=True)
         return jsonify({'message': 'Invalid or expired token'}), 401
+
 
 @user_bp.route('/update-tutorial', methods=['POST'])
 @jwt_required()
@@ -86,16 +66,13 @@ def update_tutorial():
     try:
         data = request.get_json()
         student_id = get_jwt_identity()
-        
         completed_tutorial = data.get('completed_tutorial', False)
-        
         user_service.update_tutorial_status(student_id, completed_tutorial)
-        
         return jsonify({'message': 'Tutorial status updated successfully'}), 200
-        
     except Exception as e:
-        print(f"Error updating tutorial status: {e}")
+        logger.error("Error updating tutorial status: %s", e, exc_info=True)
         return jsonify({'error': 'Failed to update tutorial status'}), 500
+
 
 @user_bp.route('/tutorial-status', methods=['GET'])
 @jwt_required()
@@ -104,9 +81,7 @@ def get_tutorial_status():
     try:
         student_id = get_jwt_identity()
         status = user_service.get_tutorial_status(student_id)
-        
         return jsonify({'completed_tutorial': status}), 200
-        
     except Exception as e:
-        print(f"Error getting tutorial status: {e}")
+        logger.error("Error getting tutorial status: %s", e, exc_info=True)
         return jsonify({'error': 'Failed to get tutorial status'}), 500

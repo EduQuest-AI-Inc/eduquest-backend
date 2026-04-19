@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import tempfile
@@ -16,6 +17,8 @@ from routes.teacher.period_schedule_service import PeriodScheduleService
 from routes.teacher.teacher_service import TeacherService
 from routes.waitlist.WaitlistService import WaitlistService
 from services.s3_service import upload_file_to_s3
+
+logger = logging.getLogger(__name__)
 
 if os.getenv("USE_SUPABASE", "false").lower() == "true":
     from data_access.supabase.teacher_dao import TeacherDAO
@@ -83,7 +86,7 @@ def create_period(
                     f.write(canvas_json)
                 file_paths.append(canvas_file_path)
             except Exception as canvas_error:
-                print(f"Warning: Failed to parse Canvas course: {canvas_error}")
+                logger.warning("Failed to parse Canvas course: %s", canvas_error)
 
         # Create OpenAI vector store and upload files
         vector_store = openai_client.vector_stores.create(name=course)
@@ -132,7 +135,7 @@ def create_period(
                 period_id=period_id, teacher_id=teacher_id
             )
         except Exception as schedule_error:
-            print(f"Warning: Failed to auto-generate schedule: {schedule_error}")
+            logger.warning("Failed to auto-generate schedule: %s", schedule_error)
 
         return {
             "message": "Period created successfully",
@@ -145,7 +148,7 @@ def create_period(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        print(f"Error in create_period: {e}")
+        logger.error("Error in create_period: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -174,7 +177,7 @@ def get_file(key: str, auth: AuthPayload = Depends(get_auth)):
             },
         )
     except Exception as e:
-        print(f"Error retrieving file: {e}")
+        logger.error("Error retrieving file: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve file")
 
 
@@ -232,7 +235,7 @@ def generate_period_schedule(
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
-        print(f"Error generating period schedule: {e}")
+        logger.error("Error generating period schedule: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to generate schedule")
 
 
@@ -257,7 +260,7 @@ def get_period_schedule(
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
-        print(f"Error getting period schedule: {e}")
+        logger.error("Error getting period schedule: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to get schedule")
 
 
@@ -283,7 +286,7 @@ def update_period_schedule(
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
-        print(f"Error updating period schedule: {e}")
+        logger.error("Error updating period schedule: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to update schedule")
 
 
@@ -309,5 +312,5 @@ def set_period_quest_weeks(
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
-        print(f"Error setting quest weeks: {e}")
+        logger.error("Error setting quest weeks: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to set quest weeks")

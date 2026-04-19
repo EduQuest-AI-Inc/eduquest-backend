@@ -1,3 +1,4 @@
+import logging
 from flask import Blueprint, request, jsonify
 import json
 import tempfile
@@ -6,6 +7,7 @@ from routes.conversation.conversation_service import ConversationService
 from utils.conversion_utils import convert_decimals
 from utils.token_utils import extract_auth_token
 
+logger = logging.getLogger(__name__)
 conversation_bp = Blueprint('conversation', __name__)
 conversation_service = ConversationService()
 
@@ -25,7 +27,7 @@ def profile_assistant():
         result = conversation_service.start_profile_assistant(auth_token)
         return jsonify(result), 200
     except Exception as e:
-        print(f"Error in initiate-profile-assistant: {e}")
+        logger.error("Error in initiate-profile-assistant: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -51,9 +53,7 @@ def continue_profile_assistant():
         )
         return jsonify(result), 200
     except Exception as e:
-        print(f"Error in continue-profile-assistant: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error in continue-profile-assistant: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -150,9 +150,7 @@ def initiate_update():
             return jsonify(result), 200
 
     except Exception as e:
-        print(f"Error in initiate-update-assistant: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error in initiate-update-assistant: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -179,7 +177,5 @@ def continue_update():
         )
         return jsonify(result), 200
     except Exception as e:
-        print(f"Error in continue-update-assistant: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error in continue-update-assistant: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500

@@ -1,3 +1,4 @@
+import logging
 from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import create_access_token, decode_token
 from .auth_service import register_user, authenticate_user
@@ -5,6 +6,8 @@ from .password_reset_service import get_password_reset_service
 from utils.token_utils import set_auth_cookie
 from utils.validation_utils import get_client_ip
 import os
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timezone
 if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
     from data_access.supabase.session_dao import SessionDAO
@@ -106,7 +109,7 @@ def signup():
                                 parent_invite_dao.mark_used(invite_code)
                             response_body['parent_linked'] = True
             except Exception as invite_err:
-                print(f'Warning: failed to process invite code during signup: {invite_err}')
+                logger.warning("Failed to process invite code during signup: %s", invite_err)
                 response_body['invite_warning'] = 'Could not process invite code. You can link your parent account later from your profile.'
 
         return jsonify(response_body), 201

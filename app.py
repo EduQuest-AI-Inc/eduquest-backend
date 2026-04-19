@@ -24,13 +24,14 @@ from flask import jsonify
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from exceptions.auth_error import AuthError
+from constants.timeouts import JWT_EXPIRY_HOURS
 
 # Initialize Flask app
 app = Flask(__name__)
 
 # Config
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'fallback-secret')  # Set secret securely
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=JWT_EXPIRY_HOURS)
 
 # Initialize JWT
 jwt = JWTManager(app)

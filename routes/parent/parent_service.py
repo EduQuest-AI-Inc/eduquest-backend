@@ -2,6 +2,7 @@ import os
 import secrets
 import string
 from datetime import datetime, timedelta, timezone
+from constants.timeouts import INVITE_EXPIRY_HOURS
 
 if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
     from data_access.supabase.period_dao import PeriodDAO
@@ -76,7 +77,7 @@ class ParentService:
 
     def generate_invite(self, parent_id: str) -> dict:
         code = ''.join(secrets.choice(_INVITE_ALPHABET) for _ in range(8))
-        expires_at = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+        expires_at = (datetime.now(timezone.utc) + timedelta(hours=INVITE_EXPIRY_HOURS)).isoformat()
         invite = ParentInvite(code=code, parent_id=parent_id, expires_at=expires_at)
         self.invite_dao.create_invite(invite)
         return {"code": code, "expires_at": expires_at}
