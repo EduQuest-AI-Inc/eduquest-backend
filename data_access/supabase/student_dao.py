@@ -72,3 +72,9 @@ class StudentDAO(SupabaseBaseDAO):
 
     def needs_tutorial(self, student_id: str) -> bool:
         return not self.get_tutorial_status(student_id)
+
+    def update_canvas_credentials(self, student_id: str, api_url: str, api_key: str) -> None:
+        self._update({'student_id': student_id}, {'canvas_api_url': api_url, 'canvas_api_key': api_key})
+
+    def clear_canvas_credentials(self, student_id: str) -> None:
+        self._update({'student_id': student_id}, {'canvas_api_url': None, 'canvas_api_key': None})

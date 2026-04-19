@@ -1,6 +1,7 @@
 import logging
 import os
 
+from canvasapi import Canvas
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity, decode_token
 from .user_service import UserService
@@ -42,6 +43,7 @@ def _fetch_user_profile(user_id):
     student = student_dao.get_student_by_id(user_id)
     if student:
         student['role'] = 'student'
+        student.pop('canvas_api_key', None)
         return student
     teacher = teacher_dao.get_teacher_by_id(user_id)
     if teacher:
@@ -96,3 +98,51 @@ def get_tutorial_status():
     except Exception as e:
         logger.error("Error getting tutorial status: %s", e, exc_info=True)
         return jsonify({'error': 'Failed to get tutorial status'}), 500
+
+
+@user_bp.route('/canvas/connect', methods=['POST'])
+@jwt_required()
+def canvas_connect():
+    student_id = get_jwt_identity()
+    data = request.get_json()
+    api_url = data.get('api_url')
+    api_key = data.get('api_key')
+    if not api_url or not api_key:
+        return jsonify({'error': 'api_url and api_key are required'}), 400
+    try:
+        canvas = Canvas(api_url, api_key)
+        canvas.get_current_user()
+    except Exception:
+        return jsonify({'error': 'Invalid Canvas credentials. Check your URL and token.'}), 400
+    student_dao.update_canvas_credentials(student_id, api_url, api_key)
+    return jsonify({'message': 'Canvas connected'}), 200
+
+
+@user_bp.route('/canvas/courses', methods=['GET'])
+@jwt_required()
+def canvas_courses():
+    student_id = get_jwt_identity()
+    student = student_dao.get_student_by_id(student_id)
+    api_url = student.get('canvas_api_url')
+    api_key = student.get('canvas_api_key')
+    if not api_url or not api_key:
+        return jsonify({'error': 'Canvas not connected'}), 400
+    try:
+        canvas = Canvas(api_url, api_key)
+        current_user = canvas.get_current_user()
+        courses = [
+            {'id': c.id, 'name': getattr(c, 'name', f'Course {c.id}')}
+            for c in current_user.get_courses(enrollment_type='student')
+        ]
+        return jsonify({'courses': courses}), 200
+    except Exception as e:
+        logger.error("Error fetching Canvas courses: %s", e, exc_info=True)
+        return jsonify({'error': 'Failed to fetch Canvas courses'}), 400
+
+
+@user_bp.route('/canvas/disconnect', methods=['DELETE'])
+@jwt_required()
+def canvas_disconnect():
+    student_id = get_jwt_identity()
+    student_dao.clear_canvas_credentials(student_id)
+    return jsonify({'message': 'Canvas disconnected'}), 200
