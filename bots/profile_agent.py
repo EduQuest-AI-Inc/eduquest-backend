@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from agents import Agent
 
-from EQ_agents.guardrails import check_student_output_safety
+from bots.guardrails import check_student_output_safety
 
 
 # --- Pydantic schemas ---

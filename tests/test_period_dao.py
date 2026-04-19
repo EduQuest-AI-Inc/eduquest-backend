@@ -1,9 +1,10 @@
 import sys
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+
 import json
 from mock_course_data import data
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from data_access.period_dao import PeriodDAO
 from models.period import Period
@@ -13,6 +14,7 @@ def test_crud_operations():
 
     period = Period(
         period_id="per001",
+        owner_id="teach001",
         teacher_id="teach001",
         vector_store_id="vs_789",
         course=json.dumps(data, indent=2),

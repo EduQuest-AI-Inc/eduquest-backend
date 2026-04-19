@@ -20,7 +20,7 @@ from agents import (
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 import asyncio
-from models.rubric import Rubric, Scale
+from bots.schemas.rubric import Rubric, Scale
 
 
 class IndividualQuest(BaseModel):

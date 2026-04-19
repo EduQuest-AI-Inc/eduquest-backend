@@ -17,7 +17,7 @@ def test_crud_operations():
         last_name="Tanaka",
         email="bob@example.com",
         enrollments=["CS102", "MATH300"],
-        # grade=4,
+        grade=4,
         # strenth="Math",
         # weakness="Writing",
         # interest="Robotics",

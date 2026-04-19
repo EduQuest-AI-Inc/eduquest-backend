@@ -16,6 +16,7 @@ def test_crud_operations():
         teacher_id="teach001",
         first_name="Bob",
         last_name="Smith",
+        email="bob@example.com",
         last_login=now,
         password="securePass123"
     )

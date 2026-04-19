@@ -12,7 +12,7 @@ def test_crud_operations():
     dao = EnrollmentDAO()
 
     enrollment = Enrollment(
-        class_id="CS101",
+        period_id="CS101",
         student_id="stu_test",
         semester="TestSemester",
         enrolled_at="2025-05-17T13:24:53.812345+00:00"

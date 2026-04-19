@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any
 
 from agents import Runner, OpenAIConversationsSession
 
-from EQ_agents.teacher_feedback_agent import (
+from bots.teacher_feedback_agent import (
     create_teacher_feedback_agent,
     TeacherFeedbackResponse,
 )

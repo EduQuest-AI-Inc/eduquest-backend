@@ -17,8 +17,8 @@ if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
     from data_access.supabase.teacher_dao import TeacherDAO
 else:
     from data_access.teacher_dao import TeacherDAO
-from s3 import upload_file_to_s3
-from canvas.canvas import Course as CanvasCourse, course_to_json
+from services.s3_service import upload_file_to_s3
+from routes.teacher.canvas_integration import Course as CanvasCourse, course_to_json
 
 teacher_bp = Blueprint("teacher", __name__)
 teacher_service = TeacherService()

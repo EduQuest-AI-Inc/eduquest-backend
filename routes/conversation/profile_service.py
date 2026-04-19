@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any
 
 from agents import Runner
 
-from EQ_agents.profile_agent import create_profile_agent, ProfileResponse
+from bots.profile_agent import create_profile_agent, ProfileResponse
 
 
 class ProfileConversationService:

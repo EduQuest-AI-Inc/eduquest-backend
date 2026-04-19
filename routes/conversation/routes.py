@@ -1,39 +1,17 @@
 from flask import Blueprint, request, jsonify
 import json
 import tempfile
-from decimal import Decimal
 import os
 from routes.conversation.conversation_service import ConversationService
+from utils.conversion_utils import convert_decimals
+from utils.token_utils import extract_auth_token
 
 conversation_bp = Blueprint('conversation', __name__)
 conversation_service = ConversationService()
 
 
-def convert_decimals(obj):
-    """Convert Decimal objects to regular numbers for JSON serialization"""
-    if isinstance(obj, Decimal):
-        return float(obj)
-    elif isinstance(obj, dict):
-        return {key: convert_decimals(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_decimals(item) for item in obj]
-    else:
-        return obj
-
-
 def _extract_auth_token():
-    """Extract auth token from Authorization header or Cookie fallback."""
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header and auth_header.lower().startswith('bearer '):
-        return auth_header.split(' ', 1)[1].strip()
-
-    raw_cookie = request.headers.get('Cookie', '')
-    if 'auth_token=' in raw_cookie:
-        parts = [p.strip() for p in raw_cookie.split(';')]
-        auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-        if auth_tokens:
-            return auth_tokens[-1]
-    return None
+    return extract_auth_token(request)
 
 
 # ------------------------------------------------------------------
