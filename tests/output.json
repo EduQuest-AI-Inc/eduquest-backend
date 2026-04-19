@@ -1,0 +1,94 @@
+{
+  "list_of_quests": [
+    {
+      "Description": "Visualize different lines on a golf course map. Collect images of golf holes and sketch lines representing possible shots. Identify slope and y-intercept for each line visually. Create slides or a graphic storyboard to show how different lines represent shots with varying slopes and distances.",
+      "Skills": "Understanding and interpreting linear equations, visual modeling, applying lines to real contexts (golf shots)",
+      "Week": 1
+    },
+    {
+      "Description": "Gather or simulate simple golf data (distances, clubs used). Relate each dataset to a function (input: club, output: average distance). Draw visual mappings and storyboards showing how inputs change outputs. Present findings as function maps (e.g., diagram/flowcharts).",
+      "Skills": "Defining and applying functions, visualizing input-output relationships, mapping real-world actions to functions",
+      "Week": 2
+    },
+    {
+      "Description": "Create basic graphs of your golf data functions (distance vs. club) using digital or drawn visuals. Visually interpret how changes in club selection affect distance. Populate a gallery of visual graphs to demonstrate understanding.",
+      "Skills": "Graphing functions, interpreting functional representations visually, making connections between data and visual graphs",
+      "Week": 3
+    },
+    {
+      "Description": "Manipulate your existing function graphs to show transformations such as shifting/distorting (e.g., simulating windy impacts or terrain changes on a golf hole). Create a visual gallery of these changes and describe their effects.",
+      "Skills": "Translating, reflecting, and stretching/shrinking graphs, visually analyzing function transformations",
+      "Week": 4
+    },
+    {
+      "Description": "Combine two data sources\u2014for example, wind and club selection\u2014into a new function that models their combined influence on distance. Graph the resulting combinations and annotate visually for clarity. Show the visual impact of combining variables in golf outcomes.",
+      "Skills": "Combining functions (addition, subtraction, etc.), modeling two-variable relationships visually",
+      "Week": 5
+    },
+    {
+      "Description": "Find and graph the inverse of a function from your golf data (e.g., given distance, find club needed). Show visually how the inverse undoes the original mapping, using side-by-side graphs and storyboards.",
+      "Skills": "Concept and calculation of inverse functions, visual demonstration of inverse processes",
+      "Week": 6
+    },
+    {
+      "Description": "Collect or simulate quadratic golf data (height of shot vs. time/distance). Fit your data visually to quadratic models and graph them, identifying key features like vertex (max height) and axis of symmetry. Present a storyboard visually explaining the arc of a golf shot.",
+      "Skills": "Quadratic functions, vertex form, graphing and interpreting parabolic motion visually",
+      "Week": 7
+    },
+    {
+      "Description": "Create and visualize polynomial models to fit more complex golf scenarios (e.g., shot patterns over several holes). Write out and graph these polynomials. Annotate your visuals to show how they model ups and downs in golf performance.",
+      "Skills": "Polynomial functions, higher-order graphing, visual analysis of real-life performance data",
+      "Week": 8
+    },
+    {
+      "Description": "Identify the zeros of your polynomial models (when does a shot land, or performance drops to zero?). Show visually where zeros occur on golf performance graphs and annotate their meaning (e.g., ball lands, player scores zero on a hole).",
+      "Skills": "Finding and interpreting zeros of polynomials, visual annotation of real-life applications",
+      "Week": 9
+    },
+    {
+      "Description": "Graph rational functions to model ratios in golf, such as shots per hole, and analyze asymptotes visually (e.g., theoretical limits\u2014unreachable scores). Present these as overlay graphs with clear visual labels for asymptotes and intercepts.",
+      "Skills": "Rational functions, visual understanding of asymptotes and intercepts, applying models to performance ratios",
+      "Week": 10
+    },
+    {
+      "Description": "Collect sequences (e.g., strokes per hole) and visually identify arithmetic or geometric patterns in your golf data. Create visual storyboards to show patterns over multiple holes or rounds.",
+      "Skills": "Building and identifying sequences and series, visualizing recursive data in context",
+      "Week": 11
+    },
+    {
+      "Description": "Apply series sums to your collected golf sequence data\u2014compute and visually represent running totals of strokes, over/under par status, etc. Present your visual sum graphs in a portfolio.",
+      "Skills": "Applying and visualizing series sums, cumulative data representation for real-life scenarios",
+      "Week": 12
+    },
+    {
+      "Description": "Use binomial and counting principles visually to model different ways a golfer can approach a hole (e.g., combinations of clubs, possible shot sequences). Create a decision tree or branching diagram to illustrate.",
+      "Skills": "Visualizing counting principles, binomial theorem, real-world application of combinatorics",
+      "Week": 13
+    },
+    {
+      "Description": "Visually analyze probability in golf. Use your data to calculate and chart probability of desired outcomes (e.g., chance of scoring par). Show probability distributions with bar graphs or pie charts for key scenarios.",
+      "Skills": "Probability, likelihood analysis, creating and interpreting probability graphs and charts",
+      "Week": 14
+    },
+    {
+      "Description": "Gather golf data involving two interacting variables (e.g., shot distance and wind speed). Set up a matrix of your data and use color-coding or heatmaps to visually identify trends. Describe your approach and findings visually.",
+      "Skills": "Matrices, organizing and visualizing multivariate data, using matrices for trend analysis",
+      "Week": 15
+    },
+    {
+      "Description": "Perform matrix operations (addition, scalar multiplication) on your organized golf data. Visualize the effects through annotated heatmaps or grids, showing how each operation impacts data display and interpretation.",
+      "Skills": "Matrix operations, visual understanding of multivariate transformations, annotation for clarity",
+      "Week": 16
+    },
+    {
+      "Description": "Begin compiling your visual analysis project. Design slides or an infographic storyboard incorporating your work from previous weeks\u2014highlight function models, graphs, probability, and matrix insights. Create drafts and gather feedback from classmates, teachers, or online communities.",
+      "Skills": "Synthesizing visual models, communication through visual means, project-based learning, peer review and iteration",
+      "Week": 17
+    },
+    {
+      "Description": "Polish and present your visual data analysis project on golf statistics. Practice clear, engaging visual explanations, annotate key insights, and submit your project portfolio/storyboard as a capstone achievement towards your long-term goal.",
+      "Skills": "Presentation and communication of visual/statistical findings, project completion and reflection, mastery demonstration of pre-calculus concepts through a statistics/golf lens",
+      "Week": 18
+    }
+  ]
+}

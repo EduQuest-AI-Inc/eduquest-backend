@@ -1,0 +1,47 @@
+{
+  "HomeworkTitle": "Algebraic Expressions Homework",
+  "Description": "Reviewed algebraic expressions including terms, coefficients, and constants. Applied PEMDAS to expressions with exponents and square roots.",
+  "Problems": [
+    {
+      "Problem": "3 + 2 * (5 - 3)^2",
+      "Result": 11
+    },
+    {
+      "Problem": "sqrt(16) + 2^3",
+      "Result": 12
+    },
+    {
+      "Problem": "(2 + 3)^2 - 4",
+      "Result": 21
+    },
+    {
+      "Problem": "5 * (6 - 4) + 3^2",
+      "Result": 19
+    },
+    {
+      "Problem": "(7 - 2)^2 / 5",
+      "Result": 5
+    },
+    {
+      "Problem": "4 + (3^2 - 5)",
+      "Result": 8
+    },
+    {
+      "Problem": "2^3 + sqrt(9) * 2",
+      "Result": 14
+    },
+    {
+      "Problem": "(8 / 2)^2 - 3",
+      "Result": 13
+    },
+    {
+      "Problem": "sqrt(25) + (4 - 1)^2",
+      "Result": 14
+    },
+    {
+      "Problem": "6 + 2 * sqrt(49)",
+      "Result": 20
+    }
+  ],
+  "Reflection": "Some challenges I faced included remembering to apply exponents before multiplication and dealing with square roots carefully. To overcome this, I wrote down each step and double-checked my operations. This helped me stay organized and improve my accuracy."
+}
