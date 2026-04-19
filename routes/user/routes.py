@@ -23,37 +23,48 @@ teacher_dao = TeacherDAO()
 session_dao = SessionDAO()
 
 
+def _resolve_identity(token):
+    """Return user_id from JWT claims or session fallback. Returns None if unresolvable."""
+    try:
+        claims = decode_token(token)
+        username = claims.get('sub')
+        if username:
+            return username
+    except Exception as e:
+        logger.debug("JWT decode failed, falling back to session lookup: %s", e)
+
+    session_data = session_dao.get_sessions_by_auth_token(token)
+    return session_data[0]['user_id'] if session_data else None
+
+
+def _fetch_user_profile(user_id):
+    """Look up student then teacher by user_id. Returns profile dict with 'role', or None."""
+    student = student_dao.get_student_by_id(user_id)
+    if student:
+        student['role'] = 'student'
+        return student
+    teacher = teacher_dao.get_teacher_by_id(user_id)
+    if teacher:
+        teacher['role'] = 'teacher'
+        teacher.setdefault('pilot_approved', False)
+        return teacher
+    return None
+
+
 @user_bp.route('/profile', methods=['GET'])
 def get_profile_cookie():
     token = extract_auth_token(request)
     if not token:
         return jsonify({'message': 'Missing token'}), 401
     try:
-        username = None
-        try:
-            claims = decode_token(token)
-            username = claims.get('sub')
-        except Exception as e:
-            logger.debug("JWT decode failed, falling back to session lookup: %s", e)
-
-        if not username:
-            session_data = session_dao.get_sessions_by_auth_token(token)
-            username = session_data[0]['user_id'] if session_data else None
-
-        if not username:
+        user_id = _resolve_identity(token)
+        if not user_id:
             return jsonify({'message': 'Invalid or expired token'}), 401
 
-        student = student_dao.get_student_by_id(username)
-        if student:
-            student['role'] = 'student'
-            return jsonify(student), 200
-        teacher = teacher_dao.get_teacher_by_id(username)
-        if teacher:
-            teacher['role'] = 'teacher'
-            if 'pilot_approved' not in teacher:
-                teacher['pilot_approved'] = False
-            return jsonify(teacher), 200
-        return jsonify({'message': 'User not found'}), 404
+        profile = _fetch_user_profile(user_id)
+        if not profile:
+            return jsonify({'message': 'User not found'}), 404
+        return jsonify(profile), 200
     except Exception as e:
         logger.error("Error in get_profile_cookie: %s", e, exc_info=True)
         return jsonify({'message': 'Invalid or expired token'}), 401
