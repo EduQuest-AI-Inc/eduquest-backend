@@ -11,7 +11,7 @@ from openai import OpenAI
 from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
-from routes.teacher.canvas_integration import Course as CanvasCourse, course_to_json
+from services.canvas_service import Course as CanvasCourse, course_to_json
 from routes.teacher.period_schedule_service import PeriodScheduleService
 from routes.teacher.teacher_service import TeacherService
 from routes.waitlist.WaitlistService import WaitlistService
