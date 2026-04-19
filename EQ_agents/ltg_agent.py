@@ -6,8 +6,7 @@ and their strengths, weaknesses, interests, and learning style.
 """
 from typing import Optional
 from pydantic import BaseModel, Field
-from agents import Agent, FileSearchTool, ModelSettings
-from openai.types.shared import Reasoning
+from agents import Agent, FileSearchTool
 
 
 class LTGResponse(BaseModel):
@@ -56,9 +55,6 @@ If the student indicates they want to choose a goal (e.g., "I choose goal 1", "I
         name="Long-Term Goal Assistant",
         instructions=instructions,
         model="gpt-5",
-        model_settings=ModelSettings(
-            reasoning=Reasoning(effort="medium"),
-        ),
         output_type=LTGResponse,
         tools=[
             FileSearchTool(

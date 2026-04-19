@@ -29,6 +29,7 @@ from routes.conversation.profile_service import (
     continue_profile_conversation,
 )
 from routes.conversation.grading_service import grade_student_submission
+from routes.auth_utils import require_auth
 from routes.conversation.teacher_feedback_service import (
     initiate_teacher_feedback,
     continue_teacher_feedback,
@@ -50,10 +51,7 @@ class ConversationService:
     # ------------------------------------------------------------------
 
     def start_profile_assistant(self, auth_token: str):
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-        user_id = sessions[0]["user_id"]
+        user_id = require_auth(self.session_dao, auth_token, ["student"])
 
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
@@ -61,15 +59,17 @@ class ConversationService:
 
         result = initiate_profile_conversation(student)
 
-        conversation_id = result.get("conversation_id")
-        if not conversation_id:
-            raise Exception("Failed to obtain conversation_id from profile agent")
+        response_id = result.get("response_id")
+        if not response_id:
+            raise Exception("Failed to obtain response_id from profile agent")
 
+        conversation_id = str(uuid.uuid4())
         self.conversation_dao.add_conversation(Conversation(
             conversation_id=conversation_id,
             user_id=user_id,
             role="student",
             conversation_type="profile",
+            last_response_id=response_id,
         ))
 
         return {
@@ -78,10 +78,7 @@ class ConversationService:
         }
 
     def continue_profile_assistant(self, auth_token, conversation_type, conversation_id, message):
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-        user_id = sessions[0]["user_id"]
+        user_id = require_auth(self.session_dao, auth_token, ["student"])
 
         conversation = self.conversation_dao.get_conversation_by_id_user_type(
             conversation_id, user_id, conversation_type
@@ -89,7 +86,14 @@ class ConversationService:
         if not conversation:
             raise Exception("Conversation not found")
 
-        result = continue_profile_conversation(conversation_id, message)
+        last_response_id = conversation.get("last_response_id")
+        result = continue_profile_conversation(last_response_id, message)
+
+        new_response_id = result.get("response_id")
+        if new_response_id:
+            self.conversation_dao.update_conversation(
+                conversation_id, {"last_response_id": new_response_id}
+            )
 
         if result.get("profile_complete") and result.get("profile"):
             self.student_dao.update_student(user_id, result["profile"])
@@ -183,7 +187,7 @@ class ConversationService:
             raw_response = result.get("response", "")
             suggested_change = result.get("suggested_change")
             if suggested_change and period_id:
-                self._apply_quest_change(auth_token, period_id, suggested_change, student_id)
+                self._apply_quest_change(auth_token, student_id, period_id, suggested_change)
 
             return {
                 "conversation_id": conversation_id,
@@ -224,7 +228,7 @@ class ConversationService:
 
         # PRIORITY 2: apply recommended quest changes
         if change and recommended_change and period_id:
-            self._apply_quest_change(auth_token, period_id, recommended_change)
+            self._apply_quest_change(auth_token, student_id or user_id, period_id, recommended_change)
 
         # Save a conversation record for auditing
         conversation_id = str(uuid.uuid4())
@@ -269,7 +273,7 @@ class ConversationService:
 
         suggested_change = result.get("suggested_change")
         if suggested_change and period_id:
-            self._apply_quest_change(auth_token, period_id, suggested_change, target_user_id)
+            self._apply_quest_change(auth_token, target_user_id, period_id, suggested_change)
 
         return {"response": result.get("response", "")}
 
@@ -325,13 +329,13 @@ class ConversationService:
         except Exception as e:
             print(f"Error saving grade: {e}")
 
-    def _apply_quest_change(self, auth_token, period_id, recommended_change, student_id=None):
+    def _apply_quest_change(self, auth_token, student_id, period_id, recommended_change):
         """Delegate recommended changes to PeriodService."""
         try:
             from routes.period.period_service import PeriodService
             period_service = PeriodService()
             quest_update_result = period_service.update_quests_with_recommended_change(
-                auth_token, period_id, recommended_change, student_id,
+                auth_token, student_id, period_id, recommended_change,
             )
             print(f"Quest update: {quest_update_result.get('message', '')}")
         except Exception as e:

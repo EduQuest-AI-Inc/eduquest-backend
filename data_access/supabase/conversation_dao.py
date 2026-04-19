@@ -14,6 +14,7 @@ class ConversationDAO(SupabaseBaseDAO):
             'role': conversation.role,
             'conversation_type': conversation.conversation_type,
             'period_id': getattr(conversation, 'period_id', None),
+            'last_response_id': getattr(conversation, 'last_response_id', None),
             'created_at': getattr(conversation, 'created_at', None),
         })
 
