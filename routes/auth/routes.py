@@ -1,9 +1,9 @@
-# auth/routes.py
-
 from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import create_access_token, decode_token
 from .auth_service import register_user, authenticate_user
 from .password_reset_service import get_password_reset_service
+from utils.token_utils import set_auth_cookie
+from utils.validation_utils import get_client_ip
 import os
 from datetime import datetime, timezone
 if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
@@ -29,7 +29,8 @@ parent_dao = ParentDAO()
 parent_invite_dao = ParentInviteDAO()
 conversation_service = ConversationService()
 password_reset_service = get_password_reset_service()
-#sdf1234567890123456
+
+
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
     data = request.get_json()
@@ -139,49 +140,10 @@ def login():
                 response_data['needs_profile'] = True
         # Set cookie
         resp = make_response(jsonify(response_data), 200)
-        
-        # Determine if we're in development or production
-        is_development = request.headers.get('Origin', '').startswith('http://localhost') or \
-                        request.headers.get('Host', '').startswith('localhost') or \
-                        request.headers.get('Host', '').startswith('127.0.0.1')
-        
-        if is_development:
-            # Development settings
-            resp.set_cookie(
-                'auth_token',
-                access_token,
-                httponly=False,
-                secure=False,         # No HTTPS in development
-                samesite='Lax',       # More permissive for development
-                path="/"
-            )
-        else:
-            # Production settings
-            resp.set_cookie(
-                'auth_token',
-                access_token,
-                httponly=False,
-                secure=True,          # HTTPS required in production
-                samesite='None',      # Cross-site cookies for production
-                domain='eduquestai.org',
-                path="/"
-            )
+        set_auth_cookie(resp, access_token)
         return resp
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
-
-
-def _get_client_ip():
-    """Get the client's IP address, handling proxies."""
-    # Check X-Forwarded-For header (set by load balancers/proxies)
-    if request.headers.get('X-Forwarded-For'):
-        # Take the first IP in the chain (original client)
-        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
-    # Check X-Real-IP header (alternative proxy header)
-    if request.headers.get('X-Real-IP'):
-        return request.headers.get('X-Real-IP').strip()
-    # Fall back to remote_addr
-    return request.remote_addr or '0.0.0.0'
 
 
 @auth_bp.route('/password-reset/request', methods=['POST'])
@@ -200,7 +162,7 @@ def password_reset_request():
         return jsonify({'message': 'Email is required'}), 400
     
     # Get client info
-    ip_address = _get_client_ip()
+    ip_address = get_client_ip(request)
     user_agent = request.headers.get('User-Agent', '')
     
     # Process the request
@@ -234,7 +196,7 @@ def password_reset_confirm():
         return jsonify({'message': 'New password is required'}), 400
     
     # Get client IP
-    ip_address = _get_client_ip()
+    ip_address = get_client_ip(request)
     
     # Process the confirmation
     success, message = password_reset_service.confirm_password_reset(

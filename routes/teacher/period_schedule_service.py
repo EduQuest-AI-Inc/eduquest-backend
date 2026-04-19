@@ -10,8 +10,8 @@ else:
     from data_access.period_schedule_dao import PeriodScheduleDAO
     from data_access.period_dao import PeriodDAO
 from models.period_schedule import PeriodSchedule
-from EQ_agents.schedule_agent import PeriodScheduleAgent
-from s3 import upload_file_to_s3
+from bots.schedule_agent import PeriodScheduleAgent
+from services.s3_service import upload_file_to_s3
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 

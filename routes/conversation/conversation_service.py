@@ -22,7 +22,7 @@ else:
     from data_access.conversation_dao import ConversationDAO
     from data_access.teacher_dao import TeacherDAO
 from models.conversation import Conversation
-from s3 import upload_file_to_s3
+from services.s3_service import upload_file_to_s3
 
 from routes.conversation.profile_service import (
     initiate_profile_conversation,

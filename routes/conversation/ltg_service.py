@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any
 
 from agents import Runner
 
-from EQ_agents.ltg_agent import create_ltg_agent, LTGResponse
+from bots.ltg_agent import create_ltg_agent, LTGResponse
 
 
 class LTGConversationService:

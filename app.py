@@ -20,6 +20,10 @@ from routes.waitlist.routes import waitlist_bp
 from routes.parent_waitlist import parent_waitlist_bp
 from routes.parent.routes import parent_bp
 from datetime import timedelta
+from flask import jsonify
+from exceptions.validation_error import ValidationError
+from exceptions.not_found_error import NotFoundError
+from exceptions.auth_error import AuthError
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -70,7 +74,18 @@ app.register_blueprint(waitlist_bp, url_prefix='/pilot-waitlist')
 app.register_blueprint(parent_waitlist_bp, url_prefix='/parent-waitlist')
 app.register_blueprint(parent_bp, url_prefix='/parent')
 
-# Add helloworld route for testing connection
+@app.errorhandler(ValidationError)
+def handle_validation_error(e):
+    return jsonify({"error": str(e)}), 400
+
+@app.errorhandler(NotFoundError)
+def handle_not_found_error(e):
+    return jsonify({"error": str(e)}), 404
+
+@app.errorhandler(AuthError)
+def handle_auth_error(e):
+    return jsonify({"error": str(e)}), 401
+
 @app.route('/helloworld', methods=['GET'])
 def hello_world():
     return "helloworld"

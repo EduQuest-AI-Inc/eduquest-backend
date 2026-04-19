@@ -8,7 +8,7 @@ from openai import OpenAI
 
 from routes.parent.parent_service import ParentService
 from routes.teacher.period_schedule_service import PeriodScheduleService
-from s3 import upload_file_to_s3
+from services.s3_service import upload_file_to_s3
 
 # #region debug log
 import json as _dbg_json

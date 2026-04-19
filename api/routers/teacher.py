@@ -11,11 +11,11 @@ from openai import OpenAI
 from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
-from canvas.canvas import Course as CanvasCourse, course_to_json
+from routes.teacher.canvas_integration import Course as CanvasCourse, course_to_json
 from routes.teacher.period_schedule_service import PeriodScheduleService
 from routes.teacher.teacher_service import TeacherService
 from routes.waitlist.WaitlistService import WaitlistService
-from s3 import upload_file_to_s3
+from services.s3_service import upload_file_to_s3
 
 if os.getenv("USE_SUPABASE", "false").lower() == "true":
     from data_access.supabase.teacher_dao import TeacherDAO
