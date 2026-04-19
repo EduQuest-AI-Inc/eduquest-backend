@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .period_service import PeriodService
-from utils.token_utils import extract_auth_token
+from utils.token_utils import extract_auth_token, get_user_id_from_token
 
 if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
     from data_access.supabase.parent_dao import ParentDAO
@@ -45,10 +45,6 @@ def verify_period():
             return jsonify({"error": "period_id is required"}), 400
         period = period_service.verify_period_id(_token(), period_id)
         return jsonify({"message": "Period verified and added to enrollments", "period": period}), 200
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
-    except LookupError as le:
-        return jsonify({"error": str(le)}), 404
     except Exception as e:
         logger.error("Unexpected error in verify-period: %s", e, exc_info=True)
         return jsonify({"error": "An unexpected error occurred"}), 500
@@ -63,10 +59,6 @@ def unenroll():
             return jsonify({"error": "period_id is required"}), 400
         result = period_service.unenroll_from_period(_token(), period_id)
         return jsonify(result), 200
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
-    except LookupError as le:
-        return jsonify({"error": str(le)}), 404
     except Exception as e:
         logger.error("Unexpected error in unenroll: %s", e, exc_info=True)
         return jsonify({"error": "An unexpected error occurred"}), 500
@@ -81,10 +73,6 @@ def initiate_ltg_conversation():
             return jsonify({"error": "period_id is required"}), 400
         result = period_service.initiate_ltg_conversation(_token(), period_id)
         return jsonify(result), 200
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
-    except LookupError as le:
-        return jsonify({"error": str(le)}), 404
     except Exception as e:
         logger.error("Unexpected error in initiate-ltg-conversation: %s", e, exc_info=True)
         return jsonify({"error": "An unexpected error occurred"}), 500
@@ -111,6 +99,7 @@ def continue_ltg_conversation():
         )
         return jsonify(result), 200
     except Exception as e:
+        logger.error("Unexpected error in continue-ltg-conversation: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -118,10 +107,7 @@ def continue_ltg_conversation():
 def initiate_homework_agent():
     try:
         auth_token = _token()
-        sessions = period_service.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            return jsonify({"error": "Invalid auth token"}), 401
-        caller_id = sessions[0]['user_id']
+        caller_id = get_user_id_from_token(auth_token, period_service.session_dao)
 
         data = request.json
         period_id = data.get('period_id')

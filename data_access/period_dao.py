@@ -1,8 +1,10 @@
+import logging
 from data_access.base_dao import BaseDAO
 from models.period import Period
 from data_access.config import DynamoDBConfig
-from boto3.dynamodb.conditions import Key
-from boto3.dynamodb.conditions import Attr
+from boto3.dynamodb.conditions import Key, Attr
+
+logger = logging.getLogger(__name__)
 from typing import Dict, Any
 from dotenv import load_dotenv
 
@@ -56,7 +58,7 @@ class PeriodDAO(BaseDAO):
             items = response.get("Items", [])
             return [Period(**item) for item in items]
         except Exception as e:
-            print(f"Error in get_periods_by_owner_id: {e}")
+            logger.error("Error in get_periods_by_owner_id: %s", e, exc_info=True)
             return []
 
     def get_periods_by_teacher_id(self, teacher_id):

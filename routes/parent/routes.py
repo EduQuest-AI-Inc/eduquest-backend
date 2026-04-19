@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import tempfile
@@ -10,26 +11,7 @@ from routes.parent.parent_service import ParentService
 from routes.teacher.period_schedule_service import PeriodScheduleService
 from services.s3_service import upload_file_to_s3
 
-# #region debug log
-import json as _dbg_json
-import time as _dbg_time
-import traceback as _dbg_tb
-_DBG_PATH = "/Users/goldenhuang/Desktop/EduQuest/.cursor/debug-f19ec3.log"
-def _dbg(hypothesis_id, location, message, data):
-    try:
-        with open(_DBG_PATH, "a") as _f:
-            _f.write(_dbg_json.dumps({
-                "sessionId": "f19ec3",
-                "hypothesisId": hypothesis_id,
-                "location": location,
-                "message": message,
-                "data": data,
-                "timestamp": int(_dbg_time.time() * 1000),
-            }) + "\n")
-    except Exception:
-        pass
-# #endregion
-
+logger = logging.getLogger(__name__)
 parent_bp = Blueprint("parent", __name__)
 parent_service = ParentService()
 period_schedule_service = PeriodScheduleService()
@@ -95,14 +77,13 @@ def create_period():
         # Auto-generate schedule for the period (non-blocking; failures are logged)
         schedule_result = None
         try:
-            print(f"Auto-generating schedule for parent period {period_id}...")
             schedule_result = period_schedule_service.generate_and_save_schedule(
                 period_id=period_id,
                 teacher_id=parent_id
             )
-            print(f"Schedule generated successfully for parent period {period_id}")
+            logger.info("Schedule generated successfully for parent period %s", period_id)
         except Exception as schedule_error:
-            print(f"Warning: Failed to auto-generate schedule for parent period: {schedule_error}")
+            logger.warning("Failed to auto-generate schedule for parent period %s: %s", period_id, schedule_error)
 
         return jsonify({
             "message": "Class created successfully",
@@ -113,7 +94,7 @@ def create_period():
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 400
     except Exception as e:
-        print(f"Error creating parent period: {e}")
+        logger.error("Error creating parent period: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -126,7 +107,7 @@ def my_periods():
         periods = parent_service.get_periods_by_parent(parent_id)
         return jsonify({"periods": periods}), 200
     except Exception as e:
-        print(f"Error fetching parent periods: {e}")
+        logger.error("Error fetching parent periods: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -142,7 +123,7 @@ def generate_invite():
         invite = parent_service.generate_invite(parent_id)
         return jsonify(invite), 201
     except Exception as e:
-        print(f"Error generating invite: {e}")
+        logger.error("Error generating invite: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -158,7 +139,7 @@ def get_students():
         students = parent_service.get_linked_students(parent_id)
         return jsonify({"students": students}), 200
     except Exception as e:
-        print(f"Error fetching linked students: {e}")
+        logger.error("Error fetching linked students: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -172,11 +153,6 @@ def generate_period_schedule():
         parent_id = get_jwt_identity()
         body = request.get_json(silent=True) or {}
         period_id = body.get("period_id")
-        # #region debug log
-        _dbg("H2", "routes/parent/routes.py:generate_period_schedule", "entry", {
-            "parent_id": parent_id, "period_id": period_id, "body_keys": list(body.keys()),
-        })
-        # #endregion
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
 
@@ -191,14 +167,7 @@ def generate_period_schedule():
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404
     except Exception as e:
-        # #region debug log
-        _dbg("H2", "routes/parent/routes.py:generate_period_schedule", "exception", {
-            "exc_type": type(e).__name__,
-            "exc_str": str(e),
-            "traceback_tail": _dbg_tb.format_exc()[-2000:],
-        })
-        # #endregion
-        print(f"Error generating parent schedule: {e}")
+        logger.error("Error generating parent schedule: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -209,16 +178,6 @@ def get_period_schedule():
     try:
         parent_id = get_jwt_identity()
         period_id = request.args.get("period_id")
-        # #region debug log
-        _dbg("H1", "routes/parent/routes.py:get_period_schedule", "entry", {
-            "parent_id": parent_id,
-            "request_url": request.url,
-            "request_path": request.path,
-            "request_query_string": request.query_string.decode("utf-8", errors="replace"),
-            "arg_period_id": period_id,
-            "all_args": dict(request.args),
-        })
-        # #endregion
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
 
@@ -235,7 +194,7 @@ def get_period_schedule():
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404
     except Exception as e:
-        print(f"Error fetching parent schedule: {e}")
+        logger.error("Error fetching parent schedule: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -263,7 +222,7 @@ def update_period_schedule():
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404
     except Exception as e:
-        print(f"Error updating parent schedule: {e}")
+        logger.error("Error updating parent schedule: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -291,5 +250,5 @@ def set_quest_weeks():
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404
     except Exception as e:
-        print(f"Error setting quest weeks for parent: {e}")
+        logger.error("Error setting quest weeks for parent: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
