@@ -1,5 +1,4 @@
 import logging
-import os
 from datetime import datetime, timezone
 
 from flask import Blueprint, request, jsonify
@@ -7,12 +6,8 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from .period_service import PeriodService
 from utils.token_utils import extract_auth_token, get_user_id_from_token
 
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.parent_dao import ParentDAO
-    from data_access.supabase.parent_invite_dao import ParentInviteDAO
-else:
-    from data_access.parent_dao import ParentDAO
-    from data_access.parent_invite_dao import ParentInviteDAO
+from data_access.supabase.parent_dao import ParentDAO
+from data_access.supabase.parent_invite_dao import ParentInviteDAO
 
 logger = logging.getLogger(__name__)
 
@@ -52,16 +47,12 @@ def verify_period():
 
 @period_bp.route('/unenroll', methods=['POST'])
 def unenroll():
-    try:
-        data = request.json
-        period_id = data.get('period_id')
-        if not period_id:
-            return jsonify({"error": "period_id is required"}), 400
-        result = period_service.unenroll_from_period(_token(), period_id)
-        return jsonify(result), 200
-    except Exception as e:
-        logger.error("Unexpected error in unenroll: %s", e, exc_info=True)
-        return jsonify({"error": "An unexpected error occurred"}), 500
+    data = request.json
+    period_id = data.get('period_id')
+    if not period_id:
+        return jsonify({"error": "period_id is required"}), 400
+    result = period_service.unenroll_from_period(_token(), period_id)
+    return jsonify(result), 200
 
 
 @period_bp.route('/initiate-ltg-conversation', methods=['POST'])
@@ -114,17 +105,17 @@ def initiate_homework_agent():
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
 
-        student_id = data.get('student_id')
-        if student_id:
+        user_id = data.get('user_id')
+        if user_id:
             period = period_service.period_dao.get_period_by_id(period_id)
             if not period:
                 return jsonify({"error": "Period not found"}), 404
-            if period.get("owner_id", period.get("teacher_id")) != caller_id:
+            if period.get("owner_id", period.get("user_id")) != caller_id:
                 return jsonify({"error": "Not authorized to generate quests for this period"}), 403
         else:
-            student_id = caller_id
+            user_id = caller_id
 
-        result = period_service.start_homework_agent(auth_token, student_id, period_id)
+        result = period_service.start_homework_agent(auth_token, user_id, period_id)
         return jsonify(result), 200
     except Exception as e:
         logger.error("Error in initiate-homework-agent: %s", e, exc_info=True)
@@ -135,7 +126,7 @@ def initiate_homework_agent():
 @jwt_required()
 def accept_parent_invite():
     try:
-        student_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         data = request.get_json()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
@@ -161,26 +152,26 @@ def accept_parent_invite():
         if datetime.now(timezone.utc) > expires_at:
             return jsonify({"error": "Invite code has expired"}), 410
 
-        parent_id = invite.get("parent_id")
-        parent = _parent_dao.get_parent_by_id(parent_id)
+        user_id = invite.get("user_id")
+        parent = _parent_dao.get_parent_by_id(user_id)
         if not parent:
             return jsonify({"error": "Parent account not found"}), 404
 
-        linked_ids = parent.get("linked_student_ids") or []
-        if student_id in linked_ids:
+        linked_ids = parent.get("linked_user_ids") or []
+        if user_id in linked_ids:
             return jsonify({"message": "Already linked to this parent"}), 200
 
-        linked_ids.append(student_id)
+        linked_ids.append(user_id)
         vpc_verified_at = datetime.now(timezone.utc).isoformat()
-        _parent_dao.update_parent(parent_id, {
-            "linked_student_ids": linked_ids,
+        _parent_dao.update_parent(user_id, {
+            "linked_user_ids": linked_ids,
             "vpc_verified_at": vpc_verified_at,
         })
         _invite_dao.mark_used(code)
 
         return jsonify({
             "message": "Successfully linked to parent account",
-            "parent_id": parent_id,
+            "user_id": user_id,
             "vpc_verified_at": vpc_verified_at,
         }), 200
 

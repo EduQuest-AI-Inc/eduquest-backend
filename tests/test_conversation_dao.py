@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from data_access.conversation_dao import ConversationDAO
+from data_access.supabase.conversation_dao import ConversationDAO
 from models.conversation import Conversation
 
 def test_crud_operations():
@@ -35,6 +35,6 @@ def test_crud_operations():
     # -------Delete-------
     # dao.delete_conversation(conversation.conversation_id)
     # final = dao.get_conversations_by_id("conv_test")
-    # assert not any(c["student_id"] == "student_test" for c in final)
+    # assert not any(c["user_id"] == "student_test" for c in final)
 
 test_crud_operations()

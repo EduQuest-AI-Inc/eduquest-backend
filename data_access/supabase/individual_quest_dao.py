@@ -12,7 +12,7 @@ class IndividualQuestDAO(SupabaseBaseDAO):
         self._insert({
             'individual_quest_id': quest.individual_quest_id,
             'quest_id': quest.quest_id,
-            'student_id': quest.student_id,
+            'user_id': quest.user_id,
             'period_id': quest.period_id,
             'week': quest.week,
             'description': getattr(quest, 'description', ''),
@@ -74,17 +74,17 @@ class IndividualQuestDAO(SupabaseBaseDAO):
         )
         return response.data or []
 
-    def get_quests_by_student(self, student_id: str) -> List[Dict[str, Any]]:
-        return self._select_eq('student_id', student_id)
+    def get_quests_by_student(self, user_id: str) -> List[Dict[str, Any]]:
+        return self._select_eq('user_id', user_id)
 
     def get_quests_by_quest_id(self, quest_id: str) -> List[Dict[str, Any]]:
         return self._select_eq('quest_id', quest_id)
 
-    def get_quests_by_student_and_period(self, student_id: str, period_id: str) -> List[Dict[str, Any]]:
+    def get_quests_by_student_and_period(self, user_id: str, period_id: str) -> List[Dict[str, Any]]:
         response = (
             self._table()
             .select('*')
-            .eq('student_id', student_id)
+            .eq('user_id', user_id)
             .eq('period_id', period_id)
             .execute()
         )

@@ -3,7 +3,7 @@ from typing import List, Optional, Dict
 
 
 class Student(BaseModel):
-    student_id: str  # Partition Key
+    user_id: str  # Partition Key
     first_name: str
     last_name: str
     email: str

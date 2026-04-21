@@ -3,7 +3,7 @@ from typing import Optional
 
 
 class Teacher(BaseModel):
-    teacher_id: str  # Partition Key
+    user_id: str  # Partition Key
     first_name: str
     last_name: str
     email: str

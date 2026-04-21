@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from data_access.student_dao import StudentDAO
+from data_access.supabase.student_dao import StudentDAO
 from models.student import Student
 
 def test_crud_operations():
@@ -12,7 +12,7 @@ def test_crud_operations():
     dao = StudentDAO()
 
     student = Student(
-        student_id="stu456",
+        user_id="stu456",
         first_name="Bob",
         last_name="Tanaka",
         email="bob@example.com",

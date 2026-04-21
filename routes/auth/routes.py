@@ -5,22 +5,13 @@ from .auth_service import register_user, authenticate_user
 from .password_reset_service import get_password_reset_service
 from utils.token_utils import set_auth_cookie
 from utils.validation_utils import get_client_ip
-import os
-
 logger = logging.getLogger(__name__)
 from datetime import datetime, timezone
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.session_dao import SessionDAO
-    from data_access.supabase.student_dao import StudentDAO
-    from data_access.supabase.teacher_dao import TeacherDAO
-    from data_access.supabase.parent_dao import ParentDAO
-    from data_access.supabase.parent_invite_dao import ParentInviteDAO
-else:
-    from data_access.session_dao import SessionDAO
-    from data_access.student_dao import StudentDAO
-    from data_access.teacher_dao import TeacherDAO
-    from data_access.parent_dao import ParentDAO
-    from data_access.parent_invite_dao import ParentInviteDAO
+from data_access.supabase.session_dao import SessionDAO
+from data_access.supabase.student_dao import StudentDAO
+from data_access.supabase.teacher_dao import TeacherDAO
+from data_access.supabase.parent_dao import ParentDAO
+from data_access.supabase.parent_invite_dao import ParentInviteDAO
 from models.session import Session
 from routes.conversation.conversation_service import ConversationService
 
@@ -59,15 +50,9 @@ def signup():
     email_lc = email.strip().lower()
 
     # Check uniqueness using email_lc to prevent case-based duplicates
-    if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-        student_items = student_dao.get_student_by_email_lc(email_lc)
-        teacher_items = teacher_dao.get_teacher_by_email_lc(email_lc)
-        parent_items = parent_dao.get_parent_by_email_lc(email_lc)
-    else:
-        from boto3.dynamodb.conditions import Attr
-        student_items = student_dao.table.scan(FilterExpression=Attr("email_lc").eq(email_lc)).get("Items", [])
-        teacher_items = teacher_dao.table.scan(FilterExpression=Attr("email_lc").eq(email_lc)).get("Items", [])
-        parent_items = parent_dao.table.scan(FilterExpression=Attr("email_lc").eq(email_lc)).get("Items", [])
+    student_items = student_dao.get_student_by_email_lc(email_lc)
+    teacher_items = teacher_dao.get_teacher_by_email_lc(email_lc)
+    parent_items = parent_dao.get_parent_by_email_lc(email_lc)
     if student_items or teacher_items or parent_items:
         return jsonify({'message': 'Email address already in use'}), 409
 
@@ -93,17 +78,17 @@ def signup():
                     if datetime.now(timezone.utc) > expires_at:
                         response_body['invite_warning'] = 'Invite code has expired. You can link your parent account later from your profile.'
                     else:
-                        parent_id = invite.get('parent_id')
-                        parent = parent_dao.get_parent_by_id(parent_id)
+                        user_id = invite.get('user_id')
+                        parent = parent_dao.get_parent_by_id(user_id)
                         if not parent:
                             response_body['invite_warning'] = 'Parent account not found. You can link your parent account later from your profile.'
                         else:
-                            linked_ids = parent.get('linked_student_ids') or []
+                            linked_ids = parent.get('linked_user_ids') or []
                             if username not in linked_ids:
                                 linked_ids.append(username)
                                 vpc_verified_at = datetime.now(timezone.utc).isoformat()
-                                parent_dao.update_parent(parent_id, {
-                                    'linked_student_ids': linked_ids,
+                                parent_dao.update_parent(user_id, {
+                                    'linked_user_ids': linked_ids,
                                     'vpc_verified_at': vpc_verified_at,  # COPPA 2025 homeschool VPC record
                                 })
                                 parent_invite_dao.mark_used(invite_code)

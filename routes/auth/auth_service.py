@@ -1,15 +1,9 @@
 # auth_service.py
 # Handles user registration and authentication logic
 from werkzeug.security import generate_password_hash, check_password_hash
-import os
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.student_dao import StudentDAO
-    from data_access.supabase.teacher_dao import TeacherDAO
-    from data_access.supabase.parent_dao import ParentDAO
-else:
-    from data_access.student_dao import StudentDAO
-    from data_access.teacher_dao import TeacherDAO
-    from data_access.parent_dao import ParentDAO
+from data_access.supabase.student_dao import StudentDAO
+from data_access.supabase.teacher_dao import TeacherDAO
+from data_access.supabase.parent_dao import ParentDAO
 from models.student import Student
 from models.teacher import Teacher
 from models.parent import Parent
@@ -37,7 +31,7 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
             return {"success": False, "error": "Username already exists"}
         hashed_pw = generate_password_hash(password)
         teacher = Teacher(
-            teacher_id=username,
+            user_id=username,
             password=hashed_pw,
             first_name=first_name,
             last_name=last_name,
@@ -54,7 +48,7 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
             return {"success": False, "error": "Username already exists"}
         hashed_pw = generate_password_hash(password)
         parent = Parent(
-            parent_id=username,
+            user_id=username,
             password=hashed_pw,
             first_name=first_name,
             last_name=last_name,
@@ -70,7 +64,7 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
             return {"success": False, "error": "Username already exists"}
         hashed_pw = generate_password_hash(password)
         student = Student(
-            student_id=username,
+            user_id=username,
             password=hashed_pw,
             first_name=first_name,
             last_name=last_name,

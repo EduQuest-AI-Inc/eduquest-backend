@@ -14,7 +14,7 @@ def default_expires_at():
 
 class PasswordResetToken(BaseModel):
     token_hash: str  # Partition Key - SHA-256 hash of the actual token
-    user_id: str  # student_id or teacher_id
+    user_id: str  # user_id of the student or teacher
     role: str  # 'student' or 'teacher'
     email_lc: str  # Canonical lowercase email
     created_at_iso: str  # ISO format timestamp

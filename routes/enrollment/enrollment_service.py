@@ -1,14 +1,7 @@
 import logging
-import os
-
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.enrollment_dao import EnrollmentDAO
-    from data_access.supabase.student_dao import StudentDAO
-    from data_access.supabase.period_dao import PeriodDAO
-else:
-    from data_access.enrollment_dao import EnrollmentDAO
-    from data_access.student_dao import StudentDAO
-    from data_access.period_dao import PeriodDAO
+from data_access.supabase.enrollment_dao import EnrollmentDAO
+from data_access.supabase.student_dao import StudentDAO
+from data_access.supabase.period_dao import PeriodDAO
 
 from models.enrollment import Enrollment
 from datetime import datetime
@@ -22,23 +15,23 @@ class EnrollmentService:
         self.student_dao = StudentDAO()
         self.period_dao = PeriodDAO()
 
-    def enroll_student(self, student_id: str, period_id: str, semester: str = "Fall 2025") -> dict:
-        student = self.student_dao.get_student_by_id(student_id)
+    def enroll_student(self, user_id: str, period_id: str, semester: str = "Fall 2025") -> dict:
+        student = self.student_dao.get_student_by_id(user_id)
         if not student:
-            raise Exception(f"Student {student_id} not found")
+            raise Exception(f"Student {user_id} not found")
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
             raise Exception(f"Period {period_id} not found")
 
         enrollment = Enrollment(
-            student_id=student_id,
+            user_id=user_id,
             period_id=period_id,
             semester=semester,
             enrolled_at=datetime.utcnow().isoformat()
         )
         self.enrollment_dao.add_enrollment(enrollment)
-        return {"message": f"Student {student_id} enrolled in {period_id} successfully"}
+        return {"message": f"Student {user_id} enrolled in {period_id} successfully"}
 
     def get_enrollments_for_period(self, period_id: str):
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
@@ -51,24 +44,21 @@ class EnrollmentService:
     def get_enrollment_by_id(self, enrollment_id: str):
         return self.enrollment_dao.get_enrollment_by_id(enrollment_id)
 
-    def delete_enrollment(self, student_id: str, period_id: str, enrolled_at: str = None):
-        if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-            self.enrollment_dao.delete_enrollment(student_id, period_id)
-        else:
-            self.enrollment_dao.delete_enrollment(period_id, enrolled_at)
-        return {"message": f"Enrollment for {student_id} deleted from {period_id}"}
+    def delete_enrollment(self, user_id: str, period_id: str, enrolled_at: str = None):
+        self.enrollment_dao.delete_enrollment(user_id, period_id)
+        return {"message": f"Enrollment for {user_id} deleted from {period_id}"}
 
-    def get_student_profile(self, period_id: str, student_id: str):
+    def get_student_profile(self, period_id: str, user_id: str):
         try:
             enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
             if not enrollments:
                 return None
 
-            matched_enrollment = next((e for e in enrollments if e.get("student_id") == student_id), None)
+            matched_enrollment = next((e for e in enrollments if e.get("user_id") == user_id), None)
             if not matched_enrollment:
                 return None
 
-            student = self.student_dao.get_student_by_id(student_id)
+            student = self.student_dao.get_student_by_id(user_id)
             if not student:
                 return None
 

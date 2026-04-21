@@ -6,7 +6,7 @@ from models.weekly_quest_item import WeeklyQuestItem
 
 class WeeklyQuest(BaseModel):
     quest_id: str  # Partition Key
-    student_id: str
+    user_id: str
     period_id: str
     student_period_key: Optional[str] = None  # DynamoDB-only composite key for GSI
     quests: Optional[List[WeeklyQuestItem]] = None  # DynamoDB-only embedded list; Supabase uses individual_quest table

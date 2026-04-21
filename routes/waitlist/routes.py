@@ -27,13 +27,13 @@ def join_pilot_waitlist():
         - joined_at: Timestamp when joined
     """
     try:
-        teacher_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         data = request.get_json(silent=True) or {}
         
         # Accept referralCode or referral_code from request body
         referral_code = data.get('referralCode') or data.get('referral_code')
         
-        result = svc.join(teacher_id, referral_code)
+        result = svc.join(user_id, referral_code)
         return jsonify(result), 200
     except ValueError as ve:
         return jsonify({"message": str(ve)}), 400
@@ -56,8 +56,8 @@ def get_waitlist_status():
         - status: Current status string
     """
     try:
-        teacher_id = get_jwt_identity()
-        result = svc.get_status(teacher_id)
+        user_id = get_jwt_identity()
+        result = svc.get_status(user_id)
         return jsonify(result), 200
 
     except Exception:
@@ -65,15 +65,15 @@ def get_waitlist_status():
         return jsonify({"message": "Failed to get waitlist status"}), 500
 
 
-@waitlist_bp.route('/approve/<teacher_id>', methods=['POST'])
+@waitlist_bp.route('/approve/<user_id>', methods=['POST'])
 @jwt_required()
-def approve_teacher(teacher_id: str):
+def approve_teacher(user_id: str):
     """
     Approve a teacher for pilot study access.
     This is an admin-only endpoint (add proper admin check in production).
     
     Args:
-        teacher_id: The teacher ID to approve
+        user_id: The teacher ID to approve
     
     Returns:
         - success: Whether the approval succeeded
@@ -81,7 +81,7 @@ def approve_teacher(teacher_id: str):
     try:
         # TODO: Add admin role check here
         # For now, just allow the operation
-        result = svc.approve(teacher_id)
+        result = svc.approve(user_id)
         
         if result.get("success"):
             return jsonify(result), 200

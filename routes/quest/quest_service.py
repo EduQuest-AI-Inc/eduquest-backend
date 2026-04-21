@@ -15,27 +15,27 @@ class QuestService:
         self._grading = QuestGradingService()
 
     # Creation
-    def save_schedule_to_weekly_quests(self, schedule_data, student_id, period_id):
-        return self._creation.save_schedule_to_weekly_quests(schedule_data, student_id, period_id)
+    def save_schedule_to_weekly_quests(self, schedule_data, user_id, period_id):
+        return self._creation.save_schedule_to_weekly_quests(schedule_data, user_id, period_id)
 
-    def create_individual_quests_from_homework(self, homework_data, student_id, period_id):
-        return self._creation.create_individual_quests_from_homework(homework_data, student_id, period_id)
+    def create_individual_quests_from_homework(self, homework_data, user_id, period_id):
+        return self._creation.create_individual_quests_from_homework(homework_data, user_id, period_id)
 
     # Retrieval
-    def get_weekly_quests_for_student(self, student_id, period_id):
-        return self._retrieval.get_weekly_quests_for_student(student_id, period_id)
+    def get_weekly_quests_for_student(self, user_id, period_id):
+        return self._retrieval.get_weekly_quests_for_student(user_id, period_id)
 
-    def get_individual_quests_for_student(self, student_id):
-        return self._retrieval.get_individual_quests_for_student(student_id)
+    def get_individual_quests_for_student(self, user_id):
+        return self._retrieval.get_individual_quests_for_student(user_id)
 
-    def get_individual_quests_for_student_and_period(self, student_id, period_id):
-        return self._retrieval.get_individual_quests_for_student_and_period(student_id, period_id)
+    def get_individual_quests_for_student_and_period(self, user_id, period_id):
+        return self._retrieval.get_individual_quests_for_student_and_period(user_id, period_id)
 
     def get_individual_quest_by_id(self, quest_id, individual_quest_id):
         return self._retrieval.get_individual_quest_by_id(quest_id, individual_quest_id)
 
-    def verify_quest_structure(self, student_id, period_id):
-        return self._retrieval.verify_quest_structure(student_id, period_id)
+    def verify_quest_structure(self, user_id, period_id):
+        return self._retrieval.verify_quest_structure(user_id, period_id)
 
     @staticmethod
     def parse_grade_data(grade_str):
@@ -49,11 +49,11 @@ class QuestService:
     def update_individual_quest_status(self, quest_id, individual_quest_id, status):
         return self._grading.update_individual_quest_status(quest_id, individual_quest_id, status)
 
-    def update_weekly_quest_with_homework(self, homework_data, student_id, period_id):
-        return self._grading.update_weekly_quest_with_homework(homework_data, student_id, period_id)
+    def update_weekly_quest_with_homework(self, homework_data, user_id, period_id):
+        return self._grading.update_weekly_quest_with_homework(homework_data, user_id, period_id)
 
-    def update_quests_preserving_completed_data(self, schedule_data, homework_data, student_id, period_id):
-        return self._grading.update_quests_preserving_completed_data(schedule_data, homework_data, student_id, period_id)
+    def update_quests_preserving_completed_data(self, schedule_data, homework_data, user_id, period_id):
+        return self._grading.update_quests_preserving_completed_data(schedule_data, homework_data, user_id, period_id)
 
-    def save_homework_to_individual_quests(self, homework_data, student_id, period_id):
-        return self._creation.create_individual_quests_from_homework(homework_data, student_id, period_id)
+    def save_homework_to_individual_quests(self, homework_data, user_id, period_id):
+        return self._creation.create_individual_quests_from_homework(homework_data, user_id, period_id)

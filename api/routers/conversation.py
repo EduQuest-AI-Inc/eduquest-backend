@@ -86,7 +86,7 @@ async def initiate_update_assistant(
 
             individual_quest_id = form.get("individual_quest_id")
             week = form.get("week")
-            student_id = form.get("student_id")
+            user_id = form.get("user_id")
             period_id = form.get("period_id")
 
             if not individual_quest_id:
@@ -102,10 +102,7 @@ async def initiate_update_assistant(
 
             # Fetch quest data to build quests_file JSON
             try:
-                if os.getenv("USE_SUPABASE", "false").lower() == "true":
-                    from data_access.supabase.individual_quest_dao import IndividualQuestDAO
-                else:
-                    from data_access.individual_quest_dao import IndividualQuestDAO
+                from data_access.supabase.individual_quest_dao import IndividualQuestDAO
                 quest_data = IndividualQuestDAO().get_individual_quest_by_id(individual_quest_id)
                 if not quest_data:
                     raise HTTPException(status_code=404, detail="Quest not found")
@@ -132,7 +129,7 @@ async def initiate_update_assistant(
                         is_instructor=False,
                         week=int(week),
                         submission_file=temp_path,
-                        student_id=student_id,
+                        user_id=user_id,
                         period_id=period_id,
                         individual_quest_id=individual_quest_id,
                     ),
@@ -151,7 +148,7 @@ async def initiate_update_assistant(
             is_instructor = data.get("is_instructor", False)
             week = data.get("week")
             submission_file = data.get("submission_file")
-            student_id = data.get("student_id")
+            user_id = data.get("user_id")
             period_id = data.get("period_id")
 
             if not quests_file:
@@ -176,7 +173,7 @@ async def initiate_update_assistant(
                     is_instructor=is_instructor,
                     week=week,
                     submission_file=submission_file,
-                    student_id=student_id,
+                    user_id=user_id,
                     period_id=period_id,
                 ),
             )
@@ -195,7 +192,7 @@ async def initiate_update_assistant(
 class ContinueUpdateRequest(BaseModel):
     conversation_id: str
     message: str
-    student_id: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 @router.post("/continue-update-assistant")
@@ -208,7 +205,7 @@ def continue_update_assistant(
             auth_token=auth.token,
             conversation_id=body.conversation_id,
             message=body.message,
-            student_id=body.student_id,
+            user_id=body.user_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

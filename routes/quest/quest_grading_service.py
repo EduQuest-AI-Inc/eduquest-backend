@@ -1,12 +1,6 @@
-import os
 import uuid
-
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
-    from data_access.supabase.individual_quest_dao import IndividualQuestDAO
-else:
-    from data_access.weekly_quest_dao import WeeklyQuestDAO
-    from data_access.individual_quest_dao import IndividualQuestDAO
+from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
+from data_access.supabase.individual_quest_dao import IndividualQuestDAO
 
 from models.weekly_quest import WeeklyQuest
 from models.individual_quest import IndividualQuest
@@ -27,10 +21,10 @@ class QuestGradingService:
             "status": status,
         }
 
-    def update_weekly_quest_with_homework(self, homework_data: dict, student_id: str, period_id: str) -> dict:
-        weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_student_and_period(student_id, period_id)
+    def update_weekly_quest_with_homework(self, homework_data: dict, user_id: str, period_id: str) -> dict:
+        weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_student_and_period(user_id, period_id)
         if not weekly_quest:
-            raise Exception(f"No weekly quest found for student {student_id} and period {period_id}")
+            raise Exception(f"No weekly quest found for student {user_id} and period {period_id}")
 
         quest_id = weekly_quest['quest_id'] if isinstance(weekly_quest, dict) else weekly_quest.quest_id
         individual_quests = self.individual_quest_dao.get_quests_by_quest_id(quest_id)
@@ -54,7 +48,7 @@ class QuestGradingService:
                 individual_quest = IndividualQuest(
                     individual_quest_id=str(uuid.uuid4()),
                     quest_id=quest_id,
-                    student_id=student_id,
+                    user_id=user_id,
                     period_id=period_id,
                     description=homework_quest.get("Name", ""),
                     skills=homework_quest.get("Skills", ""),
@@ -74,24 +68,24 @@ class QuestGradingService:
         }
 
     def update_quests_preserving_completed_data(
-        self, schedule_data: dict, homework_data: dict, student_id: str, period_id: str
+        self, schedule_data: dict, homework_data: dict, user_id: str, period_id: str
     ) -> dict:
-        existing_quests = self.individual_quest_dao.get_quests_by_student_and_period(student_id, period_id)
+        existing_quests = self.individual_quest_dao.get_quests_by_student_and_period(user_id, period_id)
         existing_by_week = {q['week']: q for q in existing_quests}
 
-        weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_student_and_period(student_id, period_id)
+        weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_student_and_period(user_id, period_id)
 
         if not weekly_quest and existing_quests:
             quest_id = existing_quests[0]['quest_id']
             self.weekly_quest_dao.add_weekly_quest(
-                WeeklyQuest(quest_id=quest_id, student_id=student_id, period_id=period_id)
+                WeeklyQuest(quest_id=quest_id, user_id=user_id, period_id=period_id)
             )
             weekly_quest = {'quest_id': quest_id}
         elif not weekly_quest:
             from routes.quest.quest_creation_service import QuestCreationService
             creator = QuestCreationService()
-            schedule_result = creator.save_schedule_to_weekly_quests(schedule_data, student_id, period_id)
-            homework_result = self.update_weekly_quest_with_homework(homework_data, student_id, period_id)
+            schedule_result = creator.save_schedule_to_weekly_quests(schedule_data, user_id, period_id)
+            homework_result = self.update_weekly_quest_with_homework(homework_data, user_id, period_id)
             return {
                 "message": "Created new quest structure",
                 "schedule_result": schedule_result,
@@ -136,7 +130,7 @@ class QuestGradingService:
                 self.individual_quest_dao.add_individual_quest(IndividualQuest(
                     individual_quest_id=str(uuid.uuid4()),
                     quest_id=quest_id,
-                    student_id=student_id,
+                    user_id=user_id,
                     period_id=period_id,
                     description=homework_quest.get("Name", quest_data.get("Name", "")),
                     skills=quest_data.get("Skills", ""),
@@ -148,7 +142,7 @@ class QuestGradingService:
                 created_count += 1
 
         self.weekly_quest_dao.update_weekly_quest(quest_id, {})
-        total = len(self.individual_quest_dao.get_quests_by_student_and_period(student_id, period_id))
+        total = len(self.individual_quest_dao.get_quests_by_student_and_period(user_id, period_id))
         return {
             "message": "Successfully updated quests preserving completed data",
             "preserved_quests": preserved_count,

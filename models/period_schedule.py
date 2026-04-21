@@ -9,7 +9,7 @@ class PeriodSchedule(BaseModel):
     This is teacher/period scoped, not student scoped.
     """
     period_id: str  # Partition Key
-    teacher_id: str
+    user_id: str
     vector_store_id: str
     schedule_s3_key: Optional[str] = None  # S3 key for schedule.json
     schedule_json: Optional[Dict[str, Any]] = None  # Full schedule payload stored in DynamoDB (fallback when S3 unavailable)

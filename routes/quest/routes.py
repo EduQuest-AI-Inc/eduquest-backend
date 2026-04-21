@@ -1,17 +1,11 @@
 import logging
-import os
 
 from flask import Blueprint, request, jsonify
 from routes.quest.quest_service import QuestService
 from routes.quest.quest_retrieval_service import QuestRetrievalService
 from utils.token_utils import extract_auth_token, get_user_id_from_token
-
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.session_dao import SessionDAO
-    from data_access.supabase.individual_quest_dao import IndividualQuestDAO
-else:
-    from data_access.session_dao import SessionDAO
-    from data_access.individual_quest_dao import IndividualQuestDAO
+from data_access.supabase.session_dao import SessionDAO
+from data_access.supabase.individual_quest_dao import IndividualQuestDAO
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +48,11 @@ def get_individual_quests():
         return jsonify({"error": "Failed to get individual quests"}), 500
 
 
-@quest_bp.route('/individual-quests/<student_id>', methods=['GET'])
-def get_student_individual_quests(student_id):
+@quest_bp.route('/individual-quests/<user_id>', methods=['GET'])
+def get_student_individual_quests(user_id):
     try:
         _get_user_id()  # auth check
-        quests = quest_service.get_individual_quests_for_student(student_id)
+        quests = quest_service.get_individual_quests_for_student(user_id)
         for quest in quests:
             QuestRetrievalService.attach_grade_display(quest)
         return jsonify(quests), 200

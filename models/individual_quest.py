@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 class IndividualQuest(BaseModel):
     individual_quest_id: str  
     quest_id: str  
-    student_id: str
+    user_id: str
     period_id: str
     description: str
     grade: Optional[str] = Field(default=None, description="Grade data as JSON string containing detailed_grade (rubric breakdown) and overall_score (summary). For legacy compatibility, may contain simple grade values.")

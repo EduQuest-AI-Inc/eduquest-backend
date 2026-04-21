@@ -12,7 +12,7 @@ class PeriodScheduleDAO(SupabaseBaseDAO):
     def add_period_schedule(self, period_schedule) -> None:
         self._insert({
             'period_id': period_schedule.period_id,
-            'teacher_id': period_schedule.teacher_id,
+            'user_id': period_schedule.user_id,
             'vector_store_id': period_schedule.vector_store_id,
             'schedule_s3_key': getattr(period_schedule, 'schedule_s3_key', None),
             'schedule_json': getattr(period_schedule, 'schedule_json', None),

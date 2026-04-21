@@ -27,7 +27,7 @@ def create_period():
     No Canvas integration, no pilot gate.
     """
     try:
-        parent_id = get_jwt_identity()
+        user_id = get_jwt_identity()
 
         course = request.form.get("course")
         files = request.files.getlist("files")
@@ -54,7 +54,7 @@ def create_period():
 
         period = parent_service.create_period(
             course=course,
-            parent_id=parent_id,
+            user_id=user_id,
             vector_store_id=vector_store.id,
             file_urls=[],
         )
@@ -79,7 +79,7 @@ def create_period():
         try:
             schedule_result = period_schedule_service.generate_and_save_schedule(
                 period_id=period_id,
-                teacher_id=parent_id
+                user_id=user_id
             )
             logger.info("Schedule generated successfully for parent period %s", period_id)
         except Exception as schedule_error:
@@ -103,8 +103,8 @@ def create_period():
 def my_periods():
     """Return all homeschool classes owned by the authenticated parent."""
     try:
-        parent_id = get_jwt_identity()
-        periods = parent_service.get_periods_by_parent(parent_id)
+        user_id = get_jwt_identity()
+        periods = parent_service.get_periods_by_parent(user_id)
         return jsonify({"periods": periods}), 200
     except Exception as e:
         logger.error("Error fetching parent periods: %s", e, exc_info=True)
@@ -119,8 +119,8 @@ def generate_invite():
     The student enters this code to link their account to this parent.
     """
     try:
-        parent_id = get_jwt_identity()
-        invite = parent_service.generate_invite(parent_id)
+        user_id = get_jwt_identity()
+        invite = parent_service.generate_invite(user_id)
         return jsonify(invite), 201
     except Exception as e:
         logger.error("Error generating invite: %s", e, exc_info=True)
@@ -135,8 +135,8 @@ def get_students():
     Audit-logged per SOC 2 / Rule 6.
     """
     try:
-        parent_id = get_jwt_identity()
-        students = parent_service.get_linked_students(parent_id)
+        user_id = get_jwt_identity()
+        students = parent_service.get_linked_students(user_id)
         return jsonify({"students": students}), 200
     except Exception as e:
         logger.error("Error fetching linked students: %s", e, exc_info=True)
@@ -150,7 +150,7 @@ def get_students():
 def generate_period_schedule():
     """Generate (or regenerate) the AI schedule for a parent-owned period."""
     try:
-        parent_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         body = request.get_json(silent=True) or {}
         period_id = body.get("period_id")
         if not period_id:
@@ -158,7 +158,7 @@ def generate_period_schedule():
 
         result = period_schedule_service.generate_and_save_schedule(
             period_id=period_id,
-            teacher_id=parent_id
+            user_id=user_id
         )
         return jsonify(result), 200
 
@@ -176,14 +176,14 @@ def generate_period_schedule():
 def get_period_schedule():
     """Return the schedule for a parent-owned period."""
     try:
-        parent_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         period_id = request.args.get("period_id")
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
 
         result = period_schedule_service.get_schedule(
             period_id=period_id,
-            teacher_id=parent_id
+            user_id=user_id
         )
         if result is None:
             return jsonify({"error": "No schedule found for this period"}), 404
@@ -203,7 +203,7 @@ def get_period_schedule():
 def update_period_schedule():
     """Save manual edits to the schedule for a parent-owned period."""
     try:
-        parent_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         body = request.get_json(silent=True) or {}
         period_id = body.get("period_id")
         schedule_dict = body.get("schedule")
@@ -212,7 +212,7 @@ def update_period_schedule():
 
         result = period_schedule_service.update_schedule(
             period_id=period_id,
-            teacher_id=parent_id,
+            user_id=user_id,
             schedule_dict=schedule_dict
         )
         return jsonify(result), 200
@@ -231,7 +231,7 @@ def update_period_schedule():
 def set_quest_weeks():
     """Set which weeks have quests enabled for a parent-owned period."""
     try:
-        parent_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         body = request.get_json(silent=True) or {}
         period_id = body.get("period_id")
         quest_enabled_weeks = body.get("quest_enabled_weeks")
@@ -240,7 +240,7 @@ def set_quest_weeks():
 
         result = period_schedule_service.set_quest_weeks(
             period_id=period_id,
-            teacher_id=parent_id,
+            user_id=user_id,
             quest_enabled_weeks=quest_enabled_weeks
         )
         return jsonify(result), 200
