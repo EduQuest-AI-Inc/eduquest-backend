@@ -1,29 +1,18 @@
 import logging
-import os
 from typing import Dict, Any, List
 from routes.auth_utils import require_auth
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
+from data_access.supabase.period_dao import PeriodDAO
+from data_access.supabase.session_dao import SessionDAO
+from data_access.supabase.student_dao import StudentDAO
+from data_access.supabase.enrollment_dao import EnrollmentDAO
+from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
+from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+from data_access.supabase.ltg_conversation_dao import LtgConversationDAO
+from data_access.supabase.conversation_dao import ConversationDAO
 
 logger = logging.getLogger(__name__)
-
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.period_dao import PeriodDAO
-    from data_access.supabase.session_dao import SessionDAO
-    from data_access.supabase.student_dao import StudentDAO
-    from data_access.supabase.enrollment_dao import EnrollmentDAO
-    from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
-    from data_access.supabase.individual_quest_dao import IndividualQuestDAO
-    from data_access.supabase.ltg_conversation_dao import LtgConversationDAO
-    from data_access.supabase.conversation_dao import ConversationDAO
-else:
-    from data_access.period_dao import PeriodDAO
-    from data_access.session_dao import SessionDAO
-    from data_access.student_dao import StudentDAO
-    from data_access.enrollment_dao import EnrollmentDAO
-    from data_access.weekly_quest_dao import WeeklyQuestDAO
-    from data_access.individual_quest_dao import IndividualQuestDAO
-    from data_access.conversation_dao import ConversationDAO
 
 from models.enrollment import Enrollment
 

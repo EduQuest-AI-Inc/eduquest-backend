@@ -1,17 +1,11 @@
 import logging
-import os
 
 from flask import Blueprint, request, jsonify
 from routes.quest.quest_service import QuestService
 from routes.quest.quest_retrieval_service import QuestRetrievalService
 from utils.token_utils import extract_auth_token, get_user_id_from_token
-
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.session_dao import SessionDAO
-    from data_access.supabase.individual_quest_dao import IndividualQuestDAO
-else:
-    from data_access.session_dao import SessionDAO
-    from data_access.individual_quest_dao import IndividualQuestDAO
+from data_access.supabase.session_dao import SessionDAO
+from data_access.supabase.individual_quest_dao import IndividualQuestDAO
 
 logger = logging.getLogger(__name__)
 

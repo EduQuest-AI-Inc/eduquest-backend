@@ -1,14 +1,7 @@
 import logging
-import os
-
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.enrollment_dao import EnrollmentDAO
-    from data_access.supabase.student_dao import StudentDAO
-    from data_access.supabase.period_dao import PeriodDAO
-else:
-    from data_access.enrollment_dao import EnrollmentDAO
-    from data_access.student_dao import StudentDAO
-    from data_access.period_dao import PeriodDAO
+from data_access.supabase.enrollment_dao import EnrollmentDAO
+from data_access.supabase.student_dao import StudentDAO
+from data_access.supabase.period_dao import PeriodDAO
 
 from models.enrollment import Enrollment
 from datetime import datetime
@@ -52,10 +45,7 @@ class EnrollmentService:
         return self.enrollment_dao.get_enrollment_by_id(enrollment_id)
 
     def delete_enrollment(self, user_id: str, period_id: str, enrolled_at: str = None):
-        if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-            self.enrollment_dao.delete_enrollment(user_id, period_id)
-        else:
-            self.enrollment_dao.delete_enrollment(period_id, enrolled_at)
+        self.enrollment_dao.delete_enrollment(user_id, period_id)
         return {"message": f"Enrollment for {user_id} deleted from {period_id}"}
 
     def get_student_profile(self, period_id: str, user_id: str):

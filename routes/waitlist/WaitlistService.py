@@ -1,11 +1,6 @@
 from typing import Dict, Optional
-import os
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.waitlist_dao import WaitlistDAO
-    from data_access.supabase.teacher_dao import TeacherDAO
-else:
-    from data_access.waitlist_dao import WaitlistDAO
-    from data_access.teacher_dao import TeacherDAO
+from data_access.supabase.waitlist_dao import WaitlistDAO
+from data_access.supabase.teacher_dao import TeacherDAO
 
 
 class WaitlistService:

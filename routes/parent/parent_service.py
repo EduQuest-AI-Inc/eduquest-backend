@@ -1,19 +1,11 @@
-import os
 import secrets
 import string
 from datetime import datetime, timedelta, timezone
 from constants.timeouts import INVITE_EXPIRY_HOURS
-
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.period_dao import PeriodDAO
-    from data_access.supabase.parent_dao import ParentDAO
-    from data_access.supabase.parent_invite_dao import ParentInviteDAO
-    from data_access.supabase.student_dao import StudentDAO
-else:
-    from data_access.period_dao import PeriodDAO
-    from data_access.parent_dao import ParentDAO
-    from data_access.parent_invite_dao import ParentInviteDAO
-    from data_access.student_dao import StudentDAO
+from data_access.supabase.period_dao import PeriodDAO
+from data_access.supabase.parent_dao import ParentDAO
+from data_access.supabase.parent_invite_dao import ParentInviteDAO
+from data_access.supabase.student_dao import StudentDAO
 
 from models.period import Period
 from models.parent_invite import ParentInvite

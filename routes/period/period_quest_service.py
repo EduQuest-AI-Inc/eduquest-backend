@@ -1,20 +1,11 @@
-import os
 from typing import Dict, Any
 from routes.auth_utils import require_auth
-
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.period_dao import PeriodDAO
-    from data_access.supabase.session_dao import SessionDAO
-    from data_access.supabase.student_dao import StudentDAO
-    from data_access.supabase.enrollment_dao import EnrollmentDAO
-    from data_access.supabase.period_schedule_dao import PeriodScheduleDAO
-    from data_access.supabase.ltg_conversation_dao import LtgConversationDAO
-else:
-    from data_access.period_dao import PeriodDAO
-    from data_access.session_dao import SessionDAO
-    from data_access.student_dao import StudentDAO
-    from data_access.enrollment_dao import EnrollmentDAO
-    from data_access.period_schedule_dao import PeriodScheduleDAO
+from data_access.supabase.period_dao import PeriodDAO
+from data_access.supabase.session_dao import SessionDAO
+from data_access.supabase.student_dao import StudentDAO
+from data_access.supabase.enrollment_dao import EnrollmentDAO
+from data_access.supabase.period_schedule_dao import PeriodScheduleDAO
+from data_access.supabase.ltg_conversation_dao import LtgConversationDAO
 
 from bots.agent import HWAgent
 from routes.quest.quest_service import QuestService

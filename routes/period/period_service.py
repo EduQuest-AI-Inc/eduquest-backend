@@ -2,17 +2,11 @@
 Thin orchestrator — delegates to focused sub-services.
 Kept for backwards compatibility so routes.py imports remain unchanged.
 """
-import os
 from routes.period.period_enrollment_service import PeriodEnrollmentService
 from routes.period.period_ltg_service import PeriodLTGService
 from routes.period.period_quest_service import PeriodQuestService
-
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.session_dao import SessionDAO
-    from data_access.supabase.period_dao import PeriodDAO
-else:
-    from data_access.session_dao import SessionDAO
-    from data_access.period_dao import PeriodDAO
+from data_access.supabase.session_dao import SessionDAO
+from data_access.supabase.period_dao import PeriodDAO
 
 
 class PeriodService:

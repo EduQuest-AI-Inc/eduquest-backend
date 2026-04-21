@@ -13,10 +13,7 @@ from routes.teacher.teacher_service import TeacherService
 from routes.teacher.period_schedule_service import PeriodScheduleService
 from routes.waitlist.WaitlistService import WaitlistService
 
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.teacher_dao import TeacherDAO
-else:
-    from data_access.teacher_dao import TeacherDAO
+from data_access.supabase.teacher_dao import TeacherDAO
 from services.s3_service import upload_file_to_s3
 from services.canvas_service import Course as CanvasCourse, course_to_json
 

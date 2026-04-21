@@ -1,5 +1,4 @@
 import logging
-import os
 from datetime import datetime, timezone
 
 from flask import Blueprint, request, jsonify
@@ -7,12 +6,8 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from .period_service import PeriodService
 from utils.token_utils import extract_auth_token, get_user_id_from_token
 
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.parent_dao import ParentDAO
-    from data_access.supabase.parent_invite_dao import ParentInviteDAO
-else:
-    from data_access.parent_dao import ParentDAO
-    from data_access.parent_invite_dao import ParentInviteDAO
+from data_access.supabase.parent_dao import ParentDAO
+from data_access.supabase.parent_invite_dao import ParentInviteDAO
 
 logger = logging.getLogger(__name__)
 

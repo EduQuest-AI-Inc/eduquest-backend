@@ -1,20 +1,13 @@
 import logging
-import os
 
 from canvasapi import Canvas
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity, decode_token
 from .user_service import UserService
 from utils.token_utils import extract_auth_token
-
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.student_dao import StudentDAO
-    from data_access.supabase.teacher_dao import TeacherDAO
-    from data_access.supabase.session_dao import SessionDAO
-else:
-    from data_access.student_dao import StudentDAO
-    from data_access.teacher_dao import TeacherDAO
-    from data_access.session_dao import SessionDAO
+from data_access.supabase.student_dao import StudentDAO
+from data_access.supabase.teacher_dao import TeacherDAO
+from data_access.supabase.session_dao import SessionDAO
 
 logger = logging.getLogger(__name__)
 user_bp = Blueprint('user', __name__)

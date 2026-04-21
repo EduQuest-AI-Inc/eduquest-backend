@@ -1,12 +1,6 @@
-import os
 import json
-
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
-    from data_access.supabase.individual_quest_dao import IndividualQuestDAO
-else:
-    from data_access.weekly_quest_dao import WeeklyQuestDAO
-    from data_access.individual_quest_dao import IndividualQuestDAO
+from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
+from data_access.supabase.individual_quest_dao import IndividualQuestDAO
 
 
 class QuestRetrievalService:
