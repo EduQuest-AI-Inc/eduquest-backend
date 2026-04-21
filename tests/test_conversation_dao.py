@@ -35,6 +35,6 @@ def test_crud_operations():
     # -------Delete-------
     # dao.delete_conversation(conversation.conversation_id)
     # final = dao.get_conversations_by_id("conv_test")
-    # assert not any(c["student_id"] == "student_test" for c in final)
+    # assert not any(c["user_id"] == "student_test" for c in final)
 
 test_crud_operations()

@@ -54,11 +54,11 @@ def get_individual_quests():
         return jsonify({"error": "Failed to get individual quests"}), 500
 
 
-@quest_bp.route('/individual-quests/<student_id>', methods=['GET'])
-def get_student_individual_quests(student_id):
+@quest_bp.route('/individual-quests/<user_id>', methods=['GET'])
+def get_student_individual_quests(user_id):
     try:
         _get_user_id()  # auth check
-        quests = quest_service.get_individual_quests_for_student(student_id)
+        quests = quest_service.get_individual_quests_for_student(user_id)
         for quest in quests:
             QuestRetrievalService.attach_grade_display(quest)
         return jsonify(quests), 200

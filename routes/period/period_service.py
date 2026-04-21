@@ -40,8 +40,8 @@ class PeriodService:
     def continue_ltg_conversation(self, auth_token, conversation_type, conversation_id, message, period_id=None):
         return self._ltg.continue_ltg_conversation(auth_token, conversation_type, conversation_id, message, period_id)
 
-    def start_homework_agent(self, auth_token, student_id, period_id):
-        return self._quest.start_homework_agent(auth_token, student_id, period_id)
+    def start_homework_agent(self, auth_token, user_id, period_id):
+        return self._quest.start_homework_agent(auth_token, user_id, period_id)
 
-    def update_quests_with_recommended_change(self, auth_token, period_id, recommended_change, student_id=None):
-        return self._quest.update_quests_with_recommended_change(auth_token, student_id, period_id, recommended_change)
+    def update_quests_with_recommended_change(self, auth_token, period_id, recommended_change, user_id=None):
+        return self._quest.update_quests_with_recommended_change(auth_token, user_id, period_id, recommended_change)

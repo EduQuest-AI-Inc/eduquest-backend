@@ -23,13 +23,13 @@ def test_immediate_retrieval():
     dao = WeeklyQuestDAO()
     
     # Create test data
-    student_id = "test_student_immediate"
+    user_id = "test_student_immediate"
     period_id = "test_period_immediate"
     quest_id = str(uuid.uuid4())
     
     # Clean up any existing test data first
     try:
-        existing = dao.get_weekly_quest_by_student_and_period(student_id, period_id)
+        existing = dao.get_weekly_quest_by_student_and_period(user_id, period_id)
         if existing:
             dao.delete_weekly_quest(existing.quest_id)
             print(f"Cleaned up existing test quest: {existing.quest_id}")
@@ -49,7 +49,7 @@ def test_immediate_retrieval():
     # Create weekly quest
     weekly_quest = WeeklyQuest(
         quest_id=quest_id,
-        student_id=student_id,
+        user_id=user_id,
         period_id=period_id,
         quests=[quest_item]
     )
@@ -62,12 +62,12 @@ def test_immediate_retrieval():
         
         # Immediately try to retrieve it
         print("Attempting immediate retrieval...")
-        retrieved_quest = dao.get_weekly_quest_by_student_and_period(student_id, period_id)
+        retrieved_quest = dao.get_weekly_quest_by_student_and_period(user_id, period_id)
         
         if retrieved_quest:
             print("✓ SUCCESS: Quest retrieved immediately!")
             print(f"  Retrieved quest ID: {retrieved_quest.quest_id}")
-            print(f"  Student ID: {retrieved_quest.student_id}")
+            print(f"  Student ID: {retrieved_quest.user_id}")
             print(f"  Period ID: {retrieved_quest.period_id}")
             print(f"  Number of quests: {len(retrieved_quest.quests)}")
             return True
@@ -95,13 +95,13 @@ def test_retry_mechanism():
     dao = WeeklyQuestDAO()
     
     # Use different test data for retry test
-    student_id = "test_student_retry"
+    user_id = "test_student_retry"
     period_id = "test_period_retry"
     quest_id = str(uuid.uuid4())
     
     # Clean up any existing test data
     try:
-        existing = dao.get_weekly_quest_by_student_and_period(student_id, period_id)
+        existing = dao.get_weekly_quest_by_student_and_period(user_id, period_id)
         if existing:
             dao.delete_weekly_quest(existing.quest_id)
     except Exception:
@@ -118,7 +118,7 @@ def test_retry_mechanism():
     
     weekly_quest = WeeklyQuest(
         quest_id=quest_id,
-        student_id=student_id,
+        user_id=user_id,
         period_id=period_id,
         quests=[quest_item]
     )
@@ -129,7 +129,7 @@ def test_retry_mechanism():
         print("✓ Quest saved for retry test")
         
         # Test retrieval (should work with strong consistency + retries)
-        retrieved_quest = dao.get_weekly_quest_by_student_and_period(student_id, period_id)
+        retrieved_quest = dao.get_weekly_quest_by_student_and_period(user_id, period_id)
         
         if retrieved_quest:
             print("✓ SUCCESS: Retry mechanism working properly!")

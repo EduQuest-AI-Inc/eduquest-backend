@@ -9,7 +9,7 @@ def default_expiry() -> str:
 
 class ParentInvite(BaseModel):
     code: str       # Partition Key — 8-char random token
-    parent_id: str
+    user_id: str
     expires_at: str  # ISO timestamp
     used: bool = False
 

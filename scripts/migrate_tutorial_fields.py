@@ -31,7 +31,7 @@ def migrate_tutorial_fields():
         
         migrated_count = 0
         for student in students:
-            student_id = student.get('student_id')
+            user_id = student.get('user_id')
             
             # Check if completed_tutorial field already exists
             has_completed_tutorial = 'completed_tutorial' in student
@@ -39,11 +39,11 @@ def migrate_tutorial_fields():
             if not has_completed_tutorial:
                 try:
                     # Add the new field with default value False
-                    student_dao.update_student(student_id, {'completed_tutorial': False})
+                    student_dao.update_student(user_id, {'completed_tutorial': False})
                     migrated_count += 1
-                    print(f"Migrated student {student_id}")
+                    print(f"Migrated student {user_id}")
                 except Exception as e:
-                    print(f"Error migrating student {student_id}: {e}")
+                    print(f"Error migrating student {user_id}: {e}")
         
         print(f"Migration completed. {migrated_count} students migrated.")
         

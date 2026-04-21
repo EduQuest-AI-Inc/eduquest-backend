@@ -13,7 +13,7 @@ def test_crud_operations():
     now = datetime.now(timezone.utc).isoformat()
 
     teacher = Teacher(
-        teacher_id="teach001",
+        user_id="teach001",
         first_name="Bob",
         last_name="Smith",
         email="bob@example.com",

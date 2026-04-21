@@ -47,13 +47,13 @@ def create_period(
     canvas_course_name: Optional[str] = Form(default=None),
     auth: AuthPayload = Depends(get_auth),
 ):
-    teacher_id = auth.sub
+    user_id = auth.sub
 
     pilot_waitlist_enabled = os.getenv("PILOT_WAITLIST_ENABLED", "true").lower() == "true"
     if pilot_waitlist_enabled:
-        teacher = teacher_dao.get_teacher_by_id(teacher_id)
+        teacher = teacher_dao.get_teacher_by_id(user_id)
         if not teacher or not teacher.get("pilot_approved", False):
-            waitlist_status = waitlist_service.get_status(teacher_id)
+            waitlist_status = waitlist_service.get_status(user_id)
             raise HTTPException(
                 status_code=403,
                 detail={
@@ -104,7 +104,7 @@ def create_period(
         # Create period record (file_urls populated after S3 upload)
         period = teacher_service.create_period(
             course=course,
-            teacher_id=teacher_id,
+            user_id=user_id,
             vector_store_id=vector_store.id,
             file_urls=[],
             canvas_api_url=canvas_api_url,
@@ -132,7 +132,7 @@ def create_period(
         schedule_result = None
         try:
             schedule_result = period_schedule_service.generate_and_save_schedule(
-                period_id=period_id, teacher_id=teacher_id
+                period_id=period_id, user_id=user_id
             )
         except Exception as schedule_error:
             logger.warning("Failed to auto-generate schedule: %s", schedule_error)
@@ -227,7 +227,7 @@ def generate_period_schedule(
 ):
     try:
         result = period_schedule_service.generate_and_save_schedule(
-            period_id=body.period_id, teacher_id=auth.sub
+            period_id=body.period_id, user_id=auth.sub
         )
         return {"message": "Schedule generated successfully", **result}
     except ValueError as e:
@@ -246,7 +246,7 @@ def get_period_schedule(
 ):
     try:
         result = period_schedule_service.get_schedule(
-            period_id=period_id, teacher_id=auth.sub
+            period_id=period_id, user_id=auth.sub
         )
         if result is None:
             raise HTTPException(
@@ -277,7 +277,7 @@ def update_period_schedule(
     try:
         result = period_schedule_service.update_schedule(
             period_id=body.period_id,
-            teacher_id=auth.sub,
+            user_id=auth.sub,
             schedule_dict=body.schedule,
         )
         return result
@@ -303,7 +303,7 @@ def set_period_quest_weeks(
     try:
         result = period_schedule_service.set_quest_weeks(
             period_id=body.period_id,
-            teacher_id=auth.sub,
+            user_id=auth.sub,
             quest_enabled_weeks=body.quest_enabled_weeks,
         )
         return result

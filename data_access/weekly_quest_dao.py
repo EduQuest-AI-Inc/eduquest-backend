@@ -80,9 +80,9 @@ class WeeklyQuestDAO(BaseDAO):
     def delete_weekly_quest(self, quest_id: str) -> None:
         self.table.delete_item(Key={"quest_id": quest_id})
 
-    def get_quests_by_student_and_period(self, student_id: str, period_id: str) -> List[WeeklyQuest]:
+    def get_quests_by_student_and_period(self, user_id: str, period_id: str) -> List[WeeklyQuest]:
         """Get all weekly quests for a student in a specific period."""
-        composite_key = f"{student_id}#{period_id}"
+        composite_key = f"{user_id}#{period_id}"
         response = self.table.query(
             IndexName="student_period_index",
             KeyConditionExpression=Key("student_period_key").eq(composite_key)
@@ -90,7 +90,7 @@ class WeeklyQuestDAO(BaseDAO):
         items = response.get("Items", [])
         return [WeeklyQuest.from_item(item) for item in items]
 
-    def get_weekly_quest_by_student_and_period(self, student_id: str, period_id: str) -> WeeklyQuest:
+    def get_weekly_quest_by_student_and_period(self, user_id: str, period_id: str) -> WeeklyQuest:
         """Get the weekly quest for a student in a specific period (should be only one)."""
         import time
         
@@ -99,7 +99,7 @@ class WeeklyQuestDAO(BaseDAO):
         base_delay = 0.5
 
         for attempt in range(max_retries + 1):
-            weekly_quests = self.get_quests_by_student_and_period(student_id, period_id)
+            weekly_quests = self.get_quests_by_student_and_period(user_id, period_id)
             if weekly_quests:
                 return weekly_quests[0]
             if attempt < max_retries:

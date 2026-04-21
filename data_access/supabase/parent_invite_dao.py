@@ -10,7 +10,7 @@ class ParentInviteDAO(SupabaseBaseDAO):
     def create_invite(self, invite) -> None:
         self._insert({
             'code': invite.code,
-            'parent_id': invite.parent_id,
+            'user_id': invite.user_id,
             'expires_at': invite.expires_at,
             'used': invite.used,
         })

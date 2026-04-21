@@ -98,7 +98,7 @@ def _handle_file_submission(auth_token):
         is_instructor=False,
         week=int(week),
         submission_file=temp_file.name,
-        student_id=request.form.get('student_id'),
+        user_id=request.form.get('user_id'),
         period_id=request.form.get('period_id'),
         individual_quest_id=individual_quest_id,
     )
@@ -131,7 +131,7 @@ def _handle_json_submission(auth_token):
         is_instructor=is_instructor,
         week=week,
         submission_file=submission_file,
-        student_id=data.get('student_id'),
+        user_id=data.get('user_id'),
         period_id=data.get('period_id'),
     )
     return jsonify(result), 200
@@ -157,7 +157,7 @@ def continue_update():
 
         conversation_id = data.get('conversation_id')
         user_message = data.get('message')
-        student_id = data.get('student_id')
+        user_id = data.get('user_id')
 
         if not conversation_id:
             return jsonify({"error": "conversation_id is required"}), 400
@@ -168,7 +168,7 @@ def continue_update():
             auth_token=auth_token,
             conversation_id=conversation_id,
             message=user_message,
-            student_id=student_id,
+            user_id=user_id,
         )
         return jsonify(result), 200
     except Exception as e:

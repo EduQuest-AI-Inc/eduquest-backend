@@ -38,11 +38,11 @@ def backfill_students():
     skipped = 0
     
     for item in items:
-        student_id = item.get('student_id')
+        user_id = item.get('user_id')
         email = item.get('email', '')
         existing_email_lc = item.get('email_lc')
         
-        if not student_id:
+        if not user_id:
             continue
             
         email_lc = email.strip().lower() if email else ''
@@ -54,14 +54,14 @@ def backfill_students():
         
         try:
             dao.table.update_item(
-                Key={'student_id': student_id},
+                Key={'user_id': user_id},
                 UpdateExpression='SET email_lc = :email_lc',
                 ExpressionAttributeValues={':email_lc': email_lc}
             )
             updated += 1
-            print(f"  Updated student {student_id}: email_lc = {email_lc}")
+            print(f"  Updated student {user_id}: email_lc = {email_lc}")
         except Exception as e:
-            print(f"  ERROR updating student {student_id}: {e}")
+            print(f"  ERROR updating student {user_id}: {e}")
     
     print(f"Students: {updated} updated, {skipped} already correct")
     return updated
@@ -84,11 +84,11 @@ def backfill_teachers():
     skipped = 0
     
     for item in items:
-        teacher_id = item.get('teacher_id')
+        user_id = item.get('user_id')
         email = item.get('email', '')
         existing_email_lc = item.get('email_lc')
         
-        if not teacher_id:
+        if not user_id:
             continue
             
         email_lc = email.strip().lower() if email else ''
@@ -100,14 +100,14 @@ def backfill_teachers():
         
         try:
             dao.table.update_item(
-                Key={'teacher_id': teacher_id},
+                Key={'user_id': user_id},
                 UpdateExpression='SET email_lc = :email_lc',
                 ExpressionAttributeValues={':email_lc': email_lc}
             )
             updated += 1
-            print(f"  Updated teacher {teacher_id}: email_lc = {email_lc}")
+            print(f"  Updated teacher {user_id}: email_lc = {email_lc}")
         except Exception as e:
-            print(f"  ERROR updating teacher {teacher_id}: {e}")
+            print(f"  ERROR updating teacher {user_id}: {e}")
     
     print(f"Teachers: {updated} updated, {skipped} already correct")
     return updated

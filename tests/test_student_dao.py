@@ -12,7 +12,7 @@ def test_crud_operations():
     dao = StudentDAO()
 
     student = Student(
-        student_id="stu456",
+        user_id="stu456",
         first_name="Bob",
         last_name="Tanaka",
         email="bob@example.com",

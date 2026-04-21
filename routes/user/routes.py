@@ -78,9 +78,9 @@ def update_tutorial():
     """Update tutorial completion status"""
     try:
         data = request.get_json()
-        student_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         completed_tutorial = data.get('completed_tutorial', False)
-        user_service.update_tutorial_status(student_id, completed_tutorial)
+        user_service.update_tutorial_status(user_id, completed_tutorial)
         return jsonify({'message': 'Tutorial status updated successfully'}), 200
     except Exception as e:
         logger.error("Error updating tutorial status: %s", e, exc_info=True)
@@ -92,8 +92,8 @@ def update_tutorial():
 def get_tutorial_status():
     """Get current tutorial status"""
     try:
-        student_id = get_jwt_identity()
-        status = user_service.get_tutorial_status(student_id)
+        user_id = get_jwt_identity()
+        status = user_service.get_tutorial_status(user_id)
         return jsonify({'completed_tutorial': status}), 200
     except Exception as e:
         logger.error("Error getting tutorial status: %s", e, exc_info=True)
@@ -103,7 +103,7 @@ def get_tutorial_status():
 @user_bp.route('/canvas/connect', methods=['POST'])
 @jwt_required()
 def canvas_connect():
-    student_id = get_jwt_identity()
+    user_id = get_jwt_identity()
     data = request.get_json()
     api_url = data.get('api_url')
     api_key = data.get('api_key')
@@ -114,15 +114,15 @@ def canvas_connect():
         canvas.get_current_user()
     except Exception:
         return jsonify({'error': 'Invalid Canvas credentials. Check your URL and token.'}), 400
-    student_dao.update_canvas_credentials(student_id, api_url, api_key)
+    student_dao.update_canvas_credentials(user_id, api_url, api_key)
     return jsonify({'message': 'Canvas connected'}), 200
 
 
 @user_bp.route('/canvas/courses', methods=['GET'])
 @jwt_required()
 def canvas_courses():
-    student_id = get_jwt_identity()
-    student = student_dao.get_student_by_id(student_id)
+    user_id = get_jwt_identity()
+    student = student_dao.get_student_by_id(user_id)
     api_url = student.get('canvas_api_url')
     api_key = student.get('canvas_api_key')
     if not api_url or not api_key:
@@ -143,6 +143,6 @@ def canvas_courses():
 @user_bp.route('/canvas/disconnect', methods=['DELETE'])
 @jwt_required()
 def canvas_disconnect():
-    student_id = get_jwt_identity()
-    student_dao.clear_canvas_credentials(student_id)
+    user_id = get_jwt_identity()
+    student_dao.clear_canvas_credentials(user_id)
     return jsonify({'message': 'Canvas disconnected'}), 200

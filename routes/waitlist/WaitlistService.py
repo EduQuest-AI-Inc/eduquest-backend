@@ -18,19 +18,19 @@ class WaitlistService:
         self.dao = dao or WaitlistDAO()
         self.teacher_dao = teacher_dao or TeacherDAO()
 
-    def join(self, teacher_id: str, referral_code: Optional[str] = None) -> Dict:
+    def join(self, user_id: str, referral_code: Optional[str] = None) -> Dict:
         """
         Add a teacher to the pilot study waitlist.
         
         Args:
-            teacher_id: The teacher's username/ID
+            user_id: The teacher's username/ID
             referral_code: Optional referral code from another teacher
             
         Returns:
             Dict with waitlist entry details including position and referral code
         """
         # Validate teacher exists and get their email
-        teacher = self.teacher_dao.get_teacher_by_id(teacher_id)
+        teacher = self.teacher_dao.get_teacher_by_id(user_id)
         if not teacher:
             raise ValueError("Teacher not found")
 
@@ -52,11 +52,11 @@ class WaitlistService:
             if validation.get("valid"):
                 referred_by = validation.get("referrer_id")
                 # Don't allow self-referral
-                if referred_by == teacher_id:
+                if referred_by == user_id:
                     referred_by = None
 
         # Join the waitlist (pass teacher_email for DynamoDB sort key)
-        entry = self.dao.join_waitlist(teacher_id, teacher_email, referred_by)
+        entry = self.dao.join_waitlist(user_id, teacher_email, referred_by)
 
         return {
             "success": True,
@@ -67,18 +67,18 @@ class WaitlistService:
             "referred_by": entry.get("referredBy"),
         }
 
-    def get_status(self, teacher_id: str) -> Dict:
+    def get_status(self, user_id: str) -> Dict:
         """
         Get the waitlist status for a teacher.
         
         Args:
-            teacher_id: The teacher's username/ID
+            user_id: The teacher's username/ID
             
         Returns:
             Dict with waitlist status details
         """
         # Check if teacher is already approved via the teacher record
-        teacher = self.teacher_dao.get_teacher_by_id(teacher_id)
+        teacher = self.teacher_dao.get_teacher_by_id(user_id)
         if teacher and teacher.get("pilot_approved"):
             return {
                 "on_waitlist": False,
@@ -89,25 +89,25 @@ class WaitlistService:
             }
 
         # Get waitlist entry status
-        return self.dao.get_status(teacher_id)
+        return self.dao.get_status(user_id)
 
-    def approve(self, teacher_id: str) -> Dict:
+    def approve(self, user_id: str) -> Dict:
         """
         Approve a teacher for pilot study access.
         Updates both the waitlist entry and the teacher record.
         
         Args:
-            teacher_id: The teacher's username/ID
+            user_id: The teacher's username/ID
             
         Returns:
             Dict with approval result
         """
         # Approve in waitlist
-        waitlist_success = self.dao.approve_teacher(teacher_id)
+        waitlist_success = self.dao.approve_teacher(user_id)
 
         # Update teacher record
         try:
-            self.teacher_dao.update_teacher(teacher_id, {"pilot_approved": True})
+            self.teacher_dao.update_teacher(user_id, {"pilot_approved": True})
             teacher_success = True
         except Exception:
             teacher_success = False

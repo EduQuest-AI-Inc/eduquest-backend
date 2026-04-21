@@ -11,14 +11,14 @@ from routes.quest.quest_service import QuestService
 from models.individual_quest import IndividualQuest
 import uuid
 
-def create_test_quest(student_id, period_id, week, quest_id, has_grade=False, status="not_started"):
+def create_test_quest(user_id, period_id, week, quest_id, has_grade=False, status="not_started"):
     """Create a test quest for testing preservation logic"""
     individual_quest_id = str(uuid.uuid4())
     
     quest = IndividualQuest(
         individual_quest_id=individual_quest_id,
         quest_id=quest_id,
-        student_id=student_id,
+        user_id=user_id,
         period_id=period_id,
         description=f"Original Test Quest Week {week}",
         grade="85" if has_grade else None,

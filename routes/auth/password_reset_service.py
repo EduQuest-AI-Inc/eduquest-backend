@@ -101,7 +101,7 @@ class PasswordResetService:
             # Still return neutral message
             return {"success": True, "message": NEUTRAL_REQUEST_MESSAGE}
         
-        user_id = user_data.get("student_id") or user_data.get("teacher_id")
+        user_id = user_data.get("user_id") or user_data.get("user_id")
         first_name = user_data.get("first_name")
         
         try:

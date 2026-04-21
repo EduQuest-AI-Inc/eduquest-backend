@@ -33,9 +33,9 @@ class PeriodLTGService:
         if not period_id:
             raise ValidationError("Missing period ID")
 
-        student_id = require_auth(self.session_dao, auth_token, ["student"])
+        user_id = require_auth(self.session_dao, auth_token, ["student"])
 
-        student = self.student_dao.get_student_by_id(student_id)
+        student = self.student_dao.get_student_by_id(user_id)
         if not student:
             raise Exception("Student not found")
 
@@ -47,7 +47,7 @@ class PeriodLTGService:
         if not vector_store_id:
             raise Exception("Period does not have a vector store configured")
 
-        existing_conversation_id = self.ltg_conversation_dao.get_conversation_id(student_id, period_id)
+        existing_conversation_id = self.ltg_conversation_dao.get_conversation_id(user_id, period_id)
         if existing_conversation_id:
             return {
                 "conversation_id": existing_conversation_id,
@@ -73,7 +73,7 @@ class PeriodLTGService:
 
         conversation_id = str(uuid.uuid4())
         self.ltg_conversation_dao.upsert_conversation(
-            student_id, period_id, conversation_id, last_response_id=response_id
+            user_id, period_id, conversation_id, last_response_id=response_id
         )
 
         return {
@@ -91,14 +91,14 @@ class PeriodLTGService:
         self, auth_token: str, conversation_type: str, conversation_id: str,
         message: str, period_id: str = None
     ) -> Any:
-        student_id = require_auth(self.session_dao, auth_token, ["student"])
+        user_id = require_auth(self.session_dao, auth_token, ["student"])
 
-        student = self.student_dao.get_student_by_id(student_id)
+        student = self.student_dao.get_student_by_id(user_id)
         if not student:
             raise Exception("Student not found")
 
         if not period_id:
-            period_id = self.ltg_conversation_dao.find_period_for_conversation(student_id, conversation_id)
+            period_id = self.ltg_conversation_dao.find_period_for_conversation(user_id, conversation_id)
         if not period_id:
             raise Exception("Could not determine period for conversation")
 
@@ -110,7 +110,7 @@ class PeriodLTGService:
         if not vector_store_id:
             raise Exception("Period does not have a vector store configured")
 
-        last_response_id = self.ltg_conversation_dao.get_last_response_id(student_id, period_id)
+        last_response_id = self.ltg_conversation_dao.get_last_response_id(user_id, period_id)
 
         try:
             result = ltg_continue(
@@ -121,14 +121,14 @@ class PeriodLTGService:
 
             new_response_id = result.get("response_id")
             if new_response_id:
-                self.ltg_conversation_dao.update_last_response_id(student_id, period_id, new_response_id)
+                self.ltg_conversation_dao.update_last_response_id(user_id, period_id, new_response_id)
 
             reply = result.get("message", "")
             goal_chosen = result.get("goal_chosen", False)
             chosen_goal = result.get("chosen_goal")
 
             if goal_chosen and chosen_goal:
-                self.student_dao.update_long_term_goal(student_id, period_id, chosen_goal)
+                self.student_dao.update_long_term_goal(user_id, period_id, chosen_goal)
 
             return {"response": reply, "goal_chosen": goal_chosen}
 

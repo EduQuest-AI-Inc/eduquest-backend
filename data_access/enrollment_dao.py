@@ -29,9 +29,9 @@ class EnrollmentDAO(BaseDAO):
             logger.error("Error querying enrollments by period_id: %s", e, exc_info=True)
             raise
 
-    def get_enrollments_by_student(self, student_id: str) -> List[Dict[str, Any]]:
+    def get_enrollments_by_student(self, user_id: str) -> List[Dict[str, Any]]:
         response = self.table.scan(
-            FilterExpression=Key("student_id").eq(student_id)
+            FilterExpression=Key("user_id").eq(user_id)
         )
         return response.get("Items", [])
 

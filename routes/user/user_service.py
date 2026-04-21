@@ -48,15 +48,15 @@ class UserService:
         else:
             raise ValueError(f"Unrecognized role: {role}")
 
-    def update_tutorial_status(self, student_id: str, completed_tutorial: bool):
+    def update_tutorial_status(self, user_id: str, completed_tutorial: bool):
         """Update tutorial status for a student"""
-        self.student_dao.update_tutorial_status(student_id, completed_tutorial)
+        self.student_dao.update_tutorial_status(user_id, completed_tutorial)
 
-    def get_tutorial_status(self, student_id: str) -> bool:
+    def get_tutorial_status(self, user_id: str) -> bool:
         """Get tutorial status for a student"""
-        return self.student_dao.get_tutorial_status(student_id)
+        return self.student_dao.get_tutorial_status(user_id)
 
-    def needs_tutorial(self, student_id: str) -> bool:
+    def needs_tutorial(self, user_id: str) -> bool:
         """Check if student needs tutorial"""
-        return self.student_dao.needs_tutorial(student_id)
+        return self.student_dao.needs_tutorial(user_id)
 

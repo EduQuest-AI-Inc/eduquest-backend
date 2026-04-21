@@ -107,10 +107,10 @@ class IndividualQuestDAO(BaseDAO):
         )
         return response.get("Items", [])
 
-    def get_quests_by_student(self, student_id: str) -> List[Dict[str, Any]]:
+    def get_quests_by_student(self, user_id: str) -> List[Dict[str, Any]]:
         """Get all individual quests for a specific student."""
         response = self.table.scan(
-            FilterExpression=Attr("student_id").eq(student_id)
+            FilterExpression=Attr("user_id").eq(user_id)
         )
         return response.get("Items", [])
 
@@ -121,8 +121,8 @@ class IndividualQuestDAO(BaseDAO):
         )
         return response.get("Items", [])
 
-    def get_quests_by_student_and_period(self, student_id: str, period_id: str) -> List[Dict[str, Any]]:
+    def get_quests_by_student_and_period(self, user_id: str, period_id: str) -> List[Dict[str, Any]]:
         response = self.table.scan(
-            FilterExpression=Attr("student_id").eq(student_id) & Attr("period_id").eq(period_id)
+            FilterExpression=Attr("user_id").eq(user_id) & Attr("period_id").eq(period_id)
         )
         return response.get("Items", [])

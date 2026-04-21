@@ -29,14 +29,14 @@ waitlist_service = WaitlistService()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-def _validate_pilot_access(teacher_id):
+def _validate_pilot_access(user_id):
     """Return a 403 response tuple if the teacher lacks pilot access, else None."""
     pilot_waitlist_enabled = os.getenv("PILOT_WAITLIST_ENABLED", "true").lower() == "true"
     if not pilot_waitlist_enabled:
         return None
-    teacher = teacher_dao.get_teacher_by_id(teacher_id)
+    teacher = teacher_dao.get_teacher_by_id(user_id)
     if not teacher or not teacher.get("pilot_approved", False):
-        waitlist_status = waitlist_service.get_status(teacher_id)
+        waitlist_status = waitlist_service.get_status(user_id)
         return jsonify({
             "error": "Pilot access required to create a class. Please join the pilot waitlist.",
             "code": "PILOT_WAITLIST_REQUIRED",
@@ -95,12 +95,12 @@ def _upload_period_files(file_paths, period_id):
     return s3_urls
 
 
-def _try_generate_schedule(period_id, teacher_id):
+def _try_generate_schedule(period_id, user_id):
     """Attempt schedule generation; log and return None on failure."""
     try:
         result = period_schedule_service.generate_and_save_schedule(
             period_id=period_id,
-            teacher_id=teacher_id,
+            user_id=user_id,
         )
         logger.info("Schedule generated successfully for period %s", period_id)
         return result
@@ -113,8 +113,8 @@ def _try_generate_schedule(period_id, teacher_id):
 @jwt_required()
 def create_period():
     try:
-        teacher_id = get_jwt_identity()
-        denied = _validate_pilot_access(teacher_id)
+        user_id = get_jwt_identity()
+        denied = _validate_pilot_access(user_id)
         if denied:
             return denied
 
@@ -133,7 +133,7 @@ def create_period():
 
         period = teacher_service.create_period(
             course=course,
-            teacher_id=teacher_id,
+            user_id=user_id,
             vector_store_id=vector_store.id,
             file_urls=[],
             canvas_api_url=canvas_api_url,
@@ -150,7 +150,7 @@ def create_period():
             f.close()
         shutil.rmtree(temp_dir)
 
-        schedule_result = _try_generate_schedule(period_id, teacher_id)
+        schedule_result = _try_generate_schedule(period_id, user_id)
         return jsonify({
             "message": "Period created successfully",
             "period": period,
@@ -168,8 +168,8 @@ def create_period():
 @jwt_required()
 def periods():
     try:
-        teacher_id = get_jwt_identity()
-        result = teacher_service.get_periods_by_teacher(teacher_id)
+        user_id = get_jwt_identity()
+        result = teacher_service.get_periods_by_teacher(user_id)
         return jsonify(result), 200
     except Exception as e:
         logger.error("Error in get_teacher_periods: %s", e, exc_info=True)
@@ -210,11 +210,11 @@ def add_files_to_period():
         if not files:
             return jsonify({"error": "No files provided"}), 400
 
-        teacher_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         period = teacher_service.get_period_by_id(period_id)
         if not period:
             return jsonify({"error": "Period not found"}), 404
-        if period.get('owner_id', period.get('teacher_id')) != teacher_id:
+        if period.get('owner_id', period.get('user_id')) != user_id:
             return jsonify({"error": "Unauthorized"}), 403
 
         temp_dir, file_paths = _save_files_to_temp(files)
@@ -269,7 +269,7 @@ def list_canvas_courses():
 def generate_period_schedule():
     """Generate a schedule for a period."""
     try:
-        teacher_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         data = request.get_json()
         period_id = data.get("period_id")
 
@@ -278,7 +278,7 @@ def generate_period_schedule():
 
         result = period_schedule_service.generate_and_save_schedule(
             period_id=period_id,
-            teacher_id=teacher_id
+            user_id=user_id
         )
         return jsonify({"message": "Schedule generated successfully", **result}), 200
 
@@ -296,13 +296,13 @@ def generate_period_schedule():
 def get_period_schedule():
     """Get the schedule for a period."""
     try:
-        teacher_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         period_id = request.args.get("period_id")
 
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
 
-        result = period_schedule_service.get_schedule(period_id=period_id, teacher_id=teacher_id)
+        result = period_schedule_service.get_schedule(period_id=period_id, user_id=user_id)
         if result is None:
             return jsonify({"error": "No schedule found for this period"}), 404
         return jsonify(result), 200
@@ -321,7 +321,7 @@ def get_period_schedule():
 def update_period_schedule():
     """Update the schedule for a period (teacher edits)."""
     try:
-        teacher_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         data = request.get_json()
         period_id = data.get("period_id")
         schedule = data.get("schedule")
@@ -333,7 +333,7 @@ def update_period_schedule():
 
         result = period_schedule_service.update_schedule(
             period_id=period_id,
-            teacher_id=teacher_id,
+            user_id=user_id,
             schedule_dict=schedule
         )
         return jsonify(result), 200
@@ -352,7 +352,7 @@ def update_period_schedule():
 def set_period_quest_weeks():
     """Set which weeks have quests enabled."""
     try:
-        teacher_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         data = request.get_json()
         period_id = data.get("period_id")
         quest_enabled_weeks = data.get("quest_enabled_weeks", [])
@@ -364,7 +364,7 @@ def set_period_quest_weeks():
 
         result = period_schedule_service.set_quest_weeks(
             period_id=period_id,
-            teacher_id=teacher_id,
+            user_id=user_id,
             quest_enabled_weeks=quest_enabled_weeks
         )
         return jsonify(result), 200

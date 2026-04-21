@@ -23,7 +23,7 @@ class TeacherService:
         period_id = f"{clean_course}-{random_part1}-{random_part2}"
         return period_id
 
-    def create_period(self, course, teacher_id, vector_store_id, file_urls,
+    def create_period(self, course, user_id, vector_store_id, file_urls,
                       canvas_api_url=None, canvas_api_key=None,
                       canvas_course_id=None, canvas_course_name=None):
         period_id = self.generate_period_id(course)
@@ -41,10 +41,10 @@ class TeacherService:
         new_period = Period(
             period_id=period_id,
             course=course,
-            owner_id=teacher_id,
+            owner_id=user_id,
             owner_type="teacher",
             vector_store_id=vector_store_id,
-            teacher_id=teacher_id,
+            user_id=user_id,
             file_urls=file_urls,
             canvas_api_url=canvas_api_url,
             canvas_api_key=canvas_api_key,
@@ -56,8 +56,8 @@ class TeacherService:
         result = new_period.to_item()
         return result
 
-    def get_periods_by_teacher(self, teacher_id):
-        periods = self.period_dao.get_periods_by_teacher_id(teacher_id)
+    def get_periods_by_teacher(self, user_id):
+        periods = self.period_dao.get_periods_by_teacher_id(user_id)
         return [
             {
                 "period_id": p['period_id'],

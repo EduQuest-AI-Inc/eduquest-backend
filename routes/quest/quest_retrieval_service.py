@@ -15,20 +15,20 @@ class QuestRetrievalService:
         self.weekly_quest_dao = WeeklyQuestDAO()
         self.individual_quest_dao = IndividualQuestDAO()
 
-    def get_weekly_quests_for_student(self, student_id: str, period_id: str):
-        return self.weekly_quest_dao.get_weekly_quest_by_student_and_period(student_id, period_id)
+    def get_weekly_quests_for_student(self, user_id: str, period_id: str):
+        return self.weekly_quest_dao.get_weekly_quest_by_student_and_period(user_id, period_id)
 
-    def get_individual_quests_for_student(self, student_id: str) -> list:
-        return self.individual_quest_dao.get_quests_by_student(student_id)
+    def get_individual_quests_for_student(self, user_id: str) -> list:
+        return self.individual_quest_dao.get_quests_by_student(user_id)
 
-    def get_individual_quests_for_student_and_period(self, student_id: str, period_id: str) -> list:
-        return self.individual_quest_dao.get_quests_by_student_and_period(student_id, period_id)
+    def get_individual_quests_for_student_and_period(self, user_id: str, period_id: str) -> list:
+        return self.individual_quest_dao.get_quests_by_student_and_period(user_id, period_id)
 
     def get_individual_quest_by_id(self, quest_id: str, individual_quest_id: str):
         return self.individual_quest_dao.get_individual_quest_by_id(individual_quest_id)
 
-    def verify_quest_structure(self, student_id: str, period_id: str) -> dict:
-        weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_student_and_period(student_id, period_id)
+    def verify_quest_structure(self, user_id: str, period_id: str) -> dict:
+        weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_student_and_period(user_id, period_id)
         if not weekly_quest:
             return {"error": "No weekly quest found"}
 
@@ -36,7 +36,7 @@ class QuestRetrievalService:
         individual_quests = self.individual_quest_dao.get_quests_by_quest_id(quest_id)
 
         return {
-            "weekly_quest": {"quest_id": quest_id, "student_id": student_id, "period_id": period_id},
+            "weekly_quest": {"quest_id": quest_id, "user_id": user_id, "period_id": period_id},
             "individual_quests": {
                 "total_count": len(individual_quests),
                 "quest_id": quest_id,

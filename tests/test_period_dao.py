@@ -15,7 +15,7 @@ def test_crud_operations():
     period = Period(
         period_id="per001",
         owner_id="teach001",
-        teacher_id="teach001",
+        user_id="teach001",
         vector_store_id="vs_789",
         course=json.dumps(data, indent=2),
     )

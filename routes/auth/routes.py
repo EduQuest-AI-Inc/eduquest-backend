@@ -93,17 +93,17 @@ def signup():
                     if datetime.now(timezone.utc) > expires_at:
                         response_body['invite_warning'] = 'Invite code has expired. You can link your parent account later from your profile.'
                     else:
-                        parent_id = invite.get('parent_id')
-                        parent = parent_dao.get_parent_by_id(parent_id)
+                        user_id = invite.get('user_id')
+                        parent = parent_dao.get_parent_by_id(user_id)
                         if not parent:
                             response_body['invite_warning'] = 'Parent account not found. You can link your parent account later from your profile.'
                         else:
-                            linked_ids = parent.get('linked_student_ids') or []
+                            linked_ids = parent.get('linked_user_ids') or []
                             if username not in linked_ids:
                                 linked_ids.append(username)
                                 vpc_verified_at = datetime.now(timezone.utc).isoformat()
-                                parent_dao.update_parent(parent_id, {
-                                    'linked_student_ids': linked_ids,
+                                parent_dao.update_parent(user_id, {
+                                    'linked_user_ids': linked_ids,
                                     'vpc_verified_at': vpc_verified_at,  # COPPA 2025 homeschool VPC record
                                 })
                                 parent_invite_dao.mark_used(invite_code)

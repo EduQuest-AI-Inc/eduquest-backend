@@ -13,7 +13,7 @@ def test_crud_operations():
 
     enrollment = Enrollment(
         period_id="CS101",
-        student_id="stu_test",
+        user_id="stu_test",
         semester="TestSemester",
         enrolled_at="2025-05-17T13:24:53.812345+00:00"
     )
@@ -35,7 +35,7 @@ def test_crud_operations():
     # -------Delete-------
     # dao.delete_enrollment(enrollment.class_id, enrollment.enrolled_at)
     # final = dao.get_enrollments_by_class("CS101")
-    # assert not any(e.student_id == "stu_test" for e in final)
+    # assert not any(e.user_id == "stu_test" for e in final)
 
 
 test_crud_operations()

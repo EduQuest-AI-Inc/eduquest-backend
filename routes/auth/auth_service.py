@@ -37,7 +37,7 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
             return {"success": False, "error": "Username already exists"}
         hashed_pw = generate_password_hash(password)
         teacher = Teacher(
-            teacher_id=username,
+            user_id=username,
             password=hashed_pw,
             first_name=first_name,
             last_name=last_name,
@@ -54,7 +54,7 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
             return {"success": False, "error": "Username already exists"}
         hashed_pw = generate_password_hash(password)
         parent = Parent(
-            parent_id=username,
+            user_id=username,
             password=hashed_pw,
             first_name=first_name,
             last_name=last_name,
@@ -70,7 +70,7 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
             return {"success": False, "error": "Username already exists"}
         hashed_pw = generate_password_hash(password)
         student = Student(
-            student_id=username,
+            user_id=username,
             password=hashed_pw,
             first_name=first_name,
             last_name=last_name,

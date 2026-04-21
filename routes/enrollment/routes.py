@@ -12,10 +12,10 @@ service = EnrollmentService()
 def enroll():
     try:
         data = request.json
-        student_id = data.get("student_id")
+        user_id = data.get("user_id")
         period_id = data.get("period_id")
         semester = data.get("semester", "Fall 2025")
-        result = service.enroll_student(student_id, period_id, semester)
+        result = service.enroll_student(user_id, period_id, semester)
         return jsonify(result), 200
     except Exception as e:
         logger.error("Enrollment error: %s", e, exc_info=True)
@@ -32,10 +32,10 @@ def get_enrollments(period_id):
         return jsonify({"error": "Failed to fetch enrollments"}), 500
 
 
-@enrollment_bp.route('/student-profile/<period_id>/<student_id>', methods=['GET'])
-def get_student_profile(period_id, student_id):
+@enrollment_bp.route('/student-profile/<period_id>/<user_id>', methods=['GET'])
+def get_student_profile(period_id, user_id):
     try:
-        profile = service.get_student_profile(period_id, student_id)
+        profile = service.get_student_profile(period_id, user_id)
         if profile:
             return jsonify(profile), 200
         return jsonify({"error": "Profile not found"}), 404

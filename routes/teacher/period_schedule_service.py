@@ -26,13 +26,13 @@ class PeriodScheduleService:
         self.period_schedule_dao = PeriodScheduleDAO()
         self.period_dao = PeriodDAO()
 
-    def generate_and_save_schedule(self, period_id: str, teacher_id: str) -> dict:
+    def generate_and_save_schedule(self, period_id: str, user_id: str) -> dict:
         """
         Generate a schedule for a period and save it to DB, S3, and vector store.
 
         Args:
             period_id: The period ID.
-            teacher_id: The teacher ID (for authorization).
+            user_id: The teacher ID (for authorization).
 
         Returns:
             dict: The generated schedule and metadata.
@@ -41,7 +41,7 @@ class PeriodScheduleService:
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
             raise ValueError("Period not found")
-        if period.get("owner_id", period.get("teacher_id")) != teacher_id:
+        if period.get("owner_id", period.get("user_id")) != user_id:
             raise PermissionError("Not authorized to access this period")
 
         vector_store_id = period.get("vector_store_id")
@@ -80,7 +80,7 @@ class PeriodScheduleService:
             # Create new record
             period_schedule = PeriodSchedule(
                 period_id=period_id,
-                teacher_id=teacher_id,
+                user_id=user_id,
                 vector_store_id=vector_store_id,
                 schedule_s3_key=schedule_s3_key,
                 schedule_json=schedule_dict,
@@ -95,13 +95,13 @@ class PeriodScheduleService:
             "schedule_openai_file_id": schedule_openai_file_id
         }
 
-    def get_schedule(self, period_id: str, teacher_id: str) -> dict:
+    def get_schedule(self, period_id: str, user_id: str) -> dict:
         """
         Get the schedule for a period.
 
         Args:
             period_id: The period ID.
-            teacher_id: The teacher ID (for authorization).
+            user_id: The teacher ID (for authorization).
 
         Returns:
             dict: The schedule data and metadata.
@@ -110,7 +110,7 @@ class PeriodScheduleService:
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
             raise ValueError("Period not found")
-        if period.get("owner_id", period.get("teacher_id")) != teacher_id:
+        if period.get("owner_id", period.get("user_id")) != user_id:
             raise PermissionError("Not authorized to access this period")
 
         # Get period schedule record
@@ -138,13 +138,13 @@ class PeriodScheduleService:
             "schedule_source": schedule_source
         }
 
-    def update_schedule(self, period_id: str, teacher_id: str, schedule_dict: dict) -> dict:
+    def update_schedule(self, period_id: str, user_id: str, schedule_dict: dict) -> dict:
         """
         Update the schedule for a period.
 
         Args:
             period_id: The period ID.
-            teacher_id: The teacher ID (for authorization).
+            user_id: The teacher ID (for authorization).
             schedule_dict: The new schedule data.
 
         Returns:
@@ -154,7 +154,7 @@ class PeriodScheduleService:
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
             raise ValueError("Period not found")
-        if period.get("owner_id", period.get("teacher_id")) != teacher_id:
+        if period.get("owner_id", period.get("user_id")) != user_id:
             raise PermissionError("Not authorized to access this period")
 
         vector_store_id = period.get("vector_store_id")
@@ -189,13 +189,13 @@ class PeriodScheduleService:
             "schedule_openai_file_id": new_file_id
         }
 
-    def set_quest_weeks(self, period_id: str, teacher_id: str, quest_enabled_weeks: list) -> dict:
+    def set_quest_weeks(self, period_id: str, user_id: str, quest_enabled_weeks: list) -> dict:
         """
         Set which weeks have quests enabled.
 
         Args:
             period_id: The period ID.
-            teacher_id: The teacher ID (for authorization).
+            user_id: The teacher ID (for authorization).
             quest_enabled_weeks: List of week numbers where quests are enabled.
 
         Returns:
@@ -205,7 +205,7 @@ class PeriodScheduleService:
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
             raise ValueError("Period not found")
-        if period.get("owner_id", period.get("teacher_id")) != teacher_id:
+        if period.get("owner_id", period.get("user_id")) != user_id:
             raise PermissionError("Not authorized to access this period")
 
         # Normalize to unique sorted ints (frontend can send strings)
@@ -225,7 +225,7 @@ class PeriodScheduleService:
             # Create a minimal record if none exists
             period_schedule = PeriodSchedule(
                 period_id=period_id,
-                teacher_id=teacher_id,
+                user_id=user_id,
                 vector_store_id=period.get("vector_store_id"),
                 quest_enabled_weeks=normalized_weeks
             )

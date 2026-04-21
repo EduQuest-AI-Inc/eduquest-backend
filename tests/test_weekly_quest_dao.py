@@ -33,7 +33,7 @@ def test_weekly_quest_crud():
     # Create weekly quest containing the list of individual quests
     weekly_quest = WeeklyQuest(
         quest_id="wq-001",
-        student_id="stu123",
+        user_id="stu123",
         period_id="period-001",
         quests=[quest1, quest2]
     )

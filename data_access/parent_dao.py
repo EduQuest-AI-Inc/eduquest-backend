@@ -16,23 +16,23 @@ class ParentDAO(BaseDAO):
     def add_parent(self, parent: Parent) -> None:
         self.table.put_item(Item=parent.to_item())
 
-    def get_parent_by_id(self, parent_id: str) -> Optional[Dict[str, Any]]:
+    def get_parent_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         response = self.table.query(
-            KeyConditionExpression=Key("parent_id").eq(parent_id)
+            KeyConditionExpression=Key("user_id").eq(user_id)
         )
         items = response.get("Items", [])
         return items[0] if items else None
 
-    def update_parent(self, parent_id: str, updates: Dict[str, Any]) -> None:
+    def update_parent(self, user_id: str, updates: Dict[str, Any]) -> None:
         update_expr = "SET " + ", ".join(f"#{k} = :{k}" for k in updates)
         expr_attr_vals = {f":{k}": v for k, v in updates.items()}
         expr_attr_names = {f"#{k}": k for k in updates}
         self.table.update_item(
-            Key={"parent_id": parent_id},
+            Key={"user_id": user_id},
             UpdateExpression=update_expr,
             ExpressionAttributeValues=expr_attr_vals,
             ExpressionAttributeNames=expr_attr_names
         )
 
-    def delete_parent(self, parent_id: str) -> None:
-        self.table.delete_item(Key={"parent_id": parent_id})
+    def delete_parent(self, user_id: str) -> None:
+        self.table.delete_item(Key={"user_id": user_id})
