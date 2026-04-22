@@ -53,7 +53,7 @@ def _save_files_to_temp(files):
     return temp_dir, file_paths
 
 
-def _append_canvas_file(temp_dir, file_paths, canvas_api_url, canvas_api_key, canvas_course_id):
+def _append_canvas_file(temp_dir, file_paths, canvas_api_url, canvas_api_key, canvas_course_id) -> None:
     """Fetch Canvas course data and append a JSON file to file_paths if credentials are present."""
     if not (canvas_api_url and canvas_api_key and canvas_course_id):
         return

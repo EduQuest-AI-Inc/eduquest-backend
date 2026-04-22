@@ -8,7 +8,7 @@ from data_access.supabase.enrollment_dao import EnrollmentDAO
 from models.enrollment import Enrollment
 from datetime import datetime, timezone
 
-def test_crud_operations():
+def test_crud_operations() -> None:
     dao = EnrollmentDAO()
 
     enrollment = Enrollment(

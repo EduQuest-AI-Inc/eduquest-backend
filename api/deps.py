@@ -9,7 +9,7 @@ JWT_ALGORITHM = "HS256"
 
 
 class AuthPayload:
-    def __init__(self, sub: str, role: str, token: str):
+    def __init__(self, sub: str, role: str, token: str) -> None:
         self.sub = sub        # decoded user id / teacher id
         self.role = role      # decoded role claim
         self.token = token    # raw JWT string — forwarded to SessionDAO-backed services

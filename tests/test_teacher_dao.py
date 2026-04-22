@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data_access.supabase.teacher_dao import TeacherDAO
 from models.teacher import Teacher
 
-def test_crud_operations():
+def test_crud_operations() -> None:
     dao = TeacherDAO()
 
     now = datetime.now(timezone.utc).isoformat()

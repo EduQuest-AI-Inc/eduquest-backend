@@ -10,7 +10,7 @@ SHARED_USER_FIELDS = {
 
 
 class ParentDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('parent')
         self._user_dao = UserDAO()
 

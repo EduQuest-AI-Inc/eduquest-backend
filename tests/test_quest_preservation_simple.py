@@ -31,7 +31,7 @@ def create_test_quest(user_id, period_id, week, quest_id, has_grade=False, statu
     )
     return quest
 
-def test_quest_preservation_logic():
+def test_quest_preservation_logic() -> bool:
     """Test the quest preservation logic without running full agents"""
     print("🧪 TESTING QUEST PRESERVATION LOGIC")
     print("=" * 50)

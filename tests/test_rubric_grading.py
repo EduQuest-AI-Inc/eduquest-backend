@@ -102,7 +102,7 @@ def test_grade_parsing():
     
     return all_passed
 
-def test_rubric_examples():
+def test_rubric_examples() -> None:
     """Test with real-world rubric examples"""
     print("\n🎯 TESTING WITH REALISTIC RUBRIC EXAMPLES")
     print("=" * 50)

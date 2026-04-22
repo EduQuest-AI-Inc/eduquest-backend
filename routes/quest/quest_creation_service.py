@@ -8,7 +8,7 @@ from models.individual_quest import IndividualQuest
 
 class QuestCreationService:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.weekly_quest_dao = WeeklyQuestDAO()
         self.individual_quest_dao = IndividualQuestDAO()
 

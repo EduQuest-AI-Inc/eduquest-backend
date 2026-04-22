@@ -20,7 +20,7 @@ class LTGConversationService:
     in the ltg_conversation table.
     """
 
-    def __init__(self, vector_store_id: str, previous_response_id: Optional[str] = None):
+    def __init__(self, vector_store_id: str, previous_response_id: Optional[str] = None) -> None:
         self.vector_store_id = vector_store_id
         self.previous_response_id = previous_response_id
         self.agent = create_ltg_agent(vector_store_id)

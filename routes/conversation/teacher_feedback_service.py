@@ -22,7 +22,7 @@ class TeacherFeedbackConversationService:
     OpenAI Conversations session.
     """
 
-    def __init__(self, conversation_id: Optional[str] = None):
+    def __init__(self, conversation_id: Optional[str] = None) -> None:
         self.agent = create_teacher_feedback_agent()
         if conversation_id:
             self.session = OpenAIConversationsSession(conversation_id=conversation_id)

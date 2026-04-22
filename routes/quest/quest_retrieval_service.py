@@ -5,7 +5,7 @@ from data_access.supabase.individual_quest_dao import IndividualQuestDAO
 
 class QuestRetrievalService:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.weekly_quest_dao = WeeklyQuestDAO()
         self.individual_quest_dao = IndividualQuestDAO()
 

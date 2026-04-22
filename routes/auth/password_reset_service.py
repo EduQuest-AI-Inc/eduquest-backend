@@ -32,7 +32,7 @@ INVALID_TOKEN_MESSAGE = "This link is invalid or expired. Please request a new o
 class PasswordResetService:
     """Service for handling password reset operations."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self.user_dao = UserDAO()
         self.token_dao = PasswordResetTokenDAO()
         self.rate_limit_dao = PasswordResetRateLimitDAO()
@@ -322,7 +322,7 @@ class PasswordResetService:
         token_hash_prefix: Optional[str] = None,
         ses_message_id: Optional[str] = None,
         result: Optional[str] = None
-    ):
+    ) -> None:
         """Log a password reset event with structured data."""
         log_data = {
             "event_type": event_type,

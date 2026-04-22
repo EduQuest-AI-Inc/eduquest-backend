@@ -4,7 +4,7 @@ import json
 
 
 class Course:
-    def __init__(self, course_id, API_URL, API_KEY):
+    def __init__(self, course_id, API_URL, API_KEY) -> None:
         self.API_URL = API_URL
         self.API_KEY = API_KEY
         self.canvas = Canvas(API_URL, API_KEY)
@@ -16,7 +16,7 @@ class Course:
             self.modules.append(self.Module(self, module_id))
 
     class Module:
-        def __init__(self, Course, module_id):
+        def __init__(self, Course, module_id) -> None:
             self.course = Course.course
             self.module = self.course.get_module(module_id)
             self.course_id = self.course.id
@@ -27,7 +27,7 @@ class Course:
                 self.items.append(self.get_item(item_id))
 
         class Assignment:
-            def __init__(self, assignment_id, course):
+            def __init__(self, assignment_id, course) -> None:
                 self.course = course
                 self.cv_assignment = self.course.get_assignment(assignment_id)
                 self.title = self.cv_assignment.name
@@ -40,7 +40,7 @@ class Course:
                 self.due_date = str(self.cv_assignment.due_at_date)
 
         class Quiz:  # do we want it?
-            def __init__(self, quiz_id, course):
+            def __init__(self, quiz_id, course) -> None:
                 self.course = course
                 self.quiz = self.course.get_quiz(quiz_id)
                 self.title = self.quiz.title
@@ -53,7 +53,7 @@ class Course:
                     self.description = soup.get_text(separator="\n", strip=True)
 
         class File:
-            def __init__(self, file_id, course):
+            def __init__(self, file_id, course) -> None:
                 self.course = course
                 self.file = self.course.get_file(file_id)
                 self.id = file_id
@@ -65,7 +65,7 @@ class Course:
                 self.metadata = {}
 
         class Page:
-            def __init__(self, page_id, course):
+            def __init__(self, page_id, course) -> None:
                 self.course = course
                 self.page = self.course.get_page(page_id)
                 self.title = self.page.title
@@ -78,7 +78,7 @@ class Course:
                     self.body = soup.get_text(separator="\n", strip=True)
 
         class Discussion:
-            def __init__(self, discussion_id, course):
+            def __init__(self, discussion_id, course) -> None:
                 self.course = course
                 self.discussion = self.course.get_discussion_topic(discussion_id)
                 self.title = self.discussion.title

@@ -5,7 +5,7 @@ import re
 
 
 class TeacherService:
-    def __init__(self):
+    def __init__(self) -> None:
         self.period_dao = PeriodDAO()
 
     def generate_period_id(self, course_name: str) -> str:
@@ -60,7 +60,7 @@ class TeacherService:
     def get_period_by_id(self, period_id):
         return self.period_dao.get_period_by_id(period_id)
 
-    def update_period_files(self, period_id, file_urls):
+    def update_period_files(self, period_id, file_urls) -> None:
         updates = {"file_urls": file_urls}
         self.period_dao.update_period(period_id, updates)
 

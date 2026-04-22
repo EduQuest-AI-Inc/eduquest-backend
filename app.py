@@ -88,7 +88,7 @@ def handle_auth_error(e):
     return jsonify({"error": str(e)}), 401
 
 @app.route('/helloworld', methods=['GET'])
-def hello_world():
+def hello_world() -> str:
     return "helloworld"
 
 if __name__ == '__main__':

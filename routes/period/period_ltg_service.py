@@ -16,7 +16,7 @@ from routes.conversation.ltg_service import (
 
 class PeriodLTGService:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.period_dao = PeriodDAO()
         self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()

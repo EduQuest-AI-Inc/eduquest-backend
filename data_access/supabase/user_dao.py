@@ -4,7 +4,7 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 
 
 class UserDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('user')
 
     def get_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:

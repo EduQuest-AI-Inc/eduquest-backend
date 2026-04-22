@@ -21,7 +21,7 @@ TUTORIAL_PERIOD_ID = "PRECALC-58F9-88F5"
 
 class PeriodEnrollmentService:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.period_dao = PeriodDAO()
         self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()

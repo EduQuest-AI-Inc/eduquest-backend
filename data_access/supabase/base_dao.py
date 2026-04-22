@@ -9,7 +9,7 @@ class SupabaseBaseDAO:
     concrete DAOs stay concise.
     """
 
-    def __init__(self, table_name: str):
+    def __init__(self, table_name: str) -> None:
         self.client: Client = get_supabase_client()
         self.table_name = table_name
 

@@ -23,7 +23,7 @@ def client(app):
 
 
 @pytest.mark.smoke
-def test_helloworld_endpoint(client):
+def test_helloworld_endpoint(client) -> None:
     """Test the helloworld endpoint"""
     response = client.get('/helloworld')
     assert response.status_code == 200
@@ -31,19 +31,19 @@ def test_helloworld_endpoint(client):
 
 
 @pytest.mark.unit
-def test_app_exists(app):
+def test_app_exists(app) -> None:
     """Test that app exists"""
     assert app is not None
 
 
 @pytest.mark.unit
-def test_app_is_testing(app):
+def test_app_is_testing(app) -> None:
     """Test that app is in testing mode"""
     assert app.config['TESTING'] is True
 
 
 @pytest.mark.api
-def test_cors_headers(client):
+def test_cors_headers(client) -> None:
     """Test CORS headers are present"""
     response = client.get('/helloworld')
     # CORS headers should be set by Flask-CORS
@@ -51,14 +51,14 @@ def test_cors_headers(client):
 
 
 @pytest.mark.api
-def test_invalid_route(client):
+def test_invalid_route(client) -> None:
     """Test invalid route returns 404"""
     response = client.get('/this-route-does-not-exist')
     assert response.status_code == 404
 
 
 @pytest.mark.unit
-def test_jwt_config(app):
+def test_jwt_config(app) -> None:
     """Test JWT configuration is set"""
     assert 'JWT_SECRET_KEY' in app.config
     assert app.config['JWT_SECRET_KEY'] is not None

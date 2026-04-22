@@ -24,7 +24,7 @@ def _build_period(period_id="MATH-101"):
 
 
 class FakeWeeklyQuest:
-    def __init__(self, quest_id):
+    def __init__(self, quest_id) -> None:
         self.quest_id = quest_id
 
 
@@ -69,7 +69,7 @@ def _setup_service(student, period, enrollments=None, weekly_quests=None, indivi
 class TestUnenrollService:
 
     @pytest.mark.unit
-    def test_unenroll_removes_enrollment(self):
+    def test_unenroll_removes_enrollment(self) -> None:
         student = _build_student()
         svc = _setup_service(student, _build_period())
 
@@ -83,7 +83,7 @@ class TestUnenrollService:
         )
 
     @pytest.mark.unit
-    def test_unenroll_deletes_conversation(self):
+    def test_unenroll_deletes_conversation(self) -> None:
         svc = _setup_service(_build_student(), _build_period())
 
         svc.unenroll_from_period("tok", "MATH-101")
@@ -91,7 +91,7 @@ class TestUnenrollService:
         svc.conversation_dao.delete_conversation.assert_called_once_with("conv-abc")
 
     @pytest.mark.unit
-    def test_unenroll_deletes_quests(self):
+    def test_unenroll_deletes_quests(self) -> None:
         wq = FakeWeeklyQuest("wq-1")
         iq = [{"individual_quest_id": "iq-1"}, {"individual_quest_id": "iq-2"}]
 
@@ -103,7 +103,7 @@ class TestUnenrollService:
         assert svc.individual_quest_dao.delete_individual_quest.call_count == 2
 
     @pytest.mark.unit
-    def test_unenroll_removes_long_term_goal(self):
+    def test_unenroll_removes_long_term_goal(self) -> None:
         svc = _setup_service(_build_student(), _build_period())
 
         svc.unenroll_from_period("tok", "MATH-101")
@@ -114,7 +114,7 @@ class TestUnenrollService:
         assert "Precalculus" not in goal_call[0][0][1]["long_term_goal"]
 
     @pytest.mark.unit
-    def test_unenroll_not_enrolled_raises(self):
+    def test_unenroll_not_enrolled_raises(self) -> None:
         student = _build_student(period_id="OTHER")
         svc = _setup_service(
             student, _build_period(),
@@ -125,13 +125,13 @@ class TestUnenrollService:
             svc.unenroll_from_period("tok", "MATH-101")
 
     @pytest.mark.unit
-    def test_unenroll_missing_period_id_raises(self):
+    def test_unenroll_missing_period_id_raises(self) -> None:
         svc = _make_service()
         with pytest.raises(Exception, match="Missing period ID"):
             svc.unenroll_from_period("tok", "")
 
     @pytest.mark.unit
-    def test_unenroll_invalid_token_raises(self):
+    def test_unenroll_invalid_token_raises(self) -> None:
         svc = _make_service()
         svc.session_dao.get_sessions_by_auth_token.return_value = []
 
@@ -159,7 +159,7 @@ class TestUnenrollRoute:
 
     @pytest.mark.api
     @patch("routes.period.routes.period_service")
-    def test_unenroll_endpoint_success(self, mock_service, client):
+    def test_unenroll_endpoint_success(self, mock_service, client) -> None:
         mock_service.unenroll_from_period.return_value = {
             "message": "Successfully unenrolled from period MATH-101",
             "period_id": "MATH-101",
@@ -178,7 +178,7 @@ class TestUnenrollRoute:
 
     @pytest.mark.api
     @patch("routes.period.routes.period_service")
-    def test_unenroll_endpoint_missing_period(self, mock_service, client):
+    def test_unenroll_endpoint_missing_period(self, mock_service, client) -> None:
         resp = client.post(
             "/period/unenroll",
             json={},
@@ -189,7 +189,7 @@ class TestUnenrollRoute:
 
     @pytest.mark.api
     @patch("routes.period.routes.period_service")
-    def test_unenroll_endpoint_not_enrolled(self, mock_service, client):
+    def test_unenroll_endpoint_not_enrolled(self, mock_service, client) -> None:
         from exceptions.validation_error import ValidationError
         mock_service.unenroll_from_period.side_effect = ValidationError("You are not enrolled in period X")
 

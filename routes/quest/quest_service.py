@@ -9,7 +9,7 @@ from routes.quest.quest_grading_service import QuestGradingService
 
 class QuestService:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._creation = QuestCreationService()
         self._retrieval = QuestRetrievalService()
         self._grading = QuestGradingService()

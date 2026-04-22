@@ -35,7 +35,7 @@ load_dotenv()
 
 
 class ConversationService:
-    def __init__(self):
+    def __init__(self) -> None:
         self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()
         self.conversation_dao = ConversationDAO()
@@ -280,7 +280,7 @@ class ConversationService:
     def _save_grade(
         self, user_id, week, period_id, individual_quest_id,
         grade, overall_score, feedback,
-    ):
+    ) -> None:
         """Persist grading results to the individual quest record."""
         try:
             grade_data = {
@@ -321,7 +321,7 @@ class ConversationService:
         except Exception as e:
             logger.error("Error saving grade: %s", e, exc_info=True)
 
-    def _apply_quest_change(self, auth_token, user_id, period_id, recommended_change):
+    def _apply_quest_change(self, auth_token, user_id, period_id, recommended_change) -> None:
         """Delegate recommended changes to PeriodService."""
         try:
             from routes.period.period_service import PeriodService

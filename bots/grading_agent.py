@@ -62,7 +62,7 @@ class GradingOrchestrator:
     to produce a comprehensive grading result.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.numerical_agent = Agent(
             name="Numerical Grading Agent",
             instructions="""You are a numerical grading specialist. Analyze the student submission against the provided rubric.

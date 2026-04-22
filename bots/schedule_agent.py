@@ -38,7 +38,7 @@ class PeriodScheduleAgent:
     This is teacher/period scoped (not student-specific).
     """
 
-    def __init__(self, vector_store_id: str, course_name: str = None):
+    def __init__(self, vector_store_id: str, course_name: str = None) -> None:
         """
         Initialize the period schedule agent.
 
@@ -134,7 +134,7 @@ class PeriodScheduleService:
     Service for managing period schedules including S3 and vector store operations.
     """
 
-    def __init__(self, period_id: str, vector_store_id: str):
+    def __init__(self, period_id: str, vector_store_id: str) -> None:
         self.period_id = period_id
         self.vector_store_id = vector_store_id
         self.schedule_openai_file_id = None

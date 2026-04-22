@@ -7,7 +7,7 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 class PasswordResetTokenDAO(SupabaseBaseDAO):
     MAX_ATTEMPTS = 5
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('password_reset_token')
 
     def add_token(self, token) -> None:

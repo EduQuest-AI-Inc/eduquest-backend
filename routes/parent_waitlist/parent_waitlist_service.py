@@ -30,7 +30,7 @@ class ParentWaitlistValidationError(ValueError):
 
 
 class ParentWaitlistService:
-    def __init__(self):
+    def __init__(self) -> None:
         self._dao = ParentWaitlistDAO()
         self._email_service = get_email_service()
 

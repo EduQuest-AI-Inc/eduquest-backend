@@ -11,7 +11,7 @@ from data_access.supabase.period_dao import PeriodDAO
 
 class PeriodService:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._enrollment = PeriodEnrollmentService()
         self._ltg = PeriodLTGService()
         self._quest = PeriodQuestService()

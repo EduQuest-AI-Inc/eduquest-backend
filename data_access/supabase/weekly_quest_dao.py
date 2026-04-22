@@ -5,7 +5,7 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 
 
 class WeeklyQuestDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('weekly_quest')
 
     def add_weekly_quest(self, quest) -> None:

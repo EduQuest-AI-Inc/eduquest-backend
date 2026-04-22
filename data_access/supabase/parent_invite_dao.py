@@ -4,7 +4,7 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 
 
 class ParentInviteDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('parent_invite')
 
     def create_invite(self, invite) -> None:

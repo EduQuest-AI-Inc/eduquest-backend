@@ -10,7 +10,7 @@ class PasswordResetRateLimitDAO(SupabaseBaseDAO):
     MAX_REQUESTS_PER_IP = 20
     COOLDOWN_SECONDS = 300      # 5 minutes
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('password_reset_rate_limit')
 
     # -- key helpers -----------------------------------------------------------

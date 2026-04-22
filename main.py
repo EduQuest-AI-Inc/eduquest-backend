@@ -34,5 +34,5 @@ app.include_router(waitlist.router, prefix="/pilot-waitlist")
 
 
 @app.get("/helloworld")
-def hello():
+def hello() -> str:
     return "helloworld"

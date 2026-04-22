@@ -15,7 +15,7 @@ _INVITE_ALPHABET = string.ascii_uppercase + string.digits
 
 
 class ParentService:
-    def __init__(self):
+    def __init__(self) -> None:
         self.period_dao = PeriodDAO()
         self.parent_dao = ParentDAO()
         self.invite_dao = ParentInviteDAO()

@@ -48,7 +48,7 @@ class HWAgent:
     student's LTG conversation) so the title-generation call gets LTG context.
     """
 
-    def __init__(self, student, period, schedule, conversation_id: Optional[str] = None, previous_response_id: Optional[str] = None):
+    def __init__(self, student, period, schedule, conversation_id: Optional[str] = None, previous_response_id: Optional[str] = None) -> None:
         """
         Initialize the HWAgent.
 

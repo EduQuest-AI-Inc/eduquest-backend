@@ -11,7 +11,7 @@ SHARED_USER_FIELDS = {
 
 
 class StudentDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('student')
         self._user_dao = UserDAO()
 

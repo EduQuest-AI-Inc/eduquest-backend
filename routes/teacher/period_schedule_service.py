@@ -17,7 +17,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class PeriodScheduleService:
     """Service for managing period schedules."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.period_schedule_dao = PeriodScheduleDAO()
         self.period_dao = PeriodDAO()
 
@@ -229,7 +229,7 @@ class PeriodScheduleService:
         finally:
             os.unlink(temp_path)
 
-    def _delete_file_from_vector_store(self, vector_store_id: str, file_id: str):
+    def _delete_file_from_vector_store(self, vector_store_id: str, file_id: str) -> None:
         """Delete a file from the vector store."""
         try:
             client.vector_stores.files.delete(

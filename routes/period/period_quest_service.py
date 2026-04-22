@@ -13,7 +13,7 @@ from routes.quest.quest_service import QuestService
 
 class PeriodQuestService:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.period_dao = PeriodDAO()
         self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()

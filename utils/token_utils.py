@@ -34,7 +34,7 @@ def get_user_id_from_token(auth_token, session_dao):
     return sessions[0]['user_id']
 
 
-def set_auth_cookie(response, token):
+def set_auth_cookie(response, token) -> None:
     """Set the auth_token cookie with environment-appropriate flags."""
     if _IS_DEVELOPMENT:
         response.set_cookie('auth_token', token, httponly=True, samesite='Lax')

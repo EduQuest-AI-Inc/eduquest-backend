@@ -5,7 +5,7 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 
 
 class IndividualQuestDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('individual_quest')
 
     def add_individual_quest(self, quest) -> None:
