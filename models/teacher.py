@@ -1,16 +1,9 @@
-from pydantic import BaseModel
 from typing import Optional
 
+from models.user import User
 
-class Teacher(BaseModel):
-    user_id: str  # Partition Key
-    first_name: str
-    last_name: str
-    email: str
-    email_lc: Optional[str] = None  # Canonical lowercase email for lookups
-    password: str
-    last_login: Optional[str] = None
-    pilot_approved: bool = False  # Whether teacher is approved for pilot study
 
-    def to_item(self):
-        return self.model_dump()
+class Teacher(User):
+    role: str = 'teacher'
+    pilot_approved: bool = False
+    school_id: Optional[str] = None
