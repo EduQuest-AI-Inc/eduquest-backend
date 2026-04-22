@@ -151,10 +151,7 @@ Quick visual reference for all 16 tables in the EduQuest backend.
 | Field                     | Type            | Notes                                     |
 | ------------------------- | --------------- | ----------------------------------------- |
 | `period_id`               | string          | PK                                        |
-| `user_id`                 | string          | FK → `user.user_id`                       |
-| `vector_store_id`         | string          |                                           |
-| `schedule_s3_key`         | string          | S3 key for `schedule.json`, optional      |
-| `schedule_json`           | map             | Full schedule payload (S3 fallback)       |
+| `schedule_json`           | map             | Full schedule payload                     |
 | `schedule_openai_file_id` | string          | OpenAI file ID for vector store, optional |
 | `quest_enabled_weeks`     | list\<integer\> | Default: `[]`                             |
 | `created_at`              | string          | ISO timestamp                             |
@@ -484,7 +481,7 @@ Quick visual reference for all 16 tables in the EduQuest backend.
 | `teacher`                    | `user_id`                   | —             | FK → `user`                     | —                  |
 | `parent`                     | `user_id`                   | —             | FK → `user`                     | —                  |
 | `period`                     | `period_id`                 | —             | —                                | —                  |
-| `period_schedule`            | `period_id`                 | —             | —                                | —                  |
+| `period_schedule`            | `period_id`                 | —             | —                               | —                  |
 | `enrollment`                 | `period_id`                 | `enrolled_at` | —                                | —                  |
 | `session`                    | `auth_token`                | `user_id`     | —                                | —                  |
 | `individual_quest`           | `individual_quest_id`       | —             | —                                | —                  |
