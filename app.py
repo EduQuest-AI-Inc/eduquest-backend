@@ -1,4 +1,7 @@
 from dotenv import load_dotenv
+from exceptions.validation_error import ValidationError
+from flask.wrappers import Response
+from typing import Tuple
 
 # Load environment variables BEFORE any other imports so feature flags
 # (e.g. USE_SUPABASE) are available at module import time.
@@ -76,7 +79,7 @@ app.register_blueprint(parent_waitlist_bp, url_prefix='/parent-waitlist')
 app.register_blueprint(parent_bp, url_prefix='/parent')
 
 @app.errorhandler(ValidationError)
-def handle_validation_error(e):
+def handle_validation_error(e: ValidationError) -> Tuple[Response, int]:
     return jsonify({"error": str(e)}), 400
 
 @app.errorhandler(NotFoundError)

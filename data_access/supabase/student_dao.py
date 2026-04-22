@@ -111,9 +111,10 @@ class StudentDAO(SupabaseBaseDAO):
             .maybe_single()
             .execute()
         )
-        if not response or not response.data:
+        data = self._row(response)
+        if not data:
             return None
-        data = dict(response.data)
+        data = dict(data)
         user_data = data.pop('user', {})
         data.update(user_data)
         return data

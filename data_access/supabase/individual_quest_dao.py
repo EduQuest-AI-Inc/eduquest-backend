@@ -2,13 +2,14 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 
 from data_access.supabase.base_dao import SupabaseBaseDAO
+from models.individual_quest import IndividualQuest
 
 
 class IndividualQuestDAO(SupabaseBaseDAO):
     def __init__(self) -> None:
         super().__init__('individual_quest')
 
-    def add_individual_quest(self, quest) -> None:
+    def add_individual_quest(self, quest: IndividualQuest) -> None:
         self._insert({
             'individual_quest_id': quest.individual_quest_id,
             'quest_id': quest.quest_id,
@@ -53,7 +54,7 @@ class IndividualQuestDAO(SupabaseBaseDAO):
 
     def get_all_quests(self) -> List[Dict[str, Any]]:
         response = self._table().select('*').execute()
-        return response.data or []
+        return self._rows(response.data)
 
     def get_quests_by_date_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         response = (
@@ -63,7 +64,7 @@ class IndividualQuestDAO(SupabaseBaseDAO):
             .lte('due_date', end_date)
             .execute()
         )
-        return response.data or []
+        return self._rows(response.data)
 
     def get_quests_by_skills(self, skills: str) -> List[Dict[str, Any]]:
         response = (
@@ -72,7 +73,7 @@ class IndividualQuestDAO(SupabaseBaseDAO):
             .ilike('skills', f'%{skills}%')
             .execute()
         )
-        return response.data or []
+        return self._rows(response.data)
 
     def get_quests_by_student(self, user_id: str) -> List[Dict[str, Any]]:
         return self._select_eq('user_id', user_id)
@@ -88,4 +89,4 @@ class IndividualQuestDAO(SupabaseBaseDAO):
             .eq('period_id', period_id)
             .execute()
         )
-        return response.data or []
+        return self._rows(response.data)

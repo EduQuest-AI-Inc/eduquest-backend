@@ -2,6 +2,7 @@ import sys
 import os
 import json
 from datetime import datetime, timezone
+from models.individual_quest import IndividualQuest
 
 # Add the parent directory to Python path so we can import from eduquest-backend
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -11,7 +12,7 @@ from routes.quest.quest_service import QuestService
 from models.individual_quest import IndividualQuest
 import uuid
 
-def create_test_quest(user_id, period_id, week, quest_id, has_grade=False, status="not_started"):
+def create_test_quest(user_id: str, period_id: str, week: int, quest_id: str, has_grade: bool=False, status: str="not_started") -> IndividualQuest:
     """Create a test quest for testing preservation logic"""
     individual_quest_id = str(uuid.uuid4())
     

@@ -1,5 +1,6 @@
 import os
 from exceptions.auth_error import AuthError
+from werkzeug.local import LocalProxy
 
 _IS_DEVELOPMENT = (
     os.getenv('FLASK_ENV', 'production') == 'development'
@@ -8,7 +9,7 @@ _IS_DEVELOPMENT = (
 _COOKIE_DOMAIN = 'eduquestai.org'
 
 
-def extract_auth_token(request):
+def extract_auth_token(request: LocalProxy) -> str:
     """Extract auth token from Authorization header with cookie fallback. Returns token string or None."""
     auth_header = request.headers.get('Authorization', '')
     if auth_header and auth_header.lower().startswith('bearer '):

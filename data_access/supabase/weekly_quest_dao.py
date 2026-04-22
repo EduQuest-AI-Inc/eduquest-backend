@@ -2,13 +2,14 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 
 from data_access.supabase.base_dao import SupabaseBaseDAO
+from models.weekly_quest import WeeklyQuest
 
 
 class WeeklyQuestDAO(SupabaseBaseDAO):
     def __init__(self) -> None:
         super().__init__('weekly_quest')
 
-    def add_weekly_quest(self, quest) -> None:
+    def add_weekly_quest(self, quest: WeeklyQuest) -> None:
         self._insert({
             'quest_id': quest.quest_id,
             'user_id': quest.user_id,
@@ -35,7 +36,7 @@ class WeeklyQuestDAO(SupabaseBaseDAO):
             .eq('period_id', period_id)
             .execute()
         )
-        return response.data or []
+        return self._rows(response.data)
 
     def get_weekly_quest_by_student_and_period(self, user_id: str, period_id: str) -> Optional[Dict[str, Any]]:
         """Get the weekly quest for a student in a specific period (returns first match)."""

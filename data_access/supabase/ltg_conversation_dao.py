@@ -22,9 +22,8 @@ class LtgConversationDAO(SupabaseBaseDAO):
             .maybe_single()
             .execute()
         )
-        if response is not None and response.data:
-            return response.data['conversation_id']
-        return None
+        row = self._row(response)
+        return row['conversation_id'] if row else None
 
     def get_last_response_id(self, user_id: str, period_id: str) -> Optional[str]:
         response = (
@@ -35,9 +34,8 @@ class LtgConversationDAO(SupabaseBaseDAO):
             .maybe_single()
             .execute()
         )
-        if response is not None and response.data:
-            return response.data.get('last_response_id')
-        return None
+        row = self._row(response)
+        return row.get('last_response_id') if row else None
 
     def update_last_response_id(self, user_id: str, period_id: str, response_id: str) -> None:
         self._update(
@@ -84,6 +82,5 @@ class LtgConversationDAO(SupabaseBaseDAO):
             .maybe_single()
             .execute()
         )
-        if response is not None and response.data:
-            return response.data['period_id']
-        return None
+        row = self._row(response)
+        return row['period_id'] if row else None

@@ -39,4 +39,4 @@ class ConversationDAO(SupabaseBaseDAO):
             .maybe_single()
             .execute()
         )
-        return response.data
+        return self._row(response)

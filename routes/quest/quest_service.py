@@ -5,6 +5,7 @@ Kept for backwards compatibility so callers importing QuestService remain unchan
 from routes.quest.quest_creation_service import QuestCreationService
 from routes.quest.quest_retrieval_service import QuestRetrievalService
 from routes.quest.quest_grading_service import QuestGradingService
+from typing import Any, Dict, List, Optional, Union
 
 
 class QuestService:
@@ -28,7 +29,7 @@ class QuestService:
     def get_individual_quests_for_student(self, user_id):
         return self._retrieval.get_individual_quests_for_student(user_id)
 
-    def get_individual_quests_for_student_and_period(self, user_id, period_id):
+    def get_individual_quests_for_student_and_period(self, user_id: str, period_id: str) -> List[Any]:
         return self._retrieval.get_individual_quests_for_student_and_period(user_id, period_id)
 
     def get_individual_quest_by_id(self, quest_id, individual_quest_id):
@@ -38,11 +39,11 @@ class QuestService:
         return self._retrieval.verify_quest_structure(user_id, period_id)
 
     @staticmethod
-    def parse_grade_data(grade_str):
+    def parse_grade_data(grade_str: Optional[str]) -> Dict[str, Optional[Union[Dict[str, int], str, Dict[str, str]]]]:
         return QuestRetrievalService.parse_grade_data(grade_str)
 
     @staticmethod
-    def format_grade_for_display(grade_str):
+    def format_grade_for_display(grade_str: Optional[str]) -> str:
         return QuestRetrievalService.format_grade_for_display(grade_str)
 
     # Grading / updates

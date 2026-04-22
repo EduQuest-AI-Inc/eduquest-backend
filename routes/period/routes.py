@@ -8,6 +8,8 @@ from utils.token_utils import extract_auth_token, get_user_id_from_token
 
 from data_access.supabase.parent_dao import ParentDAO
 from data_access.supabase.parent_invite_dao import ParentInviteDAO
+from flask.wrappers import Response
+from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,7 @@ _parent_dao = ParentDAO()
 _invite_dao = ParentInviteDAO()
 
 
-def _token():
+def _token() -> str:
     return extract_auth_token(request)
 
 
@@ -46,7 +48,7 @@ def verify_period():
 
 
 @period_bp.route('/unenroll', methods=['POST'])
-def unenroll():
+def unenroll() -> Tuple[Response, int]:
     data = request.json
     period_id = data.get('period_id')
     if not period_id:

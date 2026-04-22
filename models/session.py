@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Literal
 import time
 
-def default_expiry():
+def default_expiry() -> int:
     return int(time.time()) + 43200  # 12 hours = 43200 seconds
 
 class Session(BaseModel):

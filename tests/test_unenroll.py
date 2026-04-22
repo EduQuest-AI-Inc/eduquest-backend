@@ -4,13 +4,17 @@ and the POST /period/unenroll route.
 """
 import pytest
 from unittest.mock import MagicMock, patch
+from flask.app import Flask
+from flask.testing import FlaskClient
+from routes.period.period_enrollment_service import PeriodEnrollmentService
+from typing import Dict, Iterator, List, Optional, Union
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _build_student(period_id="MATH-101", conversation_id="conv-abc"):
+def _build_student(period_id: str="MATH-101", conversation_id: str="conv-abc") -> Dict[str, Union[str, List[str], Dict[str, str]]]:
     return {
         "user_id": "stu-1",
         "enrollments": [period_id],
@@ -19,16 +23,16 @@ def _build_student(period_id="MATH-101", conversation_id="conv-abc"):
     }
 
 
-def _build_period(period_id="MATH-101"):
+def _build_period(period_id: str="MATH-101") -> Dict[str, str]:
     return {"period_id": period_id, "name": "Precalculus"}
 
 
 class FakeWeeklyQuest:
-    def __init__(self, quest_id) -> None:
+    def __init__(self, quest_id: str) -> None:
         self.quest_id = quest_id
 
 
-def _make_service():
+def _make_service() -> PeriodEnrollmentService:
     """Build a PeriodEnrollmentService with all DAO attributes replaced by mocks."""
     from routes.period.period_enrollment_service import PeriodEnrollmentService
 
@@ -46,7 +50,7 @@ def _make_service():
     return svc
 
 
-def _setup_service(student, period, enrollments=None, weekly_quests=None, individual_quests=None, conversation_id="conv-abc"):
+def _setup_service(student: Dict[str, Union[str, List[str], Dict[str, str]]], period: Dict[str, str], enrollments: Optional[List[Dict[str, str]]]=None, weekly_quests: Optional[List[FakeWeeklyQuest]]=None, individual_quests: Optional[List[Dict[str, str]]]=None, conversation_id: str="conv-abc") -> PeriodEnrollmentService:
     svc = _make_service()
 
     svc.session_dao.get_sessions_by_auth_token.return_value = [{"user_id": student["user_id"]}]
@@ -144,14 +148,14 @@ class TestUnenrollService:
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def app():
+def app() -> Iterator[Flask]:
     from app import app as flask_app
     flask_app.config.update({"TESTING": True})
     yield flask_app
 
 
 @pytest.fixture
-def client(app):
+def client(app: Flask) -> FlaskClient:
     return app.test_client()
 
 
@@ -159,7 +163,7 @@ class TestUnenrollRoute:
 
     @pytest.mark.api
     @patch("routes.period.routes.period_service")
-    def test_unenroll_endpoint_success(self, mock_service, client) -> None:
+    def test_unenroll_endpoint_success(self, mock_service: MagicMock, client: FlaskClient) -> None:
         mock_service.unenroll_from_period.return_value = {
             "message": "Successfully unenrolled from period MATH-101",
             "period_id": "MATH-101",
@@ -178,7 +182,7 @@ class TestUnenrollRoute:
 
     @pytest.mark.api
     @patch("routes.period.routes.period_service")
-    def test_unenroll_endpoint_missing_period(self, mock_service, client) -> None:
+    def test_unenroll_endpoint_missing_period(self, mock_service: MagicMock, client: FlaskClient) -> None:
         resp = client.post(
             "/period/unenroll",
             json={},
@@ -189,7 +193,7 @@ class TestUnenrollRoute:
 
     @pytest.mark.api
     @patch("routes.period.routes.period_service")
-    def test_unenroll_endpoint_not_enrolled(self, mock_service, client) -> None:
+    def test_unenroll_endpoint_not_enrolled(self, mock_service: MagicMock, client: FlaskClient) -> None:
         from exceptions.validation_error import ValidationError
         mock_service.unenroll_from_period.side_effect = ValidationError("You are not enrolled in period X")
 
