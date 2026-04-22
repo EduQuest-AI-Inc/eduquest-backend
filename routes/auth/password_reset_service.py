@@ -12,8 +12,7 @@ from typing import Optional, Tuple
 
 from werkzeug.security import generate_password_hash
 
-from data_access.supabase.student_dao import StudentDAO
-from data_access.supabase.teacher_dao import TeacherDAO
+from data_access.supabase.user_dao import UserDAO
 from data_access.supabase.password_reset_token_dao import PasswordResetTokenDAO
 from data_access.supabase.password_reset_rate_limit_dao import PasswordResetRateLimitDAO
 from models.password_reset_token import PasswordResetToken
@@ -34,8 +33,7 @@ class PasswordResetService:
     """Service for handling password reset operations."""
     
     def __init__(self):
-        self.student_dao = StudentDAO()
-        self.teacher_dao = TeacherDAO()
+        self.user_dao = UserDAO()
         self.token_dao = PasswordResetTokenDAO()
         self.rate_limit_dao = PasswordResetRateLimitDAO()
         self.email_service = get_email_service()
@@ -269,11 +267,7 @@ class PasswordResetService:
         
         try:
             hashed_password = generate_password_hash(new_password)
-            
-            if role == "teacher":
-                self.teacher_dao.update_teacher(user_id, {"password": hashed_password})
-            else:
-                self.student_dao.update_student(user_id, {"password": hashed_password})
+            self.user_dao.update(user_id, {"password": hashed_password})
             
             self._log_event(
                 "PASSWORD_RESET_SUCCESS",
@@ -307,20 +301,14 @@ class PasswordResetService:
     def _find_user_by_email(self, email_lc: str) -> Tuple[Optional[dict], Optional[str]]:
         """
         Find a user by their canonical email address.
-        
+
         Returns:
             (user_data, role) or (None, None) if not found
         """
-        student_items = self.student_dao.get_student_by_email_lc(email_lc)
-        if student_items:
-            return student_items[0] if isinstance(student_items, list) else student_items, "student"
-
-        teacher_items = self.teacher_dao.get_teacher_by_email_lc(email_lc)
-
-        if teacher_items:
-            return teacher_items[0] if isinstance(teacher_items, list) else teacher_items, "teacher"
-
-        return None, None
+        user = self.user_dao.get_by_email_lc(email_lc)
+        if not user:
+            return None, None
+        return user, user.get('role')
     
     def _log_event(
         self,

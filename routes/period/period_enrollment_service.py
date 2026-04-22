@@ -52,7 +52,7 @@ class PeriodEnrollmentService:
                 continue
             result.append({
                 'period_id': pid,
-                'course_name': period.get('course', pid),
+                'course_name': period.get('name', pid),
                 'long_term_goal': ltg_map.get(pid),
             })
         return result
@@ -115,7 +115,7 @@ class PeriodEnrollmentService:
                 logger.warning("Could not delete conversation %s: %s", conversation_id, e)
 
         period_obj = self.period_dao.get_period_by_id(period_id)
-        period_name = period_obj.get('course', period_id) if period_obj else period_id
+        period_name = period_obj.get('name', period_id) if period_obj else period_id
         long_term_goals = student.get('long_term_goal', {})
         if isinstance(long_term_goals, list):
             long_term_goals = {}

@@ -39,9 +39,8 @@ class ParentService:
 
         new_period = Period(
             period_id=period_id,
-            course=course,
+            name=course,
             owner_id=user_id,
-            owner_type="parent",
             vector_store_id=vector_store_id,
             file_urls=file_urls,
         )
@@ -55,7 +54,7 @@ class ParentService:
             item = p if isinstance(p, dict) else p.model_dump()
             result.append({
                 "period_id": item["period_id"],
-                "course": item["course"],
+                "name": item["name"],
                 "file_urls": item.get("file_urls", []),
             })
         return result

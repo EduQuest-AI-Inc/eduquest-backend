@@ -20,7 +20,6 @@ class TeacherService:
         return period_id
 
     def create_period(self, course, user_id, vector_store_id, file_urls,
-                      canvas_api_url=None, canvas_api_key=None,
                       canvas_course_id=None, canvas_course_name=None):
         period_id = self.generate_period_id(course)
 
@@ -36,14 +35,10 @@ class TeacherService:
 
         new_period = Period(
             period_id=period_id,
-            course=course,
+            name=course,
             owner_id=user_id,
-            owner_type="teacher",
             vector_store_id=vector_store_id,
-            user_id=user_id,
             file_urls=file_urls,
-            canvas_api_url=canvas_api_url,
-            canvas_api_key=canvas_api_key,
             canvas_course_id=canvas_course_id,
             canvas_course_name=canvas_course_name,
         )
@@ -57,7 +52,7 @@ class TeacherService:
         return [
             {
                 "period_id": p['period_id'],
-                "course": p['course'],
+                "name": p['name'],
             }
             for p in periods
         ]

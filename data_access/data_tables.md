@@ -1,62 +1,78 @@
-# DynamoDB Table Reference
+# Supabase Table Reference
 
-Quick visual reference for all 14 tables in the EduQuest backend.
+Quick visual reference for all 16 tables in the EduQuest backend.
 
 ---
 
 ## Table of Contents
 
-1. [student](#student)
-2. [teacher](#teacher)
-3. [parent](#parent)
-4. [period](#period)
-5. [period_schedule](#period_schedule)
-6. [enrollment](#enrollment)
-7. [session](#session)
-8. [individual_quest](#individual_quest)
-9. [weekly_quest](#weekly_quest)
-10. [waitlist](#waitlist)
-11. [parent_invite](#parent_invite)
-12. [password_reset_token](#password_reset_token)
-13. [password_reset_rate_limit](#password_reset_rate_limit)
-14. [conversation](#conversation)
+1. [user](#user)
+2. [student](#student)
+3. [teacher](#teacher)
+4. [parent](#parent)
+5. [period](#period)
+6. [period_schedule](#period_schedule)
+7. [enrollment](#enrollment)
+8. [session](#session)
+9. [individual_quest](#individual_quest)
+10. [weekly_quest](#weekly_quest)
+11. [waitlist](#waitlist)
+12. [parent_invite](#parent_invite)
+13. [password_reset_token](#password_reset_token)
+14. [password_reset_rate_limit](#password_reset_rate_limit)
+15. [conversation](#conversation)
+16. [student_long_term_goal](#student_long_term_goal)
+17. [school](#school)
+18. [ltg_conversation](#ltg_conversation)
+19. [parent_waitlist](#parent_waitlist)
 
-**Supabase-only tables** (no DynamoDB equivalent):
+---
 
-15. [school](#school)
-16. [ltg_conversation](#ltg_conversation)
-17. [parent_waitlist](#parent_waitlist)
+### `user`
+
+> Shared identity table for all account types. Role tables (`student`, `teacher`, `parent`) hold only role-specific fields and FK to this table.
+
+|               | Key       |
+| ------------- | --------- |
+| Partition Key | `user_id` |
+| Sort Key      | —         |
+
+| Field            | Type   | Notes                                          |
+| ---------------- | ------ | ---------------------------------------------- |
+| `user_id`        | string | PK                                             |
+| `first_name`     | string |                                                |
+| `last_name`      | string |                                                |
+| `email`          | string |                                                |
+| `email_lc`       | string | Unique — canonical lowercase email for lookups |
+| `password`       | string | Hashed (werkzeug)                              |
+| `last_login`     | string | ISO timestamp, optional                        |
+| `role`           | string | `"student"` \| `"teacher"` \| `"parent"`       |
+| `canvas_api_url` | string | Optional                                       |
+| `canvas_api_key` | string | Optional                                       |
+
+**Indexes:** unique index `idx_user_email_lc` on `email_lc`
 
 ---
 
 ### `student`
 
-> Stores student accounts and their profile data (interests, learning style, long-term goals).
+> Role-specific fields for student accounts. Shared identity fields live in `user`.
 
-|               | Key          |
-| ------------- | ------------ |
+|               | Key       |
+| ------------- | --------- |
 | Partition Key | `user_id` |
-| Sort Key      | —            |
+| Sort Key      | —         |
 
-| Field                | Type           | Notes                                 |
-| -------------------- | -------------- | ------------------------------------- |
-| `user_id`         | string         | PK                                    |
-| `first_name`         | string         |                                       |
-| `last_name`          | string         |                                       |
-| `email`              | string         |                                       |
-| `email_lc`           | string         | Lowercase canonical email for lookups |
-| `password`           | string         | Hashed                                |
-| `grade`              | integer        |                                       |
-| `enrollments`        | list\<string\> | List of `period_id`s                  |
-| `strength`           | list           |                                       |
-| `weakness`           | list           |                                       |
-| `interest`           | list           |                                       |
-| `learning_style`     | list           |                                       |
-| `long_term_goal`     | map            | `{ subject: goal_string }`            |
-| `quests`             | list\<map\>    | Embedded quest references             |
-| `completed_tutorial` | boolean        | Default: `false`                      |
-| `canvas_api_url`     | string         | Optional                              |
-| `canvas_api_key`     | string         | Optional                              |
+| Field                | Type    | Notes                             |
+| -------------------- | ------- | --------------------------------- |
+| `user_id`            | string  | PK + FK → `user.user_id` CASCADE  |
+| `grade`              | integer |                                   |
+| `strength`           | list    |                                   |
+| `weakness`           | list    |                                   |
+| `interest`           | list    |                                   |
+| `learning_style`     | list    |                                   |
+| `completed_tutorial` | boolean | Default: `false`                  |
+| `school_id`          | string  | Optional — FK → `school.school_id`|
 
 **Indexes:** none
 
@@ -64,23 +80,18 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 
 ### `teacher`
 
-> Stores teacher accounts and pilot study approval status.
+> Role-specific fields for teacher accounts. Shared identity fields live in `user`.
 
-|               | Key          |
-| ------------- | ------------ |
+|               | Key       |
+| ------------- | --------- |
 | Partition Key | `user_id` |
-| Sort Key      | —            |
+| Sort Key      | —         |
 
-| Field            | Type    | Notes                                 |
-| ---------------- | ------- | ------------------------------------- |
-| `user_id`     | string  | PK                                    |
-| `first_name`     | string  |                                       |
-| `last_name`      | string  |                                       |
-| `email`          | string  |                                       |
-| `email_lc`       | string  | Lowercase canonical email for lookups |
-| `password`       | string  | Hashed                                |
-| `last_login`     | string  | ISO timestamp, optional               |
-| `pilot_approved` | boolean | Default: `false`                      |
+| Field            | Type    | Notes                              |
+| ---------------- | ------- | ---------------------------------- |
+| `user_id`        | string  | PK + FK → `user.user_id` CASCADE   |
+| `pilot_approved` | boolean | Default: `false`                   |
+| `school_id`      | string  | Optional — FK → `school.school_id` |
 
 **Indexes:** none
 
@@ -88,23 +99,18 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 
 ### `parent`
 
-> Stores parent accounts linked to one or more students (homeschool use case).
+> Role-specific fields for parent accounts. Shared identity fields live in `user`.
 
-|               | Key         |
-| ------------- | ----------- |
+|               | Key       |
+| ------------- | --------- |
 | Partition Key | `user_id` |
-| Sort Key      | —           |
+| Sort Key      | —         |
 
-| Field                | Type           | Notes                                 |
-| -------------------- | -------------- | ------------------------------------- |
-| `user_id`          | string         | PK (username)                         |
-| `first_name`         | string         |                                       |
-| `last_name`          | string         |                                       |
-| `email`              | string         |                                       |
-| `email_lc`           | string         | Lowercase canonical email for lookups |
-| `password`           | string         | Hashed                                |
-| `linked_user_ids` | list\<string\> | Default: `[]`                         |
-| `last_login`         | string         | ISO timestamp, optional               |
+| Field             | Type           | Notes                                                            |
+| ----------------- | -------------- | ---------------------------------------------------------------- |
+| `user_id`         | string         | PK + FK → `user.user_id` CASCADE                                 |
+| `linked_user_ids` | list\<string\> | Default: `[]` — `user_id`s of linked students                    |
+| `vpc_verified_at` | string         | Optional — COPPA 2025 compliance timestamp, set on invite accept |
 
 **Indexes:** none
 
@@ -119,45 +125,37 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 | Partition Key | `period_id` |
 | Sort Key      | —           |
 
-| Field                | Type           | Notes                                           |
-| -------------------- | -------------- | ----------------------------------------------- |
-| `period_id`          | string         | PK                                              |
-| `owner_id`           | string         | `user_id` or `user_id`                     |
-| `owner_type`         | string         | `"teacher"` or `"parent"`                       |
-| `course`             | string         |                                                 |
-| `vector_store_id`    | string         | OpenAI vector store ID                          |
-| `file_urls`          | list\<string\> | Default: `[]`                                   |
-| `canvas_api_url`     | string         | Optional                                        |
-| `canvas_api_key`     | string         | Optional                                        |
-| `canvas_course_id`   | integer        | Optional                                        |
-| `canvas_course_name` | string         | Optional                                        |
-| `user_id`         | string         | Optional — backward compat alias for `owner_id` |
-| `user_id`          | string         | Optional — backward compat alias for `owner_id` |
+| Field                | Type           | Notes                              |
+| -------------------- | -------------- | ---------------------------------- |
+| `period_id`          | string         | PK                                 |
+| `owner_id`           | string         | FK → `user.user_id`                |
+| `course`             | string         |                                    |
+| `vector_store_id`    | string         | OpenAI vector store ID             |
+| `file_urls`          | list\<string\> | Default: `[]`                      |
+| `canvas_course_id`   | integer        | Optional                           |
+| `canvas_course_name` | string         | Optional                           |
 
-**Indexes:** none — queries by `owner_id` use a scan with filter
+**Indexes:** none — queries by `owner_id` use a filter
 
 ---
 
 ### `period_schedule`
 
-> Stores the AI-generated class schedule for a period, including which weeks have quests enabled.
+> AI-generated class schedule for a period, including which weeks have quests enabled.
 
 |               | Key         |
 | ------------- | ----------- |
 | Partition Key | `period_id` |
 | Sort Key      | —           |
 
-| Field                     | Type            | Notes                                                         |
-| ------------------------- | --------------- | ------------------------------------------------------------- |
-| `period_id`               | string          | PK                                                            |
-| `user_id`              | string          |                                                               |
-| `vector_store_id`         | string          |                                                               |
-| `schedule_s3_key`         | string          | S3 key for `schedule.json`, optional                          |
-| `schedule_json`           | map             | Full schedule payload (DynamoDB fallback when S3 unavailable) |
-| `schedule_openai_file_id` | string          | OpenAI file ID for vector store, optional                     |
-| `quest_enabled_weeks`     | list\<integer\> | Default: `[]`                                                 |
-| `created_at`              | string          | ISO timestamp                                                 |
-| `last_updated_at`         | string          | ISO timestamp — auto-updated on every write                   |
+| Field                     | Type            | Notes                                     |
+| ------------------------- | --------------- | ----------------------------------------- |
+| `period_id`               | string          | PK                                        |
+| `schedule_json`           | map             | Full schedule payload                     |
+| `schedule_openai_file_id` | string          | OpenAI file ID for vector store, optional |
+| `quest_enabled_weeks`     | list\<integer\> | Default: `[]`                             |
+| `created_at`              | string          | ISO timestamp                             |
+| `last_updated_at`         | string          | ISO timestamp — auto-updated on write     |
 
 **Indexes:** none
 
@@ -176,10 +174,10 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 | ------------- | ------ | ---------------------------------- |
 | `period_id`   | string | PK                                 |
 | `enrolled_at` | string | SK — ISO timestamp, auto-generated |
-| `user_id`  | string |                                    |
+| `user_id`     | string | FK → `user.user_id`                |
 | `semester`    | string | e.g. `"Fall 2025"`                 |
 
-**Indexes:** none — queries by `user_id` use a scan with filter
+**Indexes:** none — queries by `user_id` use a filter
 
 ---
 
@@ -195,7 +193,7 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 | Field        | Type    | Notes                                             |
 | ------------ | ------- | ------------------------------------------------- |
 | `auth_token` | string  | PK — JWT token                                    |
-| `user_id`    | string  | SK                                                |
+| `user_id`    | string  | SK — FK → `user.user_id`                          |
 | `role`       | string  | `"student"` \| `"teacher"` \| `"parent"`          |
 | `expires_at` | integer | Epoch timestamp — default: 12 hours from creation |
 
@@ -216,7 +214,7 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 | --------------------- | ------- | ----------------------------------------------------------- |
 | `individual_quest_id` | string  | PK                                                          |
 | `quest_id`            | string  | Parent weekly quest reference                               |
-| `user_id`          | string  |                                                             |
+| `user_id`             | string  | FK → `user.user_id`                                         |
 | `period_id`           | string  |                                                             |
 | `description`         | string  |                                                             |
 | `skills`              | string  | Skills practiced                                            |
@@ -230,30 +228,30 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 | `created_at`          | string  | ISO timestamp                                               |
 | `last_updated_at`     | string  | ISO timestamp — auto-updated on write                       |
 
-**Indexes:** none — filters by `user_id`, `period_id`, `week`, `status`, etc. all use scans
+**Indexes:** none — filters by `user_id`, `period_id`, `week`, `status` use filters
 
 ---
 
 ### `weekly_quest`
 
-> Groups all individual quests for a student in a period across a semester. Contains embedded quest items in DynamoDB.
+> Groups all individual quests for a student in a period across a semester.
 
 |               | Key        |
 | ------------- | ---------- |
 | Partition Key | `quest_id` |
 | Sort Key      | —          |
 
-| Field                | Type        | Notes                                              |
-| -------------------- | ----------- | -------------------------------------------------- |
-| `quest_id`           | string      | PK                                                 |
-| `user_id`         | string      |                                                    |
-| `period_id`          | string      |                                                    |
-| `student_period_key` | string      | Composite GSI key: `"user_id#period_id"`        |
-| `quests`             | list\<map\> | Embedded `WeeklyQuestItem` objects (DynamoDB only) |
-| `year`               | integer     | Default: current year                              |
-| `semester`           | string      | Default: `"Fall 2025"`                             |
-| `created_at`         | string      | ISO timestamp                                      |
-| `last_updated_at`    | string      | ISO timestamp — auto-updated on write              |
+| Field                | Type        | Notes                                   |
+| -------------------- | ----------- | --------------------------------------- |
+| `quest_id`           | string      | PK                                      |
+| `user_id`            | string      | FK → `user.user_id`                     |
+| `period_id`          | string      |                                         |
+| `student_period_key` | string      | Composite index key: `"user_id#period_id"` |
+| `quests`             | list\<map\> | Embedded `WeeklyQuestItem` objects      |
+| `year`               | integer     | Default: current year                   |
+| `semester`           | string      | Default: `"Fall 2025"`                  |
+| `created_at`         | string      | ISO timestamp                           |
+| `last_updated_at`    | string      | ISO timestamp — auto-updated on write   |
 
 **WeeklyQuestItem fields** (embedded in `quests` list):
 
@@ -273,7 +271,7 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 | `created_at`          | string  |
 | `last_updated_at`     | string  |
 
-**Indexes:** GSI `student_period_index` — PK: `student_period_key`
+**Indexes:** unique index on `student_period_key`
 
 ---
 
@@ -281,28 +279,28 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 
 > Teacher pilot study waitlist with referral tracking.
 
-|               | Key                                |
-| ------------- | ---------------------------------- |
-| Partition Key | `waitlistID` (stores `user_id`) |
-| Sort Key      | `email`                            |
+|               | Key          |
+| ------------- | ------------ |
+| Partition Key | `waitlistID` |
+| Sort Key      | `email`      |
 
-| Field          | Type    | Notes                               |
-| -------------- | ------- | ----------------------------------- |
-| `waitlistID`   | string  | PK — stores `user_id`            |
-| `email`        | string  | SK — lowercase                      |
-| `joinedAt`     | string  | ISO timestamp                       |
-| `position`     | integer | Queue position                      |
-| `referralCode` | string  | 8-char uppercase code               |
-| `referredBy`   | string  | Optional — `user_id` of referrer |
-| `status`       | string  | `"pending"` \| `"approved"`         |
+| Field          | Type    | Notes                             |
+| -------------- | ------- | --------------------------------- |
+| `waitlistID`   | string  | PK — stores `user_id`             |
+| `email`        | string  | SK — lowercase                    |
+| `joinedAt`     | string  | ISO timestamp                     |
+| `position`     | integer | Queue position                    |
+| `referralCode` | string  | 8-char uppercase code             |
+| `referredBy`   | string  | Optional — `user_id` of referrer  |
+| `status`       | string  | `"pending"` \| `"approved"`       |
 
-**Indexes:** GSI `referralCode-index` — PK: `referralCode`
+**Indexes:** unique index on `referralCode`
 
 ---
 
 ### `parent_invite`
 
-> Single-use invite codes that allow a parent to be onboarded.
+> Single-use invite codes that allow a parent to link a student account.
 
 |               | Key    |
 | ------------- | ------ |
@@ -312,7 +310,7 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 | Field        | Type    | Notes                                                        |
 | ------------ | ------- | ------------------------------------------------------------ |
 | `code`       | string  | PK — 8-char random token                                     |
-| `user_id`  | string  |                                                              |
+| `user_id`    | string  | FK → `user.user_id` (parent)                                 |
 | `expires_at` | string  | ISO timestamp — default: `INVITE_EXPIRY_HOURS` from creation |
 | `used`       | boolean | Default: `false`                                             |
 
@@ -331,12 +329,12 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 
 | Field              | Type    | Notes                                        |
 | ------------------ | ------- | -------------------------------------------- |
-| `token_hash`       | string  | PK — SHA-256 hash of the actual token        |
-| `user_id`          | string  | `user_id` or `user_id`                 |
-| `role`             | string  | `"student"` \| `"teacher"`                   |
+| `token_hash`       | string  | PK — SHA-256 hash of the raw token           |
+| `user_id`          | string  | FK → `user.user_id`                          |
+| `role`             | string  | `"student"` \| `"teacher"` \| `"parent"`     |
 | `email_lc`         | string  | Lowercase canonical email                    |
 | `created_at_iso`   | string  | ISO timestamp                                |
-| `expires_at_epoch` | integer | Epoch timestamp — **TTL attribute** (45 min) |
+| `expires_at_epoch` | integer | Epoch timestamp — TTL (45 min)               |
 | `attempts`         | integer | Confirmation attempts; max 5 before burning  |
 | `used_at_iso`      | string  | Optional — set when token is consumed        |
 | `burned_at_iso`    | string  | Optional — set when token is burned          |
@@ -360,7 +358,7 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 | ------------------ | ------- | ----------------------------------------------------- |
 | `key`              | string  | PK — composite key; format varies by tier (see below) |
 | `count`            | integer | Request count within window                           |
-| `expires_at_epoch` | integer | Epoch timestamp — **TTL attribute**                   |
+| `expires_at_epoch` | integer | Epoch timestamp — TTL                                 |
 
 **Key formats:**
 
@@ -376,7 +374,7 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 
 ### `conversation`
 
-> Stores conversation metadata for AI chat sessions between students/teachers and the agent.
+> Conversation metadata for AI chat sessions between students/teachers and the agent.
 
 |               | Key               |
 | ------------- | ----------------- |
@@ -386,24 +384,40 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 | Field               | Type   | Notes                                            |
 | ------------------- | ------ | ------------------------------------------------ |
 | `conversation_id`   | string | PK                                               |
-| `user_id`           | string |                                                  |
+| `user_id`           | string | FK → `user.user_id`                              |
 | `role`              | string | `"student"` \| `"teacher"`                       |
-| `conversation_type` | string | e.g. `"profile"`                                 |
+| `conversation_type` | string | e.g. `"profile"`, `"update"`                     |
 | `period_id`         | string | Optional                                         |
 | `last_response_id`  | string | Optional — last OpenAI response ID for threading |
-| `created_at`        | string | ISO timestamp (aliased as `createdAt` in model)  |
+| `created_at`        | string | ISO timestamp                                    |
 
 **Indexes:** none — filtering by `user_id` / `conversation_type` done in application code
 
 ---
 
-## Supabase-Only Tables
+### `student_long_term_goal`
+
+> Per-student, per-period long-term goal text. Written by `StudentDAO.update_long_term_goal`.
+
+|               | Key                           |
+| ------------- | ----------------------------- |
+| Partition Key | `user_id` + `period_id` (composite) |
+| Sort Key      | —                             |
+
+| Field        | Type   | Notes                                  |
+| ------------ | ------ | -------------------------------------- |
+| `user_id`    | string | Part of composite PK — FK → `user.user_id` |
+| `period_id`  | string | Part of composite PK                   |
+| `goal_text`  | string |                                        |
+| `updated_at` | string | ISO timestamp — set on every upsert    |
+
+**Indexes:** unique index on `(user_id, period_id)`
 
 ---
 
 ### `school`
 
-> Represents a school organization. Supabase-only — no DynamoDB counterpart.
+> Represents a school organization.
 
 |               | Key         |
 | ------------- | ----------- |
@@ -421,16 +435,16 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 
 ### `ltg_conversation`
 
-> Maps each (student, period) pair to an OpenAI long-term goal conversation ID. Supabase-only.
+> Maps each (student, period) pair to an OpenAI long-term goal conversation ID.
 
-|               | Key                                    |
-| ------------- | -------------------------------------- |
-| Partition Key | `user_id` + `period_id` (composite) |
-| Sort Key      | —                                      |
+|               | Key                                  |
+| ------------- | ------------------------------------ |
+| Partition Key | `user_id` + `period_id` (composite)  |
+| Sort Key      | —                                    |
 
 | Field              | Type   | Notes                                            |
 | ------------------ | ------ | ------------------------------------------------ |
-| `user_id`       | string | Part of composite PK                             |
+| `user_id`          | string | Part of composite PK — FK → `user.user_id`       |
 | `period_id`        | string | Part of composite PK                             |
 | `conversation_id`  | string | OpenAI conversation ID                           |
 | `last_response_id` | string | Optional — last OpenAI response ID for threading |
@@ -442,17 +456,17 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 
 ### `parent_waitlist`
 
-> Waitlist for parent onboarding. Supabase-only by design — new feature with no DynamoDB legacy path.
+> Waitlist for parent onboarding.
 
-|               | Key                        |
-| ------------- | -------------------------- |
+|               | Key                       |
+| ------------- | ------------------------- |
 | Partition Key | `email` (via unique index) |
-| Sort Key      | —                          |
+| Sort Key      | —                         |
 
 | Field                 | Type   | Notes                                                                 |
 | --------------------- | ------ | --------------------------------------------------------------------- |
 | `email`               | string | Unique — case-insensitive via `idx_parent_waitlist_email_lower` index |
-| _(additional fields)_ |        | Set by caller via `create()` — no fixed schema enforced in DAO        |
+| _(additional fields)_ |        | Set by caller — no fixed schema enforced in DAO                       |
 
 **Indexes:** unique index `idx_parent_waitlist_email_lower` on lowercase `email`
 
@@ -460,22 +474,24 @@ Quick visual reference for all 14 tables in the EduQuest backend.
 
 ## Quick Reference
 
-| Table                                | PK                       | SK            | GSI                              | TTL                |
-| ------------------------------------ | ------------------------ | ------------- | -------------------------------- | ------------------ |
-| `student`                            | `user_id`             | —             | —                                | —                  |
-| `teacher`                            | `user_id`             | —             | —                                | —                  |
-| `parent`                             | `user_id`              | —             | —                                | —                  |
-| `period`                             | `period_id`              | —             | —                                | —                  |
-| `period_schedule`                    | `period_id`              | —             | —                                | —                  |
-| `enrollment`                         | `period_id`              | `enrolled_at` | —                                | —                  |
-| `session`                            | `auth_token`             | `user_id`     | —                                | —                  |
-| `individual_quest`                   | `individual_quest_id`    | —             | —                                | —                  |
-| `weekly_quest`                       | `quest_id`               | —             | `student_period_index`           | —                  |
-| `waitlist`                           | `waitlistID`             | `email`       | `referralCode-index`             | —                  |
-| `parent_invite`                      | `code`                   | —             | —                                | —                  |
-| `password_reset_token`               | `token_hash`             | —             | —                                | `expires_at_epoch` |
-| `password_reset_rate_limit`          | `key`                    | —             | —                                | `expires_at_epoch` |
-| `conversation`                       | `conversation_id`        | —             | —                                | —                  |
-| `school` _(Supabase only)_           | `school_id`              | —             | —                                | —                  |
-| `ltg_conversation` _(Supabase only)_ | `user_id + period_id` | —             | unique `(user_id, period_id)` | —                  |
-| `parent_waitlist` _(Supabase only)_  | `email`                  | —             | unique `email_lower`             | —                  |
+| Table                        | PK                          | SK            | Unique / Index                  | TTL                |
+| ---------------------------- | --------------------------- | ------------- | ------------------------------- | ------------------ |
+| `user`                       | `user_id`                   | —             | `email_lc`                      | —                  |
+| `student`                    | `user_id`                   | —             | FK → `user`                     | —                  |
+| `teacher`                    | `user_id`                   | —             | FK → `user`                     | —                  |
+| `parent`                     | `user_id`                   | —             | FK → `user`                     | —                  |
+| `period`                     | `period_id`                 | —             | —                                | —                  |
+| `period_schedule`            | `period_id`                 | —             | —                               | —                  |
+| `enrollment`                 | `period_id`                 | `enrolled_at` | —                                | —                  |
+| `session`                    | `auth_token`                | `user_id`     | —                                | —                  |
+| `individual_quest`           | `individual_quest_id`       | —             | —                                | —                  |
+| `weekly_quest`               | `quest_id`                  | —             | `student_period_key`            | —                  |
+| `waitlist`                   | `waitlistID`                | `email`       | `referralCode`                  | —                  |
+| `parent_invite`              | `code`                      | —             | —                                | —                  |
+| `password_reset_token`       | `token_hash`                | —             | —                                | `expires_at_epoch` |
+| `password_reset_rate_limit`  | `key`                       | —             | —                                | `expires_at_epoch` |
+| `conversation`               | `conversation_id`           | —             | —                                | —                  |
+| `student_long_term_goal`     | `user_id + period_id`       | —             | unique `(user_id, period_id)`   | —                  |
+| `school`                     | `school_id`                 | —             | —                                | —                  |
+| `ltg_conversation`           | `user_id + period_id`       | —             | unique `(user_id, period_id)`   | —                  |
+| `parent_waitlist`            | `email`                     | —             | `email_lower`                   | —                  |

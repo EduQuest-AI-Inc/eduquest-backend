@@ -8,8 +8,8 @@ from utils.validation_utils import get_client_ip
 logger = logging.getLogger(__name__)
 from datetime import datetime, timezone
 from data_access.supabase.session_dao import SessionDAO
+from data_access.supabase.user_dao import UserDAO
 from data_access.supabase.student_dao import StudentDAO
-from data_access.supabase.teacher_dao import TeacherDAO
 from data_access.supabase.parent_dao import ParentDAO
 from data_access.supabase.parent_invite_dao import ParentInviteDAO
 from models.session import Session
@@ -17,8 +17,8 @@ from routes.conversation.conversation_service import ConversationService
 
 auth_bp = Blueprint('auth', __name__)
 session_dao = SessionDAO()
+user_dao = UserDAO()
 student_dao = StudentDAO()
-teacher_dao = TeacherDAO()
 parent_dao = ParentDAO()
 parent_invite_dao = ParentInviteDAO()
 conversation_service = ConversationService()
@@ -50,10 +50,7 @@ def signup():
     email_lc = email.strip().lower()
 
     # Check uniqueness using email_lc to prevent case-based duplicates
-    student_items = student_dao.get_student_by_email_lc(email_lc)
-    teacher_items = teacher_dao.get_teacher_by_email_lc(email_lc)
-    parent_items = parent_dao.get_parent_by_email_lc(email_lc)
-    if student_items or teacher_items or parent_items:
+    if user_dao.get_by_email_lc(email_lc):
         return jsonify({'message': 'Email address already in use'}), 409
 
     invite_code = data.get('invite_code', '').strip().upper()
