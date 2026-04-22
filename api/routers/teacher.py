@@ -36,7 +36,7 @@ openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @router.post("/create-period", status_code=201)
 def create_period(
-    course: str = Form(...),
+    name: str = Form(...),
     files: List[UploadFile] = File(default=[]),
     canvas_api_url: Optional[str] = Form(default=None),
     canvas_api_key: Optional[str] = Form(default=None),
@@ -86,7 +86,7 @@ def create_period(
                 logger.warning("Failed to parse Canvas course: %s", canvas_error)
 
         # Create OpenAI vector store and upload files
-        vector_store = openai_client.vector_stores.create(name=course)
+        vector_store = openai_client.vector_stores.create(name=name)
         file_streams = [open(p, "rb") for p in file_paths]
         try:
             if file_streams:
@@ -100,12 +100,10 @@ def create_period(
 
         # Create period record (file_urls populated after S3 upload)
         period = teacher_service.create_period(
-            course=course,
+            course=name,
             user_id=user_id,
             vector_store_id=vector_store.id,
             file_urls=[],
-            canvas_api_url=canvas_api_url,
-            canvas_api_key=canvas_api_key,
             canvas_course_id=int(canvas_course_id) if canvas_course_id else None,
             canvas_course_name=canvas_course_name,
         )

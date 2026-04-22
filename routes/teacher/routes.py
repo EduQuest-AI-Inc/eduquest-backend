@@ -115,7 +115,7 @@ def create_period():
         if denied:
             return denied
 
-        course = request.form.get("course")
+        course = request.form.get("name")
         if not course:
             return jsonify({"error": "Course name is required"}), 400
 
@@ -133,8 +133,6 @@ def create_period():
             user_id=user_id,
             vector_store_id=vector_store.id,
             file_urls=[],
-            canvas_api_url=canvas_api_url,
-            canvas_api_key=canvas_api_key,
             canvas_course_id=int(canvas_course_id) if canvas_course_id else None,
             canvas_course_name=canvas_course_name,
         )

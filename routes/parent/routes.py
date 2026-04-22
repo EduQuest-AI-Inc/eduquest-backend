@@ -29,7 +29,7 @@ def create_period():
     try:
         user_id = get_jwt_identity()
 
-        course = request.form.get("course")
+        course = request.form.get("name")
         files = request.files.getlist("files")
 
         if not course:

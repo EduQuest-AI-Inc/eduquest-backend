@@ -17,14 +17,14 @@ def test_crud_operations():
         owner_id="teach001",
         user_id="teach001",
         vector_store_id="vs_789",
-        course=json.dumps(data, indent=2),
+        name=json.dumps(data, indent=2),
     )
 
     # -------Add-------
     # dao.add_period(period)
 
     # -------Update-------
-    # dao.update_period("per001", {"course": "Advanced Math"})
+    # dao.update_period("per001", {"name": "Advanced Math"})
 
     # -------Get-------
     # result = dao.get_period_by_id("per001")

@@ -20,7 +20,7 @@ def _build_student(period_id="MATH-101", conversation_id="conv-abc"):
 
 
 def _build_period(period_id="MATH-101"):
-    return {"period_id": period_id, "course": "Precalculus"}
+    return {"period_id": period_id, "name": "Precalculus"}
 
 
 class FakeWeeklyQuest:

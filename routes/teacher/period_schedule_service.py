@@ -41,7 +41,7 @@ class PeriodScheduleService:
             raise PermissionError("Not authorized to access this period")
 
         vector_store_id = period.get("vector_store_id")
-        course_name = period.get("course", "Course")
+        course_name = period.get("name", "Course")
 
         # Generate schedule using the agent
         agent = PeriodScheduleAgent(

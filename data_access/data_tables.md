@@ -129,12 +129,9 @@ Quick visual reference for all 16 tables in the EduQuest backend.
 | -------------------- | -------------- | ---------------------------------- |
 | `period_id`          | string         | PK                                 |
 | `owner_id`           | string         | FK → `user.user_id`                |
-| `owner_type`         | string         | `"teacher"` or `"parent"`          |
 | `course`             | string         |                                    |
 | `vector_store_id`    | string         | OpenAI vector store ID             |
 | `file_urls`          | list\<string\> | Default: `[]`                      |
-| `canvas_api_url`     | string         | Optional                           |
-| `canvas_api_key`     | string         | Optional                           |
 | `canvas_course_id`   | integer        | Optional                           |
 | `canvas_course_name` | string         | Optional                           |
 
