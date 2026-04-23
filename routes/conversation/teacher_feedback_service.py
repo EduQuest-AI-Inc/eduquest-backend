@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any
 
 from agents import Runner, OpenAIConversationsSession
 
-from EQ_agents.teacher_feedback_agent import (
+from bots.teacher_feedback_agent import (
     create_teacher_feedback_agent,
     TeacherFeedbackResponse,
 )
@@ -22,7 +22,7 @@ class TeacherFeedbackConversationService:
     OpenAI Conversations session.
     """
 
-    def __init__(self, conversation_id: Optional[str] = None):
+    def __init__(self, conversation_id: Optional[str] = None) -> None:
         self.agent = create_teacher_feedback_agent()
         if conversation_id:
             self.session = OpenAIConversationsSession(conversation_id=conversation_id)

@@ -5,7 +5,7 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 
 
 class SessionDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('session')
 
     def add_session(self, session) -> None:

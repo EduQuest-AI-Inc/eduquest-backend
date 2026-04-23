@@ -23,7 +23,7 @@ class EmailService:
     Email service using AWS SES.
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         self.ses_client = boto3.client(
             'ses',
             region_name=os.getenv('AWS_REGION', 'us-east-2'),

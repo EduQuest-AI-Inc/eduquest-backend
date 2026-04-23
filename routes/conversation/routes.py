@@ -1,39 +1,19 @@
+import logging
 from flask import Blueprint, request, jsonify
 import json
 import tempfile
-from decimal import Decimal
 import os
 from routes.conversation.conversation_service import ConversationService
+from utils.conversion_utils import convert_decimals
+from utils.token_utils import extract_auth_token
 
+logger = logging.getLogger(__name__)
 conversation_bp = Blueprint('conversation', __name__)
 conversation_service = ConversationService()
 
 
-def convert_decimals(obj):
-    """Convert Decimal objects to regular numbers for JSON serialization"""
-    if isinstance(obj, Decimal):
-        return float(obj)
-    elif isinstance(obj, dict):
-        return {key: convert_decimals(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_decimals(item) for item in obj]
-    else:
-        return obj
-
-
 def _extract_auth_token():
-    """Extract auth token from Authorization header or Cookie fallback."""
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header and auth_header.lower().startswith('bearer '):
-        return auth_header.split(' ', 1)[1].strip()
-
-    raw_cookie = request.headers.get('Cookie', '')
-    if 'auth_token=' in raw_cookie:
-        parts = [p.strip() for p in raw_cookie.split(';')]
-        auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-        if auth_tokens:
-            return auth_tokens[-1]
-    return None
+    return extract_auth_token(request)
 
 
 # ------------------------------------------------------------------
@@ -47,7 +27,7 @@ def profile_assistant():
         result = conversation_service.start_profile_assistant(auth_token)
         return jsonify(result), 200
     except Exception as e:
-        print(f"Error in initiate-profile-assistant: {e}")
+        logger.error("Error in initiate-profile-assistant: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -73,9 +53,7 @@ def continue_profile_assistant():
         )
         return jsonify(result), 200
     except Exception as e:
-        print(f"Error in continue-profile-assistant: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error in continue-profile-assistant: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -83,98 +61,88 @@ def continue_profile_assistant():
 # Update assistant (grading / teacher feedback)
 # ------------------------------------------------------------------
 
+def _handle_file_submission(auth_token):
+    """Handle multipart/form-data submissions (student file uploads)."""
+    file = request.files.get('file')
+    if not file:
+        return jsonify({"error": "No file provided"}), 400
+
+    individual_quest_id = request.form.get('individual_quest_id')
+    week = request.form.get('week')
+    if not individual_quest_id:
+        return jsonify({"error": "individual_quest_id is required for student submissions"}), 400
+    if not week:
+        return jsonify({"error": "week is required for student submissions"}), 400
+
+    temp_file = tempfile.NamedTemporaryFile(
+        delete=False, suffix=os.path.splitext(file.filename)[1],
+    )
+    file.save(temp_file.name)
+    temp_file.close()
+
+    try:
+        from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+        quest_data = IndividualQuestDAO().get_individual_quest_by_id(individual_quest_id)
+        if not quest_data:
+            return jsonify({"error": "Quest not found"}), 404
+        quests_file = json.dumps([convert_decimals(quest_data)])
+    except Exception as quest_error:
+        return jsonify({"error": f"Failed to fetch quest: {quest_error}"}), 500
+
+    result = conversation_service.start_update_assistant(
+        auth_token=auth_token,
+        quests_file=quests_file,
+        is_instructor=False,
+        week=int(week),
+        submission_file=temp_file.name,
+        user_id=request.form.get('user_id'),
+        period_id=request.form.get('period_id'),
+        individual_quest_id=individual_quest_id,
+    )
+    try:
+        os.unlink(temp_file.name)
+    except Exception:
+        pass
+    return jsonify(result), 200
+
+
+def _handle_json_submission(auth_token):
+    """Handle JSON body submissions (instructor or student without file upload)."""
+    data = request.json
+    quests_file = data.get('quests_file')
+    is_instructor = data.get('is_instructor', False)
+    week = data.get('week')
+    submission_file = data.get('submission_file')
+
+    if not quests_file:
+        return jsonify({"error": "quests_file is required"}), 400
+    if not is_instructor:
+        if not week:
+            return jsonify({"error": "week is required for student submissions"}), 400
+        if not submission_file:
+            return jsonify({"error": "submission_file is required for student submissions"}), 400
+
+    result = conversation_service.start_update_assistant(
+        auth_token=auth_token,
+        quests_file=quests_file,
+        is_instructor=is_instructor,
+        week=week,
+        submission_file=submission_file,
+        user_id=data.get('user_id'),
+        period_id=data.get('period_id'),
+    )
+    return jsonify(result), 200
+
+
 @conversation_bp.route('/initiate-update-assistant', methods=['POST'])
 def initiate_update():
     try:
         auth_token = _extract_auth_token()
-
         if request.files:
-            file = request.files.get('file')
-            if not file:
-                return jsonify({"error": "No file provided"}), 400
-
-            temp_file = tempfile.NamedTemporaryFile(
-                delete=False, suffix=os.path.splitext(file.filename)[1],
-            )
-            file.save(temp_file.name)
-            temp_file.close()
-
-            individual_quest_id = request.form.get('individual_quest_id')
-            week = request.form.get('week')
-            student_id = request.form.get('student_id')
-            period_id = request.form.get('period_id')
-
-            if not individual_quest_id:
-                return jsonify({"error": "individual_quest_id is required for student submissions"}), 400
-            if not week:
-                return jsonify({"error": "week is required for student submissions"}), 400
-
-            try:
-                import os as _os
-                if _os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-                    from data_access.supabase.individual_quest_dao import IndividualQuestDAO
-                else:
-                    from data_access.individual_quest_dao import IndividualQuestDAO
-                quest_data = IndividualQuestDAO().get_individual_quest_by_id(individual_quest_id)
-                if not quest_data:
-                    return jsonify({"error": "Quest not found"}), 404
-                quest_data = convert_decimals(quest_data)
-                quests_file = json.dumps([quest_data])
-            except Exception as quest_error:
-                return jsonify({"error": f"Failed to fetch quest: {quest_error}"}), 500
-
-            result = conversation_service.start_update_assistant(
-                auth_token=auth_token,
-                quests_file=quests_file,
-                is_instructor=False,
-                week=int(week),
-                submission_file=temp_file.name,
-                student_id=student_id,
-                period_id=period_id,
-                individual_quest_id=individual_quest_id,
-            )
-
-            try:
-                os.unlink(temp_file.name)
-            except Exception:
-                pass
-
-            return jsonify(result), 200
-
-        else:
-            data = request.json
-            quests_file = data.get('quests_file')
-            is_instructor = data.get('is_instructor', False)
-
-            if not quests_file:
-                return jsonify({"error": "quests_file is required"}), 400
-
-            week = data.get('week')
-            submission_file = data.get('submission_file')
-            student_id = data.get('student_id')
-            period_id = data.get('period_id')
-
-            if not is_instructor:
-                if not week:
-                    return jsonify({"error": "week is required for student submissions"}), 400
-                if not submission_file:
-                    return jsonify({"error": "submission_file is required for student submissions"}), 400
-
-            result = conversation_service.start_update_assistant(
-                auth_token=auth_token,
-                quests_file=quests_file,
-                is_instructor=is_instructor,
-                week=week,
-                submission_file=submission_file,
-                student_id=student_id,
-                period_id=period_id,
-            )
-            return jsonify(result), 200
-
+            return _handle_file_submission(auth_token)
+        return _handle_json_submission(auth_token)
     except Exception as e:
-        print(f"Error in initiate-update-assistant: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error in initiate-update-assistant: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -186,7 +154,7 @@ def continue_update():
 
         conversation_id = data.get('conversation_id')
         user_message = data.get('message')
-        student_id = data.get('student_id')
+        user_id = data.get('user_id')
 
         if not conversation_id:
             return jsonify({"error": "conversation_id is required"}), 400
@@ -197,11 +165,9 @@ def continue_update():
             auth_token=auth_token,
             conversation_id=conversation_id,
             message=user_message,
-            student_id=student_id,
+            user_id=user_id,
         )
         return jsonify(result), 200
     except Exception as e:
-        print(f"Error in continue-update-assistant: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error in continue-update-assistant: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500

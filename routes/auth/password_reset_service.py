@@ -12,17 +12,9 @@ from typing import Optional, Tuple
 
 from werkzeug.security import generate_password_hash
 
-import os
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.student_dao import StudentDAO
-    from data_access.supabase.teacher_dao import TeacherDAO
-    from data_access.supabase.password_reset_token_dao import PasswordResetTokenDAO
-    from data_access.supabase.password_reset_rate_limit_dao import PasswordResetRateLimitDAO
-else:
-    from data_access.student_dao import StudentDAO
-    from data_access.teacher_dao import TeacherDAO
-    from data_access.password_reset_token_dao import PasswordResetTokenDAO
-    from data_access.password_reset_rate_limit_dao import PasswordResetRateLimitDAO
+from data_access.supabase.user_dao import UserDAO
+from data_access.supabase.password_reset_token_dao import PasswordResetTokenDAO
+from data_access.supabase.password_reset_rate_limit_dao import PasswordResetRateLimitDAO
 from models.password_reset_token import PasswordResetToken
 from services.email_service import get_email_service
 from .password_policy import validate_password
@@ -40,9 +32,8 @@ INVALID_TOKEN_MESSAGE = "This link is invalid or expired. Please request a new o
 class PasswordResetService:
     """Service for handling password reset operations."""
     
-    def __init__(self):
-        self.student_dao = StudentDAO()
-        self.teacher_dao = TeacherDAO()
+    def __init__(self) -> None:
+        self.user_dao = UserDAO()
         self.token_dao = PasswordResetTokenDAO()
         self.rate_limit_dao = PasswordResetRateLimitDAO()
         self.email_service = get_email_service()
@@ -101,7 +92,7 @@ class PasswordResetService:
             # Still return neutral message
             return {"success": True, "message": NEUTRAL_REQUEST_MESSAGE}
         
-        user_id = user_data.get("student_id") or user_data.get("teacher_id")
+        user_id = user_data.get("user_id") or user_data.get("user_id")
         first_name = user_data.get("first_name")
         
         try:
@@ -276,11 +267,7 @@ class PasswordResetService:
         
         try:
             hashed_password = generate_password_hash(new_password)
-            
-            if role == "teacher":
-                self.teacher_dao.update_teacher(user_id, {"password": hashed_password})
-            else:
-                self.student_dao.update_student(user_id, {"password": hashed_password})
+            self.user_dao.update(user_id, {"password": hashed_password})
             
             self._log_event(
                 "PASSWORD_RESET_SUCCESS",
@@ -314,35 +301,14 @@ class PasswordResetService:
     def _find_user_by_email(self, email_lc: str) -> Tuple[Optional[dict], Optional[str]]:
         """
         Find a user by their canonical email address.
-        
+
         Returns:
             (user_data, role) or (None, None) if not found
         """
-        # Check students first
-        if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-            student_items = self.student_dao.get_student_by_email_lc(email_lc)
-        else:
-            student_items = self.student_dao.table.scan(
-                FilterExpression="email_lc = :email_lc",
-                ExpressionAttributeValues={":email_lc": email_lc}
-            ).get("Items", [])
-
-        if student_items:
-            return student_items[0] if isinstance(student_items, list) else student_items, "student"
-
-        # Check teachers
-        if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-            teacher_items = self.teacher_dao.get_teacher_by_email_lc(email_lc)
-        else:
-            teacher_items = self.teacher_dao.table.scan(
-                FilterExpression="email_lc = :email_lc",
-                ExpressionAttributeValues={":email_lc": email_lc}
-            ).get("Items", [])
-
-        if teacher_items:
-            return teacher_items[0] if isinstance(teacher_items, list) else teacher_items, "teacher"
-
-        return None, None
+        user = self.user_dao.get_by_email_lc(email_lc)
+        if not user:
+            return None, None
+        return user, user.get('role')
     
     def _log_event(
         self,
@@ -356,7 +322,7 @@ class PasswordResetService:
         token_hash_prefix: Optional[str] = None,
         ses_message_id: Optional[str] = None,
         result: Optional[str] = None
-    ):
+    ) -> None:
         """Log a password reset event with structured data."""
         log_data = {
             "event_type": event_type,

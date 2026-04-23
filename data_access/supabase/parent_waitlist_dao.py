@@ -6,13 +6,13 @@ and `USE_SUPABASE=true` in production, so we avoid a dead DynamoDB
 code path.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from data_access.supabase.base_dao import SupabaseBaseDAO
 
 
 class ParentWaitlistDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("parent_waitlist")
 
     def get_by_email(self, email: str) -> Optional[Dict[str, Any]]:
@@ -23,7 +23,7 @@ class ParentWaitlistDAO(SupabaseBaseDAO):
         normalized = (email or "").strip().lower()
         if not normalized:
             return None
-        rows = (
+        rows = cast(list[Dict[str, Any]], (
             self._table()
             .select("*")
             .ilike("email", normalized)
@@ -31,7 +31,7 @@ class ParentWaitlistDAO(SupabaseBaseDAO):
             .execute()
             .data
             or []
-        )
+        ))
         return rows[0] if rows else None
 
     def create(self, row: Dict[str, Any]) -> Dict[str, Any]:

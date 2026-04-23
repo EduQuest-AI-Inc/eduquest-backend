@@ -2,33 +2,30 @@
 Conversation service — orchestrates profile gathering, grading, and
 teacher-feedback flows by delegating to specialised agent services.
 """
+import logging
 import uuid
 import os
 import json
 import tempfile
 
+logger = logging.getLogger(__name__)
+
 from dotenv import load_dotenv
 
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.session_dao import SessionDAO
-    from data_access.supabase.period_dao import PeriodDAO
-    from data_access.supabase.student_dao import StudentDAO
-    from data_access.supabase.conversation_dao import ConversationDAO
-    from data_access.supabase.teacher_dao import TeacherDAO
-else:
-    from data_access.session_dao import SessionDAO
-    from data_access.period_dao import PeriodDAO
-    from data_access.student_dao import StudentDAO
-    from data_access.conversation_dao import ConversationDAO
-    from data_access.teacher_dao import TeacherDAO
+from data_access.supabase.session_dao import SessionDAO
+from data_access.supabase.period_dao import PeriodDAO
+from data_access.supabase.student_dao import StudentDAO
+from data_access.supabase.conversation_dao import ConversationDAO
+from data_access.supabase.teacher_dao import TeacherDAO
 from models.conversation import Conversation
-from s3 import upload_file_to_s3
+from services.s3_service import upload_file_to_s3
 
 from routes.conversation.profile_service import (
     initiate_profile_conversation,
     continue_profile_conversation,
 )
 from routes.conversation.grading_service import grade_student_submission
+from routes.auth_utils import require_auth
 from routes.conversation.teacher_feedback_service import (
     initiate_teacher_feedback,
     continue_teacher_feedback,
@@ -38,7 +35,7 @@ load_dotenv()
 
 
 class ConversationService:
-    def __init__(self):
+    def __init__(self) -> None:
         self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()
         self.conversation_dao = ConversationDAO()
@@ -50,10 +47,7 @@ class ConversationService:
     # ------------------------------------------------------------------
 
     def start_profile_assistant(self, auth_token: str):
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-        user_id = sessions[0]["user_id"]
+        user_id = require_auth(self.session_dao, auth_token, ["student"])
 
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
@@ -61,15 +55,17 @@ class ConversationService:
 
         result = initiate_profile_conversation(student)
 
-        conversation_id = result.get("conversation_id")
-        if not conversation_id:
-            raise Exception("Failed to obtain conversation_id from profile agent")
+        response_id = result.get("response_id")
+        if not response_id:
+            raise Exception("Failed to obtain response_id from profile agent")
 
+        conversation_id = str(uuid.uuid4())
         self.conversation_dao.add_conversation(Conversation(
             conversation_id=conversation_id,
             user_id=user_id,
             role="student",
             conversation_type="profile",
+            last_response_id=response_id,
         ))
 
         return {
@@ -78,10 +74,7 @@ class ConversationService:
         }
 
     def continue_profile_assistant(self, auth_token, conversation_type, conversation_id, message):
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-        user_id = sessions[0]["user_id"]
+        user_id = require_auth(self.session_dao, auth_token, ["student"])
 
         conversation = self.conversation_dao.get_conversation_by_id_user_type(
             conversation_id, user_id, conversation_type
@@ -89,7 +82,14 @@ class ConversationService:
         if not conversation:
             raise Exception("Conversation not found")
 
-        result = continue_profile_conversation(conversation_id, message)
+        last_response_id = conversation.get("last_response_id")
+        result = continue_profile_conversation(last_response_id, message)
+
+        new_response_id = result.get("response_id")
+        if new_response_id:
+            self.conversation_dao.update_conversation(
+                conversation_id, {"last_response_id": new_response_id}
+            )
 
         if result.get("profile_complete") and result.get("profile"):
             self.student_dao.update_student(user_id, result["profile"])
@@ -110,7 +110,7 @@ class ConversationService:
         is_instructor: bool,
         week: int = None,
         submission_file: str = None,
-        student_id: str = None,
+        user_id: str = None,
         period_id: str = None,
         individual_quest_id: str = None,
     ):
@@ -155,12 +155,12 @@ class ConversationService:
 
         # ----- Teacher path: multi-turn feedback via TeacherFeedbackAgent -----
         if is_instructor:
-            if not student_id:
-                raise Exception("Instructor must provide a student_id to fetch quests")
+            if not user_id:
+                raise Exception("Instructor must provide a user_id to fetch quests")
             from routes.quest.quest_service import QuestService
-            quests_data = QuestService().get_individual_quests_for_student(student_id)
+            quests_data = QuestService().get_individual_quests_for_student(user_id)
 
-            target_student = self.student_dao.get_student_by_id(student_id)
+            target_student = self.student_dao.get_student_by_id(user_id)
             if not target_student:
                 raise Exception("Target student not found")
 
@@ -174,7 +174,7 @@ class ConversationService:
             if conversation_id:
                 self.conversation_dao.add_conversation(Conversation(
                     conversation_id=conversation_id,
-                    user_id=student_id,
+                    user_id=user_id,
                     role=role,
                     conversation_type="update",
                     period_id=period_id,
@@ -183,7 +183,7 @@ class ConversationService:
             raw_response = result.get("response", "")
             suggested_change = result.get("suggested_change")
             if suggested_change and period_id:
-                self._apply_quest_change(auth_token, period_id, suggested_change, student_id)
+                self._apply_quest_change(auth_token, user_id, period_id, suggested_change)
 
             return {
                 "conversation_id": conversation_id,
@@ -196,11 +196,11 @@ class ConversationService:
 
         # Upload submission to S3
         s3_key = None
-        if submission_file and period_id and student_id and individual_quest_id:
+        if submission_file and period_id and user_id and individual_quest_id:
             import time
             timestamp = int(time.time())
             filename = f"{timestamp}_{os.path.basename(submission_file)}"
-            folder = f"periods/{period_id}/students/{student_id}/{individual_quest_id}"
+            folder = f"periods/{period_id}/students/{user_id}/{individual_quest_id}"
             s3_key = upload_file_to_s3(submission_file, filename=filename, folder=folder)
 
         grading_result = grade_student_submission(
@@ -216,21 +216,21 @@ class ConversationService:
         raw_response = grading_result.get("response", "")
 
         # PRIORITY 1: persist grade + feedback
-        if week and student_id:
+        if week and user_id:
             self._save_grade(
-                student_id, week, period_id, individual_quest_id,
+                user_id, week, period_id, individual_quest_id,
                 grade, overall_score, feedback,
             )
 
         # PRIORITY 2: apply recommended quest changes
         if change and recommended_change and period_id:
-            self._apply_quest_change(auth_token, period_id, recommended_change)
+            self._apply_quest_change(auth_token, user_id or user_id, period_id, recommended_change)
 
         # Save a conversation record for auditing
         conversation_id = str(uuid.uuid4())
         self.conversation_dao.add_conversation(Conversation(
             conversation_id=conversation_id,
-            user_id=student_id or user_id,
+            user_id=user_id or user_id,
             role=role,
             conversation_type="update",
             period_id=period_id,
@@ -247,7 +247,7 @@ class ConversationService:
         auth_token: str,
         conversation_id: str,
         message: str,
-        student_id: str = None,
+        user_id: str = None,
     ):
         sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -255,7 +255,7 @@ class ConversationService:
         user_id = sessions[0]["user_id"]
         role = sessions[0].get("role", "student")
 
-        target_user_id = student_id if (role == "teacher" and student_id) else user_id
+        target_user_id = user_id if (role == "teacher" and user_id) else user_id
 
         conversation = self.conversation_dao.get_conversation_by_id_user_type(
             conversation_id, target_user_id, "update"
@@ -269,7 +269,7 @@ class ConversationService:
 
         suggested_change = result.get("suggested_change")
         if suggested_change and period_id:
-            self._apply_quest_change(auth_token, period_id, suggested_change, target_user_id)
+            self._apply_quest_change(auth_token, target_user_id, period_id, suggested_change)
 
         return {"response": result.get("response", "")}
 
@@ -278,31 +278,27 @@ class ConversationService:
     # ------------------------------------------------------------------
 
     def _save_grade(
-        self, student_id, week, period_id, individual_quest_id,
+        self, user_id, week, period_id, individual_quest_id,
         grade, overall_score, feedback,
-    ):
+    ) -> None:
         """Persist grading results to the individual quest record."""
         try:
             grade_data = {
                 "detailed_grade": grade,
                 "overall_score": overall_score,
             }
-            import os as _os
-            if _os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-                from data_access.supabase.individual_quest_dao import IndividualQuestDAO
-            else:
-                from data_access.individual_quest_dao import IndividualQuestDAO
+            from data_access.supabase.individual_quest_dao import IndividualQuestDAO
             quest_dao = IndividualQuestDAO()
 
             if individual_quest_id:
                 quest_dao.update_quest_grade_and_feedback(
                     individual_quest_id, json.dumps(grade_data), feedback
                 )
-                print(f"Saved grade {overall_score} for quest {individual_quest_id}")
+                logger.info("Saved grade %s for quest %s", overall_score, individual_quest_id)
                 return
 
             from routes.quest.quest_service import QuestService
-            individual_quests = QuestService().get_individual_quests_for_student(student_id)
+            individual_quests = QuestService().get_individual_quests_for_student(user_id)
             target_quest = None
             for quest in individual_quests:
                 if period_id and quest.get("week") == week and quest.get("period_id") == period_id:
@@ -319,22 +315,20 @@ class ConversationService:
                     json.dumps(grade_data),
                     feedback,
                 )
-                print(f"Saved grade {overall_score} for quest {target_quest['individual_quest_id']}")
+                logger.info("Saved grade %s for quest %s", overall_score, target_quest['individual_quest_id'])
             else:
-                print(f"WARNING: Could not find quest for student {student_id}, week {week}")
+                logger.warning("Could not find quest for student %s, week %s", user_id, week)
         except Exception as e:
-            print(f"Error saving grade: {e}")
+            logger.error("Error saving grade: %s", e, exc_info=True)
 
-    def _apply_quest_change(self, auth_token, period_id, recommended_change, student_id=None):
+    def _apply_quest_change(self, auth_token, user_id, period_id, recommended_change) -> None:
         """Delegate recommended changes to PeriodService."""
         try:
             from routes.period.period_service import PeriodService
             period_service = PeriodService()
             quest_update_result = period_service.update_quests_with_recommended_change(
-                auth_token, period_id, recommended_change, student_id,
+                auth_token, user_id, period_id, recommended_change,
             )
-            print(f"Quest update: {quest_update_result.get('message', '')}")
+            logger.info("Quest update: %s", quest_update_result.get('message', ''))
         except Exception as e:
-            print(f"ERROR applying quest change: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Error applying quest change: %s", e, exc_info=True)

@@ -1,4 +1,7 @@
 python-dotenv==1.0.1
+flask
+flask-cors
+flask-jwt-extended
 openai
 pandas
 fastapi>=0.111.0
@@ -11,3 +14,5 @@ boto3==1.38.17
 openai-agents
 pydantic
 supabase>=2.0.0
+pytest
+pytest-cov

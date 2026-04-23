@@ -6,15 +6,12 @@ from models.period_schedule import PeriodSchedule
 
 
 class PeriodScheduleDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('period_schedule')
 
     def add_period_schedule(self, period_schedule) -> None:
         self._insert({
             'period_id': period_schedule.period_id,
-            'teacher_id': period_schedule.teacher_id,
-            'vector_store_id': period_schedule.vector_store_id,
-            'schedule_s3_key': getattr(period_schedule, 'schedule_s3_key', None),
             'schedule_json': getattr(period_schedule, 'schedule_json', None),
             'schedule_openai_file_id': getattr(period_schedule, 'schedule_openai_file_id', None),
             'quest_enabled_weeks': getattr(period_schedule, 'quest_enabled_weeks', []),

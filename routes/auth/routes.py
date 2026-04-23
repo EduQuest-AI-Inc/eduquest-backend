@@ -1,35 +1,30 @@
-# auth/routes.py
-
+import logging
 from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import create_access_token, decode_token
 from .auth_service import register_user, authenticate_user
 from .password_reset_service import get_password_reset_service
-import os
+from utils.token_utils import set_auth_cookie
+from utils.validation_utils import get_client_ip
+logger = logging.getLogger(__name__)
 from datetime import datetime, timezone
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.session_dao import SessionDAO
-    from data_access.supabase.student_dao import StudentDAO
-    from data_access.supabase.teacher_dao import TeacherDAO
-    from data_access.supabase.parent_dao import ParentDAO
-    from data_access.supabase.parent_invite_dao import ParentInviteDAO
-else:
-    from data_access.session_dao import SessionDAO
-    from data_access.student_dao import StudentDAO
-    from data_access.teacher_dao import TeacherDAO
-    from data_access.parent_dao import ParentDAO
-    from data_access.parent_invite_dao import ParentInviteDAO
+from data_access.supabase.session_dao import SessionDAO
+from data_access.supabase.user_dao import UserDAO
+from data_access.supabase.student_dao import StudentDAO
+from data_access.supabase.parent_dao import ParentDAO
+from data_access.supabase.parent_invite_dao import ParentInviteDAO
 from models.session import Session
 from routes.conversation.conversation_service import ConversationService
 
 auth_bp = Blueprint('auth', __name__)
 session_dao = SessionDAO()
+user_dao = UserDAO()
 student_dao = StudentDAO()
-teacher_dao = TeacherDAO()
 parent_dao = ParentDAO()
 parent_invite_dao = ParentInviteDAO()
 conversation_service = ConversationService()
 password_reset_service = get_password_reset_service()
-#sdf1234567890123456
+
+
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
     data = request.get_json()
@@ -55,16 +50,7 @@ def signup():
     email_lc = email.strip().lower()
 
     # Check uniqueness using email_lc to prevent case-based duplicates
-    if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-        student_items = student_dao.get_student_by_email_lc(email_lc)
-        teacher_items = teacher_dao.get_teacher_by_email_lc(email_lc)
-        parent_items = parent_dao.get_parent_by_email_lc(email_lc)
-    else:
-        from boto3.dynamodb.conditions import Attr
-        student_items = student_dao.table.scan(FilterExpression=Attr("email_lc").eq(email_lc)).get("Items", [])
-        teacher_items = teacher_dao.table.scan(FilterExpression=Attr("email_lc").eq(email_lc)).get("Items", [])
-        parent_items = parent_dao.table.scan(FilterExpression=Attr("email_lc").eq(email_lc)).get("Items", [])
-    if student_items or teacher_items or parent_items:
+    if user_dao.get_by_email_lc(email_lc):
         return jsonify({'message': 'Email address already in use'}), 409
 
     invite_code = data.get('invite_code', '').strip().upper()
@@ -89,23 +75,23 @@ def signup():
                     if datetime.now(timezone.utc) > expires_at:
                         response_body['invite_warning'] = 'Invite code has expired. You can link your parent account later from your profile.'
                     else:
-                        parent_id = invite.get('parent_id')
-                        parent = parent_dao.get_parent_by_id(parent_id)
+                        user_id = invite.get('user_id')
+                        parent = parent_dao.get_parent_by_id(user_id)
                         if not parent:
                             response_body['invite_warning'] = 'Parent account not found. You can link your parent account later from your profile.'
                         else:
-                            linked_ids = parent.get('linked_student_ids') or []
+                            linked_ids = parent.get('linked_user_ids') or []
                             if username not in linked_ids:
                                 linked_ids.append(username)
                                 vpc_verified_at = datetime.now(timezone.utc).isoformat()
-                                parent_dao.update_parent(parent_id, {
-                                    'linked_student_ids': linked_ids,
+                                parent_dao.update_parent(user_id, {
+                                    'linked_user_ids': linked_ids,
                                     'vpc_verified_at': vpc_verified_at,  # COPPA 2025 homeschool VPC record
                                 })
                                 parent_invite_dao.mark_used(invite_code)
                             response_body['parent_linked'] = True
             except Exception as invite_err:
-                print(f'Warning: failed to process invite code during signup: {invite_err}')
+                logger.warning("Failed to process invite code during signup: %s", invite_err)
                 response_body['invite_warning'] = 'Could not process invite code. You can link your parent account later from your profile.'
 
         return jsonify(response_body), 201
@@ -139,49 +125,10 @@ def login():
                 response_data['needs_profile'] = True
         # Set cookie
         resp = make_response(jsonify(response_data), 200)
-        
-        # Determine if we're in development or production
-        is_development = request.headers.get('Origin', '').startswith('http://localhost') or \
-                        request.headers.get('Host', '').startswith('localhost') or \
-                        request.headers.get('Host', '').startswith('127.0.0.1')
-        
-        if is_development:
-            # Development settings
-            resp.set_cookie(
-                'auth_token',
-                access_token,
-                httponly=False,
-                secure=False,         # No HTTPS in development
-                samesite='Lax',       # More permissive for development
-                path="/"
-            )
-        else:
-            # Production settings
-            resp.set_cookie(
-                'auth_token',
-                access_token,
-                httponly=False,
-                secure=True,          # HTTPS required in production
-                samesite='None',      # Cross-site cookies for production
-                domain='eduquestai.org',
-                path="/"
-            )
+        set_auth_cookie(resp, access_token)
         return resp
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
-
-
-def _get_client_ip():
-    """Get the client's IP address, handling proxies."""
-    # Check X-Forwarded-For header (set by load balancers/proxies)
-    if request.headers.get('X-Forwarded-For'):
-        # Take the first IP in the chain (original client)
-        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
-    # Check X-Real-IP header (alternative proxy header)
-    if request.headers.get('X-Real-IP'):
-        return request.headers.get('X-Real-IP').strip()
-    # Fall back to remote_addr
-    return request.remote_addr or '0.0.0.0'
 
 
 @auth_bp.route('/password-reset/request', methods=['POST'])
@@ -200,7 +147,7 @@ def password_reset_request():
         return jsonify({'message': 'Email is required'}), 400
     
     # Get client info
-    ip_address = _get_client_ip()
+    ip_address = get_client_ip(request)
     user_agent = request.headers.get('User-Agent', '')
     
     # Process the request
@@ -234,7 +181,7 @@ def password_reset_confirm():
         return jsonify({'message': 'New password is required'}), 400
     
     # Get client IP
-    ip_address = _get_client_ip()
+    ip_address = get_client_ip(request)
     
     # Process the confirmation
     success, message = password_reset_service.confirm_password_reset(

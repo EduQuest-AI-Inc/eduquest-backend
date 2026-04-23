@@ -1,5 +1,5 @@
 class Quest:
-    def __init__(self, week, name, description, skill_cov, skill_mas = None, grade = None):
+    def __init__(self, week, name, description, skill_cov, skill_mas = None, grade = None) -> None:
         self.week = week
         self.name = name
         self.description = description

@@ -8,9 +8,9 @@ See supabase/migrations/003_parent_waitlist.sql.
 """
 
 import logging
-import os
 import re
 from typing import Any, Dict, Optional
+from data_access.supabase.parent_waitlist_dao import ParentWaitlistDAO
 
 from models.parent_waitlist import ParentWaitlistEntry
 from services.email_service import get_email_service
@@ -30,27 +30,14 @@ class ParentWaitlistValidationError(ValueError):
 
 
 class ParentWaitlistService:
-    def __init__(self):
-        if os.getenv("USE_SUPABASE", "false").lower() != "true":
-            # Supabase-only feature; fail fast if misconfigured.
-            self._dao = None
-        else:
-            from data_access.supabase.parent_waitlist_dao import ParentWaitlistDAO
-
-            self._dao = ParentWaitlistDAO()
+    def __init__(self) -> None:
+        self._dao = ParentWaitlistDAO()
         self._email_service = get_email_service()
-
-    @property
-    def enabled(self) -> bool:
-        return self._dao is not None
 
     # -- public ---------------------------------------------------------------
 
     def join(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Validate, persist, and send confirmation email."""
-        if not self.enabled:
-            raise RuntimeError("parent_waitlist is disabled (USE_SUPABASE is false)")
-
         entry = self._validate(payload)
 
         existing = self._dao.get_by_email(entry.email)
