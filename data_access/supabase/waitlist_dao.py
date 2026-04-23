@@ -7,33 +7,20 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 
 class WaitlistDAO(SupabaseBaseDAO):
     def __init__(self) -> None:
-        super().__init__('pilot_waitlist')
+        super().__init__('waitlist')
 
-    def get_by_teacher_id(self, teacher_id: str) -> Optional[Dict[str, Any]]:
-        return self._select_by_id('teacher_id', teacher_id)
+    def get_by_user_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        return self._select_by_id('user_id', user_id)
 
     def get_by_referral_code(self, referral_code: str) -> Optional[Dict[str, Any]]:
         return self._select_by_id('referral_code', referral_code.upper())
 
     def get_waitlist_count(self) -> int:
-        response = (
-            self._table()
-            .select('*', count='exact')
-            .execute()
-        )
+        response = self._table().select('*', count='exact').execute()
         return response.count or 0
 
-    def get_pending_count(self) -> int:
-        response = (
-            self._table()
-            .select('*', count='exact')
-            .eq('status', 'pending')
-            .execute()
-        )
-        return response.count or 0
-
-    def join_waitlist(self, teacher_id: str, teacher_email: str, referred_by: Optional[str] = None) -> Dict[str, Any]:
-        existing = self.get_by_teacher_id(teacher_id)
+    def join_waitlist(self, user_id: str, email: str, referred_by: Optional[str] = None) -> Dict[str, Any]:
+        existing = self.get_by_user_id(user_id)
         if existing:
             return existing
 
@@ -41,24 +28,23 @@ class WaitlistDAO(SupabaseBaseDAO):
         referral_code = uuid.uuid4().hex[:8].upper()
 
         data = {
-            'teacher_id': teacher_id,
-            'email': teacher_email,
+            'user_id': user_id,
+            'email': email,
             'position': position,
             'referral_code': referral_code,
             'referred_by': referred_by,
             'status': 'pending',
             'joined_at': datetime.now(timezone.utc).isoformat(),
         }
-
         self._insert(data)
         return data
 
-    def approve_teacher(self, teacher_id: str) -> bool:
-        result = self._update({'teacher_id': teacher_id}, {'status': 'approved'})
+    def approve_user(self, user_id: str) -> bool:
+        result = self._update({'user_id': user_id}, {'status': 'approved'})
         return len(result) > 0
 
-    def get_status(self, teacher_id: str) -> Dict[str, Any]:
-        entry = self.get_by_teacher_id(teacher_id)
+    def get_status(self, user_id: str) -> Dict[str, Any]:
+        entry = self.get_by_user_id(user_id)
         if not entry:
             return {
                 'on_waitlist': False,
@@ -79,12 +65,10 @@ class WaitlistDAO(SupabaseBaseDAO):
     def validate_referral_code(self, referral_code: str) -> Dict[str, Any]:
         if not referral_code:
             return {'valid': False, 'error': 'Referral code is required'}
-
         entry = self.get_by_referral_code(referral_code)
         if not entry:
             return {'valid': False, 'error': 'Invalid referral code'}
-
         return {
             'valid': True,
-            'referrer_id': entry.get('teacher_id'),
+            'referrer_id': entry.get('user_id'),
         }

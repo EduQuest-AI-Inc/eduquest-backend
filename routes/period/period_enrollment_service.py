@@ -7,8 +7,7 @@ from data_access.supabase.period_dao import PeriodDAO
 from data_access.supabase.session_dao import SessionDAO
 from data_access.supabase.student_dao import StudentDAO
 from data_access.supabase.enrollment_dao import EnrollmentDAO
-from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
-from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+from data_access.supabase.quest_dao import QuestDAO
 from data_access.supabase.ltg_conversation_dao import LtgConversationDAO
 from data_access.supabase.conversation_dao import ConversationDAO
 
@@ -26,8 +25,7 @@ class PeriodEnrollmentService:
         self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()
         self.enrollment_dao = EnrollmentDAO()
-        self.weekly_quest_dao = WeeklyQuestDAO()
-        self.individual_quest_dao = IndividualQuestDAO()
+        self.quest_dao = QuestDAO()
         self.ltg_conversation_dao = LtgConversationDAO()
         self.conversation_dao = ConversationDAO()
 
@@ -127,13 +125,9 @@ class PeriodEnrollmentService:
         if goal_removed:
             self.student_dao.update_student(user_id, {'long_term_goal': long_term_goals})
 
-        weekly_quests = self.weekly_quest_dao.get_quests_by_student_and_period(user_id, period_id)
-        for wq in weekly_quests:
-            self.weekly_quest_dao.delete_weekly_quest(wq.quest_id)
-
-        individual_quests = self.individual_quest_dao.get_quests_by_student_and_period(user_id, period_id)
-        for iq in individual_quests:
-            self.individual_quest_dao.delete_individual_quest(iq['individual_quest_id'])
+        quests = self.quest_dao.get_quests_by_student_and_period(user_id, period_id)
+        for q in quests:
+            self.quest_dao.delete_quest(q['quest_id'])
 
         return {
             "message": f"Successfully unenrolled from period {period_id}",

@@ -11,7 +11,7 @@ class Student(User):
     interest: Optional[list] = None
     learning_style: Optional[list] = None
     completed_tutorial: Optional[bool] = False
-    school_id: Optional[str] = None
+    school_name: Optional[str] = None
     # These live in related tables, not the student table itself
     enrollments: Optional[List[str]] = []
     long_term_goal: Optional[Dict[str, str]] = []

@@ -158,7 +158,7 @@ class ConversationService:
             if not user_id:
                 raise Exception("Instructor must provide a user_id to fetch quests")
             from routes.quest.quest_service import QuestService
-            quests_data = QuestService().get_individual_quests_for_student(user_id)
+            quests_data = QuestService().get_quests_for_student(user_id)
 
             target_student = self.student_dao.get_student_by_id(user_id)
             if not target_student:
@@ -287,35 +287,33 @@ class ConversationService:
                 "detailed_grade": grade,
                 "overall_score": overall_score,
             }
-            from data_access.supabase.individual_quest_dao import IndividualQuestDAO
-            quest_dao = IndividualQuestDAO()
+            from data_access.supabase.quest_dao import QuestDAO
+            quest_dao = QuestDAO()
 
             if individual_quest_id:
-                quest_dao.update_quest_grade_and_feedback(
-                    individual_quest_id, json.dumps(grade_data), feedback
-                )
+                quest_dao.update_quest_grade_and_feedback(individual_quest_id, grade_data, feedback)
                 logger.info("Saved grade %s for quest %s", overall_score, individual_quest_id)
                 return
 
             from routes.quest.quest_service import QuestService
-            individual_quests = QuestService().get_individual_quests_for_student(user_id)
+            quests = QuestService().get_quests_for_student(user_id)
             target_quest = None
-            for quest in individual_quests:
+            for quest in quests:
                 if period_id and quest.get("week") == week and quest.get("period_id") == period_id:
                     target_quest = quest
                     break
             if not target_quest:
-                for quest in individual_quests:
+                for quest in quests:
                     if quest.get("week") == week:
                         target_quest = quest
                         break
             if target_quest:
                 quest_dao.update_quest_grade_and_feedback(
-                    target_quest["individual_quest_id"],
-                    json.dumps(grade_data),
+                    target_quest["quest_id"],
+                    grade_data,
                     feedback,
                 )
-                logger.info("Saved grade %s for quest %s", overall_score, target_quest['individual_quest_id'])
+                logger.info("Saved grade %s for quest %s", overall_score, target_quest['quest_id'])
             else:
                 logger.warning("Could not find quest for student %s, week %s", user_id, week)
         except Exception as e:

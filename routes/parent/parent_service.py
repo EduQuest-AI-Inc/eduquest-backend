@@ -2,65 +2,33 @@ import secrets
 import string
 from datetime import datetime, timedelta, timezone
 from constants.timeouts import INVITE_EXPIRY_HOURS
-from data_access.supabase.period_dao import PeriodDAO
 from data_access.supabase.parent_dao import ParentDAO
 from data_access.supabase.parent_invite_dao import ParentInviteDAO
 from data_access.supabase.student_dao import StudentDAO
 
-from models.period import Period
 from models.parent_invite import ParentInvite
-from routes.teacher.teacher_service import TeacherService
+from routes.period.period_management_service import PeriodManagementService
 
 _INVITE_ALPHABET = string.ascii_uppercase + string.digits
 
 
 class ParentService:
     def __init__(self) -> None:
-        self.period_dao = PeriodDAO()
         self.parent_dao = ParentDAO()
         self.invite_dao = ParentInviteDAO()
         self.student_dao = StudentDAO()
-        self._teacher_service = TeacherService()
+        self._period_mgmt = PeriodManagementService()
 
     # -- Period helpers -------------------------------------------------------
 
     def create_period(self, course: str, user_id: str, vector_store_id: str, file_urls: list) -> dict:
-        period_id = self._teacher_service.generate_period_id(course)
-
-        existing = self.period_dao.get_period_by_id(period_id)
-        attempts = 0
-        while existing and attempts < 5:
-            period_id = self._teacher_service.generate_period_id(course)
-            existing = self.period_dao.get_period_by_id(period_id)
-            attempts += 1
-
-        if existing:
-            raise ValueError("Unable to generate unique period ID")
-
-        new_period = Period(
-            period_id=period_id,
-            name=course,
-            owner_id=user_id,
-            vector_store_id=vector_store_id,
-            file_urls=file_urls,
-        )
-        self.period_dao.add_period(new_period)
-        return new_period.to_item()
+        return self._period_mgmt.create_period(course, user_id, vector_store_id, file_urls)
 
     def get_periods_by_parent(self, user_id: str) -> list:
-        periods = self.period_dao.get_periods_by_parent_id(user_id)
-        result = []
-        for p in periods:
-            item = p if isinstance(p, dict) else p.model_dump()
-            result.append({
-                "period_id": item["period_id"],
-                "name": item["name"],
-                "file_urls": item.get("file_urls", []),
-            })
-        return result
+        return self._period_mgmt.get_periods_by_owner(user_id)
 
     def update_period_files(self, period_id: str, file_urls: list) -> None:
-        self.period_dao.update_period(period_id, {"file_urls": file_urls})
+        self._period_mgmt.update_file_urls(period_id, file_urls)
 
     # -- Invite helpers -------------------------------------------------------
 
@@ -71,19 +39,59 @@ class ParentService:
         self.invite_dao.create_invite(invite)
         return {"code": code, "expires_at": expires_at}
 
+    def accept_invite(self, student_id: str, code: str) -> dict:
+        """Link a student to a parent via a single-use invite code."""
+        invite = self.invite_dao.get_invite_by_code(code)
+        if not invite:
+            raise ValueError("Invalid invite code")
+        if invite.get("used"):
+            raise ValueError("Invite code has already been used")
+
+        expires_at_str = invite.get("expires_at", "")
+        try:
+            expires_at = datetime.fromisoformat(expires_at_str)
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            raise ValueError("Invalid invite data")
+
+        if datetime.now(timezone.utc) > expires_at:
+            raise ValueError("Invite code has expired")
+
+        parent_id = invite.get("user_id")
+        parent = self.parent_dao.get_parent_by_id(parent_id)
+        if not parent:
+            raise ValueError("Parent account not found")
+
+        linked_ids = list(parent.get("linked_student_ids") or [])
+        if student_id in linked_ids:
+            return {"message": "Already linked to this parent", "already_linked": True}
+
+        linked_ids.append(student_id)
+        vpc_verified_at = datetime.now(timezone.utc).isoformat()
+        self.parent_dao.update_parent(parent_id, {
+            "linked_student_ids": linked_ids,
+            "vpc_verified_at": vpc_verified_at,
+        })
+        self.invite_dao.mark_used(code)
+
+        return {
+            "message": "Successfully linked to parent account",
+            "student_id": student_id,
+            "parent_id": parent_id,
+            "vpc_verified_at": vpc_verified_at,
+        }
+
     # -- Student helpers ------------------------------------------------------
 
     def get_linked_students(self, user_id: str) -> list:
-        parent = self.parent_dao.get_parent_by_id(user_id)
-        if not parent:
-            return []
-        linked_ids = parent.get("linked_user_ids", [])
+        linked_ids = self.parent_dao.get_linked_student_ids(user_id)
         students = []
-        for user_id in linked_ids:
-            student = self.student_dao.get_student_by_id(user_id)
+        for student_id in linked_ids:
+            student = self.student_dao.get_student_by_id(student_id)
             if student:
                 students.append({
-                    "user_id": user_id,
+                    "user_id": student_id,
                     "first_name": student.get("first_name", ""),
                     "last_name": student.get("last_name", ""),
                     "grade": student.get("grade", ""),

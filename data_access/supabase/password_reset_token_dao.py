@@ -14,8 +14,7 @@ class PasswordResetTokenDAO(SupabaseBaseDAO):
         self._insert({
             'token_hash': token.token_hash,
             'user_id': token.user_id,
-            'role': token.role,
-            'email_lc': token.email_lc,
+            'email': token.email,
             'created_at': token.created_at_iso if hasattr(token, 'created_at_iso') else token.created_at,
             'expires_at': (
                 datetime.fromtimestamp(token.expires_at_epoch, tz=timezone.utc).isoformat()

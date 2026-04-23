@@ -98,7 +98,7 @@ class WaitlistService:
             Dict with approval result
         """
         # Approve in waitlist
-        waitlist_success = self.dao.approve_teacher(user_id)
+        waitlist_success = self.dao.approve_user(user_id)
 
         # Update teacher record
         try:

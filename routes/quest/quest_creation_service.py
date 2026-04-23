@@ -1,25 +1,19 @@
 import uuid
-from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
-from data_access.supabase.individual_quest_dao import IndividualQuestDAO
-
-from models.weekly_quest import WeeklyQuest
-from models.individual_quest import IndividualQuest
+from data_access.supabase.quest_dao import QuestDAO
+from models.quest import Quest
 
 
 class QuestCreationService:
 
     def __init__(self) -> None:
-        self.weekly_quest_dao = WeeklyQuestDAO()
-        self.individual_quest_dao = IndividualQuestDAO()
+        self.quest_dao = QuestDAO()
 
-    def save_schedule_to_weekly_quests(self, schedule_data: dict, user_id: str, period_id: str) -> dict:
-        quest_id = str(uuid.uuid4())
-        individual_quests = []
-
+    def save_quests_from_schedule(self, schedule_data: dict, user_id: str, period_id: str) -> dict:
+        """Create Quest rows for each entry in a schedule. Returns summary dict."""
+        created = []
         for quest_data in schedule_data.get("list_of_quests", []):
-            individual_quest = IndividualQuest(
-                individual_quest_id=str(uuid.uuid4()),
-                quest_id=quest_id,
+            quest = Quest(
+                quest_id=str(uuid.uuid4()),
                 user_id=user_id,
                 period_id=period_id,
                 description=quest_data.get("Name", ""),
@@ -29,32 +23,21 @@ class QuestCreationService:
                 rubric={},
                 status="not_started",
             )
-            individual_quests.append(individual_quest)
-
-        weekly_quest = WeeklyQuest(quest_id=quest_id, user_id=user_id, period_id=period_id)
-        self.weekly_quest_dao.add_weekly_quest(weekly_quest)
-        for iq in individual_quests:
-            self.individual_quest_dao.add_individual_quest(iq)
+            self.quest_dao.add_quest(quest)
+            created.append(quest.quest_id)
 
         return {
-            "message": f"Successfully saved weekly quest list with {len(individual_quests)} individual quests",
-            "quest_id": quest_id,
-            "individual_quest_count": len(individual_quests),
-            "individual_quest_ids": [q.individual_quest_id for q in individual_quests],
+            "message": f"Successfully created {len(created)} quests",
+            "created_quest_count": len(created),
+            "quest_ids": created,
         }
 
-    def create_individual_quests_from_homework(self, homework_data: dict, user_id: str, period_id: str) -> dict:
-        weekly_quest = self.weekly_quest_dao.get_weekly_quest_by_student_and_period(user_id, period_id)
-        if not weekly_quest:
-            raise Exception(f"No weekly quest found for student {user_id} and period {period_id}")
-
-        quest_id = weekly_quest['quest_id'] if isinstance(weekly_quest, dict) else weekly_quest.quest_id
-        created_count = 0
-
+    def create_quests_from_homework(self, homework_data: dict, user_id: str, period_id: str) -> dict:
+        """Create or update Quest rows from detailed homework agent output."""
+        created = []
         for quest_data in homework_data.get("list_of_quests", []):
-            individual_quest = IndividualQuest(
-                individual_quest_id=str(uuid.uuid4()),
-                quest_id=quest_id,
+            quest = Quest(
+                quest_id=str(uuid.uuid4()),
                 user_id=user_id,
                 period_id=period_id,
                 description=quest_data.get("Name", ""),
@@ -64,11 +47,11 @@ class QuestCreationService:
                 rubric=quest_data.get("rubric", {}),
                 status="not_started",
             )
-            self.individual_quest_dao.add_individual_quest(individual_quest)
-            created_count += 1
+            self.quest_dao.add_quest(quest)
+            created.append(quest.quest_id)
 
         return {
-            "message": f"Successfully created {created_count} individual quests",
-            "quest_id": quest_id,
-            "created_quests_count": created_count,
+            "message": f"Successfully created {len(created)} quests",
+            "created_quest_count": len(created),
+            "quest_ids": created,
         }

@@ -1,27 +1,61 @@
 import logging
-from datetime import datetime, timezone
+import os
+import shutil
+import tempfile
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from .period_service import PeriodService
-from utils.token_utils import extract_auth_token, get_user_id_from_token
 
-from data_access.supabase.parent_dao import ParentDAO
-from data_access.supabase.parent_invite_dao import ParentInviteDAO
-from flask.wrappers import Response
-from typing import Tuple
+from .period_service import PeriodService
+from .period_management_service import PeriodManagementService
+from .period_file_helpers import (
+    save_files_to_temp,
+    append_canvas_file,
+    create_vector_store,
+    upload_period_files,
+    try_generate_schedule,
+    get_file_presigned_url,
+)
+from routes.parent.parent_service import ParentService
+from routes.teacher.period_schedule_service import PeriodScheduleService
+from routes.teacher.teacher_service import TeacherService
+from routes.waitlist.WaitlistService import WaitlistService
+from data_access.supabase.teacher_dao import TeacherDAO
+from utils.token_utils import extract_auth_token, get_user_id_from_token
 
 logger = logging.getLogger(__name__)
 
 period_bp = Blueprint('period', __name__)
 period_service = PeriodService()
-_parent_dao = ParentDAO()
-_invite_dao = ParentInviteDAO()
+period_management_service = PeriodManagementService()
+period_schedule_service = PeriodScheduleService()
+parent_service = ParentService()
+teacher_service = TeacherService()
+teacher_dao = TeacherDAO()
+waitlist_service = WaitlistService()
 
 
 def _token() -> str:
     return extract_auth_token(request)
 
+
+def _validate_pilot_access(user_id: str):
+    """Return a 403 response tuple if the teacher lacks pilot access, else None."""
+    pilot_waitlist_enabled = os.getenv("PILOT_WAITLIST_ENABLED", "true").lower() == "true"
+    if not pilot_waitlist_enabled:
+        return None
+    teacher = teacher_dao.get_teacher_by_id(user_id)
+    if not teacher or not teacher.get("pilot_approved", False):
+        waitlist_status = waitlist_service.get_status(user_id)
+        return jsonify({
+            "error": "Pilot access required to create a class. Please join the pilot waitlist.",
+            "code": "PILOT_WAITLIST_REQUIRED",
+            "waitlist": waitlist_status,
+        }), 403
+    return None
+
+
+# ─── Student-facing period routes (use auth_token pattern; services expect it) ─
 
 @period_bp.route('/my-periods', methods=['GET'])
 def my_periods():
@@ -48,7 +82,7 @@ def verify_period():
 
 
 @period_bp.route('/unenroll', methods=['POST'])
-def unenroll() -> Tuple[Response, int]:
+def unenroll():
     data = request.json
     period_id = data.get('period_id')
     if not period_id:
@@ -97,10 +131,10 @@ def continue_ltg_conversation():
 
 
 @period_bp.route('/initiate-homework-agent', methods=['POST'])
+@jwt_required()
 def initiate_homework_agent():
     try:
-        auth_token = _token()
-        caller_id = get_user_id_from_token(auth_token, period_service.session_dao)
+        caller_id = get_jwt_identity()
 
         data = request.json
         period_id = data.get('period_id')
@@ -112,23 +146,25 @@ def initiate_homework_agent():
             period = period_service.period_dao.get_period_by_id(period_id)
             if not period:
                 return jsonify({"error": "Period not found"}), 404
-            if period.get("owner_id", period.get("user_id")) != caller_id:
+            if period.get("owner_id") != caller_id:
                 return jsonify({"error": "Not authorized to generate quests for this period"}), 403
         else:
             user_id = caller_id
 
-        result = period_service.start_homework_agent(auth_token, user_id, period_id)
+        result = period_service.start_homework_agent(_token(), user_id, period_id)
         return jsonify(result), 200
     except Exception as e:
         logger.error("Error in initiate-homework-agent: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
+# ─── Accept parent invite ──────────────────────────────────────────────────────
+
 @period_bp.route('/accept-parent-invite', methods=['POST'])
 @jwt_required()
 def accept_parent_invite():
     try:
-        user_id = get_jwt_identity()
+        student_id = get_jwt_identity()
         data = request.get_json()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
@@ -137,46 +173,235 @@ def accept_parent_invite():
         if not code:
             return jsonify({"error": "Invite code is required"}), 400
 
-        invite = _invite_dao.get_invite_by_code(code)
-        if not invite:
-            return jsonify({"error": "Invalid invite code"}), 404
-        if invite.get("used"):
-            return jsonify({"error": "Invite code has already been used"}), 410
+        result = parent_service.accept_invite(student_id, code)
+        if result.get("already_linked"):
+            return jsonify({"message": result["message"]}), 200
+        return jsonify(result), 200
 
-        expires_at_str = invite.get("expires_at", "")
-        try:
-            expires_at = datetime.fromisoformat(expires_at_str)
-            if expires_at.tzinfo is None:
-                expires_at = expires_at.replace(tzinfo=timezone.utc)
-        except (ValueError, TypeError):
-            return jsonify({"error": "Invalid invite data"}), 500
-
-        if datetime.now(timezone.utc) > expires_at:
-            return jsonify({"error": "Invite code has expired"}), 410
-
-        user_id = invite.get("user_id")
-        parent = _parent_dao.get_parent_by_id(user_id)
-        if not parent:
-            return jsonify({"error": "Parent account not found"}), 404
-
-        linked_ids = parent.get("linked_user_ids") or []
-        if user_id in linked_ids:
-            return jsonify({"message": "Already linked to this parent"}), 200
-
-        linked_ids.append(user_id)
-        vpc_verified_at = datetime.now(timezone.utc).isoformat()
-        _parent_dao.update_parent(user_id, {
-            "linked_user_ids": linked_ids,
-            "vpc_verified_at": vpc_verified_at,
-        })
-        _invite_dao.mark_used(code)
-
-        return jsonify({
-            "message": "Successfully linked to parent account",
-            "user_id": user_id,
-            "vpc_verified_at": vpc_verified_at,
-        }), 200
-
+    except ValueError as ve:
+        msg = str(ve)
+        if "expired" in msg or "already been used" in msg:
+            return jsonify({"error": msg}), 410
+        if "not found" in msg.lower() or "invalid" in msg.lower():
+            return jsonify({"error": msg}), 404
+        return jsonify({"error": msg}), 400
     except Exception as e:
         logger.error("Error in accept-parent-invite: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
+
+
+# ─── Period creation (teacher + parent, unified) ───────────────────────────────
+
+@period_bp.route('/create-period', methods=['POST'])
+@jwt_required()
+def create_period():
+    try:
+        user_id = get_jwt_identity()
+
+        # Determine role — pilot gate applies only to teachers
+        from data_access.supabase.session_dao import SessionDAO
+        sessions = SessionDAO().get_sessions_by_auth_token(_token())
+        role = sessions[0].get("role") if sessions else "student"
+
+        if role == "teacher":
+            denied = _validate_pilot_access(user_id)
+            if denied:
+                return denied
+
+        course = request.form.get("name")
+        if not course:
+            return jsonify({"error": "Course name is required"}), 400
+
+        canvas_api_url = request.form.get("canvas_api_url") if role == "teacher" else None
+        canvas_api_key = request.form.get("canvas_api_key") if role == "teacher" else None
+        canvas_course_id = request.form.get("canvas_course_id") if role == "teacher" else None
+        canvas_course_name = request.form.get("canvas_course_name") if role == "teacher" else None
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            file_paths = save_files_to_temp(request.files.getlist("files"), temp_dir)
+            if role == "teacher":
+                append_canvas_file(temp_dir, file_paths, canvas_api_url, canvas_api_key, canvas_course_id)
+
+            vector_store, file_streams = create_vector_store(course, file_paths)
+
+            period = period_management_service.create_period(
+                course=course,
+                user_id=user_id,
+                vector_store_id=vector_store.id,
+                file_urls=[],
+                canvas_course_id=int(canvas_course_id) if canvas_course_id else None,
+                canvas_course_name=canvas_course_name,
+            )
+
+            period_id = period['period_id']
+            s3_urls = upload_period_files(file_paths, period_id)
+            period_management_service.update_file_urls(period_id, [u for u in s3_urls if u])
+
+            for f in file_streams:
+                f.close()
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+        schedule_result = try_generate_schedule(period_id, user_id)
+        return jsonify({
+            "message": "Period created successfully",
+            "period": period,
+            "schedule": schedule_result,
+        }), 201
+
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        logger.error("Error in create-period: %s", e, exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
+
+
+# ─── File access ───────────────────────────────────────────────────────────────
+
+@period_bp.route('/get-file/<path:key>', methods=['GET'])
+@jwt_required()
+def get_file(key):
+    try:
+        url = get_file_presigned_url(key)
+        return jsonify({"url": url}), 200
+    except Exception as e:
+        logger.error("Error generating presigned URL for %s: %s", key, e, exc_info=True)
+        return jsonify({"error": "Failed to retrieve file"}), 500
+
+
+@period_bp.route('/add-files-to-period', methods=['POST'])
+@jwt_required()
+def add_files_to_period():
+    try:
+        user_id = get_jwt_identity()
+        period_id = request.form.get("period_id")
+        files = request.files.getlist("files")
+
+        if not period_id:
+            return jsonify({"error": "Period ID is required"}), 400
+        if not files:
+            return jsonify({"error": "No files provided"}), 400
+
+        period = period_management_service.get_period_by_id(period_id)
+        if not period:
+            return jsonify({"error": "Period not found"}), 404
+        if period.get('owner_id') != user_id:
+            return jsonify({"error": "Unauthorized"}), 403
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            file_paths = save_files_to_temp(files, temp_dir)
+            new_file_urls = [u for u in upload_period_files(file_paths, period_id) if u]
+            period_management_service.update_file_urls(
+                period_id, (period.get('file_urls') or []) + new_file_urls
+            )
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+        return jsonify({
+            "message": f"Successfully added {len(new_file_urls)} files to period",
+            "added_files": new_file_urls,
+        }), 200
+    except Exception as e:
+        logger.error("Error in add-files-to-period: %s", e, exc_info=True)
+        return jsonify({"error": "Failed to add files to period"}), 500
+
+
+# ─── Period schedule (owner-only; role-agnostic — PeriodScheduleService checks ownership) ──
+
+@period_bp.route('/period-schedule/generate', methods=['POST'])
+@jwt_required()
+def generate_period_schedule():
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json(silent=True) or {}
+        period_id = data.get("period_id")
+        if not period_id:
+            return jsonify({"error": "period_id is required"}), 400
+
+        result = period_schedule_service.generate_and_save_schedule(period_id=period_id, user_id=user_id)
+        return jsonify({"message": "Schedule generated successfully", **result}), 200
+
+    except PermissionError as pe:
+        return jsonify({"error": str(pe)}), 403
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        logger.error("Error generating period schedule: %s", e, exc_info=True)
+        return jsonify({"error": "Failed to generate schedule"}), 500
+
+
+@period_bp.route('/period-schedule', methods=['GET'])
+@jwt_required()
+def get_period_schedule():
+    try:
+        user_id = get_jwt_identity()
+        period_id = request.args.get("period_id")
+        if not period_id:
+            return jsonify({"error": "period_id is required"}), 400
+
+        result = period_schedule_service.get_schedule(period_id=period_id, user_id=user_id)
+        if result is None:
+            return jsonify({"error": "No schedule found for this period"}), 404
+        return jsonify(result), 200
+
+    except PermissionError as pe:
+        return jsonify({"error": str(pe)}), 403
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        logger.error("Error getting period schedule: %s", e, exc_info=True)
+        return jsonify({"error": "Failed to get schedule"}), 500
+
+
+@period_bp.route('/period-schedule', methods=['PUT'])
+@jwt_required()
+def update_period_schedule():
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json(silent=True) or {}
+        period_id = data.get("period_id")
+        schedule = data.get("schedule")
+        if not period_id:
+            return jsonify({"error": "period_id is required"}), 400
+        if not schedule:
+            return jsonify({"error": "schedule is required"}), 400
+
+        result = period_schedule_service.update_schedule(period_id=period_id, user_id=user_id, schedule_dict=schedule)
+        return jsonify(result), 200
+
+    except PermissionError as pe:
+        return jsonify({"error": str(pe)}), 403
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        logger.error("Error updating period schedule: %s", e, exc_info=True)
+        return jsonify({"error": "Failed to update schedule"}), 500
+
+
+@period_bp.route('/period-schedule/quest-weeks', methods=['PUT'])
+@jwt_required()
+def set_period_quest_weeks():
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json(silent=True) or {}
+        period_id = data.get("period_id")
+        quest_enabled_weeks = data.get("quest_enabled_weeks")
+        if not period_id:
+            return jsonify({"error": "period_id is required"}), 400
+        if quest_enabled_weeks is None or not isinstance(quest_enabled_weeks, list):
+            return jsonify({"error": "quest_enabled_weeks must be a list"}), 400
+
+        result = period_schedule_service.set_quest_weeks(
+            period_id=period_id, user_id=user_id, quest_enabled_weeks=quest_enabled_weeks
+        )
+        return jsonify(result), 200
+
+    except PermissionError as pe:
+        return jsonify({"error": str(pe)}), 403
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        logger.error("Error setting quest weeks: %s", e, exc_info=True)
+        return jsonify({"error": "Failed to set quest weeks"}), 500

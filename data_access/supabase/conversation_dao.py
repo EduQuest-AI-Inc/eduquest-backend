@@ -11,7 +11,6 @@ class ConversationDAO(SupabaseBaseDAO):
         self._insert({
             'conversation_id': conversation.conversation_id,
             'user_id': conversation.user_id,
-            'role': conversation.role,
             'conversation_type': conversation.conversation_type,
             'period_id': getattr(conversation, 'period_id', None),
             'last_response_id': getattr(conversation, 'last_response_id', None),

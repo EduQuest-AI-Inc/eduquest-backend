@@ -72,3 +72,20 @@ class SupabaseBaseDAO:
     def _rpc(self, function_name: str, params: dict[str, Any]) -> dict[str, Any] | list[Any]:
         response = self.client.rpc(function_name, params).execute()
         return cast(dict[str, Any] | list[Any], response.data)
+
+    def _join_user(self, id_column: str, id_value: str) -> dict[str, Any] | None:
+        """JOIN this role table with user and return a flat dict."""
+        response = (
+            self.client.table(self.table_name)
+            .select('*, user!inner(*)')
+            .eq(id_column, id_value)
+            .maybe_single()
+            .execute()
+        )
+        data = self._row(response)
+        if not data:
+            return None
+        data = dict(data)
+        user_data = data.pop('user', {})
+        data.update(user_data)
+        return data

@@ -6,4 +6,4 @@ from models.user import User
 class Teacher(User):
     role: str = 'teacher'
     pilot_approved: bool = False
-    school_id: Optional[str] = None
+    school_name: Optional[str] = None

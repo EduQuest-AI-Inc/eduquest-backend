@@ -9,6 +9,7 @@ class EnrollmentDAO(SupabaseBaseDAO):
 
     def add_enrollment(self, enrollment) -> None:
         self._insert({
+            'enrollment_id': enrollment.enrollment_id,
             'user_id': enrollment.user_id,
             'period_id': enrollment.period_id,
             'semester': enrollment.semester,

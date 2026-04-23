@@ -82,21 +82,15 @@ class PeriodQuestService:
 
         ltg_response_id = self.ltg_conversation_dao.get_last_response_id(user_id, period_id)
 
-        existing_weekly_quest = self.quest_service.get_weekly_quests_for_student(user_id, period_id)
-        if not existing_weekly_quest:
-            schedule_dict = {"list_of_quests": schedule_quests}
-            self.quest_service.save_schedule_to_weekly_quests(schedule_dict, user_id, period_id)
-
         homework_agent = HWAgent(student, period, schedule_quests, previous_response_id=ltg_response_id)
         homework = homework_agent.run()
 
         homework_dict = self._normalize_homework(homework)
+        schedule_dict = {"list_of_quests": schedule_quests}
 
-        save_result = self.quest_service.update_weekly_quest_with_homework(homework_dict, user_id, period_id)
-
-        individual_quests = self.quest_service.get_individual_quests_for_student_and_period(user_id, period_id)
-        if not individual_quests:
-            self.quest_service.create_individual_quests_from_homework(homework_dict, user_id, period_id)
+        save_result = self.quest_service.update_quests_preserving_completed_data(
+            schedule_dict, homework_dict, user_id, period_id
+        )
 
         return {
             "homework": homework_dict,
@@ -127,7 +121,7 @@ class PeriodQuestService:
         if not period:
             raise Exception("Period not found")
 
-        existing_quests = self.quest_service.get_individual_quests_for_student_and_period(user_id, period_id)
+        existing_quests = self.quest_service.get_quests_for_student_and_period(user_id, period_id)
         if not existing_quests:
             raise Exception("No existing quests found. Cannot update without existing quest structure.")
 
@@ -154,7 +148,9 @@ class PeriodQuestService:
         homework = homework_agent.run()
         homework_dict = self._normalize_homework(homework)
 
-        update_result = self.quest_service.update_weekly_quest_with_homework(homework_dict, user_id, period_id)
+        update_result = self.quest_service.update_quests_preserving_completed_data(
+            {"list_of_quests": incomplete_quests}, homework_dict, user_id, period_id
+        )
 
         affected_weeks = [q.get("Week") for q in incomplete_quests]
         return {
