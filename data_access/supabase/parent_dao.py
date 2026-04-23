@@ -54,6 +54,12 @@ class ParentDAO(SupabaseBaseDAO):
     def delete_parent(self, user_id: str) -> None:
         self._user_dao.delete(user_id)
 
+    def get_linked_student_ids(self, user_id: str) -> list:
+        parent = self.get_parent_by_id(user_id)
+        if not parent:
+            return []
+        return parent.get('linked_user_ids', [])
+
     def _join_user(self, id_column: str, id_value: str) -> Optional[Dict[str, Any]]:
         """JOIN parent + user and return a flat dict."""
         response = (
