@@ -16,7 +16,7 @@ class EnrollmentDAO(SupabaseBaseDAO):
             'enrolled_at': enrollment.enrolled_at,
         })
 
-    def get_enrollments_by_period(self, period_id: str) -> List[Dict[str, Any]]:
+    def get_enrollment_by_period(self, period_id: str) -> List[Dict[str, Any]]:
         return self._select_eq('period_id', period_id)
 
     def get_enrollments_by_student(self, user_id: str) -> List[Dict[str, Any]]:

@@ -21,7 +21,10 @@ from routes.teacher.period_schedule_service import PeriodScheduleService
 from routes.teacher.teacher_service import TeacherService
 from routes.waitlist.WaitlistService import WaitlistService
 from data_access.supabase.teacher_dao import TeacherDAO
-from utils.token_utils import extract_auth_token, get_user_id_from_token
+from utils.token_utils import extract_auth_token
+from exceptions.validation_error import ValidationError
+from exceptions.not_found_error import NotFoundError
+from exceptions.auth_error import AuthError
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +36,6 @@ parent_service = ParentService()
 teacher_service = TeacherService()
 teacher_dao = TeacherDAO()
 waitlist_service = WaitlistService()
-
-
-def _token() -> str:
-    return extract_auth_token(request)
 
 
 def _validate_pilot_access(user_id: str):
@@ -55,59 +54,95 @@ def _validate_pilot_access(user_id: str):
     return None
 
 
-# ─── Student-facing period routes (use auth_token pattern; services expect it) ─
+# ─── Owner-facing period routes (teacher + parent) ────────────────────────────
+
+@period_bp.route('/periods', methods=['GET'])
+@jwt_required()
+def list_periods():
+    try:
+        user_id = get_jwt_identity()
+        result = period_management_service.get_periods_by_owner(user_id)
+        return jsonify({"periods": result}), 200
+    except Exception as e:
+        logger.error("Unexpected error in list-periods: %s", e, exc_info=True)
+        return jsonify({"error": "An unexpected error occurred"}), 500
+
+
+# ─── Student-facing period routes ─────────────────────────────────────────────
 
 @period_bp.route('/my-periods', methods=['GET'])
+@jwt_required()
 def my_periods():
     try:
-        result = period_service.get_my_periods(_token())
+        user_id = get_jwt_identity()
+        result = period_service.get_my_periods(user_id)
         return jsonify(result), 200
+    except (ValidationError, NotFoundError, AuthError):
+        raise
     except Exception as e:
         logger.error("Unexpected error in my-periods: %s", e, exc_info=True)
         return jsonify({"error": "An unexpected error occurred"}), 500
 
 
 @period_bp.route('/verify-period', methods=['POST'])
+@jwt_required()
 def verify_period():
     try:
+        user_id = get_jwt_identity()
         data = request.json
         period_id = data.get('period_id')
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
-        period = period_service.verify_period_id(_token(), period_id)
+        period = period_service.verify_period_id(user_id, period_id)
         return jsonify({"message": "Period verified and added to enrollments", "period": period}), 200
+    except (ValidationError, NotFoundError, AuthError):
+        raise
     except Exception as e:
         logger.error("Unexpected error in verify-period: %s", e, exc_info=True)
         return jsonify({"error": "An unexpected error occurred"}), 500
 
 
 @period_bp.route('/unenroll', methods=['POST'])
+@jwt_required()
 def unenroll():
-    data = request.json
-    period_id = data.get('period_id')
-    if not period_id:
-        return jsonify({"error": "period_id is required"}), 400
-    result = period_service.unenroll_from_period(_token(), period_id)
-    return jsonify(result), 200
-
-
-@period_bp.route('/initiate-ltg-conversation', methods=['POST'])
-def initiate_ltg_conversation():
     try:
+        user_id = get_jwt_identity()
         data = request.json
         period_id = data.get('period_id')
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
-        result = period_service.initiate_ltg_conversation(_token(), period_id)
+        result = period_service.unenroll_from_period(user_id, period_id)
         return jsonify(result), 200
+    except (ValidationError, NotFoundError, AuthError):
+        raise
+    except Exception as e:
+        logger.error("Unexpected error in unenroll: %s", e, exc_info=True)
+        return jsonify({"error": "An unexpected error occurred"}), 500
+
+
+@period_bp.route('/initiate-ltg-conversation', methods=['POST'])
+@jwt_required()
+def initiate_ltg_conversation():
+    try:
+        user_id = get_jwt_identity()
+        data = request.json
+        period_id = data.get('period_id')
+        if not period_id:
+            return jsonify({"error": "period_id is required"}), 400
+        result = period_service.initiate_ltg_conversation(user_id, period_id)
+        return jsonify(result), 200
+    except (ValidationError, NotFoundError, AuthError):
+        raise
     except Exception as e:
         logger.error("Unexpected error in initiate-ltg-conversation: %s", e, exc_info=True)
         return jsonify({"error": "An unexpected error occurred"}), 500
 
 
 @period_bp.route('/continue-ltg-conversation', methods=['POST'])
+@jwt_required()
 def continue_ltg_conversation():
     try:
+        user_id = get_jwt_identity()
         data = request.json
         conversation_type = data.get('conversation_type')
         conversation_id = data.get('conversation_id')
@@ -122,9 +157,11 @@ def continue_ltg_conversation():
             return jsonify({"error": "message is required"}), 400
 
         result = period_service.continue_ltg_conversation(
-            _token(), conversation_type, conversation_id, user_message, period_id
+            user_id, conversation_type, conversation_id, user_message, period_id
         )
         return jsonify(result), 200
+    except (ValidationError, NotFoundError, AuthError):
+        raise
     except Exception as e:
         logger.error("Unexpected error in continue-ltg-conversation: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
@@ -151,7 +188,7 @@ def initiate_homework_agent():
         else:
             user_id = caller_id
 
-        result = period_service.start_homework_agent(_token(), user_id, period_id)
+        result = period_service.start_homework_agent(user_id, period_id)
         return jsonify(result), 200
     except Exception as e:
         logger.error("Error in initiate-homework-agent: %s", e, exc_info=True)
@@ -200,7 +237,7 @@ def create_period():
 
         # Determine role — pilot gate applies only to teachers
         from data_access.supabase.session_dao import SessionDAO
-        sessions = SessionDAO().get_sessions_by_auth_token(_token())
+        sessions = SessionDAO().get_sessions_by_auth_token(extract_auth_token(request))
         role = sessions[0].get("role") if sessions else "student"
 
         if role == "teacher":

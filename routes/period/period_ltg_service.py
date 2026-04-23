@@ -1,10 +1,8 @@
 import uuid
 from typing import Any
-from routes.auth_utils import require_auth
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from data_access.supabase.period_dao import PeriodDAO
-from data_access.supabase.session_dao import SessionDAO
 from data_access.supabase.student_dao import StudentDAO
 from data_access.supabase.ltg_conversation_dao import LtgConversationDAO
 
@@ -18,15 +16,12 @@ class PeriodLTGService:
 
     def __init__(self) -> None:
         self.period_dao = PeriodDAO()
-        self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()
         self.ltg_conversation_dao = LtgConversationDAO()
 
-    def initiate_ltg_conversation(self, auth_token: str, period_id: str) -> Any:
+    def initiate_ltg_conversation(self, user_id: str, period_id: str) -> Any:
         if not period_id:
             raise ValidationError("Missing period ID")
-
-        user_id = require_auth(self.session_dao, auth_token, ["student"])
 
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
@@ -81,10 +76,9 @@ class PeriodLTGService:
         }
 
     def continue_ltg_conversation(
-        self, auth_token: str, conversation_type: str, conversation_id: str,
+        self, user_id: str, conversation_type: str, conversation_id: str,
         message: str, period_id: str = None
     ) -> Any:
-        user_id = require_auth(self.session_dao, auth_token, ["student"])
 
         student = self.student_dao.get_student_by_id(user_id)
         if not student:

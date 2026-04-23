@@ -1,5 +1,4 @@
 from typing import Dict, Any
-from routes.auth_utils import require_auth
 from data_access.supabase.period_dao import PeriodDAO
 from data_access.supabase.session_dao import SessionDAO
 from data_access.supabase.student_dao import StudentDAO
@@ -27,16 +26,7 @@ class PeriodQuestService:
         if not any(e['user_id'] == user_id for e in enrollments):
             raise Exception(f"Student {user_id} is not enrolled in period {period_id}")
 
-    def start_homework_agent(self, auth_token: str, user_id: str, period_id: str) -> Dict[str, Any]:
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-        caller_id = sessions[0]["user_id"]
-        caller_role = sessions[0].get("role", "student")
-
-        if caller_role not in ("teacher", "parent") and caller_id != user_id:
-            raise Exception("Unauthorized: caller must be the target student, a teacher, or a parent")
-
+    def start_homework_agent(self, user_id: str, period_id: str) -> Dict[str, Any]:
         self._assert_enrolled(user_id, period_id)
 
         student = self.student_dao.get_student_by_id(user_id)

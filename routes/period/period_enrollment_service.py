@@ -1,10 +1,8 @@
 import logging
 from typing import Dict, Any, List
-from routes.auth_utils import require_auth
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from data_access.supabase.period_dao import PeriodDAO
-from data_access.supabase.session_dao import SessionDAO
 from data_access.supabase.student_dao import StudentDAO
 from data_access.supabase.enrollment_dao import EnrollmentDAO
 from data_access.supabase.quest_dao import QuestDAO
@@ -22,15 +20,13 @@ class PeriodEnrollmentService:
 
     def __init__(self) -> None:
         self.period_dao = PeriodDAO()
-        self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()
         self.enrollment_dao = EnrollmentDAO()
         self.quest_dao = QuestDAO()
         self.ltg_conversation_dao = LtgConversationDAO()
         self.conversation_dao = ConversationDAO()
 
-    def get_my_periods(self, auth_token: str) -> List[Dict[str, Any]]:
-        user_id = require_auth(self.session_dao, auth_token, ["student"])
+    def get_my_periods(self, user_id: str) -> List[Dict[str, Any]]:
         enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)
         period_ids = [e['period_id'] for e in enrollments]
 
@@ -55,11 +51,9 @@ class PeriodEnrollmentService:
             })
         return result
 
-    def verify_period_id(self, auth_token: str, period_id: str) -> Any:
+    def verify_period_id(self, user_id: str, period_id: str) -> Any:
         if not period_id:
             raise ValidationError("Missing period ID")
-
-        user_id = require_auth(self.session_dao, auth_token, ["student"])
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
@@ -83,11 +77,9 @@ class PeriodEnrollmentService:
 
         return period
 
-    def unenroll_from_period(self, auth_token: str, period_id: str) -> Dict[str, Any]:
+    def unenroll_from_period(self, user_id: str, period_id: str) -> Dict[str, Any]:
         if not period_id:
             raise ValidationError("Missing period ID")
-
-        user_id = require_auth(self.session_dao, auth_token, ["student"])
 
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
@@ -136,7 +128,7 @@ class PeriodEnrollmentService:
         }
 
     def assert_enrolled(self, user_id: str, period_id: str) -> None:
-        enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
+        enrollments = self.enrollment_dao.get_enrollment_by_period(period_id)
         if not any(e['user_id'] == user_id for e in enrollments):
             raise Exception(f"Student {user_id} is not enrolled in period {period_id}")
 
