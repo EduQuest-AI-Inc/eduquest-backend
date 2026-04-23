@@ -12,6 +12,8 @@ from routes.teacher.period_schedule_service import PeriodScheduleService
 from services.s3_service import upload_file_to_s3
 
 logger = logging.getLogger(__name__)
+from s3 import upload_file_to_s3
+
 parent_bp = Blueprint("parent", __name__)
 parent_service = ParentService()
 period_schedule_service = PeriodScheduleService()
@@ -168,6 +170,7 @@ def generate_period_schedule():
         return jsonify({"error": str(ve)}), 404
     except Exception as e:
         logger.error("Error generating parent schedule: %s", e, exc_info=True)
+        print(f"Error generating parent schedule: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
 
