@@ -70,7 +70,6 @@ class PeriodScheduleService:
             # Create new record
             period_schedule = PeriodSchedule(
                 period_id=period_id,
-                user_id=user_id,
                 vector_store_id=vector_store_id,
                 schedule_json=schedule_dict,
                 schedule_openai_file_id=schedule_openai_file_id,
@@ -146,7 +145,6 @@ class PeriodScheduleService:
             # Create a minimal record if none exists
             period_schedule = PeriodSchedule(
                 period_id=period_id,
-                user_id=user_id,
                 vector_store_id=period.get('vector_store_id'),
                 quest_enabled_weeks=normalized_weeks
             )

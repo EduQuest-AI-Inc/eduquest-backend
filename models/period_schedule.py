@@ -11,7 +11,6 @@ class PeriodSchedule(BaseModel):
     model_config = {"extra": "ignore"}
 
     period_id: str  # Partition Key
-    user_id: Optional[str] = None
     vector_store_id: Optional[str] = None
     schedule_json: Optional[Dict[str, Any]] = None
     schedule_openai_file_id: Optional[str] = None  # OpenAI file ID for vector store

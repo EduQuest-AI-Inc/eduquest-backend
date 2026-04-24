@@ -16,8 +16,6 @@ class PeriodScheduleDAO(SupabaseBaseDAO):
             'schedule_openai_file_id': getattr(period_schedule, 'schedule_openai_file_id', None),
             'quest_enabled_weeks': getattr(period_schedule, 'quest_enabled_weeks', []),
         }
-        if getattr(period_schedule, 'user_id', None):
-            data['user_id'] = period_schedule.user_id
         if getattr(period_schedule, 'vector_store_id', None):
             data['vector_store_id'] = period_schedule.vector_store_id
         self._insert(data)
