@@ -29,16 +29,16 @@ CREATE INDEX IF NOT EXISTS idx_period_owner_id ON period(owner_id);
 -- ============================================================
 -- Task 5: Rename individual_quest -> quest, drop weekly_quest
 -- ============================================================
+-- Drop the FK column to weekly_quest first — it is named quest_id,
+-- which would collide with the rename below.
+ALTER TABLE individual_quest DROP COLUMN IF EXISTS quest_id;
+ALTER TABLE individual_quest DROP COLUMN IF EXISTS quest_id_weekly;
+
 -- Rename table
 ALTER TABLE individual_quest RENAME TO quest;
 
--- Rename PK column
+-- Rename PK column (no collision now)
 ALTER TABLE quest RENAME COLUMN individual_quest_id TO quest_id;
-
--- Drop the old quest_id FK column (was a FK to weekly_quest)
--- This column pointed to weekly_quest.quest_id and is being replaced
--- by a direct (user_id, period_id) query pattern.
-ALTER TABLE quest DROP COLUMN IF EXISTS quest_id_weekly;
 
 -- Add index on (user_id, period_id) for fast per-student-per-period queries
 CREATE INDEX IF NOT EXISTS idx_quest_user_period ON quest(user_id, period_id);
