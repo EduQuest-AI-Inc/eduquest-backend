@@ -8,7 +8,11 @@ class PeriodSchedule(BaseModel):
     Stores the master schedule for a period (one schedule per period).
     This is teacher/period scoped, not student scoped.
     """
+    model_config = {"extra": "ignore"}
+
     period_id: str  # Partition Key
+    user_id: Optional[str] = None
+    vector_store_id: Optional[str] = None
     schedule_json: Optional[Dict[str, Any]] = None
     schedule_openai_file_id: Optional[str] = None  # OpenAI file ID for vector store
     quest_enabled_weeks: List[int] = []  # Weeks where quests are enabled
