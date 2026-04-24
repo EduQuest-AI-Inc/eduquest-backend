@@ -34,12 +34,16 @@ class PeriodScheduleService:
 
         vector_store_id = period.get("vector_store_id")
         if not vector_store_id:
-            raise ValueError("Period has no course materials. Upload files to generate a schedule.")
+            raise ValueError("Period has no vector store. Re-create the class to fix this.")
         course_name = period.get("name", "Course")
+
+        # Only search files if any were actually uploaded — empty vector stores cause API errors
+        file_urls = period.get("file_urls") or []
+        agent_vector_store_id = vector_store_id if file_urls else None
 
         # Generate schedule using the agent
         agent = PeriodScheduleAgent(
-            vector_store_id=vector_store_id,
+            vector_store_id=agent_vector_store_id,
             course_name=course_name
         )
         schedule_dict = agent.run_and_get_json()
