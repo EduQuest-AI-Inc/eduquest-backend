@@ -6,7 +6,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from routes.parent.parent_service import ParentService
 
 logger = logging.getLogger(__name__)
-from s3 import upload_file_to_s3
+from services.s3_service import upload_file_to_s3
 
 parent_bp = Blueprint("parent", __name__)
 parent_service = ParentService()
