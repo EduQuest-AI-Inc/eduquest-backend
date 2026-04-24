@@ -4,12 +4,13 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from routes.parent.parent_service import ParentService
+from routes.teacher.period_schedule_service import PeriodScheduleService
 
 logger = logging.getLogger(__name__)
-from services.s3_service import upload_file_to_s3
 
 parent_bp = Blueprint("parent", __name__)
 parent_service = ParentService()
+period_schedule_service = PeriodScheduleService()
 
 
 @parent_bp.route("/my-periods", methods=["GET"])
