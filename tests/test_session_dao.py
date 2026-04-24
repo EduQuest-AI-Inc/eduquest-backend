@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data_access.supabase.session_dao import SessionDAO
 from models.session import Session
 
-def test_crud_operations():
+def test_crud_operations() -> None:
     dao = SessionDAO()
 
     session = Session(

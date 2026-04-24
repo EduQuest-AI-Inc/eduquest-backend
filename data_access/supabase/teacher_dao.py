@@ -1,16 +1,11 @@
 from typing import Dict, Any, Optional
 
 from data_access.supabase.base_dao import SupabaseBaseDAO
-from data_access.supabase.user_dao import UserDAO
-
-SHARED_USER_FIELDS = {
-    "first_name", "last_name", "email", "email_lc",
-    "password", "last_login", "canvas_api_url", "canvas_api_key",
-}
+from data_access.supabase.user_dao import UserDAO, SHARED_USER_FIELDS
 
 
 class TeacherDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('teacher')
         self._user_dao = UserDAO()
 
@@ -21,7 +16,6 @@ class TeacherDAO(SupabaseBaseDAO):
             'first_name': teacher.first_name,
             'last_name': teacher.last_name,
             'email': teacher.email,
-            'email_lc': teacher.email_lc,
             'password': teacher.password,
             'role': 'teacher',
         })
@@ -29,7 +23,7 @@ class TeacherDAO(SupabaseBaseDAO):
             self._insert({
                 'user_id': teacher.user_id,
                 'pilot_approved': getattr(teacher, 'pilot_approved', False),
-                'school_id': getattr(teacher, 'school_id', None),
+                'school_name': getattr(teacher, 'school_name', None),
             })
         except Exception:
             self._user_dao.delete(teacher.user_id)
@@ -48,19 +42,3 @@ class TeacherDAO(SupabaseBaseDAO):
 
     def delete_teacher(self, user_id: str) -> None:
         self._user_dao.delete(user_id)
-
-    def _join_user(self, id_column: str, id_value: str) -> Optional[Dict[str, Any]]:
-        """JOIN teacher + user and return a flat dict."""
-        response = (
-            self.client.table('teacher')
-            .select('*, user!inner(*)')
-            .eq(id_column, id_value)
-            .maybe_single()
-            .execute()
-        )
-        if not response or not response.data:
-            return None
-        data = dict(response.data)
-        user_data = data.pop('user', {})
-        data.update(user_data)
-        return data

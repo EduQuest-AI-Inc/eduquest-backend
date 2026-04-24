@@ -9,7 +9,7 @@ class WaitlistService:
     Handles business logic for joining waitlist and checking status.
     """
 
-    def __init__(self, dao: Optional[WaitlistDAO] = None, teacher_dao: Optional[TeacherDAO] = None):
+    def __init__(self, dao: Optional[WaitlistDAO] = None, teacher_dao: Optional[TeacherDAO] = None) -> None:
         self.dao = dao or WaitlistDAO()
         self.teacher_dao = teacher_dao or TeacherDAO()
 
@@ -98,7 +98,7 @@ class WaitlistService:
             Dict with approval result
         """
         # Approve in waitlist
-        waitlist_success = self.dao.approve_teacher(user_id)
+        waitlist_success = self.dao.approve_user(user_id)
 
         # Update teacher record
         try:

@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data_access.supabase.student_dao import StudentDAO
 from models.student import Student
 
-def test_crud_operations():
+def test_crud_operations() -> None:
 
     dao = StudentDAO()
 

@@ -1,16 +1,11 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from data_access.supabase.base_dao import SupabaseBaseDAO
-from data_access.supabase.user_dao import UserDAO
-
-SHARED_USER_FIELDS = {
-    "first_name", "last_name", "email", "email_lc",
-    "password", "last_login", "canvas_api_url", "canvas_api_key",
-}
+from data_access.supabase.user_dao import UserDAO, SHARED_USER_FIELDS
 
 
 class ParentDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('parent')
         self._user_dao = UserDAO()
 
@@ -21,14 +16,13 @@ class ParentDAO(SupabaseBaseDAO):
             'first_name': parent.first_name,
             'last_name': parent.last_name,
             'email': parent.email,
-            'email_lc': parent.email_lc,
             'password': parent.password,
             'role': 'parent',
         })
         try:
             self._insert({
                 'user_id': parent.user_id,
-                'linked_user_ids': getattr(parent, 'linked_user_ids', []),
+                'linked_student_ids': getattr(parent, 'linked_student_ids', []),
             })
         except Exception:
             self._user_dao.delete(parent.user_id)
@@ -37,8 +31,8 @@ class ParentDAO(SupabaseBaseDAO):
     def get_parent_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         return self._join_user('user_id', user_id)
 
-    def get_parent_by_email_lc(self, email_lc: str) -> Optional[Dict[str, Any]]:
-        user = self._user_dao.get_by_email_lc(email_lc)
+    def get_parent_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        user = self._user_dao.get_by_email(email)
         if not user:
             return None
         return self.get_parent_by_id(user['user_id'])
@@ -54,18 +48,8 @@ class ParentDAO(SupabaseBaseDAO):
     def delete_parent(self, user_id: str) -> None:
         self._user_dao.delete(user_id)
 
-    def _join_user(self, id_column: str, id_value: str) -> Optional[Dict[str, Any]]:
-        """JOIN parent + user and return a flat dict."""
-        response = (
-            self.client.table('parent')
-            .select('*, user!inner(*)')
-            .eq(id_column, id_value)
-            .maybe_single()
-            .execute()
-        )
-        if not response or not response.data:
-            return None
-        data = dict(response.data)
-        user_data = data.pop('user', {})
-        data.update(user_data)
-        return data
+    def get_linked_student_ids(self, user_id: str) -> List[str]:
+        parent = self.get_parent_by_id(user_id)
+        if not parent:
+            return []
+        return parent.get('linked_student_ids', [])

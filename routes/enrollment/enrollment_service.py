@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class EnrollmentService:
-    def __init__(self):
+    def __init__(self) -> None:
         self.enrollment_dao = EnrollmentDAO()
         self.student_dao = StudentDAO()
         self.period_dao = PeriodDAO()

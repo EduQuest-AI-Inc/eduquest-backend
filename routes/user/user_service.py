@@ -7,7 +7,7 @@ from data_access.supabase.teacher_dao import TeacherDAO
 
 class UserService:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()
         self.teacher_dao = TeacherDAO()
@@ -41,7 +41,7 @@ class UserService:
         else:
             raise ValueError(f"Unrecognized role: {role}")
 
-    def update_tutorial_status(self, user_id: str, completed_tutorial: bool):
+    def update_tutorial_status(self, user_id: str, completed_tutorial: bool) -> None:
         """Update tutorial status for a student"""
         self.student_dao.update_tutorial_status(user_id, completed_tutorial)
 

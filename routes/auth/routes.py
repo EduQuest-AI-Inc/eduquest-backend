@@ -46,16 +46,14 @@ def signup():
     if role not in valid_roles:
         return jsonify({'message': f'Invalid role. Must be one of: {", ".join(valid_roles)}'}), 400
 
-    # Canonical lowercase email for consistent lookups
-    email_lc = email.strip().lower()
+    normalized_email = email.strip().lower()
 
-    # Check uniqueness using email_lc to prevent case-based duplicates
-    if user_dao.get_by_email_lc(email_lc):
+    if user_dao.get_by_email(normalized_email):
         return jsonify({'message': 'Email address already in use'}), 409
 
     invite_code = data.get('invite_code', '').strip().upper()
 
-    result = register_user(username, password, role, first_name, last_name, email, email_lc, grade if role == 'student' else None)
+    result = register_user(username, password, role, first_name, last_name, normalized_email, grade if role == 'student' else None)
 
     if result.get('success'):
         response_body = {'message': 'User registered successfully'}
@@ -80,12 +78,12 @@ def signup():
                         if not parent:
                             response_body['invite_warning'] = 'Parent account not found. You can link your parent account later from your profile.'
                         else:
-                            linked_ids = parent.get('linked_user_ids') or []
+                            linked_ids = parent.get('linked_student_ids') or []
                             if username not in linked_ids:
                                 linked_ids.append(username)
                                 vpc_verified_at = datetime.now(timezone.utc).isoformat()
                                 parent_dao.update_parent(user_id, {
-                                    'linked_user_ids': linked_ids,
+                                    'linked_student_ids': linked_ids,
                                     'vpc_verified_at': vpc_verified_at,  # COPPA 2025 homeschool VPC record
                                 })
                                 parent_invite_dao.mark_used(invite_code)

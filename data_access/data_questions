@@ -13,3 +13,5 @@ Does the conversation really need to store a role?
 Why do we need school?
 
 Could we combine the parent waitlist and waitlist to be just a waitlist?
+
+Why do all of these refactor require changes in so many files? Is there a way to fix that?

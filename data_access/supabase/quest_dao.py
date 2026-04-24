@@ -2,31 +2,31 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 
 from data_access.supabase.base_dao import SupabaseBaseDAO
+from models.quest import Quest
 
 
-class IndividualQuestDAO(SupabaseBaseDAO):
-    def __init__(self):
-        super().__init__('individual_quest')
+class QuestDAO(SupabaseBaseDAO):
+    def __init__(self) -> None:
+        super().__init__('quest')
 
-    def add_individual_quest(self, quest) -> None:
+    def add_quest(self, quest: Quest) -> None:
         self._insert({
-            'individual_quest_id': quest.individual_quest_id,
             'quest_id': quest.quest_id,
             'user_id': quest.user_id,
             'period_id': quest.period_id,
             'week': quest.week,
-            'description': getattr(quest, 'description', ''),
-            'instructions': getattr(quest, 'instructions', ''),
-            'rubric': getattr(quest, 'rubric', {}),
-            'skills': getattr(quest, 'skills', ''),
-            'due_date': getattr(quest, 'due_date', None),
-            'status': getattr(quest, 'status', 'not_started'),
-            'grade': getattr(quest, 'grade', None),
-            'feedback': getattr(quest, 'feedback', None),
+            'description': quest.description,
+            'instructions': quest.instructions,
+            'rubric': quest.rubric,
+            'skills': quest.skills,
+            'due_date': quest.due_date,
+            'status': quest.status,
+            'grade': quest.grade,
+            'feedback': quest.feedback,
         })
 
-    def get_individual_quest_by_id(self, individual_quest_id: str) -> Optional[Dict[str, Any]]:
-        return self._select_by_id('individual_quest_id', individual_quest_id)
+    def get_quest_by_id(self, quest_id: str) -> Optional[Dict[str, Any]]:
+        return self._select_by_id('quest_id', quest_id)
 
     def get_quests_by_week(self, week: int) -> List[Dict[str, Any]]:
         return self._select_eq('week', week)
@@ -34,26 +34,26 @@ class IndividualQuestDAO(SupabaseBaseDAO):
     def get_quests_by_status(self, status: str) -> List[Dict[str, Any]]:
         return self._select_eq('status', status)
 
-    def update_individual_quest(self, individual_quest_id: str, updates: Dict[str, Any]) -> None:
+    def update_quest(self, quest_id: str, updates: Dict[str, Any]) -> None:
         updates['last_updated_at'] = datetime.now(timezone.utc).isoformat()
-        self._update({'individual_quest_id': individual_quest_id}, updates)
+        self._update({'quest_id': quest_id}, updates)
 
-    def update_quest_grade_and_feedback(self, individual_quest_id: str, grade: str, feedback: str) -> None:
-        self.update_individual_quest(individual_quest_id, {
+    def update_quest_grade_and_feedback(self, quest_id: str, grade: dict, feedback: str) -> None:
+        self.update_quest(quest_id, {
             'grade': grade,
             'feedback': feedback,
             'status': 'completed',
         })
 
-    def update_quest_status(self, individual_quest_id: str, status: str) -> None:
-        self.update_individual_quest(individual_quest_id, {'status': status})
+    def update_quest_status(self, quest_id: str, status: str) -> None:
+        self.update_quest(quest_id, {'status': status})
 
-    def delete_individual_quest(self, individual_quest_id: str) -> None:
-        self._delete({'individual_quest_id': individual_quest_id})
+    def delete_quest(self, quest_id: str) -> None:
+        self._delete({'quest_id': quest_id})
 
     def get_all_quests(self) -> List[Dict[str, Any]]:
         response = self._table().select('*').execute()
-        return response.data or []
+        return self._rows(response.data)
 
     def get_quests_by_date_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         response = (
@@ -63,7 +63,7 @@ class IndividualQuestDAO(SupabaseBaseDAO):
             .lte('due_date', end_date)
             .execute()
         )
-        return response.data or []
+        return self._rows(response.data)
 
     def get_quests_by_skills(self, skills: str) -> List[Dict[str, Any]]:
         response = (
@@ -72,13 +72,10 @@ class IndividualQuestDAO(SupabaseBaseDAO):
             .ilike('skills', f'%{skills}%')
             .execute()
         )
-        return response.data or []
+        return self._rows(response.data)
 
     def get_quests_by_student(self, user_id: str) -> List[Dict[str, Any]]:
         return self._select_eq('user_id', user_id)
-
-    def get_quests_by_quest_id(self, quest_id: str) -> List[Dict[str, Any]]:
-        return self._select_eq('quest_id', quest_id)
 
     def get_quests_by_student_and_period(self, user_id: str, period_id: str) -> List[Dict[str, Any]]:
         response = (
@@ -88,4 +85,4 @@ class IndividualQuestDAO(SupabaseBaseDAO):
             .eq('period_id', period_id)
             .execute()
         )
-        return response.data or []
+        return self._rows(response.data)

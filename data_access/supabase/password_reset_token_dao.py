@@ -7,15 +7,14 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 class PasswordResetTokenDAO(SupabaseBaseDAO):
     MAX_ATTEMPTS = 5
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('password_reset_token')
 
     def add_token(self, token) -> None:
         self._insert({
             'token_hash': token.token_hash,
             'user_id': token.user_id,
-            'role': token.role,
-            'email_lc': token.email_lc,
+            'email': token.email,
             'created_at': token.created_at_iso if hasattr(token, 'created_at_iso') else token.created_at,
             'expires_at': (
                 datetime.fromtimestamp(token.expires_at_epoch, tz=timezone.utc).isoformat()

@@ -9,7 +9,7 @@ from mock_course_data import data
 from data_access.supabase.period_dao import PeriodDAO
 from models.period import Period
 
-def test_crud_operations():
+def test_crud_operations() -> None:
     dao = PeriodDAO()
 
     period = Period(

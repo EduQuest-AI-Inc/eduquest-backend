@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from routes.quest.quest_service import QuestService
 
-def test_grade_parsing():
+def test_grade_parsing() -> bool:
     """Test the grade parsing functionality with different formats"""
     print("🧪 TESTING RUBRIC-BASED GRADE PARSING")
     print("=" * 50)
@@ -102,7 +102,7 @@ def test_grade_parsing():
     
     return all_passed
 
-def test_rubric_examples():
+def test_rubric_examples() -> None:
     """Test with real-world rubric examples"""
     print("\n🎯 TESTING WITH REALISTIC RUBRIC EXAMPLES")
     print("=" * 50)

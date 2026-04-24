@@ -17,27 +17,20 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class PeriodScheduleService:
     """Service for managing period schedules."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.period_schedule_dao = PeriodScheduleDAO()
         self.period_dao = PeriodDAO()
 
-    def generate_and_save_schedule(self, period_id: str, user_id: str) -> dict:
-        """
-        Generate a schedule for a period and save it to DB and vector store.
-
-        Args:
-            period_id: The period ID.
-            user_id: The teacher ID (for authorization).
-
-        Returns:
-            dict: The generated schedule and metadata.
-        """
-        # Get period to verify ownership and get vector_store_id
+    def _verify_period_ownership(self, period_id: str, user_id: str) -> dict:
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
             raise ValueError("Period not found")
-        if period.get("owner_id", period.get("user_id")) != user_id:
+        if period.get("owner_id") != user_id:
             raise PermissionError("Not authorized to access this period")
+        return period
+
+    def generate_and_save_schedule(self, period_id: str, user_id: str) -> dict:
+        period = self._verify_period_ownership(period_id, user_id)
 
         vector_store_id = period.get("vector_store_id")
         course_name = period.get("name", "Course")
@@ -83,22 +76,7 @@ class PeriodScheduleService:
         }
 
     def get_schedule(self, period_id: str, user_id: str) -> dict:
-        """
-        Get the schedule for a period.
-
-        Args:
-            period_id: The period ID.
-            user_id: The teacher ID (for authorization).
-
-        Returns:
-            dict: The schedule data and metadata.
-        """
-        # Verify period ownership
-        period = self.period_dao.get_period_by_id(period_id)
-        if not period:
-            raise ValueError("Period not found")
-        if period.get("owner_id", period.get("user_id")) != user_id:
-            raise PermissionError("Not authorized to access this period")
+        self._verify_period_ownership(period_id, user_id)
 
         # Get period schedule record
         period_schedule = self.period_schedule_dao.get_by_period_id(period_id)
@@ -112,24 +90,7 @@ class PeriodScheduleService:
         }
 
     def update_schedule(self, period_id: str, user_id: str, schedule_dict: dict) -> dict:
-        """
-        Update the schedule for a period.
-
-        Args:
-            period_id: The period ID.
-            user_id: The teacher ID (for authorization).
-            schedule_dict: The new schedule data.
-
-        Returns:
-            dict: The updated schedule metadata.
-        """
-        # Verify period ownership
-        period = self.period_dao.get_period_by_id(period_id)
-        if not period:
-            raise ValueError("Period not found")
-        if period.get("owner_id", period.get("user_id")) != user_id:
-            raise PermissionError("Not authorized to access this period")
-
+        period = self._verify_period_ownership(period_id, user_id)
         vector_store_id = period.get("vector_store_id")
 
         # Get existing period schedule
@@ -158,23 +119,7 @@ class PeriodScheduleService:
         }
 
     def set_quest_weeks(self, period_id: str, user_id: str, quest_enabled_weeks: list) -> dict:
-        """
-        Set which weeks have quests enabled.
-
-        Args:
-            period_id: The period ID.
-            user_id: The teacher ID (for authorization).
-            quest_enabled_weeks: List of week numbers where quests are enabled.
-
-        Returns:
-            dict: Confirmation message.
-        """
-        # Verify period ownership
-        period = self.period_dao.get_period_by_id(period_id)
-        if not period:
-            raise ValueError("Period not found")
-        if period.get("owner_id", period.get("user_id")) != user_id:
-            raise PermissionError("Not authorized to access this period")
+        self._verify_period_ownership(period_id, user_id)
 
         # Normalize to unique sorted ints (frontend can send strings)
         normalized_weeks = []
@@ -229,7 +174,7 @@ class PeriodScheduleService:
         finally:
             os.unlink(temp_path)
 
-    def _delete_file_from_vector_store(self, vector_store_id: str, file_id: str):
+    def _delete_file_from_vector_store(self, vector_store_id: str, file_id: str) -> None:
         """Delete a file from the vector store."""
         try:
             client.vector_stores.files.delete(

@@ -32,7 +32,7 @@ INVALID_TOKEN_MESSAGE = "This link is invalid or expired. Please request a new o
 class PasswordResetService:
     """Service for handling password reset operations."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self.user_dao = UserDAO()
         self.token_dao = PasswordResetTokenDAO()
         self.rate_limit_dao = PasswordResetRateLimitDAO()
@@ -58,110 +58,94 @@ class PasswordResetService:
             dict with 'success' (always True) and 'message' (always neutral)
         """
         request_id = str(uuid.uuid4())[:8]
-        email_lc = email.strip().lower() if email else ""
-        
-        # Log the request
-        self._log_event("PASSWORD_RESET_REQUEST_RECEIVED", request_id, email_lc=email_lc, ip=ip_address)
-        
-        # Check rate limits
-        is_allowed, limit_reason = self.rate_limit_dao.check_rate_limit(ip_address, email_lc)
+        normalized_email = email.strip().lower() if email else ""
+
+        self._log_event("PASSWORD_RESET_REQUEST_RECEIVED", request_id, email=normalized_email, ip=ip_address)
+
+        is_allowed, limit_reason = self.rate_limit_dao.check_rate_limit(ip_address, normalized_email)
         if not is_allowed:
             self._log_event(
                 "PASSWORD_RESET_REQUEST_RATE_LIMITED",
                 request_id,
-                email_lc=email_lc,
+                email=normalized_email,
                 ip=ip_address,
-                result=limit_reason
+                result=limit_reason,
             )
-            # Still return neutral message
             return {"success": True, "message": NEUTRAL_REQUEST_MESSAGE}
-        
-        # Record the request for rate limiting
-        self.rate_limit_dao.record_request(ip_address, email_lc)
-        
-        # Find user by email
-        user_data, role = self._find_user_by_email(email_lc)
-        
+
+        self.rate_limit_dao.record_request(ip_address, normalized_email)
+
+        user_data, role = self._find_user_by_email(normalized_email)
+
         if not user_data:
             self._log_event(
                 "PASSWORD_RESET_REQUEST_USER_NOT_FOUND",
                 request_id,
-                email_lc=email_lc,
-                ip=ip_address
+                email=normalized_email,
+                ip=ip_address,
             )
-            # Still return neutral message
             return {"success": True, "message": NEUTRAL_REQUEST_MESSAGE}
-        
-        user_id = user_data.get("user_id") or user_data.get("user_id")
+
+        user_id = user_data.get("user_id")
         first_name = user_data.get("first_name")
-        
+
         try:
-            # Generate token
             raw_token = secrets.token_urlsafe(48)
             token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-            
-            # Create token record
+
             token_record = PasswordResetToken(
                 token_hash=token_hash,
                 user_id=user_id,
-                role=role,
-                email_lc=email_lc,
+                email=normalized_email,
                 created_at_iso=datetime.now(timezone.utc).isoformat(),
                 request_ip=ip_address,
-                user_agent=user_agent
+                user_agent=user_agent,
             )
-            
-            # Store token
+
             self.token_dao.add_token(token_record)
-            
+
             self._log_event(
                 "PASSWORD_RESET_TOKEN_CREATED",
                 request_id,
-                email_lc=email_lc,
+                email=normalized_email,
                 user_id=user_id,
-                role=role,
                 ip=ip_address,
-                token_hash_prefix=token_hash[:8]
+                token_hash_prefix=token_hash[:8],
             )
-            
-            # Send email
+
             email_result = self.email_service.send_password_reset_email(
-                to_email=email_lc,
+                to_email=normalized_email,
                 reset_token=raw_token,
-                user_first_name=first_name
+                user_first_name=first_name,
             )
-            
+
             if email_result.get("success"):
-                # Set cooldown after successful send
-                self.rate_limit_dao.set_cooldown(email_lc)
-                
+                self.rate_limit_dao.set_cooldown(normalized_email)
                 self._log_event(
                     "PASSWORD_RESET_EMAIL_SENT",
                     request_id,
-                    email_lc=email_lc,
+                    email=normalized_email,
                     user_id=user_id,
-                    role=role,
                     ip=ip_address,
-                    ses_message_id=email_result.get("message_id")
+                    ses_message_id=email_result.get("message_id"),
                 )
             else:
                 self._log_event(
                     "PASSWORD_RESET_EMAIL_FAILED",
                     request_id,
-                    email_lc=email_lc,
+                    email=normalized_email,
                     user_id=user_id,
-                    role=role,
                     ip=ip_address,
-                    result=email_result.get("error")
+                    result=email_result.get("error"),
                 )
-            
+
         except Exception as e:
             self._log_event(
                 "PASSWORD_RESET_REQUEST_ERROR",
                 request_id,
-                email_lc=email_lc,
+                email=normalized_email,
                 ip=ip_address,
-                result=str(e)
+                result=str(e),
             )
             logger.exception(f"Error processing password reset request: {e}")
         
@@ -262,90 +246,70 @@ class PasswordResetService:
         
         # Token consumed successfully, now update password
         user_id = consumed_token_data.get("user_id")
-        role = consumed_token_data.get("role")
-        email_lc = consumed_token_data.get("email_lc")
-        
+        email = consumed_token_data.get("email")
+
         try:
             hashed_password = generate_password_hash(new_password)
             self.user_dao.update(user_id, {"password": hashed_password})
-            
+
             self._log_event(
                 "PASSWORD_RESET_SUCCESS",
                 request_id,
-                email_lc=email_lc,
+                email=email,
                 user_id=user_id,
-                role=role,
                 ip=ip_address,
-                token_hash_prefix=token_hash_prefix
+                token_hash_prefix=token_hash_prefix,
             )
-            
+
             return True, "Your password has been updated successfully. You can now log in with your new password."
-            
+
         except Exception as e:
-            # Password update failed after consuming token
             self._log_event(
                 "PASSWORD_RESET_UPDATE_FAILED",
                 request_id,
-                email_lc=email_lc,
+                email=email,
                 user_id=user_id,
-                role=role,
                 ip=ip_address,
                 token_hash_prefix=token_hash_prefix,
-                result=str(e)
+                result=str(e),
             )
             logger.exception(f"Failed to update password after consuming token: {e}")
-            
-            # Return generic error - user will need to request a new link
             return False, "An error occurred while updating your password. Please request a new reset link."
-    
-    def _find_user_by_email(self, email_lc: str) -> Tuple[Optional[dict], Optional[str]]:
-        """
-        Find a user by their canonical email address.
 
-        Returns:
-            (user_data, role) or (None, None) if not found
-        """
-        user = self.user_dao.get_by_email_lc(email_lc)
+    def _find_user_by_email(self, email: str) -> Tuple[Optional[dict], Optional[str]]:
+        """Find a user by their canonical email address. Returns (user_data, role) or (None, None)."""
+        user = self.user_dao.get_by_email(email)
         if not user:
             return None, None
         return user, user.get('role')
-    
+
     def _log_event(
         self,
         event_type: str,
         request_id: str,
-        email_lc: Optional[str] = None,
+        email: Optional[str] = None,
         user_id: Optional[str] = None,
-        role: Optional[str] = None,
         ip: Optional[str] = None,
         user_agent: Optional[str] = None,
         token_hash_prefix: Optional[str] = None,
         ses_message_id: Optional[str] = None,
-        result: Optional[str] = None
-    ):
-        """Log a password reset event with structured data."""
-        log_data = {
-            "event_type": event_type,
-            "request_id": request_id,
-        }
-        
-        if email_lc:
-            log_data["email_lc"] = email_lc
+        result: Optional[str] = None,
+    ) -> None:
+        log_data: dict = {"event_type": event_type, "request_id": request_id}
+        if email:
+            log_data["email"] = email
         if user_id:
             log_data["user_id"] = user_id
-        if role:
-            log_data["role"] = role
         if ip:
             log_data["ip"] = ip
         if user_agent:
-            log_data["user_agent"] = user_agent[:100] if user_agent else None
+            log_data["user_agent"] = user_agent[:100]
         if token_hash_prefix:
             log_data["token_hash_prefix"] = token_hash_prefix
         if ses_message_id:
             log_data["ses_message_id"] = ses_message_id
         if result:
             log_data["result"] = result
-        
         logger.info(f"PasswordReset: {log_data}")
 
 

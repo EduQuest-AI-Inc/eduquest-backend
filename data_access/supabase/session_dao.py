@@ -5,7 +5,7 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 
 
 class SessionDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('session')
 
     def add_session(self, session) -> None:
@@ -22,8 +22,8 @@ class SessionDAO(SupabaseBaseDAO):
     def get_sessions_by_auth_token(self, auth_token: str) -> List[Dict[str, Any]]:
         return self._select_eq('auth_token', auth_token)
 
-    def update_session(self, auth_token: str, user_id: str, updates: Dict[str, Any]) -> None:
+    def update_session(self, auth_token: str, updates: Dict[str, Any]) -> None:
         self._update({'auth_token': auth_token}, updates)
 
-    def delete_session(self, auth_token: str, user_id: str) -> None:
+    def delete_session(self, auth_token: str) -> None:
         self._delete({'auth_token': auth_token})

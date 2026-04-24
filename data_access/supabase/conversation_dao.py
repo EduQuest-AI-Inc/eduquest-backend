@@ -4,14 +4,13 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 
 
 class ConversationDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('conversation')
 
     def add_conversation(self, conversation) -> None:
         self._insert({
             'conversation_id': conversation.conversation_id,
             'user_id': conversation.user_id,
-            'role': conversation.role,
             'conversation_type': conversation.conversation_type,
             'period_id': getattr(conversation, 'period_id', None),
             'last_response_id': getattr(conversation, 'last_response_id', None),
@@ -39,4 +38,4 @@ class ConversationDAO(SupabaseBaseDAO):
             .maybe_single()
             .execute()
         )
-        return response.data
+        return self._row(response)

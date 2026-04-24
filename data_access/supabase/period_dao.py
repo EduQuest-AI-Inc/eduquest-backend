@@ -4,7 +4,7 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 
 
 class PeriodDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('period')
 
     def add_period(self, period) -> None:
@@ -24,14 +24,11 @@ class PeriodDAO(SupabaseBaseDAO):
     def update_period(self, period_id: str, updates: Dict[str, Any]) -> None:
         self._update({'period_id': period_id}, updates)
 
+    def update_file_urls(self, period_id: str, file_urls: list) -> None:
+        self._update({'period_id': period_id}, {'file_urls': file_urls})
+
     def delete_period(self, period_id: str) -> None:
         self._delete({'period_id': period_id})
 
     def get_periods_by_owner_id(self, owner_id: str) -> List:
         return self._select_eq('owner_id', owner_id)
-
-    def get_periods_by_teacher_id(self, teacher_id: str) -> List:
-        return self._select_eq('owner_id', teacher_id)
-
-    def get_periods_by_parent_id(self, parent_id: str) -> List:
-        return self._select_eq('owner_id', parent_id)

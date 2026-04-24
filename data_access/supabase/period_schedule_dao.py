@@ -6,7 +6,7 @@ from models.period_schedule import PeriodSchedule
 
 
 class PeriodScheduleDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('period_schedule')
 
     def add_period_schedule(self, period_schedule) -> None:

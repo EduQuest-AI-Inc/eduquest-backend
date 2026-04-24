@@ -4,18 +4,19 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 
 
 class EnrollmentDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('enrollment')
 
     def add_enrollment(self, enrollment) -> None:
         self._insert({
+            'enrollment_id': enrollment.enrollment_id,
             'user_id': enrollment.user_id,
             'period_id': enrollment.period_id,
             'semester': enrollment.semester,
             'enrolled_at': enrollment.enrolled_at,
         })
 
-    def get_enrollments_by_period(self, period_id: str) -> List[Dict[str, Any]]:
+    def get_enrollment_by_period(self, period_id: str) -> List[Dict[str, Any]]:
         return self._select_eq('period_id', period_id)
 
     def get_enrollments_by_student(self, user_id: str) -> List[Dict[str, Any]]:

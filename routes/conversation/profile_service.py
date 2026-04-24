@@ -17,7 +17,7 @@ class ProfileConversationService:
     Wraps the profile agent using previous_response_id for stateful tracking.
     """
 
-    def __init__(self, previous_response_id: Optional[str] = None):
+    def __init__(self, previous_response_id: Optional[str] = None) -> None:
         self.agent = create_profile_agent()
         self.previous_response_id = previous_response_id
 

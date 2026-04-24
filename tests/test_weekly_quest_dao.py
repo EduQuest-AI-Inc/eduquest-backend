@@ -8,7 +8,7 @@ from models.weekly_quest import WeeklyQuest
 from models.weekly_quest_item import WeeklyQuestItem
 from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
 
-def test_weekly_quest_crud():
+def test_weekly_quest_crud() -> None:
     dao = WeeklyQuestDAO()
 
     # Create individual quest items

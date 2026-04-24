@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data_access.supabase.conversation_dao import ConversationDAO
 from models.conversation import Conversation
 
-def test_crud_operations():
+def test_crud_operations() -> None:
     dao = ConversationDAO()
 
     now = datetime.now(timezone.utc).isoformat()

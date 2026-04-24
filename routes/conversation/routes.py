@@ -81,8 +81,8 @@ def _handle_file_submission(auth_token):
     temp_file.close()
 
     try:
-        from data_access.supabase.individual_quest_dao import IndividualQuestDAO
-        quest_data = IndividualQuestDAO().get_individual_quest_by_id(individual_quest_id)
+        from data_access.supabase.quest_dao import QuestDAO
+        quest_data = QuestDAO().get_quest_by_id(individual_quest_id)
         if not quest_data:
             return jsonify({"error": "Quest not found"}), 404
         quests_file = json.dumps([convert_decimals(quest_data)])

@@ -7,7 +7,6 @@ class User(BaseModel):
     first_name: str
     last_name: str
     email: str
-    email_lc: Optional[str] = None
     password: str
     last_login: Optional[str] = None
     role: str

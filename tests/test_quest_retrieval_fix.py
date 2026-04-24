@@ -16,7 +16,7 @@ from models.weekly_quest_item import WeeklyQuestItem
 from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
 
 
-def test_immediate_retrieval():
+def test_immediate_retrieval() -> bool:
     """Test that we can immediately retrieve a quest after saving it."""
     print("Testing immediate quest retrieval after save...")
     
@@ -88,7 +88,7 @@ def test_immediate_retrieval():
             print(f"Warning: Could not clean up test data: {e}")
 
 
-def test_retry_mechanism():
+def test_retry_mechanism() -> bool:
     """Test the retry mechanism with a quest that should be found."""
     print("\nTesting retry mechanism...")
     
