@@ -64,6 +64,8 @@ class PeriodScheduleService:
             # Create new record
             period_schedule = PeriodSchedule(
                 period_id=period_id,
+                user_id=user_id,
+                vector_store_id=vector_store_id,
                 schedule_json=schedule_dict,
                 schedule_openai_file_id=schedule_openai_file_id,
                 quest_enabled_weeks=[]
@@ -119,7 +121,7 @@ class PeriodScheduleService:
         }
 
     def set_quest_weeks(self, period_id: str, user_id: str, quest_enabled_weeks: list) -> dict:
-        self._verify_period_ownership(period_id, user_id)
+        period = self._verify_period_ownership(period_id, user_id)
 
         # Normalize to unique sorted ints (frontend can send strings)
         normalized_weeks = []
@@ -138,6 +140,8 @@ class PeriodScheduleService:
             # Create a minimal record if none exists
             period_schedule = PeriodSchedule(
                 period_id=period_id,
+                user_id=user_id,
+                vector_store_id=period.get('vector_store_id'),
                 quest_enabled_weeks=normalized_weeks
             )
             self.period_schedule_dao.add_period_schedule(period_schedule)

@@ -10,12 +10,17 @@ class PeriodScheduleDAO(SupabaseBaseDAO):
         super().__init__('period_schedule')
 
     def add_period_schedule(self, period_schedule) -> None:
-        self._insert({
+        data = {
             'period_id': period_schedule.period_id,
             'schedule_json': getattr(period_schedule, 'schedule_json', None),
             'schedule_openai_file_id': getattr(period_schedule, 'schedule_openai_file_id', None),
             'quest_enabled_weeks': getattr(period_schedule, 'quest_enabled_weeks', []),
-        })
+        }
+        if getattr(period_schedule, 'user_id', None):
+            data['user_id'] = period_schedule.user_id
+        if getattr(period_schedule, 'vector_store_id', None):
+            data['vector_store_id'] = period_schedule.vector_store_id
+        self._insert(data)
 
     def get_by_period_id(self, period_id: str) -> Optional[PeriodSchedule]:
         row = self._select_by_id('period_id', period_id)
