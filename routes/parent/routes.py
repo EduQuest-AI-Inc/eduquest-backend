@@ -77,8 +77,7 @@ def generate_period_schedule():
         return jsonify({"error": str(ve)}), 404
     except Exception as e:
         logger.error("Error generating parent schedule: %s", e, exc_info=True)
-        print(f"Error generating parent schedule: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": f"Failed to generate schedule: {e}"}), 500
 
 
 @parent_bp.route("/period-schedule", methods=["GET"])

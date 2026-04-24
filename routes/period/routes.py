@@ -366,7 +366,7 @@ def generate_period_schedule():
         return jsonify({"error": str(ve)}), 400
     except Exception as e:
         logger.error("Error generating period schedule: %s", e, exc_info=True)
-        return jsonify({"error": "Failed to generate schedule"}), 500
+        return jsonify({"error": f"Failed to generate schedule: {e}"}), 500
 
 
 @period_bp.route('/period-schedule', methods=['GET'])
