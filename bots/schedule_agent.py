@@ -91,7 +91,7 @@ HANDLING MISSING INFO
         self.agent = Agent(
             name="Period Schedule Agent",
             instructions=instructions,
-            model="gpt-5.2",
+            model="gpt-5",
             tools=[
                 FileSearchTool(
                     vector_store_ids=[self.vector_store_id]
