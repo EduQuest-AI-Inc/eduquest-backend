@@ -37,7 +37,8 @@ class PeriodEnrollmentService:
             .eq('user_id', user_id)
             .execute()
         )
-        ltg_map = {r['period_id']: r['goal_text'] for r in (ltg_rows.data or [])}
+        ltg_data: list[Dict[str, Any]] = ltg_rows.data or []
+        ltg_map = {r['period_id']: r['goal_text'] for r in ltg_data}
 
         result = []
         for pid in period_ids:
