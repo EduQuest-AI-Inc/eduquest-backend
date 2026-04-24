@@ -88,15 +88,16 @@ HANDLING MISSING INFO
 - Missing content for a week → describe as "Review/Catch-up week" or similar
 - Default to 18 weeks unless materials specify otherwise"""
 
+        tools = (
+            [FileSearchTool(vector_store_ids=[self.vector_store_id])]
+            if self.vector_store_id
+            else []
+        )
         self.agent = Agent(
             name="Period Schedule Agent",
             instructions=instructions,
             model="gpt-5",
-            tools=[
-                FileSearchTool(
-                    vector_store_ids=[self.vector_store_id]
-                )
-            ],
+            tools=tools,
             output_type=PeriodScheduleSchema
         )
 
