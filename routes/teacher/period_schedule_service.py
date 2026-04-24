@@ -33,6 +33,8 @@ class PeriodScheduleService:
         period = self._verify_period_ownership(period_id, user_id)
 
         vector_store_id = period.get("vector_store_id")
+        if not vector_store_id:
+            raise ValueError("Period has no course materials. Upload files to generate a schedule.")
         course_name = period.get("name", "Course")
 
         # Generate schedule using the agent
