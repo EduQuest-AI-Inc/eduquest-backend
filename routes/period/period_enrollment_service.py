@@ -2,12 +2,12 @@ import logging
 from typing import Dict, Any, List
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
-from data_access.supabase.period_dao import PeriodDAO
-from data_access.supabase.student_dao import StudentDAO
-from data_access.supabase.enrollment_dao import EnrollmentDAO
-from data_access.supabase.quest_dao import QuestDAO
-from data_access.supabase.ltg_conversation_dao import LtgConversationDAO
-from data_access.supabase.conversation_dao import ConversationDAO
+from data_access.period_dao import PeriodDAO
+from data_access.student_dao import StudentDAO
+from data_access.enrollment_dao import EnrollmentDAO
+from data_access.quest_dao import QuestDAO
+from data_access.ltg_conversation_dao import LtgConversationDAO
+from data_access.conversation_dao import ConversationDAO
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +129,7 @@ class PeriodEnrollmentService:
         }
 
     def assert_enrolled(self, user_id: str, period_id: str) -> None:
-        enrollments = self.enrollment_dao.get_enrollment_by_period(period_id)
+        enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
         if not any(e['user_id'] == user_id for e in enrollments):
             raise Exception(f"Student {user_id} is not enrolled in period {period_id}")
 

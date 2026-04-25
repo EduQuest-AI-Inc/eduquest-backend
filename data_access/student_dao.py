@@ -1,8 +1,10 @@
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 
-from data_access.supabase.base_dao import SupabaseBaseDAO
-from data_access.supabase.user_dao import UserDAO, SHARED_USER_FIELDS
+from data_access.base_dao import SupabaseBaseDAO
+from data_access.user_dao import UserDAO, SHARED_USER_FIELDS
+from exceptions.not_found_error import NotFoundError
+from exceptions.validation_error import ValidationError
 
 
 class StudentDAO(SupabaseBaseDAO):
@@ -58,22 +60,24 @@ class StudentDAO(SupabaseBaseDAO):
         self._user_dao.delete(user_id)
 
     def update_long_term_goal(self, user_id: str, period_id: str, goal: str) -> None:
-        self.client.table('student_long_term_goal').upsert({
-            'user_id': user_id,
-            'period_id': period_id,
-            'goal_text': goal,
-            'updated_at': datetime.now(timezone.utc).isoformat(),
-        }).execute()
+        self._execute(
+            self.client.table('student_long_term_goal').upsert({
+                'user_id': user_id,
+                'period_id': period_id,
+                'goal_text': goal,
+                'updated_at': datetime.now(timezone.utc).isoformat(),
+            })
+        )
 
     def update_tutorial_status(self, user_id: str, completed_tutorial: bool) -> None:
         if not user_id:
-            raise ValueError('User ID cannot be empty')
+            raise ValidationError('User ID cannot be empty')
         if not isinstance(completed_tutorial, bool):
-            raise ValueError('completed_tutorial must be a boolean value')
+            raise ValidationError('completed_tutorial must be a boolean value')
         existing = self.get_student_by_id(user_id)
         if not existing:
-            raise ValueError(f'Student with ID {user_id} not found')
-        self._table().update({'completed_tutorial': completed_tutorial}).eq('user_id', user_id).execute()
+            raise NotFoundError(f'Student with ID {user_id} not found')
+        self._execute(self._table().update({'completed_tutorial': completed_tutorial}).eq('user_id', user_id))
 
     def get_tutorial_status(self, user_id: str) -> bool:
         if not user_id:

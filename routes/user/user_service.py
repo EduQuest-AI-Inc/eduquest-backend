@@ -1,9 +1,7 @@
 from typing import Dict, Any
-from models.student import Student
-from models.teacher import Teacher
-from data_access.supabase.session_dao import SessionDAO
-from data_access.supabase.student_dao import StudentDAO
-from data_access.supabase.teacher_dao import TeacherDAO
+from data_access.session_dao import SessionDAO
+from data_access.student_dao import StudentDAO
+from data_access.teacher_dao import TeacherDAO
 
 class UserService:
 

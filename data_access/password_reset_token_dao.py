@@ -1,7 +1,7 @@
 from typing import Optional, Dict, Any, Tuple
 from datetime import datetime, timezone
 
-from data_access.supabase.base_dao import SupabaseBaseDAO
+from data_access.base_dao import SupabaseBaseDAO
 
 
 class PasswordResetTokenDAO(SupabaseBaseDAO):
@@ -15,12 +15,8 @@ class PasswordResetTokenDAO(SupabaseBaseDAO):
             'token_hash': token.token_hash,
             'user_id': token.user_id,
             'email': token.email,
-            'created_at': token.created_at_iso if hasattr(token, 'created_at_iso') else token.created_at,
-            'expires_at': (
-                datetime.fromtimestamp(token.expires_at_epoch, tz=timezone.utc).isoformat()
-                if hasattr(token, 'expires_at_epoch')
-                else token.expires_at
-            ),
+            'created_at': token.created_at,
+            'expires_at': token.expires_at,
             'request_ip': token.request_ip,
             'user_agent': token.user_agent,
             'attempts': getattr(token, 'attempts', 0),

@@ -83,7 +83,7 @@ def test_grade_parsing() -> bool:
             
             # Check if display grade matches expected
             if display_grade == test_case['expected_display']:
-                print(f"   ✅ PASS - Display grade matches expected")
+                print("   ✅ PASS - Display grade matches expected")
             else:
                 print(f"   ❌ FAIL - Expected '{test_case['expected_display']}', got '{display_grade}'")
                 all_passed = False
@@ -180,9 +180,9 @@ def test_rubric_examples() -> None:
         
         print(f"   Sample grade: {display}")
         print(f"   Detailed breakdown: {parsed['detailed_grade']}")
-        print(f"   ✅ Successfully parsed and formatted")
+        print("   ✅ Successfully parsed and formatted")
     
-    print(f"\n✅ Realistic rubric examples work correctly!")
+    print("\n✅ Realistic rubric examples work correctly!")
 
 if __name__ == "__main__":
     success1 = test_grade_parsing()

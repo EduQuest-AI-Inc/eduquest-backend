@@ -2,9 +2,9 @@ import secrets
 import string
 from datetime import datetime, timedelta, timezone
 from constants.timeouts import INVITE_EXPIRY_HOURS
-from data_access.supabase.parent_dao import ParentDAO
-from data_access.supabase.parent_invite_dao import ParentInviteDAO
-from data_access.supabase.student_dao import StudentDAO
+from data_access.parent_dao import ParentDAO
+from data_access.parent_invite_dao import ParentInviteDAO
+from data_access.student_dao import StudentDAO
 
 from models.parent_invite import ParentInvite
 from routes.period.period_management_service import PeriodManagementService

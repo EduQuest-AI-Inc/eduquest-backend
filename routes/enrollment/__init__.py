@@ -1,1 +1,1 @@
-from .routes import enrollment_bp
+from .routes import enrollment_bp as enrollment_bp

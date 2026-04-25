@@ -2,14 +2,14 @@ import json
 import logging
 import tempfile
 import os
-from datetime import datetime, timezone
 from openai import OpenAI
 
-logger = logging.getLogger(__name__)
-from data_access.supabase.period_schedule_dao import PeriodScheduleDAO
-from data_access.supabase.period_dao import PeriodDAO
+from data_access.period_schedule_dao import PeriodScheduleDAO
+from data_access.period_dao import PeriodDAO
 from models.period_schedule import PeriodSchedule
 from bots.schedule_agent import PeriodScheduleAgent
+
+logger = logging.getLogger(__name__)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -81,7 +81,7 @@ class PeriodScheduleService:
             "schedule_openai_file_id": schedule_openai_file_id
         }
 
-    def get_schedule(self, period_id: str, user_id: str) -> dict:
+    def get_schedule(self, period_id: str, user_id: str) -> dict | None:
         self._verify_period_ownership(period_id, user_id)
 
         # Get period schedule record
@@ -125,7 +125,7 @@ class PeriodScheduleService:
         }
 
     def set_quest_weeks(self, period_id: str, user_id: str, quest_enabled_weeks: list) -> dict:
-        period = self._verify_period_ownership(period_id, user_id)
+        self._verify_period_ownership(period_id, user_id)
 
         # Normalize to unique sorted ints (frontend can send strings)
         normalized_weeks = []

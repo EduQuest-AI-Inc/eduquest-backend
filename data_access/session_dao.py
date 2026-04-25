@@ -1,7 +1,6 @@
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone
+from typing import List, Dict, Any
 
-from data_access.supabase.base_dao import SupabaseBaseDAO
+from data_access.base_dao import SupabaseBaseDAO
 
 
 class SessionDAO(SupabaseBaseDAO):
@@ -9,14 +8,11 @@ class SessionDAO(SupabaseBaseDAO):
         super().__init__('session')
 
     def add_session(self, session) -> None:
-        expires_at = session.expires_at
-        if isinstance(expires_at, (int, float)):
-            expires_at = datetime.fromtimestamp(expires_at, tz=timezone.utc).isoformat()
         self._insert({
             'auth_token': session.auth_token,
             'user_id': session.user_id,
             'role': session.role,
-            'expires_at': expires_at,
+            'expires_at': session.expires_at,
         })
 
     def get_sessions_by_auth_token(self, auth_token: str) -> List[Dict[str, Any]]:

@@ -3,7 +3,7 @@ import logging
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from routes.enrollment.enrollment_service import EnrollmentService
-from data_access.supabase.period_dao import PeriodDAO
+from data_access.period_dao import PeriodDAO
 
 logger = logging.getLogger(__name__)
 enrollment_bp = Blueprint('enrollment', __name__)
@@ -12,10 +12,11 @@ _period_dao = PeriodDAO()
 
 
 @enrollment_bp.route('/enroll', methods=['POST'])
+@jwt_required()
 def enroll():
     try:
+        user_id = get_jwt_identity()
         data = request.json
-        user_id = data.get("user_id")
         period_id = data.get("period_id")
         semester = data.get("semester", "Fall 2025")
         result = service.enroll_student(user_id, period_id, semester)

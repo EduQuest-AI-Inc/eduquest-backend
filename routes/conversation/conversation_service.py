@@ -6,19 +6,18 @@ import logging
 import uuid
 import os
 import json
-import tempfile
 
 logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 
-from data_access.supabase.session_dao import SessionDAO
-from data_access.supabase.period_dao import PeriodDAO
-from data_access.supabase.student_dao import StudentDAO
-from data_access.supabase.conversation_dao import ConversationDAO
-from data_access.supabase.teacher_dao import TeacherDAO
+from data_access.session_dao import SessionDAO
+from data_access.period_dao import PeriodDAO
+from data_access.student_dao import StudentDAO
+from data_access.conversation_dao import ConversationDAO
+from data_access.teacher_dao import TeacherDAO
 from models.conversation import Conversation
-from services.s3_service import upload_file_to_s3
+from integrations.s3_service import upload_file_to_s3
 
 from routes.conversation.profile_service import (
     initiate_profile_conversation,
@@ -287,7 +286,7 @@ class ConversationService:
                 "detailed_grade": grade,
                 "overall_score": overall_score,
             }
-            from data_access.supabase.quest_dao import QuestDAO
+            from data_access.quest_dao import QuestDAO
             quest_dao = QuestDAO()
 
             if individual_quest_id:

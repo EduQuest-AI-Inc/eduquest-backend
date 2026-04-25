@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 import uuid
 
-from data_access.supabase.base_dao import SupabaseBaseDAO
+from data_access.base_dao import SupabaseBaseDAO
 
 
 class WaitlistDAO(SupabaseBaseDAO):
@@ -16,7 +16,7 @@ class WaitlistDAO(SupabaseBaseDAO):
         return self._select_by_id('referral_code', referral_code.upper())
 
     def get_waitlist_count(self) -> int:
-        response = self._table().select('*', count='exact').execute()
+        response = self._execute(self._table().select('*', count='exact'))
         return response.count or 0
 
     def join_waitlist(self, user_id: str, email: str, referred_by: Optional[str] = None) -> Dict[str, Any]:

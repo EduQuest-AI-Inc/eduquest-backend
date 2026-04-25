@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional
 
-from data_access.supabase.base_dao import SupabaseBaseDAO
+from data_access.base_dao import SupabaseBaseDAO
 
 
 class ConversationDAO(SupabaseBaseDAO):
@@ -29,13 +29,12 @@ class ConversationDAO(SupabaseBaseDAO):
     def get_conversation_by_id_user_type(
         self, conversation_id: str, user_id: str, conversation_type: str
     ) -> Optional[dict]:
-        response = (
+        response = self._execute(
             self._table()
             .select('*')
             .eq('conversation_id', conversation_id)
             .eq('user_id', user_id)
             .eq('conversation_type', conversation_type)
             .maybe_single()
-            .execute()
         )
         return self._row(response)

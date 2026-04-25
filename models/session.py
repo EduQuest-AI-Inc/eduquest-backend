@@ -1,15 +1,17 @@
 from pydantic import BaseModel, Field
 from typing import Literal
-import time
+from datetime import datetime, timedelta, timezone
 
-def default_expiry() -> int:
-    return int(time.time()) + 43200  # 12 hours = 43200 seconds
+
+def default_expiry() -> str:
+    return (datetime.now(timezone.utc) + timedelta(hours=12)).isoformat()
+
 
 class Session(BaseModel):
-    auth_token: str  # Partition key
-    user_id: str     # Sort key
+    auth_token: str
+    user_id: str
     role: Literal["student", "teacher", "parent"]
-    expires_at: int = Field(default_factory=default_expiry)  # Defaults to 12 hours
+    expires_at: str = Field(default_factory=default_expiry)
 
     def to_item(self):
         return self.model_dump(exclude_none=True)

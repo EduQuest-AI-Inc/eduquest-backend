@@ -17,10 +17,10 @@ from .period_file_helpers import (
     get_file_presigned_url,
 )
 from routes.parent.parent_service import ParentService
-from routes.teacher.period_schedule_service import PeriodScheduleService
+from .period_schedule_service import PeriodScheduleService
 from routes.teacher.teacher_service import TeacherService
 from routes.waitlist.WaitlistService import WaitlistService
-from data_access.supabase.teacher_dao import TeacherDAO
+from data_access.teacher_dao import TeacherDAO
 from utils.token_utils import extract_auth_token
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
@@ -236,7 +236,7 @@ def create_period():
         user_id = get_jwt_identity()
 
         # Determine role — pilot gate applies only to teachers
-        from data_access.supabase.session_dao import SessionDAO
+        from data_access.session_dao import SessionDAO
         sessions = SessionDAO().get_sessions_by_auth_token(extract_auth_token(request))
         role = sessions[0].get("role") if sessions else "student"
 

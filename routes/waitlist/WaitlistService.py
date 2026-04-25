@@ -1,6 +1,6 @@
 from typing import Dict, Optional
-from data_access.supabase.waitlist_dao import WaitlistDAO
-from data_access.supabase.teacher_dao import TeacherDAO
+from data_access.waitlist_dao import WaitlistDAO
+from data_access.teacher_dao import TeacherDAO
 
 
 class WaitlistService:

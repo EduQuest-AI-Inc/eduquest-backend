@@ -6,14 +6,13 @@ This tests the immediate consistency and retry mechanism improvements.
 import sys
 import os
 import uuid
-from datetime import datetime, timezone
 
 # Add parent directory to path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from models.weekly_quest import WeeklyQuest
 from models.weekly_quest_item import WeeklyQuestItem
-from data_access.supabase.weekly_quest_dao import WeeklyQuestDAO
+from data_access.weekly_quest_dao import WeeklyQuestDAO
 
 
 def test_immediate_retrieval() -> bool:

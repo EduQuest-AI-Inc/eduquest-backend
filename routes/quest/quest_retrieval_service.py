@@ -1,4 +1,4 @@
-from data_access.supabase.quest_dao import QuestDAO
+from data_access.quest_dao import QuestDAO
 
 
 class QuestRetrievalService:

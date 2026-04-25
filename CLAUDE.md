@@ -14,7 +14,7 @@ eduquest-backend/
 │   │                               #   ltg_service.py, profile_service.py, teacher_feedback_service.py
 │   ├── enrollment/                 # routes.py, enrollment_service.py
 │   ├── period/                     # routes.py, period_service.py, period_enrollment_service.py,
-│   │                               #   period_ltg_service.py, period_quest_service.py
+│   │                               #   period_quest_service.py
 │   ├── quest/                      # routes.py, quest_service.py, quest_creation_service.py,
 │   │                               #   quest_retrieval_service.py, quest_grading_service.py
 │   ├── teacher/                    # routes.py, teacher_service.py, period_schedule_service.py
@@ -36,7 +36,7 @@ eduquest-backend/
 │   ├── schedule_agent.py           # Schedule generation agent
 │   ├── teacher_feedback_agent.py   # Teacher feedback agent
 │   └── schemas/rubric.py           # Rubric Pydantic schema
-├── services/                       # Cross-cutting business logic
+├── integrations/                   # External service adapters (shared across features)
 │   ├── s3_service.py               # AWS S3 upload helpers
 │   ├── canvas_service.py           # Canvas LMS integration (canvasapi library)
 │   └── email_service.py            # SES email sending

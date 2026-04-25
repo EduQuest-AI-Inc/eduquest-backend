@@ -1,9 +1,9 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from data_access.supabase.user_dao import UserDAO
-from data_access.supabase.student_dao import StudentDAO
-from data_access.supabase.teacher_dao import TeacherDAO
-from data_access.supabase.parent_dao import ParentDAO
+from data_access.user_dao import UserDAO
+from data_access.student_dao import StudentDAO
+from data_access.teacher_dao import TeacherDAO
+from data_access.parent_dao import ParentDAO
 from models.student import Student
 from models.teacher import Teacher
 from models.parent import Parent

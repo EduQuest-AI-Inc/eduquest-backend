@@ -50,7 +50,7 @@ class PeriodScheduleAgent:
         self.course_name = course_name or "the course"
 
         # Instructions aligned with JSON schema output (not markdown tables)
-        instructions = f"""You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from course materials.
+        instructions = """You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from course materials.
 
 MISSION
 Transform course inputs into a weekly schedule with:

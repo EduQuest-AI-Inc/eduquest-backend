@@ -1,15 +1,12 @@
 import sys
 import os
-import json
-from datetime import datetime, timezone
 from models.individual_quest import IndividualQuest
 
 # Add the parent directory to Python path so we can import from eduquest-backend
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+from data_access.individual_quest_dao import IndividualQuestDAO
 from routes.quest.quest_service import QuestService
-from models.individual_quest import IndividualQuest
 import uuid
 
 def create_test_quest(user_id: str, period_id: str, week: int, quest_id: str, has_grade: bool=False, status: str="not_started") -> IndividualQuest:
@@ -142,13 +139,13 @@ def test_quest_preservation_logic() -> bool:
                     if initial_quest['feedback'] != updated_quest.get('feedback'):
                         issues.append(f"Week {week}: Feedback changed")
                     else:
-                        print(f"  ✅ Feedback preserved")
+                        print("  ✅ Feedback preserved")
                     
                     # For completed quests, instructions/rubric should NOT change
                     if initial_quest['instructions'] != updated_quest.get('instructions'):
                         issues.append(f"Week {week}: Instructions changed for completed quest")
                     else:
-                        print(f"  ✅ Instructions preserved for completed quest")
+                        print("  ✅ Instructions preserved for completed quest")
                         
                 elif initial_quest.get('status') in ['completed', 'in_progress']:
                     # In-progress/completed but not graded - should preserve status
@@ -160,9 +157,9 @@ def test_quest_preservation_logic() -> bool:
                 else:
                     # Not started quest - should be updated with new content
                     if updated_quest.get('instructions') == initial_quest.get('instructions'):
-                        print(f"  ⚠️  Instructions not updated for not-started quest")
+                        print("  ⚠️  Instructions not updated for not-started quest")
                     else:
-                        print(f"  ✅ Instructions updated for future quest")
+                        print("  ✅ Instructions updated for future quest")
                         
             elif week == 6:  # New quest
                 if updated_quest:

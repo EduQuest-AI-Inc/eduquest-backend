@@ -5,9 +5,9 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from routes.quest.quest_service import QuestService
 from routes.quest.quest_retrieval_service import QuestRetrievalService
-from data_access.supabase.quest_dao import QuestDAO
-from data_access.supabase.enrollment_dao import EnrollmentDAO
-from data_access.supabase.period_dao import PeriodDAO
+from data_access.quest_dao import QuestDAO
+from data_access.enrollment_dao import EnrollmentDAO
+from data_access.period_dao import PeriodDAO
 
 logger = logging.getLogger(__name__)
 

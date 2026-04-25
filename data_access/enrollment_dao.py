@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 
-from data_access.supabase.base_dao import SupabaseBaseDAO
+from data_access.base_dao import SupabaseBaseDAO
 
 
 class EnrollmentDAO(SupabaseBaseDAO):
@@ -15,9 +15,6 @@ class EnrollmentDAO(SupabaseBaseDAO):
             'semester': enrollment.semester,
             'enrolled_at': enrollment.enrolled_at,
         })
-
-    def get_enrollment_by_period(self, period_id: str) -> List[Dict[str, Any]]:
-        return self._select_eq('period_id', period_id)
 
     def get_enrollments_by_period(self, period_id: str) -> List[Dict[str, Any]]:
         return self._select_eq('period_id', period_id)

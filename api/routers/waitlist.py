@@ -14,7 +14,7 @@ svc = WaitlistService()
 def get_waitlist_status(auth: AuthPayload = Depends(get_auth)):
     try:
         return svc.get_status(auth.sub)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to get waitlist status")
 
 
@@ -33,5 +33,5 @@ def join_pilot_waitlist(
         return svc.join(auth.sub, referral_code)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to join waitlist")
