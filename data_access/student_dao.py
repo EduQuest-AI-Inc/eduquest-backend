@@ -1,8 +1,8 @@
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 
-from data_access.supabase.base_dao import SupabaseBaseDAO
-from data_access.supabase.user_dao import UserDAO, SHARED_USER_FIELDS
+from data_access.base_dao import SupabaseBaseDAO
+from data_access.user_dao import UserDAO, SHARED_USER_FIELDS
 
 
 class StudentDAO(SupabaseBaseDAO):

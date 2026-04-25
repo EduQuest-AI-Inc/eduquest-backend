@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import json
 from mock_course_data import data
 
-from data_access.supabase.period_dao import PeriodDAO
+from data_access.period_dao import PeriodDAO
 from models.period import Period
 
 def test_crud_operations() -> None:

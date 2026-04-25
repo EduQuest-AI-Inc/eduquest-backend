@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)
-from data_access.supabase.period_schedule_dao import PeriodScheduleDAO
-from data_access.supabase.period_dao import PeriodDAO
+from data_access.period_schedule_dao import PeriodScheduleDAO
+from data_access.period_dao import PeriodDAO
 from models.period_schedule import PeriodSchedule
 from bots.schedule_agent import PeriodScheduleAgent
 

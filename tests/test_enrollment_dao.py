@@ -4,7 +4,7 @@ import os
 # Ensure the root project folder is in the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from data_access.supabase.enrollment_dao import EnrollmentDAO
+from data_access.enrollment_dao import EnrollmentDAO
 from models.enrollment import Enrollment
 from datetime import datetime, timezone
 

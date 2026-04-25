@@ -2,7 +2,7 @@ import re
 import uuid
 from typing import Optional
 
-from data_access.supabase.period_dao import PeriodDAO
+from data_access.period_dao import PeriodDAO
 from models.period import Period
 
 

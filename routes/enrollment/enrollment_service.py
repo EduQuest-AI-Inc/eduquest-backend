@@ -1,7 +1,7 @@
 import logging
-from data_access.supabase.enrollment_dao import EnrollmentDAO
-from data_access.supabase.student_dao import StudentDAO
-from data_access.supabase.period_dao import PeriodDAO
+from data_access.enrollment_dao import EnrollmentDAO
+from data_access.student_dao import StudentDAO
+from data_access.period_dao import PeriodDAO
 
 from models.enrollment import Enrollment
 from datetime import datetime

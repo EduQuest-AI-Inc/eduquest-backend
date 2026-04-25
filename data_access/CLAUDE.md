@@ -1,11 +1,11 @@
 # CLAUDE.md — Data Access
 
-All DAOs live in `data_access/supabase/` and extend `SupabaseBaseDAO` from `base_dao.py`.
+All DAOs live in `data_access/` and extend `SupabaseBaseDAO` from `base_dao.py`.
 
 ## DAO Pattern
 
 ```python
-from data_access.supabase.base_dao import SupabaseBaseDAO
+from data_access.base_dao import SupabaseBaseDAO
 
 class ExampleDAO(SupabaseBaseDAO):
     def __init__(self):

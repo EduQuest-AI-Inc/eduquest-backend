@@ -1,6 +1,6 @@
 from typing import Any, cast
 
-from data_access.supabase.config import get_supabase_client
+from data_access.config import get_supabase_client
 from supabase import Client
 from postgrest._sync.request_builder import SyncRequestBuilder
 

@@ -12,9 +12,9 @@ from typing import Optional, Tuple
 
 from werkzeug.security import generate_password_hash
 
-from data_access.supabase.user_dao import UserDAO
-from data_access.supabase.password_reset_token_dao import PasswordResetTokenDAO
-from data_access.supabase.password_reset_rate_limit_dao import PasswordResetRateLimitDAO
+from data_access.user_dao import UserDAO
+from data_access.password_reset_token_dao import PasswordResetTokenDAO
+from data_access.password_reset_rate_limit_dao import PasswordResetRateLimitDAO
 from models.password_reset_token import PasswordResetToken
 from services.email_service import get_email_service
 from .password_policy import validate_password

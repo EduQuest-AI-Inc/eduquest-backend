@@ -7,11 +7,11 @@ from utils.token_utils import set_auth_cookie
 from utils.validation_utils import get_client_ip
 logger = logging.getLogger(__name__)
 from datetime import datetime, timezone
-from data_access.supabase.session_dao import SessionDAO
-from data_access.supabase.user_dao import UserDAO
-from data_access.supabase.student_dao import StudentDAO
-from data_access.supabase.parent_dao import ParentDAO
-from data_access.supabase.parent_invite_dao import ParentInviteDAO
+from data_access.session_dao import SessionDAO
+from data_access.user_dao import UserDAO
+from data_access.student_dao import StudentDAO
+from data_access.parent_dao import ParentDAO
+from data_access.parent_invite_dao import ParentInviteDAO
 from models.session import Session
 from routes.conversation.conversation_service import ConversationService
 

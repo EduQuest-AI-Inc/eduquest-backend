@@ -102,7 +102,7 @@ async def initiate_update_assistant(
 
             # Fetch quest data to build quests_file JSON
             try:
-                from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+                from data_access.individual_quest_dao import IndividualQuestDAO
                 quest_data = IndividualQuestDAO().get_individual_quest_by_id(individual_quest_id)
                 if not quest_data:
                     raise HTTPException(status_code=404, detail="Quest not found")

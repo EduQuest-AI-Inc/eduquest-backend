@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 import uuid
 
-from data_access.supabase.base_dao import SupabaseBaseDAO
+from data_access.base_dao import SupabaseBaseDAO
 
 
 class WaitlistDAO(SupabaseBaseDAO):

@@ -1,6 +1,6 @@
 from typing import Dict, Any, Optional
 
-from data_access.supabase.base_dao import SupabaseBaseDAO
+from data_access.base_dao import SupabaseBaseDAO
 
 SHARED_USER_FIELDS = {
     "first_name", "last_name", "email",

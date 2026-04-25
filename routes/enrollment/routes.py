@@ -3,7 +3,7 @@ import logging
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from routes.enrollment.enrollment_service import EnrollmentService
-from data_access.supabase.period_dao import PeriodDAO
+from data_access.period_dao import PeriodDAO
 
 logger = logging.getLogger(__name__)
 enrollment_bp = Blueprint('enrollment', __name__)

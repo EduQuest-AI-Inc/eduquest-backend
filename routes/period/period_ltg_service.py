@@ -2,9 +2,9 @@ import uuid
 from typing import Any
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
-from data_access.supabase.period_dao import PeriodDAO
-from data_access.supabase.student_dao import StudentDAO
-from data_access.supabase.ltg_conversation_dao import LtgConversationDAO
+from data_access.period_dao import PeriodDAO
+from data_access.student_dao import StudentDAO
+from data_access.ltg_conversation_dao import LtgConversationDAO
 
 from routes.conversation.ltg_service import (
     initiate_ltg_conversation as ltg_initiate,

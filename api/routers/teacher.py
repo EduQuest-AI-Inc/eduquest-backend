@@ -20,7 +20,7 @@ from services.s3_service import upload_file_to_s3
 
 logger = logging.getLogger(__name__)
 
-from data_access.supabase.teacher_dao import TeacherDAO
+from data_access.teacher_dao import TeacherDAO
 
 router = APIRouter()
 teacher_service = TeacherService()

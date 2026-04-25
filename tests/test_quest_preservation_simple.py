@@ -7,7 +7,7 @@ from models.individual_quest import IndividualQuest
 # Add the parent directory to Python path so we can import from eduquest-backend
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+from data_access.individual_quest_dao import IndividualQuestDAO
 from routes.quest.quest_service import QuestService
 from models.individual_quest import IndividualQuest
 import uuid
