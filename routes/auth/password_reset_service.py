@@ -97,7 +97,6 @@ class PasswordResetService:
                 token_hash=token_hash,
                 user_id=user_id,
                 email=normalized_email,
-                created_at_iso=datetime.now(timezone.utc).isoformat(),
                 request_ip=ip_address,
                 user_agent=user_agent,
             )

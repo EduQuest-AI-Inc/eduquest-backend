@@ -19,8 +19,8 @@ class Quest(BaseModel):
     rubric: Dict[str, Any] = Field(description="Grading criteria and expectations for the quest")
     status: Literal["not_started", "in_progress", "completed"] = Field(default="not_started")
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    due_date: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    last_updated_at: Optional[str] = Field(default=None)
+    due_date: Optional[str] = None
+    last_updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_item(self):
         return self.model_dump()

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime, timedelta, timezone
 from constants.timeouts import INVITE_EXPIRY_HOURS
 
@@ -8,10 +8,11 @@ def default_expiry() -> str:
 
 
 class ParentInvite(BaseModel):
-    code: str       # Partition Key — 8-char random token
+    code: str
     user_id: str
-    expires_at: str  # ISO timestamp
+    expires_at: str = Field(default_factory=default_expiry)
     used: bool = False
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_item(self):
         return self.model_dump()
