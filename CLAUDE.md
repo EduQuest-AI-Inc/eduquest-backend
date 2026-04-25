@@ -36,7 +36,7 @@ eduquest-backend/
 │   ├── schedule_agent.py           # Schedule generation agent
 │   ├── teacher_feedback_agent.py   # Teacher feedback agent
 │   └── schemas/rubric.py           # Rubric Pydantic schema
-├── services/                       # Cross-cutting business logic
+├── integrations/                   # External service adapters (shared across features)
 │   ├── s3_service.py               # AWS S3 upload helpers
 │   ├── canvas_service.py           # Canvas LMS integration (canvasapi library)
 │   └── email_service.py            # SES email sending

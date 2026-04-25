@@ -5,8 +5,8 @@ import os
 import boto3
 from openai import OpenAI
 
-from services.s3_service import upload_file_to_s3
-from services.canvas_service import Course as CanvasCourse, course_to_json
+from integrations.s3_service import upload_file_to_s3
+from integrations.canvas_service import Course as CanvasCourse, course_to_json
 from routes.teacher.period_schedule_service import PeriodScheduleService
 
 logger = logging.getLogger(__name__)

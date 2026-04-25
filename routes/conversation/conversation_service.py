@@ -18,7 +18,7 @@ from data_access.student_dao import StudentDAO
 from data_access.conversation_dao import ConversationDAO
 from data_access.teacher_dao import TeacherDAO
 from models.conversation import Conversation
-from services.s3_service import upload_file_to_s3
+from integrations.s3_service import upload_file_to_s3
 
 from routes.conversation.profile_service import (
     initiate_profile_conversation,

@@ -12,11 +12,11 @@ from openai import OpenAI
 from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
-from services.canvas_service import Course as CanvasCourse, course_to_json
+from integrations.canvas_service import Course as CanvasCourse, course_to_json
 from routes.teacher.period_schedule_service import PeriodScheduleService
 from routes.teacher.teacher_service import TeacherService
 from routes.waitlist.WaitlistService import WaitlistService
-from services.s3_service import upload_file_to_s3
+from integrations.s3_service import upload_file_to_s3
 
 logger = logging.getLogger(__name__)
 
