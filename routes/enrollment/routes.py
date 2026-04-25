@@ -12,10 +12,11 @@ _period_dao = PeriodDAO()
 
 
 @enrollment_bp.route('/enroll', methods=['POST'])
+@jwt_required()
 def enroll():
     try:
+        user_id = get_jwt_identity()
         data = request.json
-        user_id = data.get("user_id")
         period_id = data.get("period_id")
         semester = data.get("semester", "Fall 2025")
         result = service.enroll_student(user_id, period_id, semester)

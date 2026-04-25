@@ -17,7 +17,7 @@ from .period_file_helpers import (
     get_file_presigned_url,
 )
 from routes.parent.parent_service import ParentService
-from routes.teacher.period_schedule_service import PeriodScheduleService
+from .period_schedule_service import PeriodScheduleService
 from routes.teacher.teacher_service import TeacherService
 from routes.waitlist.WaitlistService import WaitlistService
 from data_access.teacher_dao import TeacherDAO

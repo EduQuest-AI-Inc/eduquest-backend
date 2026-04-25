@@ -14,7 +14,7 @@ eduquest-backend/
 │   │                               #   ltg_service.py, profile_service.py, teacher_feedback_service.py
 │   ├── enrollment/                 # routes.py, enrollment_service.py
 │   ├── period/                     # routes.py, period_service.py, period_enrollment_service.py,
-│   │                               #   period_ltg_service.py, period_quest_service.py
+│   │                               #   period_quest_service.py
 │   ├── quest/                      # routes.py, quest_service.py, quest_creation_service.py,
 │   │                               #   quest_retrieval_service.py, quest_grading_service.py
 │   ├── teacher/                    # routes.py, teacher_service.py, period_schedule_service.py
