@@ -152,6 +152,8 @@ sequenceDiagram
 
 ## User / Profile Flows
 
+> **Frontend caching note:** The profile response is stored in React Query's in-memory cache (`staleTime: Infinity`) in `contexts/user-context.tsx`. It is fetched once on page load and held for the session — subsequent reads come from the cache, not Supabase. The cache is explicitly invalidated via `refetch()` after any action that mutates the profile (profile conversation complete, LTG goal confirmed, Canvas connect/disconnect).
+
 ### Get Profile
 
 ```mermaid

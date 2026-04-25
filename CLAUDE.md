@@ -6,27 +6,50 @@ See also: [data_access/CLAUDE.md](data_access/CLAUDE.md) for DAO and database pa
 
 ```
 eduquest-backend/
-├── app.py                          # Flask app factory, Blueprint registration
-├── main.py                         # Alternative FastAPI entry point (migration pending)
+├── app.py                          # Flask app factory (legacy — being migrated to FastAPI)
+├── main.py                         # FastAPI app factory and entry point (active)
+├── api/                            # FastAPI layer
+│   ├── deps.py                     # get_auth() dependency → AuthPayload (JWT from header or cookie)
+│   └── routers/
+│       ├── conversation.py         # /conversation — profile assistant, update assistant
+│       ├── period.py               # /period — LTG conversation, homework agent
+│       ├── teacher.py              # /teacher — create period, S3 file, Canvas, period schedule
+│       └── waitlist.py             # /pilot-waitlist — status, join
 ├── routes/                         # Feature modules (Blueprint + service files)
+│   ├── auth_utils.py               # Shared auth helpers used across route modules
 │   ├── auth/                       # routes.py, auth_service.py, password_reset_service.py, password_policy.py
 │   ├── conversation/               # routes.py, conversation_service.py, grading_service.py,
 │   │                               #   ltg_service.py, profile_service.py, teacher_feedback_service.py
 │   ├── enrollment/                 # routes.py, enrollment_service.py
 │   ├── period/                     # routes.py, period_service.py, period_enrollment_service.py,
-│   │                               #   period_quest_service.py
+│   │                               #   period_quest_service.py, period_schedule_service.py,
+│   │                               #   period_management_service.py, period_file_helpers.py
 │   ├── quest/                      # routes.py, quest_service.py, quest_creation_service.py,
 │   │                               #   quest_retrieval_service.py, quest_grading_service.py
-│   ├── teacher/                    # routes.py, teacher_service.py, period_schedule_service.py
+│   ├── teacher/                    # routes.py, teacher_service.py
 │   ├── user/                       # routes.py, user_service.py
 │   ├── waitlist/                   # routes.py, WaitlistService.py
-│   ├── parent/                     # routes.py, parent_service.py
-│   └── parent_waitlist/            # routes.py, parent_waitlist_service.py
+│   └── parent/                     # routes.py, parent_service.py
 ├── models/                         # Pydantic domain models
-│   ├── user.py                     # Base User model (shared fields: name, email, password, role, canvas)
-│   ├── student.py                  # Student(User) — grade, strengths/weaknesses, tutorial status
-│   ├── teacher.py                  # Teacher(User) — pilot_approved, school_id
-│   └── parent.py                   # Parent(User) — linked_user_ids
+│   ├── user.py                     # Base User model
+│   ├── student.py                  # Student(User)
+│   ├── teacher.py                  # Teacher(User)
+│   ├── parent.py                   # Parent(User)
+│   ├── student_profile.py          # StudentProfile (strengths, weaknesses, interests)
+│   ├── student_long_term_goal.py   # StudentLongTermGoal — one goal per (user_id, period_id)
+│   ├── student_skill_mastery.py    # StudentSkillMastery — skill scores per student/period
+│   ├── aggregated_metrics.py       # AggregatedMetrics — read by frontend directly from Supabase
+│   ├── quest.py                    # Quest — assignment with rubric, grade, status
+│   ├── enrollment.py               # Enrollment — student ↔ period membership
+│   ├── period.py                   # Period — class with vector store and Canvas metadata
+│   ├── period_schedule.py          # PeriodSchedule — AI-generated weekly schedule
+│   ├── conversation.py             # Conversation — chat session record
+│   ├── ltg_conversation.py         # LtgConversation — LTG chat session record
+│   ├── session.py                  # Session — JWT session record
+│   ├── parent_invite.py            # ParentInvite — invite token for parent signup
+│   ├── password_reset_token.py     # PasswordResetToken — reset link token
+│   ├── password_reset_rate_limit.py # PasswordResetRateLimit — per-email attempt tracking
+│   └── waitlist.py                 # Waitlist — pilot waitlist entry
 ├── bots/                           # All AI agent code (was EQ_agents/)
 │   ├── agent.py                    # HWAgent — quest instruction/rubric generation
 │   ├── grading_agent.py            # Multi-agent grading orchestrator
@@ -35,6 +58,7 @@ eduquest-backend/
 │   ├── profile_agent.py            # Student profile agent
 │   ├── schedule_agent.py           # Schedule generation agent
 │   ├── teacher_feedback_agent.py   # Teacher feedback agent
+│   ├── ltg_conversation_service.py # Re-export shim (backwards compat for old imports)
 │   └── schemas/rubric.py           # Rubric Pydantic schema
 ├── integrations/                   # External service adapters (shared across features)
 │   ├── s3_service.py               # AWS S3 upload helpers
@@ -55,18 +79,16 @@ eduquest-backend/
 
 ## API Modules
 
-Registered in app.py:
+### Flask (`app.py`) — legacy, being migrated
 
-- `/conversation` — AI chat interactions with students
-- `/auth` — Login, signup, Supabase integration
-- `/user` — User profile and data management
-- `/period` — Class period management
-- `/teacher` — Teacher-specific operations
-- `/enrollment` — Student-class enrollment
-- `/quest` — Quest assignment and tracking
-- `/pilot-waitlist` — Pilot waitlist management
-- `/parent` — Parent homeschool class and invite management
-- `/parent-waitlist` — Parent waitlist management
+- `/conversation`, `/auth`, `/user`, `/period`, `/teacher`, `/enrollment`, `/quest`, `/pilot-waitlist`, `/parent`
+
+### FastAPI (`main.py`) — active target
+
+- `/conversation` — profile assistant, update assistant
+- `/period` — LTG conversation, homework agent
+- `/teacher` — create period, S3 file retrieval, Canvas courses, period schedule CRUD
+- `/pilot-waitlist` — status, join
 
 ## Route Pattern
 
