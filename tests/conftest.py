@@ -1,6 +1,23 @@
+# HOW TO RUN TESTS (from eduquest-backend/ with venv active):
+#   pytest                                    # all tests
+#   pytest -m unit                            # unit tests only (no network)
+#   USE_SUPABASE=true pytest -m integration    # integration tests (hits real Supabase)
+#   pytest tests/test_teacher_dao.py          # single file
+#   pytest --cov=. --cov-report=html          # coverage report
+
 import os
 import sys
 from unittest.mock import MagicMock
+from pathlib import Path
+
+# Load .env so integration tests pick up real SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
+_env_path = Path(__file__).parent.parent / ".env"
+if _env_path.exists():
+    for _line in _env_path.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _, _v = _line.partition("=")
+            os.environ.setdefault(_k.strip(), _v.strip())
 
 os.environ['OPENAI_API_KEY'] = 'test-key-for-ci'
 os.environ['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'test-secret-key')
@@ -51,3 +68,17 @@ sys.modules['boto3.dynamodb'] = MagicMock()
 sys.modules['boto3.dynamodb.conditions'] = MagicMock()
 sys.modules['botocore'] = MagicMock()
 sys.modules['botocore.exceptions'] = MagicMock()
+
+# Prevent RuntimeError from get_supabase_client() during unit test imports.
+# Without these, any module import chain that reaches SupabaseBaseDAO.__init__
+# will raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set").
+os.environ.setdefault('SUPABASE_URL', 'http://localhost:54321')
+os.environ.setdefault('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
+os.environ.setdefault('USE_SUPABASE', 'false')
+
+import pytest
+
+@pytest.fixture(scope="session")
+def supabase_required():
+    if os.environ.get("USE_SUPABASE") != "true":
+        pytest.skip("Integration test requires USE_SUPABASE=true")

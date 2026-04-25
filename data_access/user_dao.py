@@ -1,6 +1,9 @@
-from typing import Dict, Any, Optional
+from typing import TYPE_CHECKING, Dict, Any, Optional
 
 from data_access.base_dao import SupabaseBaseDAO
+
+if TYPE_CHECKING:
+    from models.user import User
 
 SHARED_USER_FIELDS = {
     "first_name", "last_name", "email",
@@ -11,6 +14,9 @@ SHARED_USER_FIELDS = {
 class UserDAO(SupabaseBaseDAO):
     def __init__(self) -> None:
         super().__init__('user')
+
+    def add_user(self, user: "User") -> None:
+        self._insert(user.model_dump())
 
     def get_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         return self._select_by_id('user_id', user_id)

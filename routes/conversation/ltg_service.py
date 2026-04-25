@@ -14,6 +14,7 @@ from bots.ltg_agent import create_ltg_agent, LTGResponse
 from data_access.period_dao import PeriodDAO
 from data_access.student_dao import StudentDAO
 from data_access.ltg_conversation_dao import LtgConversationDAO
+from data_access.student_long_term_goal_dao import StudentLongTermGoalDAO
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 
@@ -180,12 +181,7 @@ def run_continue_ltg(
     message: str, period_id: str = None,
 ) -> Dict[str, Any]:
     period_dao = PeriodDAO()
-    student_dao = StudentDAO()
     ltg_conversation_dao = LtgConversationDAO()
-
-    student = student_dao.get_student_by_id(user_id)
-    if not student:
-        raise Exception("Student not found")
 
     if not period_id:
         period_id = ltg_conversation_dao.find_period_for_conversation(user_id, conversation_id)
@@ -218,7 +214,7 @@ def run_continue_ltg(
         chosen_goal = result.get("chosen_goal")
 
         if goal_chosen and chosen_goal:
-            student_dao.update_long_term_goal(user_id, period_id, chosen_goal)
+            StudentLongTermGoalDAO().upsert(user_id, period_id, chosen_goal)
 
         return {"response": reply, "goal_chosen": goal_chosen}
 

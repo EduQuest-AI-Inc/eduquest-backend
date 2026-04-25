@@ -1,5 +1,4 @@
 from typing import Dict, Any, Optional
-from datetime import datetime, timezone
 
 from data_access.base_dao import SupabaseBaseDAO
 from data_access.user_dao import UserDAO, SHARED_USER_FIELDS
@@ -58,16 +57,6 @@ class StudentDAO(SupabaseBaseDAO):
 
     def delete_student(self, user_id: str) -> None:
         self._user_dao.delete(user_id)
-
-    def update_long_term_goal(self, user_id: str, period_id: str, goal: str) -> None:
-        self._execute(
-            self.client.table('student_long_term_goal').upsert({
-                'user_id': user_id,
-                'period_id': period_id,
-                'goal_text': goal,
-                'updated_at': datetime.now(timezone.utc).isoformat(),
-            })
-        )
 
     def update_tutorial_status(self, user_id: str, completed_tutorial: bool) -> None:
         if not user_id:
