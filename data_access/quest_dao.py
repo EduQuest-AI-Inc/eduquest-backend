@@ -52,25 +52,23 @@ class QuestDAO(SupabaseBaseDAO):
         self._delete({'quest_id': quest_id})
 
     def get_all_quests(self) -> List[Dict[str, Any]]:
-        response = self._table().select('*').execute()
+        response = self._execute(self._table().select('*'))
         return self._rows(response.data)
 
     def get_quests_by_date_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
-        response = (
+        response = self._execute(
             self._table()
             .select('*')
             .gte('due_date', start_date)
             .lte('due_date', end_date)
-            .execute()
         )
         return self._rows(response.data)
 
     def get_quests_by_skills(self, skills: str) -> List[Dict[str, Any]]:
-        response = (
+        response = self._execute(
             self._table()
             .select('*')
             .ilike('skills', f'%{skills}%')
-            .execute()
         )
         return self._rows(response.data)
 
@@ -78,11 +76,10 @@ class QuestDAO(SupabaseBaseDAO):
         return self._select_eq('user_id', user_id)
 
     def get_quests_by_student_and_period(self, user_id: str, period_id: str) -> List[Dict[str, Any]]:
-        response = (
+        response = self._execute(
             self._table()
             .select('*')
             .eq('user_id', user_id)
             .eq('period_id', period_id)
-            .execute()
         )
         return self._rows(response.data)

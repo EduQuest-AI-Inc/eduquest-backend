@@ -14,25 +14,23 @@ class LtgConversationDAO(SupabaseBaseDAO):
         super().__init__('ltg_conversation')
 
     def get_conversation_id(self, user_id: str, period_id: str) -> Optional[str]:
-        response = (
+        response = self._execute(
             self._table()
             .select('conversation_id')
             .eq('user_id', user_id)
             .eq('period_id', period_id)
             .maybe_single()
-            .execute()
         )
         row = self._row(response)
         return row['conversation_id'] if row else None
 
     def get_last_response_id(self, user_id: str, period_id: str) -> Optional[str]:
-        response = (
+        response = self._execute(
             self._table()
             .select('last_response_id')
             .eq('user_id', user_id)
             .eq('period_id', period_id)
             .maybe_single()
-            .execute()
         )
         row = self._row(response)
         return row.get('last_response_id') if row else None
@@ -74,13 +72,12 @@ class LtgConversationDAO(SupabaseBaseDAO):
 
     def find_period_for_conversation(self, user_id: str, conversation_id: str) -> Optional[str]:
         """Find which period_id a conversation_id belongs to for a student."""
-        response = (
+        response = self._execute(
             self._table()
             .select('period_id')
             .eq('user_id', user_id)
             .eq('conversation_id', conversation_id)
             .maybe_single()
-            .execute()
         )
         row = self._row(response)
         return row['period_id'] if row else None
