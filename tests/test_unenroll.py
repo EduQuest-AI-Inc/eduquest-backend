@@ -38,30 +38,27 @@ def _make_service() -> PeriodEnrollmentService:
 
     svc = PeriodEnrollmentService.__new__(PeriodEnrollmentService)
     svc.period_dao = MagicMock()
-    svc.session_dao = MagicMock()
     svc.student_dao = MagicMock()
     svc.conversation_dao = MagicMock()
     svc.enrollment_dao = MagicMock()
-    svc.period_schedule_dao = MagicMock()
-    svc.weekly_quest_dao = MagicMock()
-    svc.individual_quest_dao = MagicMock()
     svc.ltg_conversation_dao = MagicMock()
-    svc.quest_service = MagicMock()
+    svc.ltg_goal_dao = MagicMock()
+    svc.quest_dao = MagicMock()
     return svc
 
 
 def _setup_service(student: Dict[str, Union[str, List[str], Dict[str, str]]], period: Dict[str, str], enrollments: Optional[List[Dict[str, str]]]=None, weekly_quests: Optional[List[FakeWeeklyQuest]]=None, individual_quests: Optional[List[Dict[str, str]]]=None, conversation_id: str="conv-abc") -> PeriodEnrollmentService:
     svc = _make_service()
 
-    svc.session_dao.get_sessions_by_auth_token.return_value = [{"user_id": student["user_id"]}]
     svc.student_dao.get_student_by_id.return_value = student
     svc.period_dao.get_period_by_id.return_value = period
     svc.enrollment_dao.get_enrollments_by_student.return_value = enrollments or [
         {"user_id": student["user_id"], "period_id": period["period_id"]}
     ]
     svc.ltg_conversation_dao.delete_conversation.return_value = conversation_id
-    svc.weekly_quest_dao.get_quests_by_student_and_period.return_value = weekly_quests or []
-    svc.individual_quest_dao.get_quests_by_student_and_period.return_value = individual_quests or []
+    svc.quest_dao.get_quests_by_student_and_period.return_value = [
+        {"quest_id": q.quest_id} for q in (weekly_quests or [])
+    ] + [{"quest_id": iq.get("individual_quest_id", iq.get("quest_id", ""))} for iq in (individual_quests or [])]
 
     return svc
 
@@ -77,7 +74,7 @@ class TestUnenrollService:
         student = _build_student()
         svc = _setup_service(student, _build_period())
 
-        result = svc.unenroll_from_period("tok", "MATH-101")
+        result = svc.unenroll_from_period("stu-1", "MATH-101")
 
         assert result["period_id"] == "MATH-101"
         assert "MATH-101" not in result["remaining_enrollments"]
@@ -90,7 +87,7 @@ class TestUnenrollService:
     def test_unenroll_deletes_conversation(self) -> None:
         svc = _setup_service(_build_student(), _build_period())
 
-        svc.unenroll_from_period("tok", "MATH-101")
+        svc.unenroll_from_period("stu-1", "MATH-101")
 
         svc.conversation_dao.delete_conversation.assert_called_once_with("conv-abc")
 
@@ -101,21 +98,19 @@ class TestUnenrollService:
 
         svc = _setup_service(_build_student(), _build_period(), weekly_quests=[wq], individual_quests=iq)
 
-        svc.unenroll_from_period("tok", "MATH-101")
+        svc.unenroll_from_period("stu-1", "MATH-101")
 
-        svc.weekly_quest_dao.delete_weekly_quest.assert_called_once_with("wq-1")
-        assert svc.individual_quest_dao.delete_individual_quest.call_count == 2
+        # After the step-3 refactor, quests are deleted via quest_dao.delete_quest.
+        assert svc.quest_dao.delete_quest.call_count == 3  # 1 weekly + 2 individual
 
     @pytest.mark.unit
     def test_unenroll_removes_long_term_goal(self) -> None:
         svc = _setup_service(_build_student(), _build_period())
 
-        svc.unenroll_from_period("tok", "MATH-101")
+        svc.unenroll_from_period("stu-1", "MATH-101")
 
-        calls = svc.student_dao.update_student.call_args_list
-        goal_call = [c for c in calls if "long_term_goal" in c[0][1]]
-        assert len(goal_call) == 1
-        assert "Precalculus" not in goal_call[0][0][1]["long_term_goal"]
+        # After the step-3/4 refactor, long-term goals are deleted via ltg_goal_dao.delete.
+        svc.ltg_goal_dao.delete.assert_called_once_with("stu-1", "MATH-101")
 
     @pytest.mark.unit
     def test_unenroll_not_enrolled_raises(self) -> None:
@@ -126,21 +121,21 @@ class TestUnenrollService:
         )
 
         with pytest.raises(Exception, match="not enrolled"):
-            svc.unenroll_from_period("tok", "MATH-101")
+            svc.unenroll_from_period("stu-1", "MATH-101")
 
     @pytest.mark.unit
     def test_unenroll_missing_period_id_raises(self) -> None:
         svc = _make_service()
         with pytest.raises(Exception, match="Missing period ID"):
-            svc.unenroll_from_period("tok", "")
+            svc.unenroll_from_period("stu-1", "")
 
     @pytest.mark.unit
-    def test_unenroll_invalid_token_raises(self) -> None:
+    def test_unenroll_student_not_found_raises(self) -> None:
         svc = _make_service()
-        svc.session_dao.get_sessions_by_auth_token.return_value = []
+        svc.student_dao.get_student_by_id.return_value = None
 
-        with pytest.raises(Exception, match="Invalid auth token"):
-            svc.unenroll_from_period("bad-tok", "MATH-101")
+        with pytest.raises(Exception, match="Student not found"):
+            svc.unenroll_from_period("unknown-user", "MATH-101")
 
 
 # ---------------------------------------------------------------------------

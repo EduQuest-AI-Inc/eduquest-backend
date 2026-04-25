@@ -4,7 +4,7 @@ from data_access.student_dao import StudentDAO
 from data_access.period_dao import PeriodDAO
 
 from models.enrollment import Enrollment
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class EnrollmentService:
             user_id=user_id,
             period_id=period_id,
             semester=semester,
-            enrolled_at=datetime.utcnow().isoformat()
+            enrolled_at=datetime.now(timezone.utc).isoformat()
         )
         self.enrollment_dao.add_enrollment(enrollment)
         return {"message": f"Student {user_id} enrolled in {period_id} successfully"}
