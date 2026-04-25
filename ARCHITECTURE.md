@@ -599,4 +599,4 @@ sequenceDiagram
 
 ## Data Tables Reference
 
-See [data_access/data_tables.md](data_access/data_tables.md).
+See [data_access/data_tables.md](data_access/DATA_TABLES.md).
