@@ -1,6 +1,6 @@
 import logging
 from flask import Blueprint, request, jsonify, make_response
-from flask_jwt_extended import create_access_token, decode_token
+from flask_jwt_extended import create_access_token
 from .auth_service import register_user, authenticate_user
 from .password_reset_service import get_password_reset_service
 from utils.token_utils import set_auth_cookie

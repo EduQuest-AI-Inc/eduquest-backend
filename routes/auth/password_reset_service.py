@@ -7,7 +7,6 @@ import secrets
 import hashlib
 import logging
 import uuid
-from datetime import datetime, timezone
 from typing import Optional, Tuple
 
 from werkzeug.security import generate_password_hash

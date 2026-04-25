@@ -7,7 +7,7 @@ multi-turn conversation), so no OpenAIConversationsSession is needed.
 """
 import asyncio
 import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 
 from bots.grading_agent import GradingOrchestrator, GradingInput, GradingResult
 

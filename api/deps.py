@@ -2,7 +2,7 @@ import os
 from typing import Optional
 
 import jwt
-from fastapi import Cookie, Depends, Header, HTTPException
+from fastapi import Cookie, Header, HTTPException
 
 JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret")
 JWT_ALGORITHM = "HS256"

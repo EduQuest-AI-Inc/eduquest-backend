@@ -18,7 +18,7 @@ One file per Supabase table.
 
 Shared identity fields live in the `user` table:
 
-- `first_name`, `last_name`, `email`, `email_lc`, `password`, `last_login`, `canvas_api_url`, `canvas_api_key`
+- `first_name`, `last_name`, `email` (UNIQUE constraint), `password`, `last_login`, `canvas_api_url`, `canvas_api_key`
 
 Role tables (`student`, `teacher`, `parent`) hold only role-specific fields and a FK to `user.user_id` with `ON DELETE CASCADE`.
 
@@ -26,7 +26,7 @@ Role tables (`student`, `teacher`, `parent`) hold only role-specific fields and 
 
 **UserDAO** (`user_dao.py`):
 
-- `get_by_id`, `get_by_email_lc`, `update`, `delete`
+- `get_by_id`, `get_by_email`, `update`, `delete`
 - All email uniqueness checks and password resets go through `UserDAO` directly — no need to query all three role tables
 
 **Role DAOs** (`student_dao.py`, `teacher_dao.py`, `parent_dao.py`):

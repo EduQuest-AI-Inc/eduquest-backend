@@ -23,7 +23,6 @@ from routes.waitlist.routes import waitlist_bp
 from routes.parent.routes import parent_bp
 from datetime import timedelta
 from flask import jsonify
-from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from exceptions.auth_error import AuthError
 from constants.timeouts import JWT_EXPIRY_HOURS

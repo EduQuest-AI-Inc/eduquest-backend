@@ -6,7 +6,6 @@ This tests the immediate consistency and retry mechanism improvements.
 import sys
 import os
 import uuid
-from datetime import datetime, timezone
 
 # Add parent directory to path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))

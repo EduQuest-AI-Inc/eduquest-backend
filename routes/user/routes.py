@@ -7,6 +7,8 @@ from .user_service import UserService
 from utils.token_utils import extract_auth_token
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
+from data_access.parent_dao import ParentDAO
+from data_access.user_dao import UserDAO
 from data_access.session_dao import SessionDAO
 
 logger = logging.getLogger(__name__)
@@ -14,6 +16,8 @@ user_bp = Blueprint('user', __name__)
 user_service = UserService()
 student_dao = StudentDAO()
 teacher_dao = TeacherDAO()
+parent_dao = ParentDAO()
+user_dao = UserDAO()
 session_dao = SessionDAO()
 
 
@@ -31,19 +35,31 @@ def _resolve_identity(token):
     return session_data[0]['user_id'] if session_data else None
 
 
+_ROLE_FETCHERS = {
+    'student': lambda uid: student_dao.get_student_by_id(uid),
+    'teacher': lambda uid: teacher_dao.get_teacher_by_id(uid),
+    'parent':  lambda uid: parent_dao.get_parent_by_id(uid),
+}
+
+
 def _fetch_user_profile(user_id):
-    """Look up student then teacher by user_id. Returns profile dict with 'role', or None."""
-    student = student_dao.get_student_by_id(user_id)
-    if student:
-        student['role'] = 'student'
-        student.pop('canvas_api_key', None)
-        return student
-    teacher = teacher_dao.get_teacher_by_id(user_id)
-    if teacher:
-        teacher['role'] = 'teacher'
-        teacher.setdefault('pilot_approved', False)
-        return teacher
-    return None
+    """Dispatch to the correct role DAO based on user.role. Returns profile dict or None."""
+    user = user_dao.get_by_id(user_id)
+    if not user:
+        return None
+    role = user.get('role')
+    fetcher = _ROLE_FETCHERS.get(role)
+    if not fetcher:
+        return None
+    profile = fetcher(user_id)
+    if not profile:
+        return None
+    profile['role'] = role
+    if profile.get('role') == 'student':
+        profile.pop('canvas_api_key', None)
+    if profile.get('role') == 'teacher':
+        profile.setdefault('pilot_approved', False)
+    return profile
 
 
 @user_bp.route('/profile', methods=['GET'])

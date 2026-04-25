@@ -1,6 +1,4 @@
 from typing import Dict, Any
-from models.student import Student
-from models.teacher import Teacher
 from data_access.session_dao import SessionDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO

@@ -2,7 +2,7 @@
 from routes.quest.quest_creation_service import QuestCreationService
 from routes.quest.quest_retrieval_service import QuestRetrievalService
 from routes.quest.quest_grading_service import QuestGradingService
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List
 
 
 class QuestService:

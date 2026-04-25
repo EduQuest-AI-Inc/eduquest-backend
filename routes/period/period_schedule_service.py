@@ -2,7 +2,6 @@ import json
 import logging
 import tempfile
 import os
-from datetime import datetime, timezone
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)

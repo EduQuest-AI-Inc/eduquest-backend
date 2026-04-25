@@ -92,7 +92,7 @@ sequenceDiagram
 
     C->>R: {email, password, first_name, last_name, role}
     R->>S: register_user()
-    S->>DB: UserDAO.get_by_email_lc()  — check duplicate
+    S->>DB: UserDAO.get_by_id()  — check duplicate
     DB-->>S: null (no duplicate)
     S->>DB: UserDAO.add_user()  — insert user row
     S->>DB: StudentDAO / TeacherDAO / ParentDAO.add_*()  — insert role row
@@ -112,13 +112,13 @@ sequenceDiagram
 
     C->>R: {email, password, role}
     R->>S: login_user()
-    S->>DB: UserDAO.get_by_email_lc()
+    S->>DB: UserDAO.get_by_id()
     DB-->>S: user row
     S->>S: bcrypt verify password
     S->>DB: SessionDAO.add_session()  — store token with 1 h expiry
     S-->>R: JWT auth_token
     R-->>C: 200  {auth_token, user_id, role}
-    Note over C,R: All subsequent requests send\nAuthorization: Bearer {auth_token}
+    Note over C,R: All subsequent requests send Authorization: Bearer {auth_token}
 ```
 
 ### Password Reset
@@ -356,7 +356,7 @@ sequenceDiagram
     loop For each enrolled student
         S->>DB: StudentDAO.get_student_by_id()  — fetch profile
         S->>AI: HWAgent.generate_title() → generate_instructions() → generate_rubric()
-        Note over AI,OAI: Agent searches vector store for\ncourse-relevant content
+        Note over AI,OAI: Agent searches vector store for course-relevant content
         AI-->>S: {title, instructions, rubric}
         S->>DB: QuestDAO.add_quest()
     end
@@ -419,7 +419,7 @@ sequenceDiagram
     S->>DB: StudentDAO.get_student_by_id()  — load profile
     S->>DB: PeriodDAO.get_period_by_id()  — load vector_store_id
     S->>AI: create_ltg_agent() — first message
-    Note over AI,OAI: Agent searches course docs to align\ngoals with curriculum
+    Note over AI,OAI: Agent searches course docs to align goals with curriculum
     AI-->>S: {response_text, response_id, goal_suggestions?}
     S->>DB: LTGConversationDAO.upsert()  — store response_id
     R1-->>C: 200  {conversation_id, message}
