@@ -7,6 +7,7 @@ from data_access.ltg_conversation_dao import LtgConversationDAO
 from data_access.period_dao import PeriodDAO
 from data_access.user_dao import UserDAO
 from models.period import Period
+from models.user import User
 
 _USER_ID = "test-step8-ltgconv-user"
 _PERIOD_ID = "test-step8-ltgconv-period"
@@ -15,10 +16,10 @@ _CONV_ID = "test-step8-ltgconv-openai-id"
 
 def _setup(period_dao, user_dao):
     period_dao.add_period(Period(period_id=_PERIOD_ID, owner_id="owner", name="LTG Test", vector_store_id="vs"))
-    user_dao._insert({
-        "user_id": _USER_ID, "first_name": "L", "last_name": "User",
-        "email": "test-step8-ltgconv@example.com", "password": "pw", "role": "student",
-    })
+    user_dao.add_user(User(
+        user_id=_USER_ID, first_name="L", last_name="User",
+        email="test-step8-ltgconv@example.com", password="pw", role="student",
+    ))
 
 
 def _teardown(dao, period_dao, user_dao):

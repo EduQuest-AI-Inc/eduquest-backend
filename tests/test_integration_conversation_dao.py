@@ -32,7 +32,7 @@ def test_add_and_get_by_id(supabase_required):
     user_dao = UserDAO()
     _setup(user_dao)
     try:
-        conv = Conversation(conversation_id=_ID, user_id=_USER_ID, conversation_type="homework", period_id="p-test")
+        conv = Conversation(conversation_id=_ID, user_id=_USER_ID, conversation_type="profile")
         dao.add_conversation(conv)
         results = dao.get_conversations_by_id(_ID)
         assert any(r["conversation_id"] == _ID for r in results)
@@ -46,9 +46,9 @@ def test_get_conversation_by_id_user_type(supabase_required):
     user_dao = UserDAO()
     _setup(user_dao)
     try:
-        conv = Conversation(conversation_id=_ID, user_id=_USER_ID, conversation_type="homework", period_id="p-test")
+        conv = Conversation(conversation_id=_ID, user_id=_USER_ID, conversation_type="profile")
         dao.add_conversation(conv)
-        result = dao.get_conversation_by_id_user_type(_ID, _USER_ID, "homework")
+        result = dao.get_conversation_by_id_user_type(_ID, _USER_ID, "profile")
         assert result is not None
         assert result["conversation_id"] == _ID
     finally:
@@ -61,7 +61,7 @@ def test_update_conversation(supabase_required):
     user_dao = UserDAO()
     _setup(user_dao)
     try:
-        conv = Conversation(conversation_id=_ID, user_id=_USER_ID, conversation_type="homework", period_id="p-test")
+        conv = Conversation(conversation_id=_ID, user_id=_USER_ID, conversation_type="profile")
         dao.add_conversation(conv)
         dao.update_conversation(_ID, {"last_response_id": "resp-99"})
         results = dao.get_conversations_by_id(_ID)
@@ -76,7 +76,7 @@ def test_delete_conversation(supabase_required):
     user_dao = UserDAO()
     _setup(user_dao)
     try:
-        conv = Conversation(conversation_id=_ID, user_id=_USER_ID, conversation_type="homework", period_id="p-test")
+        conv = Conversation(conversation_id=_ID, user_id=_USER_ID, conversation_type="profile")
         dao.add_conversation(conv)
         dao.delete_conversation(_ID)
         results = dao.get_conversations_by_id(_ID)
