@@ -44,7 +44,9 @@ class SupabaseBaseDAO:
             .eq(id_column, id_value)
             .maybe_single()
         )
-        return cast(dict[str, Any], response.data) if response.data is not None else None
+        if response is None or response.data is None:
+            return None
+        return cast(dict[str, Any], response.data)
 
     def _select_eq(self, column: str, value: str) -> list[dict[str, Any]]:
         response = self._execute(
