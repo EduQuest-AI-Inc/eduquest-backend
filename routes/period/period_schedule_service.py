@@ -4,11 +4,12 @@ import tempfile
 import os
 from openai import OpenAI
 
-logger = logging.getLogger(__name__)
 from data_access.period_schedule_dao import PeriodScheduleDAO
 from data_access.period_dao import PeriodDAO
 from models.period_schedule import PeriodSchedule
 from bots.schedule_agent import PeriodScheduleAgent
+
+logger = logging.getLogger(__name__)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -80,7 +81,7 @@ class PeriodScheduleService:
             "schedule_openai_file_id": schedule_openai_file_id
         }
 
-    def get_schedule(self, period_id: str, user_id: str) -> dict:
+    def get_schedule(self, period_id: str, user_id: str) -> dict | None:
         self._verify_period_ownership(period_id, user_id)
 
         # Get period schedule record
