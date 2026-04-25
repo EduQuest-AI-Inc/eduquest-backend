@@ -1,1 +1,1 @@
-from .routes import auth_bp
+from .routes import auth_bp as auth_bp

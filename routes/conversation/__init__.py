@@ -1,2 +1,2 @@
-from .routes import conversation_bp
+from .routes import conversation_bp as conversation_bp
 

@@ -1,2 +1,2 @@
-from .routes import user_bp
+from .routes import user_bp as user_bp
 

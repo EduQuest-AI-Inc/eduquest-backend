@@ -124,7 +124,7 @@ class PeriodScheduleService:
         }
 
     def set_quest_weeks(self, period_id: str, user_id: str, quest_enabled_weeks: list) -> dict:
-        period = self._verify_period_ownership(period_id, user_id)
+        self._verify_period_ownership(period_id, user_id)
 
         # Normalize to unique sorted ints (frontend can send strings)
         normalized_weeks = []
