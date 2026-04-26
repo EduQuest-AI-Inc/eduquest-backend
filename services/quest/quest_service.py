@@ -1,7 +1,7 @@
 """Thin orchestrator — delegates to focused sub-services."""
-from routes.quest.quest_creation_service import QuestCreationService
-from routes.quest.quest_retrieval_service import QuestRetrievalService
-from routes.quest.quest_grading_service import QuestGradingService
+from services.quest.quest_creation_service import QuestCreationService
+from services.quest.quest_retrieval_service import QuestRetrievalService
+from services.quest.quest_grading_service import QuestGradingService
 from typing import Any, Dict, List
 
 

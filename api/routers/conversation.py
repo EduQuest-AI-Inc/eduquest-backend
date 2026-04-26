@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
-from routes.conversation.conversation_service import ConversationService
+from services.conversation.conversation_service import ConversationService
 
 router = APIRouter()
 conversation_service = ConversationService()

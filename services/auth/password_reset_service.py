@@ -9,7 +9,7 @@ import logging
 import uuid
 from typing import Optional, Tuple
 
-from werkzeug.security import generate_password_hash
+from services.auth.auth_service import generate_password_hash
 
 from data_access.user_dao import UserDAO
 from data_access.password_reset_token_dao import PasswordResetTokenDAO

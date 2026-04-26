@@ -1,4 +1,4 @@
-from routes.period.period_management_service import PeriodManagementService
+from services.period.period_management_service import PeriodManagementService
 
 
 class TeacherService:

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from main import app
 from api.deps import get_auth, AuthPayload
-from routes.period.period_enrollment_service import PeriodEnrollmentService
+from services.period.period_enrollment_service import PeriodEnrollmentService
 from typing import Dict, List, Optional, Union
 
 
@@ -35,7 +35,7 @@ class FakeWeeklyQuest:
 
 def _make_service() -> PeriodEnrollmentService:
     """Build a PeriodEnrollmentService with all DAO attributes replaced by mocks."""
-    from routes.period.period_enrollment_service import PeriodEnrollmentService
+    from services.period.period_enrollment_service import PeriodEnrollmentService
 
     svc = PeriodEnrollmentService.__new__(PeriodEnrollmentService)
     svc.period_dao = MagicMock()

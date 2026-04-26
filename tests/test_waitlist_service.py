@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from routes.waitlist.WaitlistService import WaitlistService
+from services.waitlist.WaitlistService import WaitlistService
 
 
 def _svc():

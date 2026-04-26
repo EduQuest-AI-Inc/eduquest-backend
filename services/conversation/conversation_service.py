@@ -19,13 +19,13 @@ from data_access.teacher_dao import TeacherDAO
 from models.conversation import Conversation
 from integrations.s3_service import upload_file_to_s3
 
-from routes.conversation.profile_service import (
+from services.conversation.profile_service import (
     initiate_profile_conversation,
     continue_profile_conversation,
 )
-from routes.conversation.grading_service import grade_student_submission
-from routes.auth_utils import require_auth
-from routes.conversation.teacher_feedback_service import (
+from services.conversation.grading_service import grade_student_submission
+from services.auth_utils import require_auth
+from services.conversation.teacher_feedback_service import (
     initiate_teacher_feedback,
     continue_teacher_feedback,
 )
@@ -156,7 +156,7 @@ class ConversationService:
         if is_instructor:
             if not user_id:
                 raise Exception("Instructor must provide a user_id to fetch quests")
-            from routes.quest.quest_service import QuestService
+            from services.quest.quest_service import QuestService
             quests_data = QuestService().get_quests_for_student(user_id)
 
             target_student = self.student_dao.get_student_by_id(user_id)
@@ -294,7 +294,7 @@ class ConversationService:
                 logger.info("Saved grade %s for quest %s", overall_score, individual_quest_id)
                 return
 
-            from routes.quest.quest_service import QuestService
+            from services.quest.quest_service import QuestService
             quests = QuestService().get_quests_for_student(user_id)
             target_quest = None
             for quest in quests:
@@ -321,7 +321,7 @@ class ConversationService:
     def _apply_quest_change(self, auth_token, user_id, period_id, recommended_change) -> None:
         """Delegate recommended changes to PeriodService."""
         try:
-            from routes.period.period_service import PeriodService
+            from services.period.period_service import PeriodService
             period_service = PeriodService()
             quest_update_result = period_service.update_quests_with_recommended_change(
                 auth_token, user_id, period_id, recommended_change,

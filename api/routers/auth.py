@@ -14,8 +14,8 @@ from data_access.session_dao import SessionDAO
 from data_access.student_dao import StudentDAO
 from data_access.user_dao import UserDAO
 from models.session import Session
-from routes.auth.auth_service import authenticate_user, register_user
-from routes.auth.password_reset_service import get_password_reset_service
+from services.auth.auth_service import authenticate_user, register_user
+from services.auth.password_reset_service import get_password_reset_service
 from utils.token_utils import set_auth_cookie
 from utils.validation_utils import get_client_ip
 

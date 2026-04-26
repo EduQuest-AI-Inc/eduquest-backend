@@ -10,7 +10,7 @@ from data_access.parent_dao import ParentDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
 from data_access.user_dao import UserDAO
-from routes.user.user_service import UserService
+from services.user.user_service import UserService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

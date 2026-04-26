@@ -6,7 +6,7 @@ These tests cover get_my_periods, verify_period_id, and assert_enrolled.
 import pytest
 from unittest.mock import MagicMock
 
-from routes.period.period_enrollment_service import PeriodEnrollmentService
+from services.period.period_enrollment_service import PeriodEnrollmentService
 
 
 def _svc():

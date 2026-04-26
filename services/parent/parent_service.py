@@ -7,7 +7,7 @@ from data_access.parent_invite_dao import ParentInviteDAO
 from data_access.student_dao import StudentDAO
 
 from models.parent_invite import ParentInvite
-from routes.period.period_management_service import PeriodManagementService
+from services.period.period_management_service import PeriodManagementService
 
 _INVITE_ALPHABET = string.ascii_uppercase + string.digits
 

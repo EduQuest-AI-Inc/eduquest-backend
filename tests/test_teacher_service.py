@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from routes.teacher.teacher_service import TeacherService
+from services.teacher.teacher_service import TeacherService
 
 
 def _svc():

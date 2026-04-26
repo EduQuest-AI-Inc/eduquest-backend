@@ -1,4 +1,14 @@
-from werkzeug.security import generate_password_hash, check_password_hash
+from passlib.context import CryptContext
+
+_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def generate_password_hash(password: str) -> str:
+    return _pwd_context.hash(password)
+
+
+def check_password_hash(hashed: str, password: str) -> bool:
+    return _pwd_context.verify(password, hashed)
 
 from data_access.user_dao import UserDAO
 from data_access.student_dao import StudentDAO

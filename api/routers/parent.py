@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.deps import AuthPayload, get_auth
-from routes.parent.parent_service import ParentService
+from services.parent.parent_service import ParentService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

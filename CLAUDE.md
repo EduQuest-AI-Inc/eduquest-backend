@@ -19,7 +19,7 @@ eduquest-backend/
 │       ├── teacher.py              # /teacher — create period, S3 file, Canvas, period schedule
 │       ├── user.py                 # /user — user profile
 │       └── waitlist.py             # /pilot-waitlist — status, join
-├── routes/                         # Service/business logic layer (imported by api/routers/)
+├── services/                         # Service/business logic layer (imported by api/routers/)
 │   ├── auth_utils.py               # Shared auth helpers used across service modules
 │   ├── auth/                       # auth_service.py, password_reset_service.py, password_policy.py
 │   ├── conversation/               # conversation_service.py, grading_service.py,
@@ -97,11 +97,11 @@ eduquest-backend/
 
 ## Route Pattern
 
-FastAPI routers live in `api/routers/[feature].py`. Each imports service classes from `routes/[feature]/`:
+FastAPI routers live in `api/routers/[feature].py`. Each imports service classes from `services/[feature]/`:
 
 ```
 api/routers/[feature].py       # FastAPI router — HTTP boundary only
-routes/[feature]/
+services/[feature]/
   ├── [feature]_service.py     # Business logic (thin orchestrator)
   ├── [feature]_*_service.py   # Sub-services for specific concerns
   └── __init__.py

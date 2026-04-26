@@ -7,7 +7,7 @@ from openai import OpenAI
 
 from integrations.s3_service import upload_file_to_s3
 from integrations.canvas_service import Course as CanvasCourse, course_to_json
-from routes.period.period_schedule_service import PeriodScheduleService
+from services.period.period_schedule_service import PeriodScheduleService
 
 logger = logging.getLogger(__name__)
 _client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))

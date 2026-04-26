@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from routes.parent.parent_service import ParentService
+from services.parent.parent_service import ParentService
 
 
 def _svc():

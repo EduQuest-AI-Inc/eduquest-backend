@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
 from data_access.period_dao import PeriodDAO
-from routes.enrollment.enrollment_service import EnrollmentService
+from services.enrollment.enrollment_service import EnrollmentService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

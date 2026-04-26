@@ -7,7 +7,7 @@ from data_access.period_schedule_dao import PeriodScheduleDAO
 from data_access.ltg_conversation_dao import LtgConversationDAO
 
 from bots.agent import HWAgent
-from routes.quest.quest_service import QuestService
+from services.quest.quest_service import QuestService
 
 
 class PeriodQuestService:

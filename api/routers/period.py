@@ -9,17 +9,17 @@ from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
 from data_access.teacher_dao import TeacherDAO
-from routes.parent.parent_service import ParentService
-from routes.period.period_file_helpers import (
+from services.parent.parent_service import ParentService
+from services.period.period_file_helpers import (
     append_canvas_file,
     create_vector_store,
     get_file_presigned_url,
     upload_period_files,
     try_generate_schedule,
 )
-from routes.period.period_management_service import PeriodManagementService
-from routes.period.period_service import PeriodService
-from routes.waitlist.WaitlistService import WaitlistService
+from services.period.period_management_service import PeriodManagementService
+from services.period.period_service import PeriodService
+from services.waitlist.WaitlistService import WaitlistService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

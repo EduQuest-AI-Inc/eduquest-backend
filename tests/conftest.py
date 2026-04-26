@@ -37,7 +37,6 @@ sys.modules['bots.grading_agent'] = MagicMock()
 sys.modules['bots.teacher_feedback_agent'] = MagicMock()
 sys.modules['bots.schedule_agent'] = MagicMock()
 sys.modules['bots.guardrails'] = MagicMock()
-sys.modules['bots.ltg_conversation_service'] = MagicMock()
 sys.modules['bots.schemas'] = MagicMock()
 sys.modules['bots.schemas.rubric'] = MagicMock()
 

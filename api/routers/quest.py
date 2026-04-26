@@ -8,8 +8,8 @@ from api.deps import AuthPayload, get_auth
 from data_access.enrollment_dao import EnrollmentDAO
 from data_access.period_dao import PeriodDAO
 from data_access.quest_dao import QuestDAO
-from routes.quest.quest_retrieval_service import QuestRetrievalService
-from routes.quest.quest_service import QuestService
+from services.quest.quest_retrieval_service import QuestRetrievalService
+from services.quest.quest_service import QuestService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

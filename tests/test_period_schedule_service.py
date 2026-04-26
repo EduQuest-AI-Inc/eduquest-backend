@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from routes.period.period_schedule_service import PeriodScheduleService
+from services.period.period_schedule_service import PeriodScheduleService
 
 
 def _svc():
