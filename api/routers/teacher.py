@@ -31,6 +31,20 @@ openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 # ---------------------------------------------------------------------------
+# Get teacher periods
+# ---------------------------------------------------------------------------
+
+@router.get("/periods")
+def get_teacher_periods(auth: AuthPayload = Depends(get_auth)):
+    try:
+        result = teacher_service.get_periods_by_teacher(auth.sub)
+        return {"periods": result}
+    except Exception as e:
+        logger.error("Error in get_teacher_periods: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ---------------------------------------------------------------------------
 # Create period (multipart)
 # ---------------------------------------------------------------------------
 

@@ -10,9 +10,11 @@ def normalize_email(email):
     return email.strip().lower() if email else ''
 
 
-def get_client_ip(request):
-    """Extract client IP from X-Forwarded-For header or REMOTE_ADDR fallback."""
+def get_client_ip(request) -> str:
+    """Extract client IP from X-Forwarded-For header or request.client fallback."""
     forwarded = request.headers.get('X-Forwarded-For')
     if forwarded:
         return forwarded.split(',')[0].strip()
-    return request.remote_addr
+    if request.client:
+        return request.client.host
+    return ''

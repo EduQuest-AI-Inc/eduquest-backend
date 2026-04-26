@@ -6,30 +6,34 @@ See also: [data_access/CLAUDE.md](data_access/CLAUDE.md) for DAO and database pa
 
 ```
 eduquest-backend/
-├── app.py                          # Flask app factory (legacy — being migrated to FastAPI)
-├── main.py                         # FastAPI app factory and entry point (active)
+├── main.py                         # FastAPI app factory and entry point (sole server — Flask migration complete)
 ├── api/                            # FastAPI layer
 │   ├── deps.py                     # get_auth() dependency → AuthPayload (JWT from header or cookie)
 │   └── routers/
+│       ├── auth.py                 # /auth — login, register, password reset
 │       ├── conversation.py         # /conversation — profile assistant, update assistant
+│       ├── enrollment.py           # /enrollment — enroll/unenroll students
+│       ├── parent.py               # /parent — parent invite, child lookup
 │       ├── period.py               # /period — LTG conversation, homework agent
+│       ├── quest.py                # /quest — quest retrieval, submission
 │       ├── teacher.py              # /teacher — create period, S3 file, Canvas, period schedule
+│       ├── user.py                 # /user — user profile
 │       └── waitlist.py             # /pilot-waitlist — status, join
-├── routes/                         # Feature modules (Blueprint + service files)
-│   ├── auth_utils.py               # Shared auth helpers used across route modules
-│   ├── auth/                       # routes.py, auth_service.py, password_reset_service.py, password_policy.py
-│   ├── conversation/               # routes.py, conversation_service.py, grading_service.py,
+├── routes/                         # Service/business logic layer (imported by api/routers/)
+│   ├── auth_utils.py               # Shared auth helpers used across service modules
+│   ├── auth/                       # auth_service.py, password_reset_service.py, password_policy.py
+│   ├── conversation/               # conversation_service.py, grading_service.py,
 │   │                               #   ltg_service.py, profile_service.py, teacher_feedback_service.py
-│   ├── enrollment/                 # routes.py, enrollment_service.py
-│   ├── period/                     # routes.py, period_service.py, period_enrollment_service.py,
+│   ├── enrollment/                 # enrollment_service.py
+│   ├── period/                     # period_service.py, period_enrollment_service.py,
 │   │                               #   period_quest_service.py, period_schedule_service.py,
 │   │                               #   period_management_service.py, period_file_helpers.py
-│   ├── quest/                      # routes.py, quest_service.py, quest_creation_service.py,
+│   ├── quest/                      # quest_service.py, quest_creation_service.py,
 │   │                               #   quest_retrieval_service.py, quest_grading_service.py
-│   ├── teacher/                    # routes.py, teacher_service.py
-│   ├── user/                       # routes.py, user_service.py
-│   ├── waitlist/                   # routes.py, WaitlistService.py
-│   └── parent/                     # routes.py, parent_service.py
+│   ├── teacher/                    # teacher_service.py, period_schedule_service.py
+│   ├── user/                       # user_service.py
+│   ├── waitlist/                   # WaitlistService.py
+│   └── parent/                     # parent_service.py
 ├── models/                         # Pydantic domain models
 │   ├── user.py                     # Base User model
 │   ├── student.py                  # Student(User)
@@ -79,34 +83,35 @@ eduquest-backend/
 
 ## API Modules
 
-### Flask (`app.py`) — legacy, being migrated
+### FastAPI (`main.py`) — sole server
 
-- `/conversation`, `/auth`, `/user`, `/period`, `/teacher`, `/enrollment`, `/quest`, `/pilot-waitlist`, `/parent`
-
-### FastAPI (`main.py`) — active target
-
+- `/auth` — login, register, password reset
 - `/conversation` — profile assistant, update assistant
+- `/enrollment` — student enrollment
+- `/parent` — parent invite and child lookup
 - `/period` — LTG conversation, homework agent
+- `/quest` — quest retrieval, submission
 - `/teacher` — create period, S3 file retrieval, Canvas courses, period schedule CRUD
+- `/user` — user profile
 - `/pilot-waitlist` — status, join
 
 ## Route Pattern
 
-Each route module follows:
+FastAPI routers live in `api/routers/[feature].py`. Each imports service classes from `routes/[feature]/`:
 
 ```
+api/routers/[feature].py       # FastAPI router — HTTP boundary only
 routes/[feature]/
-  ├── routes.py              # Flask Blueprint and endpoints
-  ├── [feature]_service.py   # Business logic (thin orchestrator)
-  ├── [feature]_*_service.py # Sub-services for specific concerns
+  ├── [feature]_service.py     # Business logic (thin orchestrator)
+  ├── [feature]_*_service.py   # Sub-services for specific concerns
   └── __init__.py
 ```
 
-Route handlers that do more than one distinct thing extract underscore-prefixed helpers in the same file (e.g. `_validate_pilot_access()`, `_resolve_identity()`, `_handle_file_submission()`). These are private to the module — no helper should exceed 20 lines.
+Router handlers that do more than one distinct thing extract underscore-prefixed helpers in the same file (e.g. `_validate_pilot_access()`, `_resolve_identity()`, `_handle_file_submission()`). These are private to the module — no helper should exceed 20 lines.
 
 ## Error Handling
 
-Custom exceptions in `exceptions/` are caught by global handlers in `app.py`:
+Custom exceptions in `exceptions/` are caught by global handlers in `main.py`:
 
 - `ValidationError` → 400
 - `NotFoundError` → 404
@@ -156,8 +161,8 @@ pip install -r requirements.txt
 **Run**:
 
 ```bash
-python app.py
-# http://0.0.0.0:5000, debug mode
+uvicorn main:app --reload
+# http://0.0.0.0:8000
 ```
 
 **Testing**:

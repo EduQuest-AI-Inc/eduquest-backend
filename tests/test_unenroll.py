@@ -4,10 +4,11 @@ and the POST /period/unenroll route.
 """
 import pytest
 from unittest.mock import MagicMock, patch
-from flask.app import Flask
-from flask.testing import FlaskClient
+from fastapi.testclient import TestClient
+from main import app
+from api.deps import get_auth, AuthPayload
 from routes.period.period_enrollment_service import PeriodEnrollmentService
-from typing import Dict, Iterator, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 
 # ---------------------------------------------------------------------------
@@ -142,59 +143,43 @@ class TestUnenrollService:
 # Route-level tests
 # ---------------------------------------------------------------------------
 
-@pytest.fixture
-def app() -> Iterator[Flask]:
-    from app import app as flask_app
-    flask_app.config.update({"TESTING": True})
-    yield flask_app
+def _fake_auth():
+    return AuthPayload(sub="stu-1", role="student", token="fake-token")
 
 
-@pytest.fixture
-def client(app: Flask) -> FlaskClient:
-    return app.test_client()
+@pytest.fixture(scope="module")
+def client():
+    app.dependency_overrides[get_auth] = _fake_auth
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
 
 
 class TestUnenrollRoute:
 
     @pytest.mark.api
-    @patch("routes.period.routes.period_service")
-    def test_unenroll_endpoint_success(self, mock_service: MagicMock, client: FlaskClient) -> None:
+    @patch("api.routers.period.period_service")
+    def test_unenroll_endpoint_success(self, mock_service: MagicMock, client) -> None:
         mock_service.unenroll_from_period.return_value = {
             "message": "Successfully unenrolled from period MATH-101",
             "period_id": "MATH-101",
             "remaining_enrollments": [],
         }
-
-        resp = client.post(
-            "/period/unenroll",
-            json={"period_id": "MATH-101"},
-            headers={"Authorization": "Bearer fake-token"},
-        )
-
+        resp = client.post("/period/unenroll", json={"period_id": "MATH-101"})
         assert resp.status_code == 200
-        data = resp.get_json()
+        data = resp.json()
         assert data["period_id"] == "MATH-101"
 
     @pytest.mark.api
-    @patch("routes.period.routes.period_service")
-    def test_unenroll_endpoint_missing_period(self, mock_service: MagicMock, client: FlaskClient) -> None:
-        resp = client.post(
-            "/period/unenroll",
-            json={},
-            headers={"Authorization": "Bearer fake-token"},
-        )
-        assert resp.status_code == 400
-        assert "period_id" in resp.get_json()["error"]
+    @patch("api.routers.period.period_service")
+    def test_unenroll_endpoint_missing_period(self, mock_service: MagicMock, client) -> None:
+        resp = client.post("/period/unenroll", json={})
+        assert resp.status_code == 422  # FastAPI returns 422 for missing required fields
 
     @pytest.mark.api
-    @patch("routes.period.routes.period_service")
-    def test_unenroll_endpoint_not_enrolled(self, mock_service: MagicMock, client: FlaskClient) -> None:
+    @patch("api.routers.period.period_service")
+    def test_unenroll_endpoint_not_enrolled(self, mock_service: MagicMock, client) -> None:
         from exceptions.validation_error import ValidationError
         mock_service.unenroll_from_period.side_effect = ValidationError("You are not enrolled in period X")
-
-        resp = client.post(
-            "/period/unenroll",
-            json={"period_id": "X"},
-            headers={"Authorization": "Bearer fake-token"},
-        )
+        resp = client.post("/period/unenroll", json={"period_id": "X"})
         assert resp.status_code == 400
