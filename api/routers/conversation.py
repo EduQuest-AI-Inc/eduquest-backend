@@ -2,7 +2,6 @@ import asyncio
 import json
 import os
 import tempfile
-from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -10,19 +9,10 @@ from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
 from services.conversation.conversation_service import ConversationService
+from utils.conversion_utils import convert_decimals as _convert_decimals
 
 router = APIRouter()
 conversation_service = ConversationService()
-
-
-def _convert_decimals(obj):
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, dict):
-        return {k: _convert_decimals(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_convert_decimals(i) for i in obj]
-    return obj
 
 
 # ---------------------------------------------------------------------------

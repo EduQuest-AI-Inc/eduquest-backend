@@ -7,7 +7,6 @@ from data_access.parent_invite_dao import ParentInviteDAO
 from data_access.student_dao import StudentDAO
 
 from models.parent_invite import ParentInvite
-from services.period.period_management_service import PeriodManagementService
 
 _INVITE_ALPHABET = string.ascii_uppercase + string.digits
 
@@ -17,18 +16,6 @@ class ParentService:
         self.parent_dao = ParentDAO()
         self.invite_dao = ParentInviteDAO()
         self.student_dao = StudentDAO()
-        self._period_mgmt = PeriodManagementService()
-
-    # -- Period helpers -------------------------------------------------------
-
-    def create_period(self, course: str, user_id: str, vector_store_id: str, file_urls: list) -> dict:
-        return self._period_mgmt.create_period(course, user_id, vector_store_id, file_urls)
-
-    def get_periods_by_parent(self, user_id: str) -> list:
-        return self._period_mgmt.get_periods_by_owner(user_id)
-
-    def update_period_files(self, period_id: str, file_urls: list) -> None:
-        self._period_mgmt.update_file_urls(period_id, file_urls)
 
     # -- Invite helpers -------------------------------------------------------
 

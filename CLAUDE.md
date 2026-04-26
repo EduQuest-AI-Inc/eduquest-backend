@@ -39,21 +39,15 @@ eduquest-backend/
 │   ├── student.py                  # Student(User)
 │   ├── teacher.py                  # Teacher(User)
 │   ├── parent.py                   # Parent(User)
-│   ├── student_profile.py          # StudentProfile (strengths, weaknesses, interests)
 │   ├── student_long_term_goal.py   # StudentLongTermGoal — one goal per (user_id, period_id)
-│   ├── student_skill_mastery.py    # StudentSkillMastery — skill scores per student/period
-│   ├── aggregated_metrics.py       # AggregatedMetrics — read by frontend directly from Supabase
 │   ├── quest.py                    # Quest — assignment with rubric, grade, status
 │   ├── enrollment.py               # Enrollment — student ↔ period membership
 │   ├── period.py                   # Period — class with vector store and Canvas metadata
 │   ├── period_schedule.py          # PeriodSchedule — AI-generated weekly schedule
 │   ├── conversation.py             # Conversation — chat session record
-│   ├── ltg_conversation.py         # LtgConversation — LTG chat session record
 │   ├── session.py                  # Session — JWT session record
 │   ├── parent_invite.py            # ParentInvite — invite token for parent signup
-│   ├── password_reset_token.py     # PasswordResetToken — reset link token
-│   ├── password_reset_rate_limit.py # PasswordResetRateLimit — per-email attempt tracking
-│   └── waitlist.py                 # Waitlist — pilot waitlist entry
+│   └── password_reset_token.py     # PasswordResetToken — reset link token
 ├── bots/                           # All AI agent code (was EQ_agents/)
 │   ├── agent.py                    # HWAgent — quest instruction/rubric generation
 │   ├── grading_agent.py            # Multi-agent grading orchestrator

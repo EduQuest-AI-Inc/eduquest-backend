@@ -8,13 +8,12 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from constants.timeouts import JWT_EXPIRY_HOURS
-from data_access.parent_dao import ParentDAO
-from data_access.parent_invite_dao import ParentInviteDAO
 from data_access.session_dao import SessionDAO
 from data_access.student_dao import StudentDAO
 from data_access.user_dao import UserDAO
 from models.session import Session
 from services.auth.auth_service import authenticate_user, register_user
+from services.parent.parent_service import ParentService
 from services.auth.password_reset_service import get_password_reset_service
 from utils.token_utils import set_auth_cookie
 from utils.validation_utils import get_client_ip
@@ -28,8 +27,7 @@ JWT_ALGORITHM = "HS256"
 session_dao = SessionDAO()
 user_dao = UserDAO()
 student_dao = StudentDAO()
-parent_dao = ParentDAO()
-parent_invite_dao = ParentInviteDAO()
+_parent_service = ParentService()
 password_reset_service = get_password_reset_service()
 
 
@@ -84,36 +82,12 @@ def signup(body: SignupRequest):
     if body.role == "student" and body.invite_code:
         invite_code = body.invite_code.strip().upper()
         try:
-            invite = parent_invite_dao.get_invite_by_code(invite_code)
-            if not invite:
-                response_body["invite_warning"] = "Invite code not found. You can link your parent account later from your profile."
-            elif invite.get("used"):
-                response_body["invite_warning"] = "Invite code has already been used. You can link your parent account later from your profile."
-            else:
-                expires_at_str = invite.get("expires_at", "")
-                expires_at = datetime.fromisoformat(expires_at_str)
-                if expires_at.tzinfo is None:
-                    expires_at = expires_at.replace(tzinfo=timezone.utc)
-                if datetime.now(timezone.utc) > expires_at:
-                    response_body["invite_warning"] = "Invite code has expired. You can link your parent account later from your profile."
-                else:
-                    parent_user_id = invite.get("user_id")
-                    parent = parent_dao.get_parent_by_id(parent_user_id)
-                    if not parent:
-                        response_body["invite_warning"] = "Parent account not found. You can link your parent account later from your profile."
-                    else:
-                        linked_ids = parent.get("linked_student_ids") or []
-                        if body.username not in linked_ids:
-                            linked_ids.append(body.username)
-                            vpc_verified_at = datetime.now(timezone.utc).isoformat()
-                            parent_dao.update_parent(parent_user_id, {
-                                "linked_student_ids": linked_ids,
-                                "vpc_verified_at": vpc_verified_at,
-                            })
-                            parent_invite_dao.mark_used(invite_code)
-                        response_body["parent_linked"] = True
-        except Exception as invite_err:
-            logger.warning("Failed to process invite code during signup: %s", invite_err)
+            _parent_service.accept_invite(body.username, invite_code)
+            response_body["parent_linked"] = True
+        except ValueError as inv_err:
+            response_body["invite_warning"] = f"{inv_err}. You can link your parent account later from your profile."
+        except Exception as inv_err:
+            logger.warning("Failed to process invite code during signup: %s", inv_err)
             response_body["invite_warning"] = "Could not process invite code. You can link your parent account later from your profile."
 
     return response_body

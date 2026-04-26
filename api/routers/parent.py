@@ -4,16 +4,18 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from api.deps import AuthPayload, get_auth
 from services.parent.parent_service import ParentService
+from services.period.period_management_service import PeriodManagementService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 parent_service = ParentService()
+period_management_service = PeriodManagementService()
 
 
 @router.get("/my-periods")
 def my_periods(auth: AuthPayload = Depends(get_auth)):
     try:
-        periods = parent_service.get_periods_by_parent(auth.sub)
+        periods = period_management_service.get_periods_by_owner(auth.sub)
         return {"periods": periods}
     except Exception as e:
         logger.error("Error fetching parent periods: %s", e, exc_info=True)
