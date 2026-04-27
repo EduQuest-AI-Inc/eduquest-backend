@@ -140,7 +140,7 @@ class HWAgent:
                 
                 Return ONLY the instructions as a numbered list. No headers or extra text.
                 """,
-                model="gpt-4o"
+                model="gpt-5.5"
             )
             
             result = await Runner.run(
@@ -181,7 +181,7 @@ class HWAgent:
                 Make each criterion's scoring descriptions specific to what you're evaluating in that area.
                 Each score level should clearly describe what performance looks like for that criterion at that level.
                 """,
-                model="gpt-4o",
+                model="gpt-5.5",
                 output_type=Rubric
             )
             
