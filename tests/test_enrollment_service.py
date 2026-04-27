@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from routes.enrollment.enrollment_service import EnrollmentService
+from services.enrollment.enrollment_service import EnrollmentService
 
 
 def _svc():

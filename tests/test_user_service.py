@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from routes.user.user_service import UserService
+from services.user.user_service import UserService
 
 
 def _svc():

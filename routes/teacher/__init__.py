@@ -1,1 +1,0 @@
-from .routes import teacher_bp as teacher_bp

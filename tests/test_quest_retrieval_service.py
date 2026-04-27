@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from routes.quest.quest_retrieval_service import QuestRetrievalService
+from services.quest.quest_retrieval_service import QuestRetrievalService
 
 
 # --- pure-function tests (no DAO needed) ---

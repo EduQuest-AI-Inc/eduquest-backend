@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
-from routes.waitlist.WaitlistService import WaitlistService
+from services.waitlist.WaitlistService import WaitlistService
 
 router = APIRouter()
 svc = WaitlistService()
@@ -35,3 +35,17 @@ def join_pilot_waitlist(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to join waitlist")
+
+
+@router.post("/approve/{user_id}")
+def approve_teacher(user_id: str, auth: AuthPayload = Depends(get_auth)):
+    # TODO: add admin role check
+    try:
+        result = svc.approve(user_id)
+        if result.get("success"):
+            return result
+        raise HTTPException(status_code=400, detail="Failed to approve teacher")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to approve teacher")

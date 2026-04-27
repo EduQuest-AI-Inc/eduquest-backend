@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, call
 
-from routes.quest.quest_grading_service import QuestGradingService
+from services.quest.quest_grading_service import QuestGradingService
 
 
 def _svc():
