@@ -4,8 +4,8 @@
     "ParameterValue": "YOUR_EC2_PUBLIC_IP_HERE"
   },
   {
-    "ParameterKey": "FlaskPort",
-    "ParameterValue": "5000"
+    "ParameterKey": "BackendPort",
+    "ParameterValue": "8000"
   },
   {
     "ParameterKey": "StageName",

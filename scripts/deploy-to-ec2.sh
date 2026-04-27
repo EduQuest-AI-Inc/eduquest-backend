@@ -67,7 +67,7 @@ COMMAND_ID=$(aws ssm send-command \
             pip3 install -r requirements.txt
         fi
 
-        export FLASK_ENV=${ENVIRONMENT}
+        export APP_ENV=${ENVIRONMENT}
 
         sudo systemctl restart eduquest-backend
 
