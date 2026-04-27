@@ -6,27 +6,48 @@ See also: [data_access/CLAUDE.md](data_access/CLAUDE.md) for DAO and database pa
 
 ```
 eduquest-backend/
-├── app.py                          # Flask app factory, Blueprint registration
-├── main.py                         # Alternative FastAPI entry point (migration pending)
-├── routes/                         # Feature modules (Blueprint + service files)
-│   ├── auth/                       # routes.py, auth_service.py, password_reset_service.py, password_policy.py
-│   ├── conversation/               # routes.py, conversation_service.py, grading_service.py,
+├── main.py                         # FastAPI app factory and entry point (sole server — Flask migration complete)
+├── api/                            # FastAPI layer
+│   ├── deps.py                     # get_auth() dependency → AuthPayload (JWT from header or cookie)
+│   └── routers/
+│       ├── auth.py                 # /auth — login, register, password reset
+│       ├── conversation.py         # /conversation — profile assistant, update assistant
+│       ├── enrollment.py           # /enrollment — enroll/unenroll students
+│       ├── parent.py               # /parent — parent invite, child lookup
+│       ├── period.py               # /period — LTG conversation, homework agent
+│       ├── quest.py                # /quest — quest retrieval, submission
+│       ├── teacher.py              # /teacher — create period, S3 file, Canvas, period schedule
+│       ├── user.py                 # /user — user profile
+│       └── waitlist.py             # /pilot-waitlist — status, join
+├── services/                         # Service/business logic layer (imported by api/routers/)
+│   ├── auth_utils.py               # Shared auth helpers used across service modules
+│   ├── auth/                       # auth_service.py, password_reset_service.py, password_policy.py
+│   ├── conversation/               # conversation_service.py, grading_service.py,
 │   │                               #   ltg_service.py, profile_service.py, teacher_feedback_service.py
-│   ├── enrollment/                 # routes.py, enrollment_service.py
-│   ├── period/                     # routes.py, period_service.py, period_enrollment_service.py,
-│   │                               #   period_ltg_service.py, period_quest_service.py
-│   ├── quest/                      # routes.py, quest_service.py, quest_creation_service.py,
+│   ├── enrollment/                 # enrollment_service.py
+│   ├── period/                     # period_service.py, period_enrollment_service.py,
+│   │                               #   period_quest_service.py, period_schedule_service.py,
+│   │                               #   period_management_service.py, period_file_helpers.py
+│   ├── quest/                      # quest_service.py, quest_creation_service.py,
 │   │                               #   quest_retrieval_service.py, quest_grading_service.py
-│   ├── teacher/                    # routes.py, teacher_service.py, period_schedule_service.py
-│   ├── user/                       # routes.py, user_service.py
-│   ├── waitlist/                   # routes.py, WaitlistService.py
-│   ├── parent/                     # routes.py, parent_service.py
-│   └── parent_waitlist/            # routes.py, parent_waitlist_service.py
+│   ├── teacher/                    # teacher_service.py, period_schedule_service.py
+│   ├── user/                       # user_service.py
+│   ├── waitlist/                   # WaitlistService.py
+│   └── parent/                     # parent_service.py
 ├── models/                         # Pydantic domain models
-│   ├── user.py                     # Base User model (shared fields: name, email, password, role, canvas)
-│   ├── student.py                  # Student(User) — grade, strengths/weaknesses, tutorial status
-│   ├── teacher.py                  # Teacher(User) — pilot_approved, school_id
-│   └── parent.py                   # Parent(User) — linked_user_ids
+│   ├── user.py                     # Base User model
+│   ├── student.py                  # Student(User)
+│   ├── teacher.py                  # Teacher(User)
+│   ├── parent.py                   # Parent(User)
+│   ├── student_long_term_goal.py   # StudentLongTermGoal — one goal per (user_id, period_id)
+│   ├── quest.py                    # Quest — assignment with rubric, grade, status
+│   ├── enrollment.py               # Enrollment — student ↔ period membership
+│   ├── period.py                   # Period — class with vector store and Canvas metadata
+│   ├── period_schedule.py          # PeriodSchedule — AI-generated weekly schedule
+│   ├── conversation.py             # Conversation — chat session record
+│   ├── session.py                  # Session — JWT session record
+│   ├── parent_invite.py            # ParentInvite — invite token for parent signup
+│   └── password_reset_token.py     # PasswordResetToken — reset link token
 ├── bots/                           # All AI agent code (was EQ_agents/)
 │   ├── agent.py                    # HWAgent — quest instruction/rubric generation
 │   ├── grading_agent.py            # Multi-agent grading orchestrator
@@ -35,8 +56,9 @@ eduquest-backend/
 │   ├── profile_agent.py            # Student profile agent
 │   ├── schedule_agent.py           # Schedule generation agent
 │   ├── teacher_feedback_agent.py   # Teacher feedback agent
+│   ├── ltg_conversation_service.py # Re-export shim (backwards compat for old imports)
 │   └── schemas/rubric.py           # Rubric Pydantic schema
-├── services/                       # Cross-cutting business logic
+├── integrations/                   # External service adapters (shared across features)
 │   ├── s3_service.py               # AWS S3 upload helpers
 │   ├── canvas_service.py           # Canvas LMS integration (canvasapi library)
 │   └── email_service.py            # SES email sending
@@ -55,36 +77,35 @@ eduquest-backend/
 
 ## API Modules
 
-Registered in app.py:
+### FastAPI (`main.py`) — sole server
 
-- `/conversation` — AI chat interactions with students
-- `/auth` — Login, signup, Supabase integration
-- `/user` — User profile and data management
-- `/period` — Class period management
-- `/teacher` — Teacher-specific operations
-- `/enrollment` — Student-class enrollment
-- `/quest` — Quest assignment and tracking
-- `/pilot-waitlist` — Pilot waitlist management
-- `/parent` — Parent homeschool class and invite management
-- `/parent-waitlist` — Parent waitlist management
+- `/auth` — login, register, password reset
+- `/conversation` — profile assistant, update assistant
+- `/enrollment` — student enrollment
+- `/parent` — parent invite and child lookup
+- `/period` — LTG conversation, homework agent
+- `/quest` — quest retrieval, submission
+- `/teacher` — create period, S3 file retrieval, Canvas courses, period schedule CRUD
+- `/user` — user profile
+- `/pilot-waitlist` — status, join
 
 ## Route Pattern
 
-Each route module follows:
+FastAPI routers live in `api/routers/[feature].py`. Each imports service classes from `services/[feature]/`:
 
 ```
-routes/[feature]/
-  ├── routes.py              # Flask Blueprint and endpoints
-  ├── [feature]_service.py   # Business logic (thin orchestrator)
-  ├── [feature]_*_service.py # Sub-services for specific concerns
+api/routers/[feature].py       # FastAPI router — HTTP boundary only
+services/[feature]/
+  ├── [feature]_service.py     # Business logic (thin orchestrator)
+  ├── [feature]_*_service.py   # Sub-services for specific concerns
   └── __init__.py
 ```
 
-Route handlers that do more than one distinct thing extract underscore-prefixed helpers in the same file (e.g. `_validate_pilot_access()`, `_resolve_identity()`, `_handle_file_submission()`). These are private to the module — no helper should exceed 20 lines.
+Router handlers that do more than one distinct thing extract underscore-prefixed helpers in the same file (e.g. `_validate_pilot_access()`, `_resolve_identity()`, `_handle_file_submission()`). These are private to the module — no helper should exceed 20 lines.
 
 ## Error Handling
 
-Custom exceptions in `exceptions/` are caught by global handlers in `app.py`:
+Custom exceptions in `exceptions/` are caught by global handlers in `main.py`:
 
 - `ValidationError` → 400
 - `NotFoundError` → 404
@@ -134,8 +155,8 @@ pip install -r requirements.txt
 **Run**:
 
 ```bash
-python app.py
-# http://0.0.0.0:5000, debug mode
+uvicorn main:app --reload
+# http://0.0.0.0:8000
 ```
 
 **Testing**:

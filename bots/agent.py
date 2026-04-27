@@ -17,13 +17,12 @@ logger = logging.getLogger(__name__)
 from agents import (
     Agent,
     Runner,
-    FileSearchTool,
     trace,
 )
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 import asyncio
-from bots.schemas.rubric import Rubric, Scale
+from bots.schemas.rubric import Rubric
 
 
 class IndividualQuest(BaseModel):

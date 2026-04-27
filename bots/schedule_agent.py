@@ -50,7 +50,7 @@ class PeriodScheduleAgent:
         self.course_name = course_name or "the course"
 
         # Instructions aligned with JSON schema output (not markdown tables)
-        instructions = f"""You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from course materials.
+        instructions = """You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from course materials.
 
 MISSION
 Transform course inputs into a weekly schedule with:
@@ -88,15 +88,16 @@ HANDLING MISSING INFO
 - Missing content for a week → describe as "Review/Catch-up week" or similar
 - Default to 18 weeks unless materials specify otherwise"""
 
+        tools = (
+            [FileSearchTool(vector_store_ids=[self.vector_store_id])]
+            if self.vector_store_id
+            else []
+        )
         self.agent = Agent(
             name="Period Schedule Agent",
             instructions=instructions,
-            model="gpt-5.2",
-            tools=[
-                FileSearchTool(
-                    vector_store_ids=[self.vector_store_id]
-                )
-            ],
+            model="gpt-5",
+            tools=tools,
             output_type=PeriodScheduleSchema
         )
 

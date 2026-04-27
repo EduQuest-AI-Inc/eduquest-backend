@@ -1,16 +1,13 @@
 import os
+from fastapi import Response
 from exceptions.auth_error import AuthError
-from werkzeug.local import LocalProxy
 
-_IS_DEVELOPMENT = (
-    os.getenv('FLASK_ENV', 'production') == 'development'
-    or os.getenv('FLASK_DEBUG', '0') == '1'
-)
+_IS_DEVELOPMENT = os.getenv('APP_ENV', 'production') == 'development'
 _COOKIE_DOMAIN = 'eduquestai.org'
 
 
-def extract_auth_token(request: LocalProxy) -> str:
-    """Extract auth token from Authorization header with cookie fallback. Returns token string or None."""
+def extract_auth_token(request) -> str | None:
+    """Extract auth token from Authorization header with cookie fallback."""
     auth_header = request.headers.get('Authorization', '')
     if auth_header and auth_header.lower().startswith('bearer '):
         return auth_header.split(' ', 1)[1].strip()
@@ -25,7 +22,7 @@ def extract_auth_token(request: LocalProxy) -> str:
     return None
 
 
-def get_user_id_from_token(auth_token, session_dao):
+def get_user_id_from_token(auth_token, session_dao) -> str:
     """Validate auth_token and return user_id, or raise AuthError."""
     if not auth_token:
         raise AuthError("Missing auth token")
@@ -35,13 +32,13 @@ def get_user_id_from_token(auth_token, session_dao):
     return sessions[0]['user_id']
 
 
-def set_auth_cookie(response, token) -> None:
+def set_auth_cookie(response: Response, token: str) -> None:
     """Set the auth_token cookie with environment-appropriate flags."""
     if _IS_DEVELOPMENT:
-        response.set_cookie('auth_token', token, httponly=True, samesite='Lax')
+        response.set_cookie('auth_token', token, httponly=True, samesite='lax')
     else:
         response.set_cookie(
             'auth_token', token,
             httponly=True, secure=True,
-            samesite='None', domain=_COOKIE_DOMAIN,
+            samesite='none', domain=_COOKIE_DOMAIN,
         )

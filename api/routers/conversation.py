@@ -2,27 +2,17 @@ import asyncio
 import json
 import os
 import tempfile
-from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
-from routes.conversation.conversation_service import ConversationService
+from services.conversation.conversation_service import ConversationService
+from utils.conversion_utils import convert_decimals as _convert_decimals
 
 router = APIRouter()
 conversation_service = ConversationService()
-
-
-def _convert_decimals(obj):
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, dict):
-        return {k: _convert_decimals(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_convert_decimals(i) for i in obj]
-    return obj
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +92,7 @@ async def initiate_update_assistant(
 
             # Fetch quest data to build quests_file JSON
             try:
-                from data_access.supabase.individual_quest_dao import IndividualQuestDAO
+                from data_access.individual_quest_dao import IndividualQuestDAO
                 quest_data = IndividualQuestDAO().get_individual_quest_by_id(individual_quest_id)
                 if not quest_data:
                     raise HTTPException(status_code=404, detail="Quest not found")
