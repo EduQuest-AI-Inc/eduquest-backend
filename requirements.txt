@@ -1,5 +1,7 @@
 python-dotenv==1.0.1
-passlib[bcrypt]
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+Werkzeug>=3.0.0
 httpx
 openai
 pandas

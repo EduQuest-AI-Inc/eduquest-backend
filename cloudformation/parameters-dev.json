@@ -4,8 +4,8 @@
     "ParameterValue": "3.15.42.96"
   },
   {
-    "ParameterKey": "FlaskPort",
-    "ParameterValue": "5000"
+    "ParameterKey": "BackendPort",
+    "ParameterValue": "8000"
   },
   {
     "ParameterKey": "StageName",

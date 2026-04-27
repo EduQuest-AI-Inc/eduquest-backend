@@ -1,6 +1,8 @@
 from passlib.context import CryptContext
+from werkzeug.security import check_password_hash as _werkzeug_check
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+_LEGACY_PREFIXES = ("pbkdf2:", "scrypt:")
 
 
 def generate_password_hash(password: str) -> str:
@@ -8,7 +10,13 @@ def generate_password_hash(password: str) -> str:
 
 
 def check_password_hash(hashed: str, password: str) -> bool:
+    if hashed.startswith(_LEGACY_PREFIXES):
+        return _werkzeug_check(hashed, password)
     return _pwd_context.verify(password, hashed)
+
+
+def _is_legacy_hash(hashed: str) -> bool:
+    return hashed.startswith(_LEGACY_PREFIXES)
 
 from data_access.user_dao import UserDAO
 from data_access.student_dao import StudentDAO
@@ -76,4 +84,12 @@ def authenticate_user(username: str, password: str, role: str) -> bool:
     user = user_dao.get_by_id(username)
     if not user or user.get('role') != role:
         return False
-    return check_password_hash(user['password'], password)
+    stored_hash = user['password']
+    if not check_password_hash(stored_hash, password):
+        return False
+    if _is_legacy_hash(stored_hash):
+        try:
+            user_dao.update(username, {"password": generate_password_hash(password)})
+        except Exception:
+            pass
+    return True
