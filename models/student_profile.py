@@ -1,5 +1,5 @@
 class student_profile:
-    def __init__(self, first_name, last_name, age, gender, grade, strength=None, weakness=None, interest=None, learning_style=None, long_term_goal=None):
+    def __init__(self, first_name, last_name, age, gender, grade, strength=None, weakness=None, interest=None, learning_style=None, long_term_goal=None) -> None:
         self.first_name = first_name
         self.last_name = last_name
         self.age = age

@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import tempfile
@@ -8,6 +9,9 @@ from openai import OpenAI
 
 from routes.parent.parent_service import ParentService
 from routes.teacher.period_schedule_service import PeriodScheduleService
+from services.s3_service import upload_file_to_s3
+
+logger = logging.getLogger(__name__)
 from s3 import upload_file_to_s3
 
 parent_bp = Blueprint("parent", __name__)
@@ -25,9 +29,9 @@ def create_period():
     No Canvas integration, no pilot gate.
     """
     try:
-        parent_id = get_jwt_identity()
+        user_id = get_jwt_identity()
 
-        course = request.form.get("course")
+        course = request.form.get("name")
         files = request.files.getlist("files")
 
         if not course:
@@ -52,7 +56,7 @@ def create_period():
 
         period = parent_service.create_period(
             course=course,
-            parent_id=parent_id,
+            user_id=user_id,
             vector_store_id=vector_store.id,
             file_urls=[],
         )
@@ -75,14 +79,13 @@ def create_period():
         # Auto-generate schedule for the period (non-blocking; failures are logged)
         schedule_result = None
         try:
-            print(f"Auto-generating schedule for parent period {period_id}...")
             schedule_result = period_schedule_service.generate_and_save_schedule(
                 period_id=period_id,
-                teacher_id=parent_id
+                user_id=user_id
             )
-            print(f"Schedule generated successfully for parent period {period_id}")
+            logger.info("Schedule generated successfully for parent period %s", period_id)
         except Exception as schedule_error:
-            print(f"Warning: Failed to auto-generate schedule for parent period: {schedule_error}")
+            logger.warning("Failed to auto-generate schedule for parent period %s: %s", period_id, schedule_error)
 
         return jsonify({
             "message": "Class created successfully",
@@ -93,7 +96,7 @@ def create_period():
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 400
     except Exception as e:
-        print(f"Error creating parent period: {e}")
+        logger.error("Error creating parent period: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -102,11 +105,11 @@ def create_period():
 def my_periods():
     """Return all homeschool classes owned by the authenticated parent."""
     try:
-        parent_id = get_jwt_identity()
-        periods = parent_service.get_periods_by_parent(parent_id)
+        user_id = get_jwt_identity()
+        periods = parent_service.get_periods_by_parent(user_id)
         return jsonify({"periods": periods}), 200
     except Exception as e:
-        print(f"Error fetching parent periods: {e}")
+        logger.error("Error fetching parent periods: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -118,11 +121,11 @@ def generate_invite():
     The student enters this code to link their account to this parent.
     """
     try:
-        parent_id = get_jwt_identity()
-        invite = parent_service.generate_invite(parent_id)
+        user_id = get_jwt_identity()
+        invite = parent_service.generate_invite(user_id)
         return jsonify(invite), 201
     except Exception as e:
-        print(f"Error generating invite: {e}")
+        logger.error("Error generating invite: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -134,11 +137,11 @@ def get_students():
     Audit-logged per SOC 2 / Rule 6.
     """
     try:
-        parent_id = get_jwt_identity()
-        students = parent_service.get_linked_students(parent_id)
+        user_id = get_jwt_identity()
+        students = parent_service.get_linked_students(user_id)
         return jsonify({"students": students}), 200
     except Exception as e:
-        print(f"Error fetching linked students: {e}")
+        logger.error("Error fetching linked students: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -149,7 +152,7 @@ def get_students():
 def generate_period_schedule():
     """Generate (or regenerate) the AI schedule for a parent-owned period."""
     try:
-        parent_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         body = request.get_json(silent=True) or {}
         period_id = body.get("period_id")
         if not period_id:
@@ -157,7 +160,7 @@ def generate_period_schedule():
 
         result = period_schedule_service.generate_and_save_schedule(
             period_id=period_id,
-            teacher_id=parent_id
+            user_id=user_id
         )
         return jsonify(result), 200
 
@@ -166,6 +169,7 @@ def generate_period_schedule():
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404
     except Exception as e:
+        logger.error("Error generating parent schedule: %s", e, exc_info=True)
         print(f"Error generating parent schedule: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
@@ -175,14 +179,14 @@ def generate_period_schedule():
 def get_period_schedule():
     """Return the schedule for a parent-owned period."""
     try:
-        parent_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         period_id = request.args.get("period_id")
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
 
         result = period_schedule_service.get_schedule(
             period_id=period_id,
-            teacher_id=parent_id
+            user_id=user_id
         )
         if result is None:
             return jsonify({"error": "No schedule found for this period"}), 404
@@ -193,7 +197,7 @@ def get_period_schedule():
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404
     except Exception as e:
-        print(f"Error fetching parent schedule: {e}")
+        logger.error("Error fetching parent schedule: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -202,7 +206,7 @@ def get_period_schedule():
 def update_period_schedule():
     """Save manual edits to the schedule for a parent-owned period."""
     try:
-        parent_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         body = request.get_json(silent=True) or {}
         period_id = body.get("period_id")
         schedule_dict = body.get("schedule")
@@ -211,7 +215,7 @@ def update_period_schedule():
 
         result = period_schedule_service.update_schedule(
             period_id=period_id,
-            teacher_id=parent_id,
+            user_id=user_id,
             schedule_dict=schedule_dict
         )
         return jsonify(result), 200
@@ -221,7 +225,7 @@ def update_period_schedule():
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404
     except Exception as e:
-        print(f"Error updating parent schedule: {e}")
+        logger.error("Error updating parent schedule: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -230,7 +234,7 @@ def update_period_schedule():
 def set_quest_weeks():
     """Set which weeks have quests enabled for a parent-owned period."""
     try:
-        parent_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         body = request.get_json(silent=True) or {}
         period_id = body.get("period_id")
         quest_enabled_weeks = body.get("quest_enabled_weeks")
@@ -239,7 +243,7 @@ def set_quest_weeks():
 
         result = period_schedule_service.set_quest_weeks(
             period_id=period_id,
-            teacher_id=parent_id,
+            user_id=user_id,
             quest_enabled_weeks=quest_enabled_weeks
         )
         return jsonify(result), 200
@@ -249,5 +253,5 @@ def set_quest_weeks():
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404
     except Exception as e:
-        print(f"Error setting quest weeks for parent: {e}")
+        logger.error("Error setting quest weeks for parent: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500

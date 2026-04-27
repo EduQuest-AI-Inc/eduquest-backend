@@ -6,7 +6,7 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 
 
 class WaitlistDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('pilot_waitlist')
 
     def get_by_teacher_id(self, teacher_id: str) -> Optional[Dict[str, Any]]:

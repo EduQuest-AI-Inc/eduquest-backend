@@ -4,7 +4,7 @@ from data_access.supabase.base_dao import SupabaseBaseDAO
 
 
 class SchoolDAO(SupabaseBaseDAO):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('school')
 
     def add_school(self, school) -> None:

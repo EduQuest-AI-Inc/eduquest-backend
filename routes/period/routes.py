@@ -1,199 +1,84 @@
-import os
+import logging
 from datetime import datetime, timezone
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .period_service import PeriodService
+from utils.token_utils import extract_auth_token, get_user_id_from_token
 
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.parent_dao import ParentDAO
-    from data_access.supabase.parent_invite_dao import ParentInviteDAO
-else:
-    from data_access.parent_dao import ParentDAO
-    from data_access.parent_invite_dao import ParentInviteDAO
+from data_access.supabase.parent_dao import ParentDAO
+from data_access.supabase.parent_invite_dao import ParentInviteDAO
+from flask.wrappers import Response
+from typing import Tuple
+
+logger = logging.getLogger(__name__)
 
 period_bp = Blueprint('period', __name__)
 period_service = PeriodService()
 _parent_dao = ParentDAO()
 _invite_dao = ParentInviteDAO()
 
+
+def _token() -> str:
+    return extract_auth_token(request)
+
+
 @period_bp.route('/my-periods', methods=['GET'])
 def my_periods():
     try:
-        auth_token = None
-        auth_header = request.headers.get('Authorization', '')
-        if auth_header and auth_header.lower().startswith('bearer '):
-            auth_token = auth_header.split(' ', 1)[1].strip()
-
-        if not auth_token:
-            raw_cookie = request.headers.get('Cookie', '')
-            if 'auth_token=' in raw_cookie:
-                parts = [p.strip() for p in raw_cookie.split(';')]
-                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-                if auth_tokens:
-                    auth_token = auth_tokens[-1]
-
-        if not auth_token:
-            return jsonify({"error": "Missing auth token"}), 401
-
-        result = period_service.get_my_periods(auth_token)
+        result = period_service.get_my_periods(_token())
         return jsonify(result), 200
-
     except Exception as e:
-        print(f"Unexpected error in my-periods: {e}")
+        logger.error("Unexpected error in my-periods: %s", e, exc_info=True)
         return jsonify({"error": "An unexpected error occurred"}), 500
+
 
 @period_bp.route('/verify-period', methods=['POST'])
 def verify_period():
     try:
-        
-        
-        # Prefer Authorization: Bearer <token>
-        auth_token = None
-        token = None
-        auth_header = request.headers.get('Authorization', '')
-        if auth_header and auth_header.lower().startswith('bearer '):
-            token = auth_header.split(' ', 1)[1].strip()
-            auth_token = token
-
-
-        # Fallback: parse the last auth_token from Cookie header if multiple exist
-        if not token:
-            raw_cookie = request.headers.get('Cookie', '')
-            if 'auth_token=' in raw_cookie:
-                parts = [p.strip() for p in raw_cookie.split(';')]
-                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-                if auth_tokens:
-                    auth_token = auth_tokens[-1]
-
-        print(f"Auth token for initiate-profile-assistant: {auth_token}")
-
         data = request.json
         period_id = data.get('period_id')
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
-
-        # Verify period and add to enrollments
-        period = period_service.verify_period_id(auth_token, period_id)
+        period = period_service.verify_period_id(_token(), period_id)
         return jsonify({"message": "Period verified and added to enrollments", "period": period}), 200
-
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
-    except LookupError as le:
-        return jsonify({"error": str(le)}), 404
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        logger.error("Unexpected error in verify-period: %s", e, exc_info=True)
         return jsonify({"error": "An unexpected error occurred"}), 500
+
 
 @period_bp.route('/unenroll', methods=['POST'])
-def unenroll():
-    try:
-        auth_token = None
-        token = None
-        auth_header = request.headers.get('Authorization', '')
-        if auth_header and auth_header.lower().startswith('bearer '):
-            token = auth_header.split(' ', 1)[1].strip()
-            auth_token = token
+def unenroll() -> Tuple[Response, int]:
+    data = request.json
+    period_id = data.get('period_id')
+    if not period_id:
+        return jsonify({"error": "period_id is required"}), 400
+    result = period_service.unenroll_from_period(_token(), period_id)
+    return jsonify(result), 200
 
-        if not token:
-            raw_cookie = request.headers.get('Cookie', '')
-            if 'auth_token=' in raw_cookie:
-                parts = [p.strip() for p in raw_cookie.split(';')]
-                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-                if auth_tokens:
-                    auth_token = auth_tokens[-1]
-
-        data = request.json
-        period_id = data.get('period_id')
-        if not period_id:
-            return jsonify({"error": "period_id is required"}), 400
-
-        result = period_service.unenroll_from_period(auth_token, period_id)
-        return jsonify(result), 200
-
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
-    except LookupError as le:
-        return jsonify({"error": str(le)}), 404
-    except Exception as e:
-        print(f"Unexpected error in unenroll: {e}")
-        return jsonify({"error": "An unexpected error occurred"}), 500
 
 @period_bp.route('/initiate-ltg-conversation', methods=['POST'])
 def initiate_ltg_conversation():
     try:
-        
-        
-        # Prefer Authorization: Bearer <token>
-        auth_token = None
-        token = None
-        auth_header = request.headers.get('Authorization', '')
-        if auth_header and auth_header.lower().startswith('bearer '):
-            token = auth_header.split(' ', 1)[1].strip()
-            auth_token = token
-
-
-        # Fallback: parse the last auth_token from Cookie header if multiple exist
-        if not token:
-            raw_cookie = request.headers.get('Cookie', '')
-            if 'auth_token=' in raw_cookie:
-                parts = [p.strip() for p in raw_cookie.split(';')]
-                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-                if auth_tokens:
-                    auth_token = auth_tokens[-1]
-
-        print(f"Auth token for initiate-profile-assistant: {auth_token}")
-
         data = request.json
         period_id = data.get('period_id')
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
-
-        # You may want to pass auth_token and period_id to the service
-        result = period_service.initiate_ltg_conversation(auth_token, period_id)
+        result = period_service.initiate_ltg_conversation(_token(), period_id)
         return jsonify(result), 200
-
-    except ValueError as ve:
-        print(f"ValueError: {ve}")
-        return jsonify({"error": str(ve)}), 400
-
-    except LookupError as le:
-        return jsonify({"error": str(le)}), 404
-
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        logger.error("Unexpected error in initiate-ltg-conversation: %s", e, exc_info=True)
         return jsonify({"error": "An unexpected error occurred"}), 500
+
 
 @period_bp.route('/continue-ltg-conversation', methods=['POST'])
 def continue_ltg_conversation():
     try:
         data = request.json
-        
-        
-        # Prefer Authorization: Bearer <token>
-        auth_token = None
-        token = None
-        auth_header = request.headers.get('Authorization', '')
-        if auth_header and auth_header.lower().startswith('bearer '):
-            token = auth_header.split(' ', 1)[1].strip()
-            auth_token = token
-
-
-        # Fallback: parse the last auth_token from Cookie header if multiple exist
-        if not token:
-            raw_cookie = request.headers.get('Cookie', '')
-            if 'auth_token=' in raw_cookie:
-                parts = [p.strip() for p in raw_cookie.split(';')]
-                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-                if auth_tokens:
-                    auth_token = auth_tokens[-1]
-
-        print(f"Auth token for continue-ltg-conversation: {auth_token}")
-
         conversation_type = data.get('conversation_type')
         conversation_id = data.get('conversation_id')
         user_message = data.get('message')
-        period_id = data.get('period_id')  # Optional, helps with lookup
+        period_id = data.get('period_id')
 
         if not conversation_type:
             return jsonify({"error": "conversation_type is required"}), 400
@@ -203,63 +88,47 @@ def continue_ltg_conversation():
             return jsonify({"error": "message is required"}), 400
 
         result = period_service.continue_ltg_conversation(
-            auth_token, conversation_type, conversation_id, user_message, period_id
+            _token(), conversation_type, conversation_id, user_message, period_id
         )
         return jsonify(result), 200
     except Exception as e:
+        logger.error("Unexpected error in continue-ltg-conversation: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
 
-# Note: /initiate-schedules-agent has been removed. 
-# Quest generation now uses the centralized period_schedule with teacher-selected quest_enabled_weeks.
-# The /initiate-homework-agent endpoint handles both creating quest placeholders and generating homework.
-    
+
 @period_bp.route('/initiate-homework-agent', methods=['POST'])
 def initiate_homework_agent():
     try:
-        
-        
-            
-        # Prefer Authorization: Bearer <token>
-        auth_token = None
-        token = None
-        auth_header = request.headers.get('Authorization', '')
-        if auth_header and auth_header.lower().startswith('bearer '):
-            token = auth_header.split(' ', 1)[1].strip()
-            auth_token = token
+        auth_token = _token()
+        caller_id = get_user_id_from_token(auth_token, period_service.session_dao)
 
-
-        # Fallback: parse the last auth_token from Cookie header if multiple exist
-        if not token:
-            raw_cookie = request.headers.get('Cookie', '')
-            if 'auth_token=' in raw_cookie:
-                parts = [p.strip() for p in raw_cookie.split(';')]
-                auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-                if auth_tokens:
-                    auth_token = auth_tokens[-1]
-
-        print(f"Auth token for initiate-profile-assistant: {auth_token}")
         data = request.json
         period_id = data.get('period_id')
         if not period_id:
             return jsonify({"error": "period_id is required"}), 400
-        
-        result = period_service.start_homework_agent(auth_token, period_id)
+
+        user_id = data.get('user_id')
+        if user_id:
+            period = period_service.period_dao.get_period_by_id(period_id)
+            if not period:
+                return jsonify({"error": "Period not found"}), 404
+            if period.get("owner_id", period.get("user_id")) != caller_id:
+                return jsonify({"error": "Not authorized to generate quests for this period"}), 403
+        else:
+            user_id = caller_id
+
+        result = period_service.start_homework_agent(auth_token, user_id, period_id)
         return jsonify(result), 200
     except Exception as e:
-        print(f"Error in initiate-homework-agent: {str(e)}")
+        logger.error("Error in initiate-homework-agent: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
 @period_bp.route('/accept-parent-invite', methods=['POST'])
 @jwt_required()
 def accept_parent_invite():
-    """
-    Student endpoint — accepts a parent invite code.
-    Links the authenticated student to the parent who generated the code.
-    Records vpc_verified_at for COPPA 2025 homeschool consent tracking.
-    """
     try:
-        student_id = get_jwt_identity()
+        user_id = get_jwt_identity()
         data = request.get_json()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
@@ -271,7 +140,6 @@ def accept_parent_invite():
         invite = _invite_dao.get_invite_by_code(code)
         if not invite:
             return jsonify({"error": "Invalid invite code"}), 404
-
         if invite.get("used"):
             return jsonify({"error": "Invite code has already been used"}), 410
 
@@ -286,29 +154,29 @@ def accept_parent_invite():
         if datetime.now(timezone.utc) > expires_at:
             return jsonify({"error": "Invite code has expired"}), 410
 
-        parent_id = invite.get("parent_id")
-        parent = _parent_dao.get_parent_by_id(parent_id)
+        user_id = invite.get("user_id")
+        parent = _parent_dao.get_parent_by_id(user_id)
         if not parent:
             return jsonify({"error": "Parent account not found"}), 404
 
-        linked_ids = parent.get("linked_student_ids") or []
-        if student_id in linked_ids:
+        linked_ids = parent.get("linked_user_ids") or []
+        if user_id in linked_ids:
             return jsonify({"message": "Already linked to this parent"}), 200
 
-        linked_ids.append(student_id)
+        linked_ids.append(user_id)
         vpc_verified_at = datetime.now(timezone.utc).isoformat()
-        _parent_dao.update_parent(parent_id, {
-            "linked_student_ids": linked_ids,
-            "vpc_verified_at": vpc_verified_at,  # COPPA 2025 homeschool VPC record
+        _parent_dao.update_parent(user_id, {
+            "linked_user_ids": linked_ids,
+            "vpc_verified_at": vpc_verified_at,
         })
         _invite_dao.mark_used(code)
 
         return jsonify({
             "message": "Successfully linked to parent account",
-            "parent_id": parent_id,
+            "user_id": user_id,
             "vpc_verified_at": vpc_verified_at,
         }), 200
 
     except Exception as e:
-        print(f"Error in accept-parent-invite: {e}")
+        logger.error("Error in accept-parent-invite: %s", e, exc_info=True)
         return jsonify({"error": "Internal server error"}), 500

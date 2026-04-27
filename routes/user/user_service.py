@@ -1,20 +1,13 @@
 from typing import Dict, Any
 from models.student import Student
 from models.teacher import Teacher
-
-import os
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.session_dao import SessionDAO
-    from data_access.supabase.student_dao import StudentDAO
-    from data_access.supabase.teacher_dao import TeacherDAO
-else:
-    from data_access.session_dao import SessionDAO
-    from data_access.student_dao import StudentDAO
-    from data_access.teacher_dao import TeacherDAO
+from data_access.supabase.session_dao import SessionDAO
+from data_access.supabase.student_dao import StudentDAO
+from data_access.supabase.teacher_dao import TeacherDAO
 
 class UserService:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()
         self.teacher_dao = TeacherDAO()
@@ -48,15 +41,15 @@ class UserService:
         else:
             raise ValueError(f"Unrecognized role: {role}")
 
-    def update_tutorial_status(self, student_id: str, completed_tutorial: bool):
+    def update_tutorial_status(self, user_id: str, completed_tutorial: bool) -> None:
         """Update tutorial status for a student"""
-        self.student_dao.update_tutorial_status(student_id, completed_tutorial)
+        self.student_dao.update_tutorial_status(user_id, completed_tutorial)
 
-    def get_tutorial_status(self, student_id: str) -> bool:
+    def get_tutorial_status(self, user_id: str) -> bool:
         """Get tutorial status for a student"""
-        return self.student_dao.get_tutorial_status(student_id)
+        return self.student_dao.get_tutorial_status(user_id)
 
-    def needs_tutorial(self, student_id: str) -> bool:
+    def needs_tutorial(self, user_id: str) -> bool:
         """Check if student needs tutorial"""
-        return self.student_dao.needs_tutorial(student_id)
+        return self.student_dao.needs_tutorial(user_id)
 

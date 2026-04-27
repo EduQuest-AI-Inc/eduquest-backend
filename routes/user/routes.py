@@ -1,83 +1,69 @@
+import logging
+
+from canvasapi import Canvas
 from flask import Blueprint, jsonify, request
-from .user_service import UserService
 from flask_jwt_extended import jwt_required, get_jwt_identity, decode_token
-import os
-if os.getenv('USE_SUPABASE', 'false').lower() == 'true':
-    from data_access.supabase.student_dao import StudentDAO
-    from data_access.supabase.teacher_dao import TeacherDAO
-    from data_access.supabase.session_dao import SessionDAO
-else:
-    from data_access.student_dao import StudentDAO
-    from data_access.teacher_dao import TeacherDAO
-    from data_access.session_dao import SessionDAO
+from .user_service import UserService
+from utils.token_utils import extract_auth_token
+from data_access.supabase.student_dao import StudentDAO
+from data_access.supabase.teacher_dao import TeacherDAO
+from data_access.supabase.session_dao import SessionDAO
 
-
+logger = logging.getLogger(__name__)
 user_bp = Blueprint('user', __name__)
 user_service = UserService()
 student_dao = StudentDAO()
 teacher_dao = TeacherDAO()
 session_dao = SessionDAO()
 
+
+def _resolve_identity(token):
+    """Return user_id from JWT claims or session fallback. Returns None if unresolvable."""
+    try:
+        claims = decode_token(token)
+        username = claims.get('sub')
+        if username:
+            return username
+    except Exception as e:
+        logger.debug("JWT decode failed, falling back to session lookup: %s", e)
+
+    session_data = session_dao.get_sessions_by_auth_token(token)
+    return session_data[0]['user_id'] if session_data else None
+
+
+def _fetch_user_profile(user_id):
+    """Look up student then teacher by user_id. Returns profile dict with 'role', or None."""
+    student = student_dao.get_student_by_id(user_id)
+    if student:
+        student['role'] = 'student'
+        student.pop('canvas_api_key', None)
+        return student
+    teacher = teacher_dao.get_teacher_by_id(user_id)
+    if teacher:
+        teacher['role'] = 'teacher'
+        teacher.setdefault('pilot_approved', False)
+        return teacher
+    return None
+
+
 @user_bp.route('/profile', methods=['GET'])
 def get_profile_cookie():
-    print("get_profile_cookie called")
-    print(f"Request headers: {request.headers}")
-
-    # Prefer Authorization: Bearer <token>
-    token = None
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header and auth_header.lower().startswith('bearer '):
-        token = auth_header.split(' ', 1)[1].strip()
-
-
-    # Fallback: parse the last auth_token from Cookie header if multiple exist
-    if not token:
-        raw_cookie = request.headers.get('Cookie', '')
-        if 'auth_token=' in raw_cookie:
-            parts = [p.strip() for p in raw_cookie.split(';')]
-            auth_tokens = [p.split('=', 1)[1] for p in parts if p.startswith('auth_token=')]
-            if auth_tokens:
-                token = auth_tokens[-1]
-
-    print(f"Resolved auth token: {token}")
+    token = extract_auth_token(request)
     if not token:
         return jsonify({'message': 'Missing token'}), 401
     try:
-        username = None
-        # Try to decode JWT directly
-        try:
-            claims = decode_token(token)
-            username = claims.get('sub')
-        except Exception as e:
-            print(f"JWT decode failed, will try session lookup: {e}")
-
-        # Fallback to session store lookup
-        if not username:
-            session_data = session_dao.get_sessions_by_auth_token(token)
-            print(f"Session data retrieved: {session_data}")
-            username = session_data[0]['user_id'] if session_data else None
-            print(f"Username from session: {username}")
-
-        if not username:
+        user_id = _resolve_identity(token)
+        if not user_id:
             return jsonify({'message': 'Invalid or expired token'}), 401
-        
-        # Try student first
-        student = student_dao.get_student_by_id(username)
-        if student:
-            student['role'] = 'student'
-            return jsonify(student), 200
-        # Try teacher
-        teacher = teacher_dao.get_teacher_by_id(username)
-        if teacher:
-            teacher['role'] = 'teacher'
-            # Ensure pilot_approved is included (default False for existing teachers)
-            if 'pilot_approved' not in teacher:
-                teacher['pilot_approved'] = False
-            return jsonify(teacher), 200
-        return jsonify({'message': 'User not found'}), 404
+
+        profile = _fetch_user_profile(user_id)
+        if not profile:
+            return jsonify({'message': 'User not found'}), 404
+        return jsonify(profile), 200
     except Exception as e:
-        print(f"Error in get_profile_cookie: {e}")
+        logger.error("Error in get_profile_cookie: %s", e, exc_info=True)
         return jsonify({'message': 'Invalid or expired token'}), 401
+
 
 @user_bp.route('/update-tutorial', methods=['POST'])
 @jwt_required()
@@ -85,28 +71,71 @@ def update_tutorial():
     """Update tutorial completion status"""
     try:
         data = request.get_json()
-        student_id = get_jwt_identity()
-        
+        user_id = get_jwt_identity()
         completed_tutorial = data.get('completed_tutorial', False)
-        
-        user_service.update_tutorial_status(student_id, completed_tutorial)
-        
+        user_service.update_tutorial_status(user_id, completed_tutorial)
         return jsonify({'message': 'Tutorial status updated successfully'}), 200
-        
     except Exception as e:
-        print(f"Error updating tutorial status: {e}")
+        logger.error("Error updating tutorial status: %s", e, exc_info=True)
         return jsonify({'error': 'Failed to update tutorial status'}), 500
+
 
 @user_bp.route('/tutorial-status', methods=['GET'])
 @jwt_required()
 def get_tutorial_status():
     """Get current tutorial status"""
     try:
-        student_id = get_jwt_identity()
-        status = user_service.get_tutorial_status(student_id)
-        
+        user_id = get_jwt_identity()
+        status = user_service.get_tutorial_status(user_id)
         return jsonify({'completed_tutorial': status}), 200
-        
     except Exception as e:
-        print(f"Error getting tutorial status: {e}")
+        logger.error("Error getting tutorial status: %s", e, exc_info=True)
         return jsonify({'error': 'Failed to get tutorial status'}), 500
+
+
+@user_bp.route('/canvas/connect', methods=['POST'])
+@jwt_required()
+def canvas_connect():
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    api_url = data.get('api_url')
+    api_key = data.get('api_key')
+    if not api_url or not api_key:
+        return jsonify({'error': 'api_url and api_key are required'}), 400
+    try:
+        canvas = Canvas(api_url, api_key)
+        canvas.get_current_user()
+    except Exception:
+        return jsonify({'error': 'Invalid Canvas credentials. Check your URL and token.'}), 400
+    student_dao.update_canvas_credentials(user_id, api_url, api_key)
+    return jsonify({'message': 'Canvas connected'}), 200
+
+
+@user_bp.route('/canvas/courses', methods=['GET'])
+@jwt_required()
+def canvas_courses():
+    user_id = get_jwt_identity()
+    student = student_dao.get_student_by_id(user_id)
+    api_url = student.get('canvas_api_url')
+    api_key = student.get('canvas_api_key')
+    if not api_url or not api_key:
+        return jsonify({'error': 'Canvas not connected'}), 400
+    try:
+        canvas = Canvas(api_url, api_key)
+        current_user = canvas.get_current_user()
+        courses = [
+            {'id': c.id, 'name': getattr(c, 'name', f'Course {c.id}')}
+            for c in current_user.get_courses(enrollment_type='student')
+        ]
+        return jsonify({'courses': courses}), 200
+    except Exception as e:
+        logger.error("Error fetching Canvas courses: %s", e, exc_info=True)
+        return jsonify({'error': 'Failed to fetch Canvas courses'}), 400
+
+
+@user_bp.route('/canvas/disconnect', methods=['DELETE'])
+@jwt_required()
+def canvas_disconnect():
+    user_id = get_jwt_identity()
+    student_dao.clear_canvas_credentials(user_id)
+    return jsonify({'message': 'Canvas disconnected'}), 200

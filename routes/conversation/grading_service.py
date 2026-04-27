@@ -9,7 +9,7 @@ import asyncio
 import json
 from typing import Dict, Any, List, Optional
 
-from EQ_agents.grading_agent import GradingOrchestrator, GradingInput, GradingResult
+from bots.grading_agent import GradingOrchestrator, GradingInput, GradingResult
 
 
 def _read_submission_text(submission_path: str) -> str:

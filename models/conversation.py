@@ -8,6 +8,7 @@ class Conversation(BaseModel):
     role: Literal["student", "teacher"]
     conversation_type: str
     period_id: str | None = None
+    last_response_id: str | None = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat(), alias="createdAt")
 
     def to_item(self):

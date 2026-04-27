@@ -1,5 +1,8 @@
+from typing import Any, cast
+
 from data_access.supabase.config import get_supabase_client
 from supabase import Client
+from postgrest._sync.request_builder import SyncRequestBuilder
 
 
 class SupabaseBaseDAO:
@@ -9,24 +12,24 @@ class SupabaseBaseDAO:
     concrete DAOs stay concise.
     """
 
-    def __init__(self, table_name: str):
+    def __init__(self, table_name: str) -> None:
         self.client: Client = get_supabase_client()
         self.table_name = table_name
 
     # -- helpers ---------------------------------------------------------------
 
-    def _table(self):
+    def _table(self) -> SyncRequestBuilder:
         return self.client.table(self.table_name)
 
-    def _insert(self, data: dict) -> dict:
+    def _insert(self, data: dict[str, Any]) -> dict[str, Any]:
         response = self._table().insert(data).execute()
-        return response.data[0] if response.data else {}
+        return cast(dict[str, Any], response.data[0]) if response.data else {}
 
-    def _upsert(self, data: dict) -> dict:
+    def _upsert(self, data: dict[str, Any]) -> dict[str, Any]:
         response = self._table().upsert(data).execute()
-        return response.data[0] if response.data else {}
+        return cast(dict[str, Any], response.data[0]) if response.data else {}
 
-    def _select_by_id(self, id_column: str, id_value) -> dict | None:
+    def _select_by_id(self, id_column: str, id_value: str) -> dict[str, Any] | None:
         response = (
             self._table()
             .select('*')
@@ -34,31 +37,38 @@ class SupabaseBaseDAO:
             .maybe_single()
             .execute()
         )
-        return response.data if response is not None else None
+        return cast(dict[str, Any], response.data) if response is not None else None
 
-    def _select_eq(self, column: str, value) -> list[dict]:
+    def _select_eq(self, column: str, value: str) -> list[dict[str, Any]]:
         response = (
             self._table()
             .select('*')
             .eq(column, value)
             .execute()
         )
-        return response.data or []
+        return cast(list[dict[str, Any]], response.data) if response.data else []
 
-    def _update(self, filters: dict, updates: dict) -> list[dict]:
+    def _update(self, filters: dict[str, Any], updates: dict[str, Any]) -> list[dict[str, Any]]:
         query = self._table().update(updates)
         for col, val in filters.items():
             query = query.eq(col, val)
         response = query.execute()
-        return response.data or []
+        return cast(list[dict[str, Any]], response.data) if response.data else []
 
-    def _delete(self, filters: dict) -> list[dict]:
+    def _delete(self, filters: dict[str, Any]) -> list[dict[str, Any]]:
         query = self._table().delete()
         for col, val in filters.items():
             query = query.eq(col, val)
         response = query.execute()
-        return response.data or []
+        return cast(list[dict[str, Any]], response.data) if response.data else []
 
-    def _rpc(self, function_name: str, params: dict) -> dict | list:
+    def _rows(self, data: Any) -> list[dict[str, Any]]:
+        return cast(list[dict[str, Any]], data) if data else []
+
+    def _row(self, response: Any) -> dict[str, Any] | None:
+        data = response.data if hasattr(response, 'data') else response
+        return cast(dict[str, Any], data) if data is not None else None
+
+    def _rpc(self, function_name: str, params: dict[str, Any]) -> dict[str, Any] | list[Any]:
         response = self.client.rpc(function_name, params).execute()
-        return response.data
+        return cast(dict[str, Any] | list[Any], response.data)
