@@ -1,15 +1,15 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'API Gateway setup for EduQuest Backend Flask Application'
+Description: 'API Gateway setup for EduQuest Backend FastAPI Application'
 
 Parameters:
   EC2PublicIP:
     Type: String
     Description: 'Public IP address of your EC2 instance'
 
-  FlaskPort:
+  BackendPort:
     Type: String
-    Default: '5000'
-    Description: 'Port where Flask is running on EC2'
+    Default: '8000'
+    Description: 'Port where the FastAPI backend is running on EC2'
 
   StageName:
     Type: String
@@ -25,7 +25,7 @@ Resources:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: EduQuest-Backend-API
-      Description: API Gateway for EduQuest Flask Backend
+      Description: API Gateway for EduQuest FastAPI Backend
       EndpointConfiguration:
         Types:
           - REGIONAL
@@ -182,7 +182,7 @@ Resources:
       Integration:
         Type: HTTP_PROXY
         IntegrationHttpMethod: ANY
-        Uri: !Sub 'http://${EC2PublicIP}:${FlaskPort}/auth/{proxy}'
+        Uri: !Sub 'http://${EC2PublicIP}:${BackendPort}/auth/{proxy}'
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
         IntegrationResponses:
@@ -209,7 +209,7 @@ Resources:
       Integration:
         Type: HTTP_PROXY
         IntegrationHttpMethod: ANY
-        Uri: !Sub 'http://${EC2PublicIP}:${FlaskPort}/user/{proxy}'
+        Uri: !Sub 'http://${EC2PublicIP}:${BackendPort}/user/{proxy}'
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
         PassthroughBehavior: WHEN_NO_MATCH
@@ -234,7 +234,7 @@ Resources:
       Integration:
         Type: HTTP_PROXY
         IntegrationHttpMethod: ANY
-        Uri: !Sub 'http://${EC2PublicIP}:${FlaskPort}/conversation/{proxy}'
+        Uri: !Sub 'http://${EC2PublicIP}:${BackendPort}/conversation/{proxy}'
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
         PassthroughBehavior: WHEN_NO_MATCH
@@ -259,7 +259,7 @@ Resources:
       Integration:
         Type: HTTP_PROXY
         IntegrationHttpMethod: ANY
-        Uri: !Sub 'http://${EC2PublicIP}:${FlaskPort}/quest/{proxy}'
+        Uri: !Sub 'http://${EC2PublicIP}:${BackendPort}/quest/{proxy}'
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
         PassthroughBehavior: WHEN_NO_MATCH
@@ -284,7 +284,7 @@ Resources:
       Integration:
         Type: HTTP_PROXY
         IntegrationHttpMethod: ANY
-        Uri: !Sub 'http://${EC2PublicIP}:${FlaskPort}/period/{proxy}'
+        Uri: !Sub 'http://${EC2PublicIP}:${BackendPort}/period/{proxy}'
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
         PassthroughBehavior: WHEN_NO_MATCH
@@ -309,7 +309,7 @@ Resources:
       Integration:
         Type: HTTP_PROXY
         IntegrationHttpMethod: ANY
-        Uri: !Sub 'http://${EC2PublicIP}:${FlaskPort}/teacher/{proxy}'
+        Uri: !Sub 'http://${EC2PublicIP}:${BackendPort}/teacher/{proxy}'
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
         PassthroughBehavior: WHEN_NO_MATCH
@@ -334,7 +334,7 @@ Resources:
       Integration:
         Type: HTTP_PROXY
         IntegrationHttpMethod: ANY
-        Uri: !Sub 'http://${EC2PublicIP}:${FlaskPort}/enrollment/{proxy}'
+        Uri: !Sub 'http://${EC2PublicIP}:${BackendPort}/enrollment/{proxy}'
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
         PassthroughBehavior: WHEN_NO_MATCH
@@ -359,7 +359,7 @@ Resources:
       Integration:
         Type: HTTP_PROXY
         IntegrationHttpMethod: ANY
-        Uri: !Sub 'http://${EC2PublicIP}:${FlaskPort}/waitlist/{proxy}'
+        Uri: !Sub 'http://${EC2PublicIP}:${BackendPort}/waitlist/{proxy}'
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
         PassthroughBehavior: WHEN_NO_MATCH
@@ -384,7 +384,7 @@ Resources:
       Integration:
         Type: HTTP_PROXY
         IntegrationHttpMethod: ANY
-        Uri: !Sub 'http://${EC2PublicIP}:${FlaskPort}/pilot-waitlist/{proxy}'
+        Uri: !Sub 'http://${EC2PublicIP}:${BackendPort}/pilot-waitlist/{proxy}'
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
         PassthroughBehavior: WHEN_NO_MATCH
@@ -407,7 +407,7 @@ Resources:
       Integration:
         Type: HTTP_PROXY
         IntegrationHttpMethod: GET
-        Uri: !Sub 'http://${EC2PublicIP}:${FlaskPort}/helloworld'
+        Uri: !Sub 'http://${EC2PublicIP}:${BackendPort}/helloworld'
         PassthroughBehavior: WHEN_NO_MATCH
       MethodResponses:
         - StatusCode: 200

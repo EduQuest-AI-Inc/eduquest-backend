@@ -33,7 +33,7 @@ cd /home/ubuntu/eduquest-backend
 
 echo "Creating .env file..."
 cat > .env <<'EOF'
-FLASK_ENV=development
+APP_ENV=development
 
 JWT_SECRET_KEY=dev-secret-key-CHANGE-THIS-TO-SECURE-KEY
 
@@ -48,17 +48,17 @@ echo "⚠️  IMPORTANT: Edit /home/ubuntu/eduquest-backend/.env with your actua
 echo "Creating systemd service..."
 sudo tee /etc/systemd/system/eduquest-backend.service > /dev/null <<'EOF'
 [Unit]
-Description=EduQuest Backend Flask Application
+Description=EduQuest Backend FastAPI Application (dev)
 After=network.target
 
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/eduquest-backend/app
-Environment="PATH=/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin"
-Environment="FLASK_ENV=development"
+WorkingDirectory=/home/ubuntu/eduquest-backend
+Environment="PATH=/home/ubuntu/eduquest-backend/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="APP_ENV=development"
 EnvironmentFile=/home/ubuntu/eduquest-backend/.env
-ExecStart=/usr/bin/python3 /home/ubuntu/eduquest-backend/app/app.py
+ExecStart=/home/ubuntu/eduquest-backend/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=10
 StandardOutput=journal
