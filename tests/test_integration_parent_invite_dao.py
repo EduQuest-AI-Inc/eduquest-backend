@@ -9,13 +9,13 @@ from models.user import User
 from models.parent_invite import ParentInvite
 
 _CODE = "TESTSTP8"
-_USER_ID = "test-step8-invite-user"
+_USER_ID = "test-integration-invite-user"
 
 
 def _setup(user_dao):
     user_dao.add_user(User(
         user_id=_USER_ID, first_name="I", last_name="User",
-        email="test-step8-invite@example.com", password="pw", role="parent",
+        email="test-integration-invite@example.com", password="pw", role="parent",
     ))
 
 

@@ -10,9 +10,9 @@ from data_access.password_reset_token_dao import PasswordResetTokenDAO
 from data_access.user_dao import UserDAO
 from models.password_reset_token import PasswordResetToken
 
-_USER_ID = "test-step8-prt-user"
-_EMAIL = "test-step8-prt@example.com"
-_TOKEN_HASH = "test-step8-prt-token-hash"
+_USER_ID = "test-integration-prt-user"
+_EMAIL = "test-integration-prt@example.com"
+_TOKEN_HASH = "test-integration-prt-token-hash"
 
 
 def _make_token(expires_offset_minutes=45):

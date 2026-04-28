@@ -7,6 +7,7 @@ import pytest
 from unittest.mock import MagicMock
 
 from services.period.period_enrollment_service import PeriodEnrollmentService
+from exceptions.validation_error import ValidationError
 
 
 def _svc():
@@ -74,7 +75,7 @@ def test_verify_period_id_already_enrolled_raises():
     svc.student_dao.get_student_by_id.return_value = {"user_id": "u1"}
     svc.enrollment_dao.get_enrollments_by_student.return_value = [{"period_id": "p1"}]
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         svc.verify_period_id("u1", "p1")
 
 
@@ -93,5 +94,5 @@ def test_assert_enrolled_fails():
     svc = _svc()
     svc.enrollment_dao.get_enrollments_by_period.return_value = [{"user_id": "u2"}]
 
-    with pytest.raises(Exception, match="not enrolled"):
+    with pytest.raises(ValidationError, match="not enrolled"):
         svc.assert_enrolled("u1", "p1")

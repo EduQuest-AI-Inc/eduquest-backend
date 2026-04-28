@@ -3,7 +3,7 @@ import pytest
 from data_access.period_dao import PeriodDAO
 from models.period import Period
 
-_ID = "test-step8-base-dao"
+_ID = "test-integration-base-dao"
 
 
 @pytest.mark.integration

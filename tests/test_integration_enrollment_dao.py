@@ -11,15 +11,15 @@ from models.enrollment import Enrollment
 from models.period import Period
 from models.user import User
 
-_PERIOD_ID = "test-step8-enroll-period"
-_USER_ID = "test-step8-enroll-user"
+_PERIOD_ID = "test-integration-enroll-period"
+_USER_ID = "test-integration-enroll-user"
 
 
 def _setup(period_dao, user_dao):
     period_dao.add_period(Period(period_id=_PERIOD_ID, owner_id="test-owner", name="Enroll Test", vector_store_id="vs"))
     user_dao.add_user(User(
         user_id=_USER_ID, first_name="E", last_name="User",
-        email="test-step8-enroll@example.com", password="pw", role="student",
+        email="test-integration-enroll@example.com", password="pw", role="student",
     ))
 
 

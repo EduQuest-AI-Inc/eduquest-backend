@@ -7,14 +7,14 @@ from data_access.conversation_dao import ConversationDAO
 from data_access.user_dao import UserDAO
 from models.conversation import Conversation
 
-_ID = "test-step8-conv-dao"
-_USER_ID = "test-step8-conv-user"
+_ID = "test-integration-conv-dao"
+_USER_ID = "test-integration-conv-user"
 
 
 def _setup(user_dao):
     user_dao._insert({
         "user_id": _USER_ID, "first_name": "C", "last_name": "User",
-        "email": "test-step8-conv@example.com", "password": "pw", "role": "student",
+        "email": "test-integration-conv@example.com", "password": "pw", "role": "student",
     })
 
 

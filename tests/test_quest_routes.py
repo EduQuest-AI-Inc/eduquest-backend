@@ -15,6 +15,26 @@ def client():
     app.dependency_overrides.clear()
 
 
+@pytest.fixture
+def teacher_client():
+    app.dependency_overrides[get_auth] = lambda: AuthPayload(
+        sub="teacher-1", role="teacher", token="t"
+    )
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def other_teacher_client():
+    app.dependency_overrides[get_auth] = lambda: AuthPayload(
+        sub="teacher-2", role="teacher", token="t"
+    )
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
 class TestGetQuests:
 
     @pytest.mark.api
@@ -87,41 +107,25 @@ class TestGetStudentQuests:
         mock_qs.get_quests_for_student.assert_called_once_with("user-1")
 
     @pytest.mark.api
-    def test_get_student_quests_authorized_teacher(self, client):
-        app.dependency_overrides[get_auth] = lambda: AuthPayload(
-            sub="teacher-1", role="teacher", token="t"
-        )
-        try:
-            with patch("api.routers.quest.enrollment_dao") as mock_ed, \
-                 patch("api.routers.quest.period_dao") as mock_pd, \
-                 patch("api.routers.quest.quest_service") as mock_qs, \
-                 patch("api.routers.quest.QuestRetrievalService.attach_grade_display"):
-                mock_ed.get_enrollments_by_student.return_value = [{"period_id": "p1"}]
-                mock_pd.get_periods_by_owner_id.return_value = [{"period_id": "p1"}]
-                mock_qs.get_quests_for_student.return_value = [{"quest_id": "q3"}]
-                resp = client.get("/quest/quests/student/student-1")
-            assert resp.status_code == 200
-        finally:
-            app.dependency_overrides[get_auth] = lambda: AuthPayload(
-                sub="user-1", role="student", token="fake-token"
-            )
+    def test_get_student_quests_authorized_teacher(self, teacher_client):
+        with patch("api.routers.quest.enrollment_dao") as mock_ed, \
+             patch("api.routers.quest.period_dao") as mock_pd, \
+             patch("api.routers.quest.quest_service") as mock_qs, \
+             patch("api.routers.quest.QuestRetrievalService.attach_grade_display"):
+            mock_ed.get_enrollments_by_student.return_value = [{"period_id": "p1"}]
+            mock_pd.get_periods_by_owner_id.return_value = [{"period_id": "p1"}]
+            mock_qs.get_quests_for_student.return_value = [{"quest_id": "q3"}]
+            resp = teacher_client.get("/quest/quests/student/student-1")
+        assert resp.status_code == 200
 
     @pytest.mark.api
-    def test_get_student_quests_unauthorized_returns_403(self, client):
-        app.dependency_overrides[get_auth] = lambda: AuthPayload(
-            sub="teacher-2", role="teacher", token="t"
-        )
-        try:
-            with patch("api.routers.quest.enrollment_dao") as mock_ed, \
-                 patch("api.routers.quest.period_dao") as mock_pd:
-                mock_ed.get_enrollments_by_student.return_value = [{"period_id": "p1"}]
-                mock_pd.get_periods_by_owner_id.return_value = [{"period_id": "p99"}]
-                resp = client.get("/quest/quests/student/student-1")
-            assert resp.status_code == 403
-        finally:
-            app.dependency_overrides[get_auth] = lambda: AuthPayload(
-                sub="user-1", role="student", token="fake-token"
-            )
+    def test_get_student_quests_unauthorized_returns_403(self, other_teacher_client):
+        with patch("api.routers.quest.enrollment_dao") as mock_ed, \
+             patch("api.routers.quest.period_dao") as mock_pd:
+            mock_ed.get_enrollments_by_student.return_value = [{"period_id": "p1"}]
+            mock_pd.get_periods_by_owner_id.return_value = [{"period_id": "p99"}]
+            resp = other_teacher_client.get("/quest/quests/student/student-1")
+        assert resp.status_code == 403
 
     @pytest.mark.api
     def test_get_student_quests_service_error_returns_500(self, client):

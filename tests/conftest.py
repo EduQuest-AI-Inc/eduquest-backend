@@ -7,18 +7,13 @@
 
 import os
 import sys
-from unittest.mock import MagicMock
 from pathlib import Path
+from unittest.mock import MagicMock
 import pytest
+from dotenv import load_dotenv
 
 # Load .env so integration tests pick up real SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
-_env_path = Path(__file__).parent.parent / ".env"
-if _env_path.exists():
-    for _line in _env_path.read_text().splitlines():
-        _line = _line.strip()
-        if _line and not _line.startswith("#") and "=" in _line:
-            _k, _, _v = _line.partition("=")
-            os.environ.setdefault(_k.strip(), _v.strip())
+load_dotenv(Path(__file__).parent.parent / ".env", override=False)
 
 os.environ['OPENAI_API_KEY'] = 'test-key-for-ci'
 os.environ['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'test-secret-key')

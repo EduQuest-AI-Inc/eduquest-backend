@@ -2,7 +2,7 @@ import pytest
 from data_access.teacher_dao import TeacherDAO
 from models.teacher import Teacher
 
-_ID = "test-step8-teacher-dao"
+_ID = "test-integration-teacher-dao"
 
 
 def _teacher():
@@ -10,7 +10,7 @@ def _teacher():
         user_id=_ID,
         first_name="Test",
         last_name="Teacher",
-        email="test-step8-teacher@example.com",
+        email="test-integration-teacher@example.com",
         password="hashed",
         role="teacher",
         pilot_approved=False,

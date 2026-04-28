@@ -56,7 +56,7 @@ class PeriodEnrollmentService:
 
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
-            raise Exception("Student not found")
+            raise NotFoundError("Student not found")
 
         existing_enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)
         enrolled_period_ids = [e['period_id'] for e in existing_enrollments]
@@ -78,7 +78,7 @@ class PeriodEnrollmentService:
 
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
-            raise Exception("Student not found")
+            raise NotFoundError("Student not found")
 
         existing_enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)
         enrolled_period_ids = [e['period_id'] for e in existing_enrollments]
@@ -114,7 +114,7 @@ class PeriodEnrollmentService:
     def assert_enrolled(self, user_id: str, period_id: str) -> None:
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
         if not any(e['user_id'] == user_id for e in enrollments):
-            raise Exception(f"Student {user_id} is not enrolled in period {period_id}")
+            raise ValidationError(f"Student {user_id} is not enrolled in period {period_id}")
 
     def _cleanup_tutorial_periods(self, user_id: str) -> None:
         existing_enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)

@@ -8,7 +8,7 @@ from data_access.period_dao import PeriodDAO
 from models.period import Period
 from models.period_schedule import PeriodSchedule
 
-_PERIOD_ID = "test-step8-sched-period"
+_PERIOD_ID = "test-integration-sched-period"
 
 
 def _setup(period_dao):

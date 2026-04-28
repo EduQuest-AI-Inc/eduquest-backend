@@ -7,14 +7,14 @@ from data_access.session_dao import SessionDAO
 from data_access.user_dao import UserDAO
 from models.session import Session
 
-_TOKEN = "test-step8-session-token"
-_USER_ID = "test-step8-session-user"
+_TOKEN = "test-integration-session-token"
+_USER_ID = "test-integration-session-user"
 
 
 def _setup(user_dao):
     user_dao._insert({
         "user_id": _USER_ID, "first_name": "S", "last_name": "User",
-        "email": "test-step8-session@example.com", "password": "pw", "role": "student",
+        "email": "test-integration-session@example.com", "password": "pw", "role": "student",
     })
 
 

@@ -9,16 +9,16 @@ from data_access.user_dao import UserDAO
 from models.period import Period
 from models.user import User
 
-_USER_ID = "test-step8-ltg-user"
-_PERIOD_ID = "test-step8-ltg-period"
-_PERIOD_ID2 = "test-step8-ltg-period2"
+_USER_ID = "test-integration-ltg-user"
+_PERIOD_ID = "test-integration-ltg-period"
+_PERIOD_ID2 = "test-integration-ltg-period2"
 
 
 def _setup(period_dao, user_dao):
     period_dao.add_period(Period(period_id=_PERIOD_ID, owner_id="owner", name="LTG Goal Test", vector_store_id="vs"))
     user_dao.add_user(User(
         user_id=_USER_ID, first_name="G", last_name="User",
-        email="test-step8-ltg@example.com", password="pw", role="student",
+        email="test-integration-ltg@example.com", password="pw", role="student",
     ))
 
 

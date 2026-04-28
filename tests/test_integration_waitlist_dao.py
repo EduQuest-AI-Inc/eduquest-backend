@@ -6,10 +6,10 @@ import pytest
 from data_access.waitlist_dao import WaitlistDAO
 from data_access.user_dao import UserDAO
 
-_USER_ID = "test-step8-waitlist-user"
-_EMAIL = "test-step8-waitlist@example.com"
-_REFERRER_ID = "test-step8-waitlist-referrer"
-_REFERRER_EMAIL = "test-step8-referrer@example.com"
+_USER_ID = "test-integration-waitlist-user"
+_EMAIL = "test-integration-waitlist@example.com"
+_REFERRER_ID = "test-integration-waitlist-referrer"
+_REFERRER_EMAIL = "test-integration-referrer@example.com"
 
 
 def _setup_user(user_dao, user_id, email):

@@ -2,7 +2,7 @@ import pytest
 from data_access.parent_dao import ParentDAO
 from models.parent import Parent
 
-_ID = "test-step8-parent-dao"
+_ID = "test-integration-parent-dao"
 
 
 def _parent():
@@ -10,7 +10,7 @@ def _parent():
         user_id=_ID,
         first_name="Test",
         last_name="Parent",
-        email="test-step8-parent@example.com",
+        email="test-integration-parent@example.com",
         password="hashed",
         role="parent",
         linked_student_ids=[],

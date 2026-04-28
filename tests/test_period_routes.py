@@ -11,7 +11,7 @@ APPROVED_TEACHER = {"user_id": "user-1", "pilot_approved": True}
 UNAPPROVED_TEACHER = {"user_id": "user-1", "pilot_approved": False}
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def client():
     app.dependency_overrides[get_auth] = lambda: AuthPayload(
         sub="user-1", role="teacher", token="fake-token"

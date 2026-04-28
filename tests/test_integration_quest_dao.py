@@ -11,15 +11,15 @@ from models.period import Period
 from models.user import User
 
 _QUEST_ID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
-_USER_ID = "test-step8-quest-user"
-_PERIOD_ID = "test-step8-quest-period"
+_USER_ID = "test-integration-quest-user"
+_PERIOD_ID = "test-integration-quest-period"
 
 
 def _setup(period_dao, user_dao):
     period_dao.add_period(Period(period_id=_PERIOD_ID, owner_id="owner", name="Quest Test Period", vector_store_id="vs"))
     user_dao.add_user(User(
         user_id=_USER_ID, first_name="Q", last_name="User",
-        email="test-step8-quest@example.com", password="pw", role="student",
+        email="test-integration-quest@example.com", password="pw", role="student",
     ))
 
 

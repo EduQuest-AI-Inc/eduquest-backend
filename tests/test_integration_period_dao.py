@@ -2,8 +2,8 @@ import pytest
 from data_access.period_dao import PeriodDAO
 from models.period import Period
 
-_ID = "test-step8-period-dao"
-_OWNER = "test-step8-period-owner"
+_ID = "test-integration-period-dao"
+_OWNER = "test-integration-period-owner"
 
 
 def _period():
