@@ -1,8 +1,4 @@
-"""Unit tests for auth service: hashing, password policy, JWT, and PasswordResetService.
-
-Note: passlib 1.7.4 + bcrypt >=4.x have an incompatibility in detect_wrap_bug, so
-_pwd_context is mocked in the hashing tests to avoid that backend-init failure.
-"""
+"""Unit tests for auth service: hashing, password policy, JWT, and PasswordResetService."""
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -16,31 +12,25 @@ from services.auth.password_policy import validate_password
 
 
 # ---------------------------------------------------------------------------
-# Password hashing (mocked: tests the thin wrapper, not bcrypt internals)
+# Password hashing
 # ---------------------------------------------------------------------------
 
 class TestPasswordHashing:
 
     @pytest.mark.unit
-    @patch("services.auth.auth_service._pwd_context")
-    def test_hash_delegates_to_context(self, mock_ctx):
-        mock_ctx.hash.return_value = "$2b$fake_hash"
+    def test_hash_produces_bcrypt_hash(self):
         result = generate_password_hash("MySecret123")
-        assert result == "$2b$fake_hash"
-        mock_ctx.hash.assert_called_once_with("MySecret123")
+        assert result.startswith("$2b$")
 
     @pytest.mark.unit
-    @patch("services.auth.auth_service._pwd_context")
-    def test_verify_correct_password(self, mock_ctx):
-        mock_ctx.verify.return_value = True
-        assert check_password_hash("$2b$fake_hash", "RightPass1") is True
-        mock_ctx.verify.assert_called_once_with("RightPass1", "$2b$fake_hash")
+    def test_verify_correct_password(self):
+        hashed = generate_password_hash("RightPass1")
+        assert check_password_hash(hashed, "RightPass1") is True
 
     @pytest.mark.unit
-    @patch("services.auth.auth_service._pwd_context")
-    def test_verify_wrong_password(self, mock_ctx):
-        mock_ctx.verify.return_value = False
-        assert check_password_hash("$2b$fake_hash", "WrongPass1") is False
+    def test_verify_wrong_password(self):
+        hashed = generate_password_hash("RightPass1")
+        assert check_password_hash(hashed, "WrongPass1") is False
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +78,7 @@ class TestPasswordPolicy:
 
 class TestJWT:
 
-    _SECRET = "test-secret-key"
+    _SECRET = "test-secret-key-that-is-long-enough-for-hs256"
     _ALGORITHM = "HS256"
 
     def _mint(self, sub: str, role: str, exp_hours: float = 1.0) -> str:
@@ -116,7 +106,7 @@ class TestJWT:
     def test_wrong_secret_raises(self):
         token = self._mint("user-123", "student")
         with pytest.raises(jwt.InvalidTokenError):
-            jwt.decode(token, "wrong-secret", algorithms=[self._ALGORITHM])
+            jwt.decode(token, "wrong-secret-key-that-is-long-enough-for-hs256", algorithms=[self._ALGORITHM])
 
 
 # ---------------------------------------------------------------------------
