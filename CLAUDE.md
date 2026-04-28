@@ -16,7 +16,7 @@ eduquest-backend/
 │       ├── parent.py               # /parent — parent invite, child lookup
 │       ├── period.py               # /period — LTG conversation, homework agent
 │       ├── quest.py                # /quest — quest retrieval, submission
-│       ├── teacher.py              # /teacher — create period, S3 file, Canvas, period schedule
+│       ├── teacher.py              # /teacher — Canvas courses (teacher-only)
 │       ├── user.py                 # /user — user profile
 │       └── waitlist.py             # /pilot-waitlist — status, join
 ├── services/                         # Service/business logic layer (imported by api/routers/)
@@ -83,9 +83,9 @@ eduquest-backend/
 - `/conversation` — profile assistant, update assistant
 - `/enrollment` — student enrollment
 - `/parent` — parent invite and child lookup
-- `/period` — LTG conversation, homework agent
+- `/period` — LTG conversation, homework agent, period schedule CRUD (teacher + parent)
 - `/quest` — quest retrieval, submission
-- `/teacher` — create period, S3 file retrieval, Canvas courses, period schedule CRUD
+- `/teacher` — Canvas courses (teacher-only)
 - `/user` — user profile
 - `/pilot-waitlist` — status, join
 

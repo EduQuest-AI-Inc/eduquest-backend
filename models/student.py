@@ -5,7 +5,7 @@ from models.user import User
 
 class Student(User):
     role: str = 'student'
-    grade: int
+    grade: Optional[int] = None
     strength: Optional[list] = None
     weakness: Optional[list] = None
     interest: Optional[list] = None

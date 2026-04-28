@@ -22,6 +22,9 @@ class EnrollmentDAO(SupabaseBaseDAO):
     def get_enrollments_by_student(self, user_id: str) -> List[Dict[str, Any]]:
         return self._select_eq('user_id', user_id)
 
+    def get_enrollment_by_id(self, enrollment_id: str) -> Dict[str, Any] | None:
+        return self._select_by_id('enrollment_id', enrollment_id)
+
     def update_enrollment(self, user_id: str, period_id: str, updates: Dict[str, Any]) -> None:
         self._update({'user_id': user_id, 'period_id': period_id}, updates)
 

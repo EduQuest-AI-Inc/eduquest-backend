@@ -29,7 +29,7 @@ class QuestDAO(SupabaseBaseDAO):
         return self._select_by_id('quest_id', quest_id)
 
     def get_quests_by_week(self, week: int) -> List[Dict[str, Any]]:
-        return self._select_eq('week', week)
+        return self._select_eq('week', str(week))
 
     def get_quests_by_status(self, status: str) -> List[Dict[str, Any]]:
         return self._select_eq('status', status)

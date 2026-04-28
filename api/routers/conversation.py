@@ -2,7 +2,9 @@ import asyncio
 import json
 import os
 import tempfile
-from typing import Optional
+from typing import Optional, cast
+
+from fastapi import UploadFile
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -104,6 +106,7 @@ async def initiate_update_assistant(
                 raise HTTPException(status_code=500, detail=f"Failed to fetch quest: {e}")
 
             # Save uploaded file to a temp path synchronously via SpooledTemporaryFile
+            upload_file = cast(UploadFile, upload_file)
             suffix = os.path.splitext(upload_file.filename)[1] if upload_file.filename else ""
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
             tmp.write(upload_file.file.read())
@@ -117,11 +120,11 @@ async def initiate_update_assistant(
                         auth_token=auth.token,
                         quests_file=quests_file,
                         is_instructor=False,
-                        week=int(week),
+                        week=int(str(week)),
                         submission_file=temp_path,
-                        user_id=user_id,
-                        period_id=period_id,
-                        individual_quest_id=individual_quest_id,
+                        user_id=str(user_id) if user_id else None,
+                        period_id=str(period_id) if period_id else None,
+                        individual_quest_id=str(individual_quest_id),
                     ),
                 )
             finally:

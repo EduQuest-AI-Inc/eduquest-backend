@@ -85,8 +85,10 @@ class PasswordResetService:
             )
             return {"success": True, "message": NEUTRAL_REQUEST_MESSAGE}
 
-        user_id = user_data.get("user_id")
+        user_id: Optional[str] = user_data.get("user_id")
         first_name = user_data.get("first_name")
+        if not user_id:
+            return {"success": True, "message": NEUTRAL_REQUEST_MESSAGE}
 
         try:
             raw_token = secrets.token_urlsafe(48)
@@ -243,8 +245,12 @@ class PasswordResetService:
             return False, INVALID_TOKEN_MESSAGE
         
         # Token consumed successfully, now update password
-        user_id = consumed_token_data.get("user_id")
-        email = consumed_token_data.get("email")
+        if consumed_token_data is None:
+            return False, INVALID_TOKEN_MESSAGE
+        user_id: Optional[str] = consumed_token_data.get("user_id")
+        email: Optional[str] = consumed_token_data.get("email")
+        if not user_id:
+            return False, INVALID_TOKEN_MESSAGE
 
         try:
             hashed_password = generate_password_hash(new_password)

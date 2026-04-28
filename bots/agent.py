@@ -107,7 +107,7 @@ class HWAgent:
             result = await Runner.run(
                 title_agent,
                 f"Generate a quest title for week covering: {quest_skills}",
-                **run_kwargs
+                **run_kwargs  # type: ignore[arg-type]
             )
             return result.final_output.strip()
 
@@ -214,8 +214,8 @@ class HWAgent:
             # Create the IndividualQuest object
             individual_quest = IndividualQuest(
                 Name=quest_description,   # AI-generated title → stored as individual_quest.description in DB
-                Skills=quest_skills,
-                Week=quest_week,
+                Skills=quest_skills,  # type: ignore[arg-type]
+                Week=quest_week,  # type: ignore[arg-type]
                 instructions=instructions,
                 rubric=rubric_dict
             )
@@ -241,7 +241,7 @@ class HWAgent:
                     logger.debug("Completed quest %d", i)
 
             logger.info("HWAgent completed - Processed %d/%d quests successfully", len(successful_quests), total_quests)
-            return successful_quests
+            return successful_quests  # type: ignore[return-value]
 
     def run(self) -> list[IndividualQuest]:
         return asyncio.run(self._run_async())

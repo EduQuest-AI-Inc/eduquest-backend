@@ -46,6 +46,8 @@ class ParentService:
             raise ValueError("Invite code has expired")
 
         parent_id = invite.get("user_id")
+        if not parent_id:
+            raise ValueError("Invite data missing user_id")
         parent = self.parent_dao.get_parent_by_id(parent_id)
         if not parent:
             raise ValueError("Parent account not found")

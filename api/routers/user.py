@@ -31,7 +31,7 @@ def _fetch_user_profile(user_id: str) -> Optional[dict]:
     user = user_dao.get_by_id(user_id)
     if not user:
         return None
-    role = user.get("role")
+    role = user.get("role") or ""
     fetcher = _ROLE_FETCHERS.get(role)
     if not fetcher:
         return None
@@ -97,6 +97,8 @@ def canvas_connect(body: CanvasConnectRequest, auth: AuthPayload = Depends(get_a
 @router.get("/canvas/courses")
 def canvas_courses(auth: AuthPayload = Depends(get_auth)):
     student = student_dao.get_student_by_id(auth.sub)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
     api_url = student.get("canvas_api_url")
     api_key = student.get("canvas_api_key")
     if not api_url or not api_key:
