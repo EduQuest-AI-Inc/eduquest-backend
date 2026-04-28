@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
+from data_access.quest_dao import QuestDAO
 from services.conversation.conversation_service import ConversationService
 from utils.conversion_utils import convert_decimals as _convert_decimals
 
@@ -94,8 +95,7 @@ async def initiate_update_assistant(
 
             # Fetch quest data to build quests_file JSON
             try:
-                from data_access.individual_quest_dao import IndividualQuestDAO
-                quest_data = IndividualQuestDAO().get_individual_quest_by_id(individual_quest_id)
+                quest_data = QuestDAO().get_quest_by_id(individual_quest_id)
                 if not quest_data:
                     raise HTTPException(status_code=404, detail="Quest not found")
                 quest_data = _convert_decimals(quest_data)
