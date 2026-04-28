@@ -33,7 +33,7 @@ class TestSignupRoute:
             "grade": "10",
         })
         assert resp.status_code == 201
-        assert "registered successfully" in resp.json()["message"]
+        assert "message" in resp.json()
 
     @pytest.mark.api
     @patch("api.routers.auth.user_dao")

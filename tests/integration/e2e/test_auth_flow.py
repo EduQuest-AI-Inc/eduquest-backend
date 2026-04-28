@@ -21,20 +21,24 @@ from fastapi.testclient import TestClient
 
 from main import app
 
-client = TestClient(app)
-
 TEST_USERNAME = os.environ.get("TEST_USERNAME", "")
 TEST_PASSWORD = os.environ.get("TEST_PASSWORD", "")
 TEST_ROLE     = os.environ.get("TEST_ROLE", "teacher")
 
 
 # ---------------------------------------------------------------------------
-# Reusable fixture
+# Fixtures
 # ---------------------------------------------------------------------------
 
-@pytest.fixture(scope="session")
-def auth_token(supabase_required):
-    """Log in once per session; return the JWT for use in protected-route tests."""
+@pytest.fixture(scope="module")
+def client():
+    with TestClient(app) as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def auth_token(supabase_required, client):
+    """Log in once per module; return the JWT for use in protected-route tests."""
     response = client.post("/auth/login", json={
         "username": TEST_USERNAME,
         "password": TEST_PASSWORD,
@@ -52,7 +56,7 @@ def auth_token(supabase_required):
 
 @pytest.mark.integration
 @pytest.mark.auth
-def test_login_and_access_protected_route(supabase_required):
+def test_login_and_access_protected_route(supabase_required, client):
     """Full auth flow: login → receive JWT → access protected route → 200."""
 
     # Step 1 — Send login request
@@ -96,7 +100,7 @@ def test_login_and_access_protected_route(supabase_required):
 
 @pytest.mark.integration
 @pytest.mark.auth
-def test_login_invalid_credentials(supabase_required):
+def test_login_invalid_credentials(supabase_required, client):
     """Wrong password must return 401 with 'Invalid credentials'."""
     response = client.post("/auth/login", json={
         "username": TEST_USERNAME,
@@ -109,7 +113,7 @@ def test_login_invalid_credentials(supabase_required):
 
 @pytest.mark.integration
 @pytest.mark.auth
-def test_protected_route_rejects_missing_token(supabase_required):
+def test_protected_route_rejects_missing_token(supabase_required, client):
     """No token in header or cookie must return 401 with 'Missing auth token'."""
     response = client.get("/user/profile")
     assert response.status_code == 401
@@ -118,7 +122,7 @@ def test_protected_route_rejects_missing_token(supabase_required):
 
 @pytest.mark.integration
 @pytest.mark.auth
-def test_protected_route_rejects_invalid_token(supabase_required):
+def test_protected_route_rejects_invalid_token(supabase_required, client):
     """A malformed JWT must return 401 with 'Invalid token'."""
     response = client.get(
         "/user/profile",
@@ -130,7 +134,7 @@ def test_protected_route_rejects_invalid_token(supabase_required):
 
 @pytest.mark.integration
 @pytest.mark.auth
-def test_protected_route_rejects_expired_token(supabase_required):
+def test_protected_route_rejects_expired_token(supabase_required, client):
     """A correctly signed but expired JWT must return 401 with 'Token expired'."""
     expired_token = pyjwt.encode(
         {

@@ -9,7 +9,6 @@ import os
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
-import pytest
 from dotenv import load_dotenv
 
 # Load .env so integration tests pick up real SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
@@ -72,7 +71,3 @@ os.environ.setdefault('SUPABASE_URL', 'http://localhost:54321')
 os.environ.setdefault('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
 os.environ.setdefault('USE_SUPABASE', 'false')
 
-@pytest.fixture(scope="session")
-def supabase_required():
-    if os.environ.get("USE_SUPABASE") != "true":
-        pytest.skip("Integration test requires USE_SUPABASE=true")
