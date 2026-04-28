@@ -6,7 +6,7 @@ from data_access.enrollment_dao import EnrollmentDAO
 from data_access.period_schedule_dao import PeriodScheduleDAO
 from data_access.ltg_conversation_dao import LtgConversationDAO
 
-from bots.agent import HWAgent
+from bots.provider import get_bot_provider
 from services.quest.quest_service import QuestService
 
 
@@ -72,7 +72,7 @@ class PeriodQuestService:
 
         ltg_response_id = self.ltg_conversation_dao.get_last_response_id(user_id, period_id)
 
-        homework_agent = HWAgent(student, period, schedule_quests, previous_response_id=ltg_response_id)
+        homework_agent = get_bot_provider().create_hw_agent(student, period, schedule_quests, previous_response_id=ltg_response_id)
         homework = homework_agent.run()
 
         homework_dict = self._normalize_homework(homework)
@@ -134,7 +134,7 @@ class PeriodQuestService:
         ltg_response_id = self.ltg_conversation_dao.get_last_response_id(user_id, period_id)
         student_with_context = {**student, 'recommended_change': recommended_change}
 
-        homework_agent = HWAgent(student_with_context, period, incomplete_quests, previous_response_id=ltg_response_id)
+        homework_agent = get_bot_provider().create_hw_agent(student_with_context, period, incomplete_quests, previous_response_id=ltg_response_id)
         homework = homework_agent.run()
         homework_dict = self._normalize_homework(homework)
 

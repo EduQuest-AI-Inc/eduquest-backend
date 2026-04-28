@@ -5,6 +5,7 @@ from data_access.period_dao import PeriodDAO
 
 from models.enrollment import Enrollment
 from datetime import datetime, timezone
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class EnrollmentService:
     def get_enrollment_by_id(self, enrollment_id: str):
         return self.enrollment_dao.get_enrollment_by_id(enrollment_id)
 
-    def delete_enrollment(self, user_id: str, period_id: str, enrolled_at: str = None):
+    def delete_enrollment(self, user_id: str, period_id: str, enrolled_at: Optional[str] = None):
         self.enrollment_dao.delete_enrollment(user_id, period_id)
         return {"message": f"Enrollment for {user_id} deleted from {period_id}"}
 

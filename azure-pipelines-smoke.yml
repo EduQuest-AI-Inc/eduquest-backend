@@ -1,0 +1,53 @@
+trigger: none  # triggered by CD pipeline after deploy, not on a schedule
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  PYTHON_VERSION: '3.12'
+
+stages:
+  - stage: Smoke
+    displayName: 'Post-Deploy Smoke Tests'
+    jobs:
+      - job: SmokeTests
+        displayName: 'pytest -m smoke'
+        steps:
+          - checkout: self
+
+          - task: UsePythonVersion@0
+            displayName: 'Use Python $(PYTHON_VERSION)'
+            inputs:
+              versionSpec: '$(PYTHON_VERSION)'
+              addToPath: true
+
+          - script: |
+              cd eduquest-backend
+              python -m venv venv
+              source venv/bin/activate
+              pip install --upgrade pip
+              pip install -r requirements.txt
+            displayName: 'Install dependencies'
+
+          - script: |
+              cd eduquest-backend
+              source venv/bin/activate
+              pytest -m smoke --tb=short --no-header -q \
+                --junitxml=test-results-smoke.xml
+            displayName: 'Run smoke tests against staging'
+            env:
+              USE_SUPABASE: 'true'
+              JWT_SECRET_KEY: $(JWT_SECRET_KEY)
+              SUPABASE_URL: $(SUPABASE_URL)
+              SUPABASE_SERVICE_ROLE_KEY: $(SUPABASE_SERVICE_ROLE_KEY)
+              TEST_USERNAME: $(TEST_USERNAME)
+              TEST_PASSWORD: $(TEST_PASSWORD)
+              TEST_ROLE: $(TEST_ROLE)
+
+          - task: PublishTestResults@2
+            displayName: 'Publish smoke test results'
+            condition: always()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'eduquest-backend/test-results-smoke.xml'
+              failTaskOnFailedTests: true

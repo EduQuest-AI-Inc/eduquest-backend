@@ -24,7 +24,7 @@ class PeriodManagementService:
         user_id: str,
         vector_store_id: str,
         file_urls: list,
-        canvas_course_id: Optional[str] = None,
+        canvas_course_id: Optional[int] = None,
         canvas_course_name: Optional[str] = None,
     ) -> dict:
         period_id = self.generate_period_id(course)

@@ -1,18 +1,31 @@
-from passlib.context import CryptContext
-from werkzeug.security import check_password_hash as _werkzeug_check
+import hashlib
+import hmac
+import bcrypt
+from typing import Optional
 
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _LEGACY_PREFIXES = ("pbkdf2:", "scrypt:")
 
 
+def _check_werkzeug_pbkdf2(hashed: str, password: str) -> bool:
+    # werkzeug pbkdf2 format: pbkdf2:<method>:<iterations>$<salt>$<hash>
+    try:
+        _, method_iter, salt_hash = hashed.split(":", 2)
+        method, iterations = method_iter.rsplit(":", 1)
+        salt, expected = salt_hash.split("$", 1)
+        dk = hashlib.pbkdf2_hmac(method, password.encode(), salt.encode(), int(iterations))
+        return hmac.compare_digest(dk.hex(), expected)
+    except Exception:
+        return False
+
+
 def generate_password_hash(password: str) -> str:
-    return _pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def check_password_hash(hashed: str, password: str) -> bool:
     if hashed.startswith(_LEGACY_PREFIXES):
-        return _werkzeug_check(hashed, password)
-    return _pwd_context.verify(password, hashed)
+        return _check_werkzeug_pbkdf2(hashed, password)
+    return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
 def _is_legacy_hash(hashed: str) -> bool:
@@ -33,7 +46,7 @@ teacher_dao = TeacherDAO()
 parent_dao = ParentDAO()
 
 
-def register_user(username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', grade: str = None) -> dict:
+def register_user(username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', grade: Optional[str] = None) -> dict:
     """Register a new user (student, teacher, or parent)."""
     is_valid, error_msg = validate_password(password)
     if not is_valid:
@@ -74,7 +87,7 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
         first_name=first_name,
         last_name=last_name,
         email=email,
-        grade=grade,
+        grade=int(grade) if grade is not None else None,
     )
     student_dao.add_student(student)
     return {"success": True}
