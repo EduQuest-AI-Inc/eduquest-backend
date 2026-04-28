@@ -106,7 +106,7 @@ def initiate_ltg_conversation(
 
 def continue_ltg_conversation(
     vector_store_id: str,
-    previous_response_id: str,
+    previous_response_id: Optional[str],
     user_message: str,
 ) -> Dict[str, Any]:
     service = LTGConversationService(vector_store_id, previous_response_id)
@@ -178,7 +178,7 @@ def run_initiate_ltg(user_id: str, period_id: str) -> Dict[str, Any]:
 
 def run_continue_ltg(
     user_id: str, conversation_type: str, conversation_id: str,
-    message: str, period_id: str = None,
+    message: str, period_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     period_dao = PeriodDAO()
     ltg_conversation_dao = LtgConversationDAO()

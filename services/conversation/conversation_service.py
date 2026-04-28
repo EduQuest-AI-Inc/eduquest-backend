@@ -6,6 +6,7 @@ import logging
 import uuid
 import os
 import json
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,6 @@ class ConversationService:
         self.conversation_dao.add_conversation(Conversation(
             conversation_id=conversation_id,
             user_id=user_id,
-            role="student",
             conversation_type="profile",
             last_response_id=response_id,
         ))
@@ -107,11 +107,11 @@ class ConversationService:
         auth_token: str,
         quests_file: str,
         is_instructor: bool,
-        week: int = None,
-        submission_file: str = None,
-        user_id: str = None,
-        period_id: str = None,
-        individual_quest_id: str = None,
+        week: Optional[int] = None,
+        submission_file: Optional[str] = None,
+        user_id: Optional[str] = None,
+        period_id: Optional[str] = None,
+        individual_quest_id: Optional[str] = None,
     ):
         sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:
@@ -174,7 +174,6 @@ class ConversationService:
                 self.conversation_dao.add_conversation(Conversation(
                     conversation_id=conversation_id,
                     user_id=user_id,
-                    role=role,
                     conversation_type="update",
                     period_id=period_id,
                 ))
@@ -229,8 +228,7 @@ class ConversationService:
         conversation_id = str(uuid.uuid4())
         self.conversation_dao.add_conversation(Conversation(
             conversation_id=conversation_id,
-            user_id=user_id or user_id,
-            role=role,
+            user_id=user_id or "",
             conversation_type="update",
             period_id=period_id,
         ))
@@ -246,7 +244,7 @@ class ConversationService:
         auth_token: str,
         conversation_id: str,
         message: str,
-        user_id: str = None,
+        user_id: Optional[str] = None,
     ):
         sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
         if not sessions:

@@ -98,6 +98,8 @@ class PeriodScheduleService:
     def update_schedule(self, period_id: str, user_id: str, schedule_dict: dict) -> dict:
         period = self._verify_period_ownership(period_id, user_id)
         vector_store_id = period.get("vector_store_id")
+        if not vector_store_id:
+            raise ValueError("Period does not have a vector store configured")
 
         # Get existing period schedule
         period_schedule = self.period_schedule_dao.get_by_period_id(period_id)

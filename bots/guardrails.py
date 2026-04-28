@@ -161,4 +161,4 @@ async def check_student_output_safety(
         return GuardrailFunctionOutput(
             output_info=result.final_output,
             tripwire_triggered=True,
-        ), result.final_output.reason
+        )

@@ -18,7 +18,7 @@ For programmatic override (e.g. pytest):
 import os
 from typing import Optional
 
-_provider_instance = None
+_provider_instance: Optional["BotProvider"] = None
 
 
 class BotProvider:

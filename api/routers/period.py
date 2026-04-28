@@ -202,7 +202,7 @@ def create_period_unified(
     try:
         file_paths: List[str] = []
         for upload in files:
-            file_path = os.path.join(temp_dir, upload.filename)
+            file_path = os.path.join(temp_dir, upload.filename or "")
             with open(file_path, "wb") as dest:
                 shutil.copyfileobj(upload.file, dest)
             file_paths.append(file_path)
@@ -271,7 +271,7 @@ def add_files_to_period(
     try:
         file_paths: List[str] = []
         for upload in files:
-            file_path = os.path.join(temp_dir, upload.filename)
+            file_path = os.path.join(temp_dir, upload.filename or "")
             with open(file_path, "wb") as dest:
                 shutil.copyfileobj(upload.file, dest)
             file_paths.append(file_path)

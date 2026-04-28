@@ -42,6 +42,12 @@ stages:
           - script: |
               cd eduquest-backend
               source venv/bin/activate
+              mypy api/ services/ --ignore-missing-imports
+            displayName: 'Type check with mypy'
+
+          - script: |
+              cd eduquest-backend
+              source venv/bin/activate
               pytest -m unit --tb=short --no-header -q \
                 --junitxml=test-results.xml \
                 --cov=. --cov-report=xml:coverage.xml --cov-report=term-missing \

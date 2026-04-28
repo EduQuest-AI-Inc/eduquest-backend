@@ -36,25 +36,25 @@ class MockRunner:
         output_type = getattr(agent, "output_type", None)
 
         if output_type is LTGResponse:
-            payload = LTGResponse(
+            ltg_payload = LTGResponse(
                 message="[MOCK] Here are three long-term goal options based on your course. Which one resonates with you?",
                 goal_1="Build a portfolio project that applies core course concepts",
                 goal_2="Teach a concept you learned to a peer or family member",
                 goal_3="Apply a skill from class to solve a real-world problem you care about",
                 chosen_goal=None,
             )
-            return MockRunResult(final_output=payload)
+            return MockRunResult(final_output=ltg_payload)
 
         if output_type is ProfileResponse:
             prev = kwargs.get("previous_response_id")
             if prev == "mock-response-id-001":
-                payload = ProfileResponse(
+                profile_payload = ProfileResponse(
                     response="[MOCK] That's great! Tell me about something you find challenging in school and how you usually like to learn new things.",
                     profile=None,
                 )
-                return MockRunResult(final_output=payload, last_response_id="mock-response-id-002")
+                return MockRunResult(final_output=profile_payload, last_response_id="mock-response-id-002")
             if prev == "mock-response-id-002":
-                payload = ProfileResponse(
+                profile_payload = ProfileResponse(
                     response="[MOCK] Thanks for sharing! I have everything I need to personalize your experience. Let's get started!",
                     profile=StudentProfile(
                         strengths=["Analytical thinking", "Problem-solving"],
@@ -63,20 +63,20 @@ class MockRunner:
                         learning_styles=["Visual", "Hands-on"],
                     ),
                 )
-                return MockRunResult(final_output=payload, last_response_id="mock-response-id-003")
+                return MockRunResult(final_output=profile_payload, last_response_id="mock-response-id-003")
             # Turn 1 (initiate) — no previous_response_id
-            payload = ProfileResponse(
+            profile_payload = ProfileResponse(
                 response="[MOCK] Hi! I'm EduQuest. I'd love to learn more about you. What subjects do you enjoy most?",
                 profile=None,
             )
-            return MockRunResult(final_output=payload, last_response_id="mock-response-id-001")
+            return MockRunResult(final_output=profile_payload, last_response_id="mock-response-id-001")
 
         if output_type is TeacherFeedbackResponse:
-            payload = TeacherFeedbackResponse(
+            feedback_payload = TeacherFeedbackResponse(
                 response="[MOCK] Based on the quest data, this student shows strong engagement with hands-on tasks and may benefit from more open-ended challenges.",
                 suggested_change=None,
             )
-            return MockRunResult(final_output=payload)
+            return MockRunResult(final_output=feedback_payload)
 
         raise ValueError(f"MockRunner: unrecognized agent output_type {output_type!r}")
 

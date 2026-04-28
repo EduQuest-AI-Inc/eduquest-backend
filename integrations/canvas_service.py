@@ -62,7 +62,7 @@ class Course:
                 self.download_url = self.file.url
                 self.content = None
                 self.processed_content = None
-                self.metadata = {}
+                self.metadata: dict = {}
 
         class Page:
             def __init__(self, page_id, course) -> None:

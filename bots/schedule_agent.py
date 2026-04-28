@@ -1,6 +1,7 @@
 import logging
 import sys
 import os
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ class PeriodScheduleAgent:
     This is teacher/period scoped (not student-specific).
     """
 
-    def __init__(self, vector_store_id: str, course_name: str = None) -> None:
+    def __init__(self, vector_store_id: Optional[str], course_name: Optional[str] = None) -> None:
         """
         Initialize the period schedule agent.
 
@@ -97,7 +98,7 @@ HANDLING MISSING INFO
             name="Period Schedule Agent",
             instructions=instructions,
             model="gpt-5",
-            tools=tools,
+            tools=tools,  # type: ignore[arg-type]
             output_type=PeriodScheduleSchema
         )
 
@@ -138,9 +139,9 @@ class PeriodScheduleService:
     def __init__(self, period_id: str, vector_store_id: str) -> None:
         self.period_id = period_id
         self.vector_store_id = vector_store_id
-        self.schedule_openai_file_id = None
+        self.schedule_openai_file_id: Optional[str] = None
 
-    def generate_schedule(self, course_name: str = None) -> dict:
+    def generate_schedule(self, course_name: Optional[str] = None) -> dict:
         """
         Generate a new schedule using the agent.
 
@@ -192,7 +193,7 @@ class PeriodScheduleService:
             # Cleanup temp file
             os.unlink(temp_path)
 
-    def replace_schedule_in_vector_store(self, schedule_dict: dict, old_file_id: str = None) -> str:
+    def replace_schedule_in_vector_store(self, schedule_dict: dict, old_file_id: Optional[str] = None) -> str:
         """
         Replace the schedule in the vector store.
 

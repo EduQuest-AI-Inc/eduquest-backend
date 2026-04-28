@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import bcrypt
+from typing import Optional
 
 _LEGACY_PREFIXES = ("pbkdf2:", "scrypt:")
 
@@ -45,7 +46,7 @@ teacher_dao = TeacherDAO()
 parent_dao = ParentDAO()
 
 
-def register_user(username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', grade: str = None) -> dict:
+def register_user(username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', grade: Optional[str] = None) -> dict:
     """Register a new user (student, teacher, or parent)."""
     is_valid, error_msg = validate_password(password)
     if not is_valid:
@@ -86,7 +87,7 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
         first_name=first_name,
         last_name=last_name,
         email=email,
-        grade=grade,
+        grade=int(grade) if grade is not None else None,
     )
     student_dao.add_student(student)
     return {"success": True}
