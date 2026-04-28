@@ -7,7 +7,7 @@ from openai import OpenAI
 from data_access.period_schedule_dao import PeriodScheduleDAO
 from data_access.period_dao import PeriodDAO
 from models.period_schedule import PeriodSchedule
-from bots.schedule_agent import PeriodScheduleAgent
+from bots.provider import get_bot_provider
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +42,9 @@ class PeriodScheduleService:
         agent_vector_store_id = vector_store_id if file_urls else None
 
         # Generate schedule using the agent
-        agent = PeriodScheduleAgent(
+        agent = get_bot_provider().create_schedule_agent(
             vector_store_id=agent_vector_store_id,
-            course_name=course_name
+            course_name=course_name,
         )
         schedule_dict = agent.run_and_get_json()
 

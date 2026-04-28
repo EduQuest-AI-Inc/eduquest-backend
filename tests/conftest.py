@@ -9,6 +9,7 @@ import os
 import sys
 from unittest.mock import MagicMock
 from pathlib import Path
+import pytest
 
 # Load .env so integration tests pick up real SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
 _env_path = Path(__file__).parent.parent / ".env"
@@ -74,8 +75,6 @@ sys.modules['botocore.exceptions'] = MagicMock()
 os.environ.setdefault('SUPABASE_URL', 'http://localhost:54321')
 os.environ.setdefault('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
 os.environ.setdefault('USE_SUPABASE', 'false')
-
-import pytest
 
 @pytest.fixture(scope="session")
 def supabase_required():

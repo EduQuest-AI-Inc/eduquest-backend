@@ -9,7 +9,8 @@ import asyncio
 import json
 from typing import Dict, Any, Optional
 
-from bots.grading_agent import GradingOrchestrator, GradingInput, GradingResult
+from bots.grading_agent import GradingInput, GradingResult
+from bots.provider import get_bot_provider
 
 
 def _read_submission_text(submission_path: str) -> str:
@@ -55,7 +56,7 @@ def _build_grading_input(
 
 
 async def _grade(grading_input: GradingInput) -> GradingResult:
-    orchestrator = GradingOrchestrator()
+    orchestrator = get_bot_provider().create_grading_orchestrator()
     return await orchestrator.grade_submission(grading_input)
 
 

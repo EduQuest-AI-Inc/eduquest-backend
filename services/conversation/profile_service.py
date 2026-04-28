@@ -7,9 +7,8 @@ via the Responses API, avoiding the Conversations API entirely.
 import asyncio
 from typing import Optional, Dict, Any
 
-from agents import Runner
-
 from bots.profile_agent import create_profile_agent, ProfileResponse
+from bots.provider import get_bot_provider
 
 
 class ProfileConversationService:
@@ -20,6 +19,7 @@ class ProfileConversationService:
     def __init__(self, previous_response_id: Optional[str] = None) -> None:
         self.agent = create_profile_agent()
         self.previous_response_id = previous_response_id
+        self._runner = get_bot_provider().runner
 
     async def initiate(self, student: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -32,7 +32,7 @@ class ProfileConversationService:
         first_name = student.get("first_name", "Student")
         last_name = student.get("last_name", "")
         initial_message = f"Hello, I'm {first_name} {last_name}."
-        result = await Runner.run(self.agent, initial_message)
+        result = await self._runner.run(self.agent, initial_message)
 
         response: ProfileResponse = result.final_output
         profile_complete, profile = self._check_profile(response)
@@ -52,7 +52,7 @@ class ProfileConversationService:
             Dict with ``response_id``, ``response``, ``profile_complete``,
             and optionally ``profile``.
         """
-        result = await Runner.run(
+        result = await self._runner.run(
             self.agent,
             user_message,
             previous_response_id=self.previous_response_id,
