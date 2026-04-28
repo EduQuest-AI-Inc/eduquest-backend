@@ -178,7 +178,7 @@ def test_profile_continue_no_previous_id():
 def test_initiate_profile_conversation_sync_wrapper():
     with patch("services.conversation.profile_service.ProfileConversationService") as MockCls:
         with patch("services.conversation.profile_service.asyncio.run", return_value={"response": "Hi"}) as mock_run:
-            MockCls.return_value.initiate = AsyncMock(return_value={"response": "Hi"})
+            MockCls.return_value.initiate = MagicMock(return_value={"response": "Hi"})
             result = initiate_profile_conversation({"first_name": "Ana"})
     mock_run.assert_called_once()
     assert result == {"response": "Hi"}
@@ -188,7 +188,7 @@ def test_initiate_profile_conversation_sync_wrapper():
 def test_continue_profile_conversation_sync_wrapper():
     with patch("services.conversation.profile_service.ProfileConversationService") as MockCls:
         with patch("services.conversation.profile_service.asyncio.run", return_value={"response": "Next"}) as mock_run:
-            MockCls.return_value.continue_conversation = AsyncMock(return_value={"response": "Next"})
+            MockCls.return_value.continue_conversation = MagicMock(return_value={"response": "Next"})
             continue_profile_conversation("rid-old", "my message")
     MockCls.assert_called_once_with("rid-old")
     mock_run.assert_called_once()

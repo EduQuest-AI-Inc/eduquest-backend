@@ -118,7 +118,8 @@ def test_build_grading_input_instructions_fallback_to_description():
 @pytest.mark.unit
 @patch("services.conversation.grading_service.asyncio.run")
 def test_grade_student_submission_with_text(mock_run):
-    mock_run.return_value = _mock_result()
+    ret = _mock_result()
+    mock_run.side_effect = lambda coro: (coro.close(), ret)[1]
     result = grade_student_submission(_QUEST_DICT_RUBRIC, submission_text="my text")
     mock_run.assert_called_once()
     assert set(result.keys()) >= {"grade", "overall_score", "feedback", "change", "recommended_change", "response"}
@@ -134,7 +135,8 @@ def test_grade_student_submission_with_text(mock_run):
 @patch("services.conversation.grading_service.asyncio.run")
 @patch("services.conversation.grading_service._read_submission_text", return_value="file content")
 def test_grade_student_submission_with_path(mock_read, mock_run):
-    mock_run.return_value = _mock_result()
+    ret = _mock_result()
+    mock_run.side_effect = lambda coro: (coro.close(), ret)[1]
     grade_student_submission(_QUEST_DICT_RUBRIC, submission_path="/tmp/file.txt")
     mock_read.assert_called_once_with("/tmp/file.txt")
     mock_run.assert_called_once()
@@ -149,7 +151,8 @@ def test_grade_student_submission_neither_arg_raises():
 @pytest.mark.unit
 @patch("services.conversation.grading_service.asyncio.run")
 def test_grade_student_submission_recommended_changes_joined(mock_run):
-    mock_run.return_value = _mock_result(recommended_changes=["Fix intro", "Add citations"])
+    ret = _mock_result(recommended_changes=["Fix intro", "Add citations"])
+    mock_run.side_effect = lambda coro: (coro.close(), ret)[1]
     result = grade_student_submission(_QUEST_DICT_RUBRIC, submission_text="x")
     assert result["recommended_change"] == "Fix intro; Add citations"
 
@@ -157,6 +160,7 @@ def test_grade_student_submission_recommended_changes_joined(mock_run):
 @pytest.mark.unit
 @patch("services.conversation.grading_service.asyncio.run")
 def test_grade_student_submission_empty_recommended_changes_is_none(mock_run):
-    mock_run.return_value = _mock_result(recommended_changes=[])
+    ret = _mock_result(recommended_changes=[])
+    mock_run.side_effect = lambda coro: (coro.close(), ret)[1]
     result = grade_student_submission(_QUEST_DICT_RUBRIC, submission_text="x")
     assert result["recommended_change"] is None
