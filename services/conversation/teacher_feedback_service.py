@@ -8,7 +8,8 @@ of the legacy ``update`` class from assistants.py.
 import asyncio
 from typing import Optional, Dict, Any
 
-from agents import OpenAIConversationsSession
+from typing import cast
+from agents import OpenAIConversationsSession, Session
 from bots.provider import get_bot_provider
 
 from bots.teacher_feedback_agent import (
@@ -73,7 +74,7 @@ class TeacherFeedbackConversationService:
         result = await self._runner.run(
             self.agent,
             initial_message,
-            session=self.session,
+            session=cast(Session, self.session),
         )
 
         response: TeacherFeedbackResponse = result.final_output
@@ -90,7 +91,7 @@ class TeacherFeedbackConversationService:
         result = await self._runner.run(
             self.agent,
             user_message,
-            session=self.session,
+            session=cast(Session, self.session),
         )
 
         response: TeacherFeedbackResponse = result.final_output

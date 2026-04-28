@@ -87,6 +87,11 @@ async def initiate_update_assistant(
                     status_code=400,
                     detail="individual_quest_id is required for student submissions",
                 )
+            if not isinstance(individual_quest_id, str):
+                raise HTTPException(
+                    status_code=400,
+                    detail="individual_quest_id must be a string",
+                )
             if not week:
                 raise HTTPException(
                     status_code=400,
