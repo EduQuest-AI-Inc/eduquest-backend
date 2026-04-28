@@ -31,13 +31,26 @@ jobs:
           source venv/bin/activate
           pip install -r requirements.txt
 
+          echo "Verifying imports..."
+          venv/bin/python -c "import main; print('Import OK')"
+
           echo "Stopping existing backend process (if any)..."
           pkill -f "uvicorn main:app" || true
           pkill -f "python app.py" || true  # legacy Flask cleanup
+          sleep 1
 
           echo "Starting FastAPI app (uvicorn) in background..."
           nohup venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
-          sleep 2
-          echo "Health check..."
-          curl -fsS http://127.0.0.1:8000/helloworld || (echo "Server failed to start"; tail -50 app.log; exit 1)
+          disown
+          echo "Waiting for server..."
+          for i in $(seq 1 15); do
+            if curl -fsS http://127.0.0.1:8000/helloworld 2>/dev/null; then
+              echo "Server is healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server failed to start after 15s"
+          cat app.log
+          exit 1
         EOF
