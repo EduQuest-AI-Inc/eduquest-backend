@@ -12,6 +12,7 @@ AccountKey.json
 *.egg-info/
 .pytest_cache/
 htmlcov/
+.coverage
 .idea/
 *.log
 monkeytype.sqlite3

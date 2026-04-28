@@ -24,6 +24,7 @@ jobs:
           set -e
           cd /home/ubuntu/eduquest-backend
           echo "Pulling latest changes..."
+          git clean -f
           git pull origin production
 
           echo "Activating virtual environment..."
