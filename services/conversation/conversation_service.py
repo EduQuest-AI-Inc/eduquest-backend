@@ -82,6 +82,8 @@ class ConversationService:
             raise Exception("Conversation not found")
 
         last_response_id = conversation.get("last_response_id")
+        if not isinstance(last_response_id, str):
+            raise Exception("Conversation has no response ID")
         result = continue_profile_conversation(last_response_id, message)
 
         new_response_id = result.get("response_id")
@@ -250,6 +252,8 @@ class ConversationService:
         if not sessions:
             raise Exception("Invalid auth token")
         user_id = sessions[0]["user_id"]
+        if not isinstance(user_id, str):
+            raise Exception("Invalid auth token")
         role = sessions[0].get("role", "student")
 
         target_user_id = user_id if (role == "teacher" and user_id) else user_id
