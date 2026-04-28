@@ -292,7 +292,7 @@ def test_feedback_continue_returns_no_conversation_id():
 def test_initiate_teacher_feedback_sync_wrapper():
     with patch("services.conversation.teacher_feedback_service.TeacherFeedbackConversationService") as MockCls:
         with patch("services.conversation.teacher_feedback_service.asyncio.run", return_value={"response": "X"}) as mock_run:
-            MockCls.return_value.initiate = AsyncMock(return_value={"response": "X"})
+            MockCls.return_value.initiate = MagicMock(return_value={"response": "X"})
             initiate_teacher_feedback({"first_name": "Bob"}, "summary", conversation_id="cid-old")
     MockCls.assert_called_once_with("cid-old")
     mock_run.assert_called_once()
@@ -302,7 +302,7 @@ def test_initiate_teacher_feedback_sync_wrapper():
 def test_continue_teacher_feedback_sync_wrapper():
     with patch("services.conversation.teacher_feedback_service.TeacherFeedbackConversationService") as MockCls:
         with patch("services.conversation.teacher_feedback_service.asyncio.run", return_value={"response": "Y"}) as mock_run:
-            MockCls.return_value.continue_conversation = AsyncMock(return_value={"response": "Y"})
+            MockCls.return_value.continue_conversation = MagicMock(return_value={"response": "Y"})
             continue_teacher_feedback("cid-1", "Follow up message")
     MockCls.assert_called_once_with("cid-1")
     mock_run.assert_called_once()
