@@ -36,6 +36,18 @@ class MockRunner:
         output_type = getattr(agent, "output_type", None)
 
         if output_type is LTGResponse:
+            prev = kwargs.get("previous_response_id")
+            if prev == "mock-ltg-response-id-001":
+                # Turn 2: student picked a goal — confirm and close the conversation
+                ltg_payload = LTGResponse(
+                    message="[MOCK] Excellent choice! I've selected 'Build a portfolio project that applies core course concepts' as your long-term goal.",
+                    goal_1=None,
+                    goal_2=None,
+                    goal_3=None,
+                    chosen_goal="Build a portfolio project that applies core course concepts",
+                )
+                return MockRunResult(final_output=ltg_payload, last_response_id="mock-ltg-response-id-002")
+            # Turn 1 (initiate) — no previous_response_id
             ltg_payload = LTGResponse(
                 message="[MOCK] Here are three long-term goal options based on your course. Which one resonates with you?",
                 goal_1="Build a portfolio project that applies core course concepts",
@@ -43,7 +55,7 @@ class MockRunner:
                 goal_3="Apply a skill from class to solve a real-world problem you care about",
                 chosen_goal=None,
             )
-            return MockRunResult(final_output=ltg_payload)
+            return MockRunResult(final_output=ltg_payload, last_response_id="mock-ltg-response-id-001")
 
         if output_type is ProfileResponse:
             prev = kwargs.get("previous_response_id")
