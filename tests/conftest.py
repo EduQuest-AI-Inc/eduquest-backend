@@ -40,6 +40,7 @@ sys.modules['bots.schedule_agent'] = MagicMock()
 sys.modules['bots.guardrails'] = MagicMock()
 sys.modules['bots.schemas'] = MagicMock()
 sys.modules['bots.schemas.rubric'] = MagicMock()
+sys.modules['bots.provider'] = MagicMock()
 
 mock_openai_module = MagicMock()
 mock_openai_client = MagicMock()
