@@ -60,11 +60,7 @@ Here's how you will interact with users and gain information about the student:
     return Agent(
         name="Initial Conversation Agent",
         instructions=instructions,
-        model="gpt-5.4-mini",
-        model_settings=ModelSettings(
-            reasoning=Reasoning(effort="low"),
-            verbosity="medium",
-        ),
+        model="gpt-4.1-mini",
         output_type=ProfileResponse,
         output_guardrails=[check_student_output_safety],
     )

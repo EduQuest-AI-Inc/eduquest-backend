@@ -20,12 +20,17 @@ class MockRunner:
     """
     Drop-in replacement for agents.Runner. Dispatches on agent.output_type
     so the right Pydantic response model is returned for each conversation agent.
+
+    ProfileResponse turns (tracked via previous_response_id):
+      None / unknown → turn 1: ask about subjects          → mock-response-id-001
+      mock-response-id-001 → turn 2: follow-up question    → mock-response-id-002
+      mock-response-id-002 → turn 3: complete with profile → mock-response-id-003
     """
 
     @staticmethod
     async def run(agent: Any, message: str, **kwargs) -> MockRunResult:
         from bots.ltg_agent import LTGResponse
-        from bots.profile_agent import ProfileResponse
+        from bots.profile_agent import ProfileResponse, StudentProfile
         from bots.teacher_feedback_agent import TeacherFeedbackResponse
 
         output_type = getattr(agent, "output_type", None)
@@ -38,20 +43,42 @@ class MockRunner:
                 goal_3="Apply a skill from class to solve a real-world problem you care about",
                 chosen_goal=None,
             )
-        elif output_type is ProfileResponse:
+            return MockRunResult(final_output=payload)
+
+        if output_type is ProfileResponse:
+            prev = kwargs.get("previous_response_id")
+            if prev == "mock-response-id-001":
+                payload = ProfileResponse(
+                    response="[MOCK] That's great! Tell me about something you find challenging in school and how you usually like to learn new things.",
+                    profile=None,
+                )
+                return MockRunResult(final_output=payload, last_response_id="mock-response-id-002")
+            if prev == "mock-response-id-002":
+                payload = ProfileResponse(
+                    response="[MOCK] Thanks for sharing! I have everything I need to personalize your experience. Let's get started!",
+                    profile=StudentProfile(
+                        strengths=["Analytical thinking", "Problem-solving"],
+                        weaknesses=["Time management", "Public speaking"],
+                        interests=["Technology", "Science"],
+                        learning_styles=["Visual", "Hands-on"],
+                    ),
+                )
+                return MockRunResult(final_output=payload, last_response_id="mock-response-id-003")
+            # Turn 1 (initiate) — no previous_response_id
             payload = ProfileResponse(
                 response="[MOCK] Hi! I'm EduQuest. I'd love to learn more about you. What subjects do you enjoy most?",
                 profile=None,
             )
-        elif output_type is TeacherFeedbackResponse:
+            return MockRunResult(final_output=payload, last_response_id="mock-response-id-001")
+
+        if output_type is TeacherFeedbackResponse:
             payload = TeacherFeedbackResponse(
                 response="[MOCK] Based on the quest data, this student shows strong engagement with hands-on tasks and may benefit from more open-ended challenges.",
                 suggested_change=None,
             )
-        else:
-            raise ValueError(f"MockRunner: unrecognized agent output_type {output_type!r}")
+            return MockRunResult(final_output=payload)
 
-        return MockRunResult(final_output=payload)
+        raise ValueError(f"MockRunner: unrecognized agent output_type {output_type!r}")
 
 
 class MockHWAgent:
