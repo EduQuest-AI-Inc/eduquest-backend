@@ -57,7 +57,7 @@ def test_join_valid_referral_accepted():
         "position": 3, "referralCode": "XYZ", "status": "waiting", "joinedAt": "now", "referredBy": "other_teacher"
     }
 
-    result = svc.join("u1", referral_code="REFCODE")
+    svc.join("u1", referral_code="REFCODE")
 
     args, kwargs = svc.dao.join_waitlist.call_args
     # referred_by should be passed and equal to "other_teacher"

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock
 
 from services.period.period_management_service import PeriodManagementService
 
@@ -55,7 +55,7 @@ def test_create_period_propagates_canvas_fields():
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = None
 
-    result = svc.create_period(
+    svc.create_period(
         course="Canvas Course",
         user_id="u1",
         vector_store_id="vs1",

@@ -5,7 +5,7 @@ rate-limit logic by mocking the internal _get_count, _increment_counter, and
 _is_on_cooldown helpers so no DB connection is needed.
 """
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
 from data_access.password_reset_rate_limit_dao import PasswordResetRateLimitDAO
 
 
