@@ -32,5 +32,8 @@ class PeriodService:
     def start_homework_agent(self, user_id, period_id):
         return self._quest.start_homework_agent(user_id, period_id)
 
+    def has_teacher_access_to_student(self, teacher_id: str, student_id: str) -> bool:
+        return self._enrollment.has_teacher_access_to_student(teacher_id, student_id)
+
     def update_quests_with_recommended_change(self, auth_token: str, period_id: str, recommended_change: str, user_id: str):
         return self._quest.update_quests_with_recommended_change(auth_token, user_id, period_id, recommended_change)

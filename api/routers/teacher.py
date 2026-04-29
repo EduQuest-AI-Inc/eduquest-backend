@@ -1,16 +1,20 @@
 import logging
 
 from canvasapi import Canvas
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
+from data_access.aggregated_metrics_dao import AggregatedMetricsDAO
+from data_access.period_dao import PeriodDAO
 from services.period.period_management_service import PeriodManagementService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 period_management_service = PeriodManagementService()
+aggregated_metrics_dao = AggregatedMetricsDAO()
+period_dao_t = PeriodDAO()
 
 
 # ---------------------------------------------------------------------------
@@ -56,3 +60,22 @@ def list_canvas_courses(
         return {"courses": courses}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to connect to Canvas: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Skill mastery metrics
+# ---------------------------------------------------------------------------
+
+@router.get("/skill-mastery")
+def get_skill_mastery(
+    period_id: str = Query(...),
+    auth: AuthPayload = Depends(get_auth),
+):
+    if auth.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can view skill mastery metrics")
+    period = period_dao_t.get_period_by_id(period_id)
+    if not period:
+        raise HTTPException(status_code=404, detail="Period not found")
+    if period.get("owner_id") != auth.sub:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return aggregated_metrics_dao.get_by_period_id(period_id)

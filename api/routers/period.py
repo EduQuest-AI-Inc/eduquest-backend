@@ -114,9 +114,26 @@ def list_periods(auth: AuthPayload = Depends(get_auth)):
 
 # ─── Student-facing period routes ─────────────────────────────────────────────
 
+def _check_viewer_access(auth: AuthPayload, user_id: str) -> None:
+    if auth.role == "parent":
+        linked = parent_service_p.parent_dao.get_linked_student_ids(auth.sub)
+        if user_id not in linked:
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif auth.role == "teacher":
+        if not period_service.has_teacher_access_to_student(auth.sub, user_id):
+            raise HTTPException(status_code=403, detail="Access denied")
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
 @router.get("/my-periods")
-def my_periods(auth: AuthPayload = Depends(get_auth)):
-    return period_service.get_my_periods(auth.sub)
+def my_periods(
+    user_id: Optional[str] = Query(None),
+    auth: AuthPayload = Depends(get_auth),
+):
+    if user_id:
+        _check_viewer_access(auth, user_id)
+    return period_service.get_my_periods(user_id or auth.sub)
 
 
 class VerifyPeriodRequest(BaseModel):
@@ -337,46 +354,22 @@ def get_period_schedule(
         raise HTTPException(status_code=500, detail="Failed to get schedule")
 
 
-class UpdateScheduleRequest(BaseModel):
+class SaveAllScheduleRequest(BaseModel):
     period_id: str
     schedule: dict
-
-
-@router.put("/period-schedule")
-def update_period_schedule(
-    body: UpdateScheduleRequest,
-    auth: AuthPayload = Depends(get_auth),
-):
-    try:
-        result = period_schedule_service.update_schedule(
-            period_id=body.period_id,
-            user_id=auth.sub,
-            schedule_dict=body.schedule,
-        )
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except Exception as e:
-        logger.error("Error updating period schedule: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to update schedule")
-
-
-class SetQuestWeeksRequest(BaseModel):
-    period_id: str
     quest_enabled_weeks: List[int]
 
 
-@router.put("/period-schedule/quest-weeks")
-def set_period_quest_weeks(
-    body: SetQuestWeeksRequest,
+@router.put("/period-schedule/save-all")
+def save_period_schedule_and_quest_weeks(
+    body: SaveAllScheduleRequest,
     auth: AuthPayload = Depends(get_auth),
 ):
     try:
-        result = period_schedule_service.set_quest_weeks(
+        result = period_schedule_service.save_schedule_and_quest_weeks(
             period_id=body.period_id,
             user_id=auth.sub,
+            schedule_dict=body.schedule,
             quest_enabled_weeks=body.quest_enabled_weeks,
         )
         return result
@@ -385,5 +378,5 @@ def set_period_quest_weeks(
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
-        logger.error("Error setting quest weeks: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to set quest weeks")
+        logger.error("Error saving period schedule: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to save schedule")
