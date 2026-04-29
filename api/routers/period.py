@@ -146,6 +146,11 @@ def verify_period(body: VerifyPeriodRequest, auth: AuthPayload = Depends(get_aut
     return {"message": "Period verified and added to enrollments", "period": period}
 
 
+@router.get("/student/parent-periods")
+def get_parent_periods(auth: AuthPayload = Depends(get_auth)):
+    return period_service.get_parent_periods_for_student(auth.sub)
+
+
 class UnenrollRequest(BaseModel):
     period_id: str
 
