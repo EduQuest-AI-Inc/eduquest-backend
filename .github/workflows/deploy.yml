@@ -75,16 +75,15 @@ jobs:
             sleep 1
           done
 
-          if [ "$SERVER_READY" = "1" ]; then
-            exit 0
+          if [ "$SERVER_READY" != "1" ]; then
+            echo "Health check failed — rolling back to $OLD_COMMIT..."
+            git reset --hard "$OLD_COMMIT"
+            pip install -r requirements.txt
+            sudo systemctl restart eduquest-backend
+            echo "Rollback complete. Deploy failed."
+            echo "--- journalctl (failed deploy) ---"
+            sudo journalctl -u eduquest-backend -n 50 --no-pager || true
           fi
 
-          echo "Health check failed — rolling back to $OLD_COMMIT..."
-          git reset --hard "$OLD_COMMIT"
-          pip install -r requirements.txt
-          sudo systemctl restart eduquest-backend
-          echo "Rollback complete. Deploy failed."
-          echo "--- journalctl (failed deploy) ---"
-          sudo journalctl -u eduquest-backend -n 50 --no-pager || true
-          exit 1
+          exit $((1 - SERVER_READY))
         EOF
