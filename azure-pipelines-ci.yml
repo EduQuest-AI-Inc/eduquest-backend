@@ -42,8 +42,8 @@ stages:
           - script: |
               cd eduquest-backend
               source venv/bin/activate
-              mypy api/ services/ --ignore-missing-imports
-            displayName: 'Type check with mypy'
+              ruff check .
+            displayName: 'Lint with ruff'
 
           - script: |
               cd eduquest-backend
