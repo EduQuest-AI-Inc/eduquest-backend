@@ -93,7 +93,7 @@ def update_quest_status(
 
 
 class GradeQuestRequest(BaseModel):
-    grade: str
+    grade: dict
     feedback: str
 
 
