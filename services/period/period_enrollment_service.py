@@ -2,7 +2,10 @@ import logging
 from typing import Dict, Any, List
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
+from data_access.parent_dao import ParentDAO
 from data_access.period_dao import PeriodDAO
+from data_access.user_dao import UserDAO
+from data_access.period_schedule_dao import PeriodScheduleDAO
 from data_access.student_dao import StudentDAO
 from data_access.enrollment_dao import EnrollmentDAO
 from data_access.quest_dao import QuestDAO
@@ -20,7 +23,10 @@ TUTORIAL_PERIOD_ID = "PRECALC-58F9-88F5"
 class PeriodEnrollmentService:
 
     def __init__(self) -> None:
+        self.parent_dao = ParentDAO()
         self.period_dao = PeriodDAO()
+        self.user_dao = UserDAO()
+        self.period_schedule_dao = PeriodScheduleDAO()
         self.student_dao = StudentDAO()
         self.enrollment_dao = EnrollmentDAO()
         self.quest_dao = QuestDAO()
@@ -42,16 +48,50 @@ class PeriodEnrollmentService:
             result.append({
                 'period_id': pid,
                 'course_name': period.get('name', pid),
+                'file_urls': period.get('file_urls', []),
                 'long_term_goal': ltg_map.get(pid),
             })
         return result
 
-    def verify_period_id(self, user_id: str, period_id: str) -> Any:
+    def get_parent_periods_for_student(self, student_id: str) -> List[Dict[str, Any]]:
+        parents = self.parent_dao.get_parents_by_student_id(student_id)
+        enrolled = {e['period_id'] for e in self.enrollment_dao.get_enrollments_by_student(student_id)}
+        periods = []
+        for parent in parents:
+            for p in self.period_dao.get_periods_by_owner_id(parent['user_id']):
+                if p['period_id'] in enrolled:
+                    continue
+                schedule = self.period_schedule_dao.get_by_period_id(p['period_id'])
+                if schedule and schedule.quest_enabled_weeks:
+                    periods.append(p)
+        return periods
+
+    def has_teacher_access_to_student(self, teacher_id: str, student_id: str) -> bool:
+        teacher_period_ids = {
+            p['period_id']
+            for p in self.period_dao.get_periods_by_owner_id(teacher_id)
+        }
+        return any(
+            e['period_id'] in teacher_period_ids
+            for e in self.enrollment_dao.get_enrollments_by_student(student_id)
+        )
+
+    def verify_period_id(self, user_id: str, period_id: str, allow_parent_period: bool = False) -> Any:
         if not period_id:
             raise ValidationError("Missing period ID")
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
+            raise NotFoundError("Invalid period ID")
+
+        owner = self.user_dao.get_by_id(period["owner_id"])
+        if not owner:
+            raise NotFoundError("Invalid period ID")
+        if owner["role"] != "teacher" and not allow_parent_period:
+            raise NotFoundError("Invalid period ID")
+
+        schedule = self.period_schedule_dao.get_by_period_id(period_id)
+        if not schedule or not schedule.quest_enabled_weeks:
             raise NotFoundError("Invalid period ID")
 
         student = self.student_dao.get_student_by_id(user_id)
