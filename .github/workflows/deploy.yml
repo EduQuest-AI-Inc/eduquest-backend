@@ -37,20 +37,29 @@ jobs:
           echo "Stopping existing backend process (if any)..."
           pkill -f "uvicorn main:app" || true
           pkill -f "python app.py" || true  # legacy Flask cleanup
-          sleep 1
+          sleep 2
+
+          echo "Checking for port conflicts..."
+          fuser 8000/tcp && echo "WARNING: port 8000 still in use" || echo "Port 8000 is free"
 
           echo "Starting FastAPI app (uvicorn) in background..."
           nohup venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
+          UVICORN_PID=$!
           disown
-          echo "Waiting for server..."
-          for i in $(seq 1 15); do
+          echo "Waiting for server (pid=$UVICORN_PID)..."
+          for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8000/helloworld 2>/dev/null; then
               echo "Server is healthy"
               exit 0
             fi
+            if ! kill -0 $UVICORN_PID 2>/dev/null; then
+              echo "Uvicorn process died (pid=$UVICORN_PID)"
+              break
+            fi
             sleep 1
           done
-          echo "Server failed to start after 15s"
+          echo "Server failed to start after 30s"
+          echo "--- app.log ---"
           cat app.log
           exit 1
         EOF
