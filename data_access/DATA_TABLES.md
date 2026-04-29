@@ -219,11 +219,23 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `instructions`    | text         | NOT NULL    | Step-by-step completion instructions                      |
 | `rubric`          | json         | NOT NULL    | Grading criteria keyed by skill                           |
 | `status`          | quest_status | NOT NULL    | Enum: `"not_started"` \| `"in_progress"` \| `"completed"` |
-| `grade`           | json         | nullable    | Grading output: `{ detailed_grade, overall_score }`       |
+| `grade`           | jsonb        | nullable    | Grading output — see shape below                          |
 | `feedback`        | text         | nullable    | AI or teacher feedback                                    |
 | `due_date`        | timestamp    | nullable    |                                                           |
 | `created_at`      | timestamp    | NOT NULL    |                                                           |
 | `last_updated_at` | timestamp    | NOT NULL    | Auto-updated on every write                               |
+
+**`grade` JSONB shape:**
+
+```json
+{
+  "detailed_grade": { "<criterion>": <int>, ... },
+  "overall_score": <int>
+}
+```
+
+- `detailed_grade` — per-criterion scores produced by the grading agent (e.g. `{"Clarity": 18, "Analysis": 22}`)
+- `overall_score` — total points rolled up from all criteria
 
 ---
 

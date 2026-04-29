@@ -10,6 +10,7 @@ from data_access.parent_dao import ParentDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
 from data_access.user_dao import UserDAO
+from services.period.period_service import PeriodService
 from services.user.user_service import UserService
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ student_dao = StudentDAO()
 teacher_dao = TeacherDAO()
 parent_dao = ParentDAO()
 user_dao = UserDAO()
+period_service_u = PeriodService()
 
 _ROLE_FETCHERS = {
     "student": lambda uid: student_dao.get_student_by_id(uid),
@@ -46,9 +48,26 @@ def _fetch_user_profile(user_id: str) -> Optional[dict]:
     return profile
 
 
+def _check_student_viewer_access(auth: AuthPayload, user_id: str) -> None:
+    if auth.role == "parent":
+        linked = parent_dao.get_linked_student_ids(auth.sub)
+        if user_id not in linked:
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif auth.role == "teacher":
+        if not period_service_u.has_teacher_access_to_student(auth.sub, user_id):
+            raise HTTPException(status_code=403, detail="Access denied")
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
 @router.get("/profile")
-def get_profile(auth: AuthPayload = Depends(get_auth)):
-    profile = _fetch_user_profile(auth.sub)
+def get_profile(
+    user_id: Optional[str] = None,
+    auth: AuthPayload = Depends(get_auth),
+):
+    if user_id:
+        _check_student_viewer_access(auth, user_id)
+    profile = _fetch_user_profile(user_id or auth.sub)
     if not profile:
         raise HTTPException(status_code=404, detail="User not found")
     return profile

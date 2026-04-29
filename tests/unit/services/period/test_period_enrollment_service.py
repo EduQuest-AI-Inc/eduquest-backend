@@ -27,7 +27,9 @@ def _build_period(period_id: str = "MATH-101") -> Dict[str, str]:
 def _make_service() -> PeriodEnrollmentService:
     svc = PeriodEnrollmentService.__new__(PeriodEnrollmentService)
     svc.period_dao = MagicMock()
+    svc.period_schedule_dao = MagicMock()
     svc.student_dao = MagicMock()
+    svc.user_dao = MagicMock()
     svc.conversation_dao = MagicMock()
     svc.enrollment_dao = MagicMock()
     svc.ltg_conversation_dao = MagicMock()
@@ -159,10 +161,18 @@ def test_get_my_periods_skips_missing_periods():
     assert result == []
 
 
+def _setup_verify(svc: PeriodEnrollmentService, *, owner_role: str = "teacher") -> None:
+    schedule_mock = MagicMock()
+    schedule_mock.quest_enabled_weeks = True
+    svc.period_schedule_dao.get_by_period_id.return_value = schedule_mock
+    svc.user_dao.get_by_id.return_value = {"role": owner_role}
+
+
 @pytest.mark.unit
 def test_verify_period_id_not_enrolled_enrolls_student():
     svc = _make_service()
-    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "name": "Math"}
+    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "name": "Math", "owner_id": "t1"}
+    _setup_verify(svc)
     svc.student_dao.get_student_by_id.return_value = {"user_id": "u1"}
     svc.enrollment_dao.get_enrollments_by_student.return_value = []
 
@@ -175,12 +185,37 @@ def test_verify_period_id_not_enrolled_enrolls_student():
 @pytest.mark.unit
 def test_verify_period_id_already_enrolled_raises():
     svc = _make_service()
-    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1"}
+    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "t1"}
+    _setup_verify(svc)
     svc.student_dao.get_student_by_id.return_value = {"user_id": "u1"}
     svc.enrollment_dao.get_enrollments_by_student.return_value = [{"period_id": "p1"}]
 
     with pytest.raises(ValidationError):
         svc.verify_period_id("u1", "p1")
+
+
+@pytest.mark.unit
+def test_verify_rejects_parent_period_via_id():
+    svc = _make_service()
+    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "par1"}
+    _setup_verify(svc, owner_role="parent")
+
+    with pytest.raises(NotFoundError):
+        svc.verify_period_id("u1", "p1")
+
+
+@pytest.mark.unit
+def test_verify_allows_parent_period_via_dropdown():
+    svc = _make_service()
+    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "name": "Math", "owner_id": "par1"}
+    _setup_verify(svc, owner_role="parent")
+    svc.student_dao.get_student_by_id.return_value = {"user_id": "u1"}
+    svc.enrollment_dao.get_enrollments_by_student.return_value = []
+
+    result = svc.verify_period_id("u1", "p1", allow_parent_period=True)
+
+    svc.enrollment_dao.add_enrollment.assert_called_once()
+    assert result["period_id"] == "p1"
 
 
 @pytest.mark.unit

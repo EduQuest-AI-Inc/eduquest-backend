@@ -17,8 +17,8 @@ class PeriodService:
     def get_my_periods(self, user_id):
         return self._enrollment.get_my_periods(user_id)
 
-    def verify_period_id(self, user_id, period_id):
-        return self._enrollment.verify_period_id(user_id, period_id)
+    def verify_period_id(self, user_id, period_id, allow_parent_period: bool = False):
+        return self._enrollment.verify_period_id(user_id, period_id, allow_parent_period)
 
     def unenroll_from_period(self, user_id, period_id):
         return self._enrollment.unenroll_from_period(user_id, period_id)
@@ -31,6 +31,12 @@ class PeriodService:
 
     def start_homework_agent(self, user_id, period_id):
         return self._quest.start_homework_agent(user_id, period_id)
+
+    def get_parent_periods_for_student(self, student_id: str):
+        return self._enrollment.get_parent_periods_for_student(student_id)
+
+    def has_teacher_access_to_student(self, teacher_id: str, student_id: str) -> bool:
+        return self._enrollment.has_teacher_access_to_student(teacher_id, student_id)
 
     def update_quests_with_recommended_change(self, auth_token: str, period_id: str, recommended_change: str, user_id: str):
         return self._quest.update_quests_with_recommended_change(auth_token, user_id, period_id, recommended_change)

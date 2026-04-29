@@ -3,6 +3,7 @@ import uuid
 from typing import Optional
 
 from data_access.period_dao import PeriodDAO
+from data_access.period_schedule_dao import PeriodScheduleDAO
 from models.period import Period
 
 
@@ -11,6 +12,7 @@ class PeriodManagementService:
 
     def __init__(self) -> None:
         self.period_dao = PeriodDAO()
+        self.period_schedule_dao = PeriodScheduleDAO()
 
     def generate_period_id(self, course_name: str) -> str:
         clean_course = re.sub(r'[^a-zA-Z0-9]', '', course_name).upper()[:8]
@@ -53,7 +55,11 @@ class PeriodManagementService:
         self.period_dao.update_file_urls(period_id, file_urls)
 
     def get_periods_by_owner(self, user_id: str) -> list:
-        return self.period_dao.get_periods_by_owner_id(user_id)
+        periods = self.period_dao.get_periods_by_owner_id(user_id)
+        for period in periods:
+            schedule = self.period_schedule_dao.get_by_period_id(period['period_id'])
+            period['has_schedule'] = schedule is not None and len(schedule.quest_enabled_weeks) > 0
+        return periods
 
     def get_period_by_id(self, period_id: str) -> Optional[dict]:
         return self.period_dao.get_period_by_id(period_id)
