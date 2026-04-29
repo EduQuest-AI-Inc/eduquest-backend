@@ -10,7 +10,7 @@ def _student():
         user_id=_ID,
         first_name="Test",
         last_name="Student",
-        email="test-integration-student@example.com",
+        email="test-integration-student@eduquestai.org",
         password="hashed",
         role="student",
         grade=10,

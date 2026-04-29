@@ -4,7 +4,7 @@ from data_access.waitlist_dao import WaitlistDAO
 from data_access.user_dao import UserDAO
 
 _REFERRER_ID = "test-integration-waitlist-referrer"
-_REFERRER_EMAIL = "test-integration-referrer@example.com"
+_REFERRER_EMAIL = "test-integration-referrer@eduquestai.org"
 
 
 @pytest.mark.integration

@@ -33,7 +33,7 @@ def db_user(supabase_required):
         user_id="test-integration-shared-user",
         first_name="Test",
         last_name="User",
-        email="test-integration@example.com",
+        email="test-integration@eduquestai.org",
         password="hashed",
         role="student",
     )

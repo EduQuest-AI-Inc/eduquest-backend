@@ -21,7 +21,7 @@ def test_join_teacher_not_found():
 def test_join_already_approved():
     svc = _svc()
     svc.teacher_dao.get_teacher_by_id.return_value = {
-        "user_id": "u1", "email": "t@t.com", "pilot_approved": True
+        "user_id": "u1", "email": "t@eduquestai.org", "pilot_approved": True
     }
 
     result = svc.join("u1")
@@ -34,7 +34,7 @@ def test_join_already_approved():
 def test_join_success_no_referral():
     svc = _svc()
     svc.teacher_dao.get_teacher_by_id.return_value = {
-        "user_id": "u1", "email": "t@t.com", "pilot_approved": False
+        "user_id": "u1", "email": "t@eduquestai.org", "pilot_approved": False
     }
     svc.dao.join_waitlist.return_value = {
         "position": 5, "referralCode": "ABC123", "status": "waiting", "joinedAt": "now", "referredBy": None
@@ -50,7 +50,7 @@ def test_join_success_no_referral():
 def test_join_valid_referral_accepted():
     svc = _svc()
     svc.teacher_dao.get_teacher_by_id.return_value = {
-        "user_id": "u1", "email": "t@t.com", "pilot_approved": False
+        "user_id": "u1", "email": "t@eduquestai.org", "pilot_approved": False
     }
     svc.dao.validate_referral_code.return_value = {"valid": True, "referrer_id": "other_teacher"}
     svc.dao.join_waitlist.return_value = {
@@ -68,7 +68,7 @@ def test_join_valid_referral_accepted():
 def test_join_self_referral_ignored():
     svc = _svc()
     svc.teacher_dao.get_teacher_by_id.return_value = {
-        "user_id": "u1", "email": "t@t.com", "pilot_approved": False
+        "user_id": "u1", "email": "t@eduquestai.org", "pilot_approved": False
     }
     svc.dao.validate_referral_code.return_value = {"valid": True, "referrer_id": "u1"}
     svc.dao.join_waitlist.return_value = {

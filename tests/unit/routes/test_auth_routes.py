@@ -29,7 +29,7 @@ class TestSignupRoute:
             "role": "student",
             "first_name": "Jane",
             "last_name": "Doe",
-            "email": "jane@example.com",
+            "email": "jane@eduquestai.org",
             "grade": "10",
         })
         assert resp.status_code == 201
@@ -45,7 +45,7 @@ class TestSignupRoute:
             "role": "student",
             "first_name": "Jane",
             "last_name": "Doe",
-            "email": "jane@example.com",
+            "email": "jane@eduquestai.org",
             "grade": "10",
         })
         assert resp.status_code == 409
@@ -60,7 +60,7 @@ class TestSignupRoute:
             "role": "admin",
             "first_name": "Bad",
             "last_name": "Actor",
-            "email": "bad@example.com",
+            "email": "bad@eduquestai.org",
         })
         assert resp.status_code == 400
 
@@ -74,7 +74,7 @@ class TestSignupRoute:
             "role": "student",
             "first_name": "No",
             "last_name": "Grade",
-            "email": "nograde@example.com",
+            "email": "nograde@eduquestai.org",
         })
         assert resp.status_code == 400
 
@@ -89,7 +89,7 @@ class TestSignupRoute:
             "role": "student",
             "first_name": "Dup",
             "last_name": "User",
-            "email": "dup@example.com",
+            "email": "dup@eduquestai.org",
             "grade": "9",
         })
         assert resp.status_code == 409
@@ -152,7 +152,7 @@ class TestPasswordResetRequest:
             "success": True,
             "message": "If an account exists with that email, we sent a password reset link.",
         }
-        resp = client.post("/auth/password-reset/request", json={"email": "anyone@example.com"})
+        resp = client.post("/auth/password-reset/request", json={"email": "anyone@eduquestai.org"})
         assert resp.status_code == 200
         assert "message" in resp.json()
 
