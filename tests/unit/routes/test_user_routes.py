@@ -1,6 +1,6 @@
 """API-level tests for /user routes (profile, tutorial). Canvas endpoints skipped."""
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from main import app
 from api.deps import get_auth, AuthPayload

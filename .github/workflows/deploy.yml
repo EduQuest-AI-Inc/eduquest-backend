@@ -43,7 +43,8 @@ jobs:
           fuser 8000/tcp && echo "WARNING: port 8000 still in use" || echo "Port 8000 is free"
 
           echo "Starting FastAPI app (uvicorn) in background..."
-          nohup venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
+          truncate -s 0 /home/ubuntu/eduquest-backend/app.log
+          PYTHONUNBUFFERED=1 nohup venv/bin/python -u -m uvicorn main:app --host 0.0.0.0 --port 8000 > /home/ubuntu/eduquest-backend/app.log 2>&1 &
           UVICORN_PID=$!
           disown
           echo "Waiting for server (pid=$UVICORN_PID)..."
@@ -56,10 +57,14 @@ jobs:
               echo "Uvicorn process died (pid=$UVICORN_PID)"
               break
             fi
+            if [ "$i" = "5" ]; then
+              echo "--- app.log after 5s ---"
+              cat /home/ubuntu/eduquest-backend/app.log
+            fi
             sleep 1
           done
-          echo "Server failed to start after 30s"
-          echo "--- app.log ---"
-          cat app.log
+          echo "--- app.log at failure ---"
+          cat /home/ubuntu/eduquest-backend/app.log
+          ss -tlnp | grep 8000 || echo "Nothing listening on 8000"
           exit 1
         EOF

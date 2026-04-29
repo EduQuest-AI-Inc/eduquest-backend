@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 from services.quest.quest_grading_service import QuestGradingService
 
