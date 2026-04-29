@@ -17,8 +17,8 @@ class PeriodService:
     def get_my_periods(self, user_id):
         return self._enrollment.get_my_periods(user_id)
 
-    def verify_period_id(self, user_id, period_id):
-        return self._enrollment.verify_period_id(user_id, period_id)
+    def verify_period_id(self, user_id, period_id, allow_parent_period: bool = False):
+        return self._enrollment.verify_period_id(user_id, period_id, allow_parent_period)
 
     def unenroll_from_period(self, user_id, period_id):
         return self._enrollment.unenroll_from_period(user_id, period_id)

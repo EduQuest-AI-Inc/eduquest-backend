@@ -138,11 +138,12 @@ def my_periods(
 
 class VerifyPeriodRequest(BaseModel):
     period_id: str
+    allow_parent_period: bool = False
 
 
 @router.post("/verify-period")
 def verify_period(body: VerifyPeriodRequest, auth: AuthPayload = Depends(get_auth)):
-    period = period_service.verify_period_id(auth.sub, body.period_id)
+    period = period_service.verify_period_id(auth.sub, body.period_id, body.allow_parent_period)
     return {"message": "Period verified and added to enrollments", "period": period}
 
 

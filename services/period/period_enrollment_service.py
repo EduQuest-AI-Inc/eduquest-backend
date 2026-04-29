@@ -4,6 +4,7 @@ from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from data_access.parent_dao import ParentDAO
 from data_access.period_dao import PeriodDAO
+from data_access.user_dao import UserDAO
 from data_access.period_schedule_dao import PeriodScheduleDAO
 from data_access.student_dao import StudentDAO
 from data_access.enrollment_dao import EnrollmentDAO
@@ -24,6 +25,7 @@ class PeriodEnrollmentService:
     def __init__(self) -> None:
         self.parent_dao = ParentDAO()
         self.period_dao = PeriodDAO()
+        self.user_dao = UserDAO()
         self.period_schedule_dao = PeriodScheduleDAO()
         self.student_dao = StudentDAO()
         self.enrollment_dao = EnrollmentDAO()
@@ -74,12 +76,18 @@ class PeriodEnrollmentService:
             for e in self.enrollment_dao.get_enrollments_by_student(student_id)
         )
 
-    def verify_period_id(self, user_id: str, period_id: str) -> Any:
+    def verify_period_id(self, user_id: str, period_id: str, allow_parent_period: bool = False) -> Any:
         if not period_id:
             raise ValidationError("Missing period ID")
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
+            raise NotFoundError("Invalid period ID")
+
+        owner = self.user_dao.get_by_id(period["owner_id"])
+        if not owner:
+            raise NotFoundError("Invalid period ID")
+        if owner["role"] != "teacher" and not allow_parent_period:
             raise NotFoundError("Invalid period ID")
 
         schedule = self.period_schedule_dao.get_by_period_id(period_id)
