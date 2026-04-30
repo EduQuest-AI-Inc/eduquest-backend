@@ -4,8 +4,8 @@ import pytest
 
 @pytest.fixture(scope="session")
 def supabase_required():
-    if os.environ.get("USE_SUPABASE") != "true":
-        pytest.skip("Integration test requires USE_SUPABASE=true")
+    if os.environ.get("SUPABASE_SERVICE_ROLE_KEY") == "test-service-role-key":
+        pytest.skip("Integration tests require a real SUPABASE_SERVICE_ROLE_KEY")
 
 
 @pytest.fixture

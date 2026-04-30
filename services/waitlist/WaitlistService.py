@@ -50,7 +50,7 @@ class WaitlistService:
                 if referred_by == user_id:
                     referred_by = None
 
-        # Join the waitlist (pass teacher_email for DynamoDB sort key)
+        # Join the waitlist
         entry = self.dao.join_waitlist(user_id, teacher_email, referred_by)
 
         return {

@@ -47,6 +47,8 @@ Both are used in router handlers. Some routes use `Depends(get_auth)`, others ca
 
 **Fix:** Delete `convert_decimals()` and its call sites. Remove `USE_SUPABASE` flag (the app is always Supabase). Clean up DynamoDB comments and test mocks.
 
+**Status: Fixed.**
+
 ---
 
 ## 4. `bots/ltg_conversation_service.py` Backward-Compat Shim

@@ -1,7 +1,7 @@
 # HOW TO RUN TESTS (from eduquest-backend/ with venv active):
 #   pytest                                    # all tests
 #   pytest -m unit                            # unit tests only (no network)
-#   USE_SUPABASE=true pytest -m integration    # integration tests (hits real Supabase)
+#   pytest -m integration                       # integration tests (hits real Supabase)
 #   pytest tests/test_teacher_dao.py          # single file
 #   pytest --cov=. --cov-report=html          # coverage report
 
@@ -59,8 +59,6 @@ mock_boto3 = MagicMock()
 mock_boto3.resource = MagicMock(return_value=MagicMock())
 mock_boto3.client = MagicMock(return_value=MagicMock())
 sys.modules['boto3'] = mock_boto3
-sys.modules['boto3.dynamodb'] = MagicMock()
-sys.modules['boto3.dynamodb.conditions'] = MagicMock()
 sys.modules['botocore'] = MagicMock()
 sys.modules['botocore.exceptions'] = MagicMock()
 
@@ -69,5 +67,4 @@ sys.modules['botocore.exceptions'] = MagicMock()
 # will raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set").
 os.environ.setdefault('SUPABASE_URL', 'http://localhost:54321')
 os.environ.setdefault('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
-os.environ.setdefault('USE_SUPABASE', 'false')
 

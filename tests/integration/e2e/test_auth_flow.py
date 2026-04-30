@@ -3,14 +3,13 @@
 Integration tests for the end-to-end auth flow.
 
 Requires:
-  USE_SUPABASE=true
   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, JWT_SECRET_KEY in .env
   TEST_USERNAME, TEST_PASSWORD, TEST_ROLE in .env pointing to a pre-existing Supabase user
 
 Run:
   cd eduquest-backend
   source venv/bin/activate
-  USE_SUPABASE=true pytest tests/test_integration_auth.py -v
+  pytest tests/test_integration_auth.py -v
 """
 import os
 from datetime import datetime, timedelta, timezone
