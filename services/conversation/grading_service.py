@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
-from bots.grading_agent import GradingInput, GradingResult
+from bots import GradingInput, GradingResult
 from bots.provider import get_bot_provider
 
 logger = logging.getLogger(__name__)
