@@ -1,6 +1,5 @@
 from typing import Dict, Any
 from data_access.period_dao import PeriodDAO
-from data_access.session_dao import SessionDAO
 from data_access.student_dao import StudentDAO
 from data_access.enrollment_dao import EnrollmentDAO
 from data_access.period_schedule_dao import PeriodScheduleDAO
@@ -14,22 +13,21 @@ class PeriodQuestService:
 
     def __init__(self) -> None:
         self.period_dao = PeriodDAO()
-        self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()
         self.enrollment_dao = EnrollmentDAO()
         self.period_schedule_dao = PeriodScheduleDAO()
         self.ltg_conversation_dao = LtgConversationDAO()
         self.quest_service = QuestService()
 
-    def _assert_enrolled(self, user_id: str, period_id: str) -> None:
+    def _assert_enrolled(self, caller_id: str, period_id: str) -> None:
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
-        if not any(e['user_id'] == user_id for e in enrollments):
-            raise Exception(f"Student {user_id} is not enrolled in period {period_id}")
+        if not any(e['user_id'] == caller_id for e in enrollments):
+            raise Exception(f"Student {caller_id} is not enrolled in period {period_id}")
 
-    def start_homework_agent(self, user_id: str, period_id: str) -> Dict[str, Any]:
-        self._assert_enrolled(user_id, period_id)
+    def start_homework_agent(self, caller_id: str, period_id: str) -> Dict[str, Any]:
+        self._assert_enrolled(caller_id, period_id)
 
-        student = self.student_dao.get_student_by_id(user_id)
+        student = self.student_dao.get_student_by_id(caller_id)
         if not student:
             raise Exception("Student not found")
 
@@ -63,14 +61,14 @@ class PeriodQuestService:
         if not schedule_quests:
             raise Exception("No quests could be built from enabled weeks. Check period schedule data.")
 
-        ltg_conv_id = self.ltg_conversation_dao.get_conversation_id(user_id, period_id)
+        ltg_conv_id = self.ltg_conversation_dao.get_conversation_id(caller_id, period_id)
         if not ltg_conv_id:
             raise Exception(
                 "No LTG conversation found for this period. "
                 "Student must complete the Long-Term Goal conversation before generating quests."
             )
 
-        ltg_response_id = self.ltg_conversation_dao.get_last_response_id(user_id, period_id)
+        ltg_response_id = self.ltg_conversation_dao.get_last_response_id(caller_id, period_id)
 
         homework_agent = get_bot_provider().create_hw_agent(student, period, schedule_quests, previous_response_id=ltg_response_id)
         homework = homework_agent.run()
@@ -79,7 +77,7 @@ class PeriodQuestService:
         schedule_dict = {"list_of_quests": schedule_quests}
 
         save_result = self.quest_service.update_quests_preserving_completed_data(
-            schedule_dict, homework_dict, user_id, period_id
+            schedule_dict, homework_dict, caller_id, period_id
         )
 
         return {
@@ -90,28 +88,19 @@ class PeriodQuestService:
         }
 
     def update_quests_with_recommended_change(
-        self, auth_token: str, user_id: str, period_id: str, recommended_change: str
+        self, caller_id: str, caller_role: str, period_id: str, recommended_change: str
     ) -> Dict[str, Any]:
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-        caller_id = sessions[0]["user_id"]
-        caller_role = sessions[0].get("role", "student")
+        self._assert_enrolled(caller_id, period_id)
 
-        if caller_role not in ("teacher", "parent") and caller_id != user_id:
-            raise Exception("Unauthorized: caller must be the target student, a teacher, or a parent")
-
-        self._assert_enrolled(user_id, period_id)
-
-        student = self.student_dao.get_student_by_id(user_id)
+        student = self.student_dao.get_student_by_id(caller_id)
         if not student:
-            raise Exception(f"Student not found: {user_id}")
+            raise Exception(f"Student not found: {caller_id}")
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
             raise Exception("Period not found")
 
-        existing_quests = self.quest_service.get_quests_for_student_and_period(user_id, period_id)
+        existing_quests = self.quest_service.get_quests_for_student_and_period(caller_id, period_id)
         if not existing_quests:
             raise Exception("No existing quests found. Cannot update without existing quest structure.")
 
@@ -131,7 +120,7 @@ class PeriodQuestService:
                 "total_quests": len(existing_quests),
             }
 
-        ltg_response_id = self.ltg_conversation_dao.get_last_response_id(user_id, period_id)
+        ltg_response_id = self.ltg_conversation_dao.get_last_response_id(caller_id, period_id)
         student_with_context = {**student, 'recommended_change': recommended_change}
 
         homework_agent = get_bot_provider().create_hw_agent(student_with_context, period, incomplete_quests, previous_response_id=ltg_response_id)
@@ -139,7 +128,7 @@ class PeriodQuestService:
         homework_dict = self._normalize_homework(homework)
 
         update_result = self.quest_service.update_quests_preserving_completed_data(
-            {"list_of_quests": incomplete_quests}, homework_dict, user_id, period_id
+            {"list_of_quests": incomplete_quests}, homework_dict, caller_id, period_id
         )
 
         affected_weeks = [q.get("Week") for q in incomplete_quests]

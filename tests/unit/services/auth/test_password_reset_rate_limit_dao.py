@@ -26,7 +26,7 @@ def test_check_rate_limit_allows_first_request():
     dao._is_on_cooldown = MagicMock(return_value=False)
     dao._get_count = MagicMock(return_value=0)
 
-    allowed, msg = dao.check_rate_limit("1.2.3.4", "user@example.com")
+    allowed, msg = dao.check_rate_limit("1.2.3.4", "user@eduquestai.org")
 
     assert allowed is True
     assert msg == ""
@@ -39,7 +39,7 @@ def test_check_rate_limit_blocks_after_ip_email_limit():
     # ip_email count is at limit; ip count is under
     dao._get_count = MagicMock(side_effect=[5, 0])
 
-    allowed, reason = dao.check_rate_limit("1.2.3.4", "user@example.com")
+    allowed, reason = dao.check_rate_limit("1.2.3.4", "user@eduquestai.org")
 
     assert allowed is False
     assert reason == "ip_email_limit"
@@ -51,7 +51,7 @@ def test_set_cooldown_then_blocked():
     dao._is_on_cooldown = MagicMock(return_value=True)
     dao._get_count = MagicMock(return_value=0)
 
-    allowed, reason = dao.check_rate_limit("1.2.3.4", "user@example.com")
+    allowed, reason = dao.check_rate_limit("1.2.3.4", "user@eduquestai.org")
 
     assert allowed is False
     assert reason == "cooldown"

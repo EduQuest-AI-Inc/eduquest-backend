@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import tempfile
 from typing import Optional, cast
@@ -12,8 +13,7 @@ from pydantic import BaseModel
 from api.deps import AuthPayload, get_auth
 from data_access.quest_dao import QuestDAO
 from services.conversation.conversation_service import ConversationService
-from utils.conversion_utils import convert_decimals as _convert_decimals
-
+logger = logging.getLogger(__name__)
 router = APIRouter()
 conversation_service = ConversationService()
 
@@ -24,8 +24,10 @@ conversation_service = ConversationService()
 
 @router.post("/initiate-profile-assistant")
 def initiate_profile_assistant(auth: AuthPayload = Depends(get_auth)):
+    if auth.role != "student":
+        raise HTTPException(status_code=403, detail="Students only")
     try:
-        return conversation_service.start_profile_assistant(auth.token)
+        return conversation_service.start_profile_assistant(auth.sub)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -43,7 +45,7 @@ def continue_profile_assistant(
 ):
     try:
         return conversation_service.continue_profile_assistant(
-            auth.token,
+            auth.sub,
             body.conversation_type,
             body.conversation_id,
             body.message,
@@ -103,7 +105,6 @@ async def initiate_update_assistant(
                 quest_data = QuestDAO().get_quest_by_id(individual_quest_id)
                 if not quest_data:
                     raise HTTPException(status_code=404, detail="Quest not found")
-                quest_data = _convert_decimals(quest_data)
                 quests_file = json.dumps([quest_data])
             except HTTPException:
                 raise
@@ -122,9 +123,10 @@ async def initiate_update_assistant(
                 result = await loop.run_in_executor(
                     None,
                     lambda: conversation_service.start_update_assistant(
-                        auth_token=auth.token,
                         quests_file=quests_file,
                         is_instructor=False,
+                        caller_user_id=auth.sub,
+                        caller_role=auth.role,
                         week=int(str(week)),
                         submission_file=temp_path,
                         user_id=str(user_id) if user_id else None,
@@ -166,9 +168,10 @@ async def initiate_update_assistant(
             result = await loop.run_in_executor(
                 None,
                 lambda: conversation_service.start_update_assistant(
-                    auth_token=auth.token,
                     quests_file=quests_file,
                     is_instructor=is_instructor,
+                    caller_user_id=auth.sub,
+                    caller_role=auth.role,
                     week=week,
                     submission_file=submission_file,
                     user_id=user_id,
@@ -184,6 +187,7 @@ async def initiate_update_assistant(
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.error("initiate-update-assistant failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -200,10 +204,10 @@ def continue_update_assistant(
 ):
     try:
         return conversation_service.continue_update_assistant(
-            auth_token=auth.token,
+            user_id=auth.sub,
+            caller_role=auth.role,
             conversation_id=body.conversation_id,
             message=body.message,
-            user_id=body.user_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -1,22 +1,58 @@
 import logging
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
 from data_access.period_dao import PeriodDAO
 from services.enrollment.enrollment_service import EnrollmentService
+from services.parent.parent_service import ParentService
+from services.period.period_service import PeriodService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 service = EnrollmentService()
+period_service = PeriodService()
+parent_service = ParentService()
 _period_dao = PeriodDAO()
 
+
+# ─── Request models ───────────────────────────────────────────────────────────
 
 class EnrollRequest(BaseModel):
     period_id: str
     semester: str = "Fall 2025"
 
+
+class VerifyPeriodRequest(BaseModel):
+    period_id: str
+    allow_parent_period: bool = False
+
+
+class UnenrollRequest(BaseModel):
+    period_id: str
+
+
+class AcceptInviteRequest(BaseModel):
+    code: str
+
+
+# ─── Private helpers ──────────────────────────────────────────────────────────
+
+def _check_viewer_access(auth: AuthPayload, user_id: str) -> None:
+    if auth.role == "parent":
+        linked = parent_service.parent_dao.get_linked_student_ids(auth.sub)
+        if user_id not in linked:
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif auth.role == "teacher":
+        if not period_service.has_teacher_access_to_student(auth.sub, user_id):
+            raise HTTPException(status_code=403, detail="Access denied")
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
+# ─── Teacher-facing enrollment management ────────────────────────────────────
 
 @router.post("/enroll")
 def enroll(body: EnrollRequest, auth: AuthPayload = Depends(get_auth)):
@@ -60,3 +96,53 @@ def get_student_profile(period_id: str, user_id: str, auth: AuthPayload = Depend
     except Exception as e:
         logger.error("Error fetching student profile: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Server error")
+
+
+# ─── Student enrollment ───────────────────────────────────────────────────────
+
+@router.get("/my-periods")
+def my_periods(
+    user_id: Optional[str] = Query(None),
+    auth: AuthPayload = Depends(get_auth),
+):
+    if user_id:
+        _check_viewer_access(auth, user_id)
+    return period_service.get_my_periods(user_id or auth.sub)
+
+
+@router.post("/verify-period")
+def verify_period(body: VerifyPeriodRequest, auth: AuthPayload = Depends(get_auth)):
+    period = period_service.verify_period_id(auth.sub, body.period_id, body.allow_parent_period)
+    return {"message": "Period verified and added to enrollments", "period": period}
+
+
+@router.post("/unenroll")
+def unenroll(body: UnenrollRequest, auth: AuthPayload = Depends(get_auth)):
+    return period_service.unenroll_from_period(auth.sub, body.period_id)
+
+
+@router.get("/student/parent-periods")
+def get_parent_periods(auth: AuthPayload = Depends(get_auth)):
+    return period_service.get_parent_periods_for_student(auth.sub)
+
+
+# ─── Parent ───────────────────────────────────────────────────────────────────
+
+@router.post("/accept-parent-invite")
+def accept_parent_invite(body: AcceptInviteRequest, auth: AuthPayload = Depends(get_auth)):
+    code = body.code.strip().upper()
+    if not code:
+        raise HTTPException(status_code=400, detail="Invite code is required")
+    try:
+        result = parent_service.accept_invite(auth.sub, code)
+        return result
+    except ValueError as ve:
+        msg = str(ve)
+        if "expired" in msg or "already been used" in msg:
+            raise HTTPException(status_code=410, detail=msg)
+        if "not found" in msg.lower() or "invalid" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
+    except Exception as e:
+        logger.error("Error in accept-parent-invite: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")

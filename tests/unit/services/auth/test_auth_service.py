@@ -132,7 +132,7 @@ class TestPasswordResetService:
         svc.rate_limit_dao.check_rate_limit.return_value = (True, None)
         svc.user_dao.get_by_email.return_value = None
 
-        result = svc.request_password_reset("nobody@example.com", "127.0.0.1")
+        result = svc.request_password_reset("nobody@eduquestai.org", "127.0.0.1")
         assert result["success"] is True
         assert "reset" in result["message"].lower() or "email" in result["message"].lower()
 
@@ -149,7 +149,7 @@ class TestPasswordResetService:
         }
         svc.rate_limit_dao.set_cooldown.return_value = None
 
-        result = svc.request_password_reset("alice@example.com", "127.0.0.1")
+        result = svc.request_password_reset("alice@eduquestai.org", "127.0.0.1")
         assert result["success"] is True
 
     @pytest.mark.unit
@@ -157,7 +157,7 @@ class TestPasswordResetService:
         svc = _make_reset_service()
         svc.rate_limit_dao.check_rate_limit.return_value = (False, "rate_limited")
 
-        result = svc.request_password_reset("any@example.com", "1.2.3.4")
+        result = svc.request_password_reset("any@eduquestai.org", "1.2.3.4")
         assert result["success"] is True
 
     @pytest.mark.unit
@@ -176,7 +176,7 @@ class TestPasswordResetService:
         svc = _make_reset_service()
         svc.rate_limit_dao.check_confirm_rate_limit.return_value = (True, None)
         svc.rate_limit_dao.record_confirm_attempt.return_value = None
-        token_data = {"user_id": "u1", "email": "u@example.com"}
+        token_data = {"user_id": "u1", "email": "u@eduquestai.org"}
         svc.token_dao.is_token_valid.return_value = (True, token_data, None)
         svc.token_dao.consume_token.return_value = (True, token_data, None)
         svc.user_dao.update.return_value = None

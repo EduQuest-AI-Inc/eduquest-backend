@@ -10,7 +10,7 @@ def _teacher():
         user_id=_ID,
         first_name="Test",
         last_name="Teacher",
-        email="test-integration-teacher@example.com",
+        email="test-integration-teacher@eduquestai.org",
         password="hashed",
         role="teacher",
         pilot_approved=False,

@@ -2,7 +2,7 @@ import pytest
 from data_access.user_dao import UserDAO
 
 _ID = "test-integration-user-dao"
-_EMAIL = "test-integration-user@example.com"
+_EMAIL = "test-integration-user@eduquestai.org"
 
 
 def _insert(dao):

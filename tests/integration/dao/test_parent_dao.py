@@ -10,7 +10,7 @@ def _parent():
         user_id=_ID,
         first_name="Test",
         last_name="Parent",
-        email="test-integration-parent@example.com",
+        email="test-integration-parent@eduquestai.org",
         password="hashed",
         role="parent",
         linked_student_ids=[],

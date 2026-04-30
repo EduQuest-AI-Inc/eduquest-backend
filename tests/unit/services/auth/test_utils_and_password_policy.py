@@ -180,12 +180,12 @@ def test_validate_required_fields_all_missing_lists_all_in_message():
 
 @pytest.mark.unit
 def test_normalize_email_lowercases_and_strips():
-    assert normalize_email("  Alice@Example.COM  ") == "alice@example.com"
+    assert normalize_email("  Alice@Example.COM  ") == "alice@eduquestai.org"
 
 
 @pytest.mark.unit
 def test_normalize_email_already_normal():
-    assert normalize_email("alice@example.com") == "alice@example.com"
+    assert normalize_email("alice@eduquestai.org") == "alice@eduquestai.org"
 
 
 @pytest.mark.unit

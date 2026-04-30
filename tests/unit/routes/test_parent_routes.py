@@ -71,7 +71,7 @@ class TestGetStudents:
         with patch("api.routers.parent.parent_service") as mock_ps:
             mock_ps.get_linked_students.return_value = [
                 {"user_id": "s1", "first_name": "Alice", "last_name": "Smith",
-                 "grade": "10", "email": "alice@test.com"}
+                 "grade": "10", "email": "alice@eduquestai.org"}
             ]
             resp = client.get("/parent/students")
         assert resp.status_code == 200

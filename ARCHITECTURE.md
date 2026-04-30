@@ -8,13 +8,13 @@
 graph TB
     Client["Client<br/>(Browser / Mobile)"]
 
-    subgraph Flask["Flask Application — Port 5000"]
+    subgraph FastAPI["FastAPI Application — Port 8000"]
         MW["CORS + JWT Middleware"]
-        BP["Route Blueprints<br/>/auth  /user  /conversation  /period<br/>/teacher  /enrollment  /quest  /parent  /pilot-waitlist"]
-        Svc["Feature Services<br/>(one or more per Blueprint)"]
+        BP["Route Handlers<br/>/auth  /user  /conversation  /period<br/>/teacher  /enrollment  /quest  /parent  /pilot-waitlist"]
+        Svc["Feature Services<br/>(one or more per Router)"]
     end
 
-    AI["AI Layer (OpenAI Agents SDK)<br/>Profile · LTG · HW · Grading · Teacher Feedback"]
+    AI["AI Layer (OpenAI Agents SDK)<br/>Profile · LTG · HW · Grading · Schedule · Teacher Feedback"]
     DB["Supabase / PostgreSQL"]
     Ext["External<br/>S3 · SES · Canvas LMS · OpenAI Files API"]
 
@@ -40,12 +40,13 @@ graph LR
         WaitSvc["WaitlistService"]
     end
 
-    subgraph AI["AI Agents"]
-        ProfBot["Profile Agent"]
-        LTGBot["LTG Agent"]
-        HWBot["HW Agent"]
-        GradeBot["Grading Orchestrator<br/>(4 sub-agents)"]
-        TFBot["Teacher Feedback"]
+    subgraph AI["AI Agents (bots/)"]
+        ProfBot["Profile Agent<br/>(gpt-4.1-mini)"]
+        LTGBot["LTG Agent<br/>(gpt-5)"]
+        HWBot["HW Agent<br/>(gpt-5)"]
+        GradeBot["Grading Orchestrator<br/>4 sub-agents (gpt-5)"]
+        SchedBot["Schedule Agent<br/>(gpt-5)"]
+        TFBot["Teacher Feedback Agent"]
     end
 
     subgraph Ext["External Services"]
@@ -55,11 +56,11 @@ graph LR
         OAI["OpenAI Files API"]
     end
 
-    subgraph DB["Database"]
+    subgraph DB["Database (Supabase)"]
         Auth_t["session<br/>password_reset_token<br/>password_reset_rate_limit"]
         Identity_t["user · student<br/>teacher · parent"]
         Course_t["period · period_schedule<br/>enrollment"]
-        AI_t["conversation · ltg_conversation<br/>quest · student_skill_mastery"]
+        AI_t["conversation · ltg_conversation<br/>quest · student_skill_mastery<br/>aggregated_metrics"]
         Onboard_t["parent_invite · waitlist"]
     end
 
@@ -67,7 +68,7 @@ graph LR
     UserSvc --> Identity_t & Canvas
     ConvSvc --> ProfBot & GradeBot & TFBot
     ConvSvc --> AI_t & Identity_t
-    PeriodSvc --> LTGBot & HWBot
+    PeriodSvc --> LTGBot & HWBot & SchedBot
     PeriodSvc --> Course_t & OAI & S3
     EnrollSvc --> Course_t
     QuestSvc --> AI_t
@@ -99,6 +100,7 @@ sequenceDiagram
     S->>DB: SessionDAO.add_session()  — create session
     S-->>R: {auth_token, user_id, role}
     R-->>C: 201  {auth_token, user_id, role}
+    Note over R,C: Token also set as HTTP-only cookie via set_auth_cookie()
 ```
 
 ### Login
@@ -159,17 +161,17 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor C as Client
-    participant MW as JWT Middleware
+    participant MW as get_auth() dependency
     participant R as GET /user/profile
     participant S as user_service
     participant DB as Supabase
 
-    C->>MW: Authorization: Bearer {token}
+    C->>MW: Authorization: Bearer {token}  (or auth_token cookie)
     MW->>DB: SessionDAO.get_by_token()  — validate session
-    MW-->>R: user_id, role (from JWT claims)
+    MW-->>R: AuthPayload(sub, role, token)
     R->>S: get_profile(user_id, role)
     S->>DB: StudentDAO / TeacherDAO / ParentDAO.get_by_id()
-    DB-->>S: full profile row
+    DB-->>S: full profile row (joins user + role table)
     S-->>R: profile object
     R-->>C: 200  {profile}
 ```
@@ -204,7 +206,7 @@ sequenceDiagram
 
 ## Conversation Flows
 
-All conversation routes require a valid JWT. The conversation state (which AI thread to continue) is tracked in the `conversation` table using OpenAI's `last_response_id`.
+All conversation routes require a valid JWT. Conversation state is tracked in the `conversation` table using OpenAI's `last_response_id` from the Responses API — the previous response ID is passed to `Runner.run()` to continue a thread without re-sending history.
 
 ### Profile Gathering (New Student Onboarding)
 
@@ -214,12 +216,13 @@ sequenceDiagram
     participant R1 as POST /conversation/initiate-profile-assistant
     participant R2 as POST /conversation/continue-profile-assistant
     participant S as conversation_service / profile_service
-    participant AI as Profile Agent (OpenAI)
+    participant AI as Profile Agent (gpt-4.1-mini)
     participant DB as Supabase
 
     C->>R1: {} (no body needed)
     R1->>S: initiate_profile(user_id)
     S->>AI: create_profile_agent() — first message
+    Note over S,AI: Guardrails applied via check_student_output_safety()
     AI-->>S: {response_text, response_id}
     S->>DB: ConversationDAO.add_conversation()  — store response_id
     R1-->>C: 200  {conversation_id, message}
@@ -240,7 +243,7 @@ sequenceDiagram
 
 ### Grading / Update Assistant
 
-This flow handles student work submissions. The update assistant is a multi-turn conversation that first grades the work and then may gather additional context.
+This flow handles student work submissions. The update assistant grades the work via a multi-agent orchestrator then may continue as a follow-up conversation.
 
 ```mermaid
 sequenceDiagram
@@ -248,7 +251,7 @@ sequenceDiagram
     participant R1 as POST /conversation/initiate-update-assistant
     participant R2 as POST /conversation/continue-update-assistant
     participant S as conversation_service / grading_service
-    participant AI as Grading Orchestrator (4 sub-agents)
+    participant AI as Grading Orchestrator (gpt-5)
     participant DB as Supabase
     participant S3 as AWS S3
 
@@ -260,7 +263,7 @@ sequenceDiagram
     S->>AI: GradingOrchestrator.grade()
     Note over AI: 1. Numerical Grade Agent  → score per rubric criterion
     Note over AI: 2. Feedback Agent         → written feedback
-    Note over AI: 3. Skill Mastery Agent    → updates skill mastery levels
+    Note over AI: 3. Skill Mastery Agent    → updates skill mastery levels (0.0–1.0)
     Note over AI: 4. HW Recommendation Agent → next quest suggestions
     AI-->>S: {grade, feedback, skill_updates, next_quests}
     S->>DB: QuestDAO.update_quest()  — persist grade + feedback
@@ -278,6 +281,8 @@ sequenceDiagram
         R2-->>C: 200  {message}
     end
 ```
+
+> **Skill metrics note:** After grading, the frontend reads aggregated skill metrics directly from the `aggregated_metrics` Supabase table — there is no `/metrics` API endpoint. This table is populated by `GradingOrchestrator` via `AggregatedMetricsDAO`.
 
 ---
 
@@ -347,7 +352,7 @@ sequenceDiagram
     actor T as Client (Teacher / Parent)
     participant R as POST /period/initiate-homework-agent
     participant S as period_quest_service
-    participant AI as HW Agent (OpenAI)
+    participant AI as HW Agent (gpt-5)
     participant OAI as OpenAI Files API (vector store)
     participant DB as Supabase
 
@@ -375,14 +380,14 @@ sequenceDiagram
     participant R3 as PUT  /period/period-schedule
     participant R4 as PUT  /period/period-schedule/quest-weeks
     participant S as period_schedule_service
-    participant OAI as OpenAI Files API
+    participant AI as Schedule Agent (gpt-5)
     participant DB as Supabase
 
     T->>R1: {period_id}
     R1->>S: generate_schedule(period_id)
     S->>DB: PeriodDAO.get_period_by_id()  — fetch vector_store_id
-    S->>OAI: Prompt schedule agent with course documents
-    OAI-->>S: schedule JSON
+    S->>AI: ScheduleAgent with course documents
+    AI-->>S: schedule JSON
     S->>DB: PeriodScheduleDAO.upsert()  — store schedule
     R1-->>T: 200  {schedule}
 
@@ -411,8 +416,8 @@ sequenceDiagram
     actor C as Client (Student)
     participant R1 as POST /period/initiate-ltg-conversation
     participant R2 as POST /period/continue-ltg-conversation
-    participant S as period_ltg_service
-    participant AI as LTG Agent (OpenAI)
+    participant S as ltg_service
+    participant AI as LTG Agent (gpt-5)
     participant OAI as OpenAI Files API (vector store)
     participant DB as Supabase
 
@@ -420,7 +425,7 @@ sequenceDiagram
     R1->>S: initiate_ltg(user_id, period_id)
     S->>DB: StudentDAO.get_student_by_id()  — load profile
     S->>DB: PeriodDAO.get_period_by_id()  — load vector_store_id
-    S->>AI: create_ltg_agent() — first message
+    S->>AI: create_ltg_agent(vector_store_id) — first message
     Note over AI,OAI: Agent searches course docs to align goals with curriculum
     AI-->>S: {response_text, response_id, goal_suggestions?}
     S->>DB: LTGConversationDAO.upsert()  — store response_id
@@ -434,7 +439,7 @@ sequenceDiagram
         AI-->>S: {response_text, response_id, goal_confirmed?, goal_text?}
         S->>DB: LTGConversationDAO.update()
         alt Goal confirmed
-            S->>DB: StudentDAO.update_long_term_goal()
+            S->>DB: StudentLongTermGoalDAO.upsert()  — one row per (user_id, period_id)
         end
         R2-->>C: 200  {message, goal_confirmed}
     end
@@ -494,7 +499,7 @@ sequenceDiagram
         S->>DB: QuestDAO.get_quests_by_student()
     end
     DB-->>S: [quest rows]
-    R-->>C: 200  [{quest_id, description, status, grade, feedback, ...}]
+    R-->>C: 200  [{quest_id, title, instructions, rubric, status, grade, feedback, ...}]
 ```
 
 ### Update Quest Status
@@ -561,7 +566,7 @@ sequenceDiagram
 
     P->>R: {}
     R->>S: generate_invite(parent_id)
-    S->>S: uuid / random code, set expiry = now + 24 h
+    S->>S: uuid / random code, set expiry = now + INVITE_EXPIRY_HOURS (24 h)
     S->>DB: ParentInviteDAO.insert()
     R-->>P: 200  {invite_code, expires_at}
 ```
@@ -599,6 +604,25 @@ sequenceDiagram
 
 ---
 
+## AI Agent Details
+
+All agents live in `bots/` and use the OpenAI Agents SDK (`from agents import Agent, Runner`). Structured outputs use Pydantic schemas in `bots/schemas/`.
+
+| Agent | File | Model | Purpose |
+|---|---|---|---|
+| Profile Agent | `profile_agent.py` | gpt-4.1-mini | Gathers student strengths, weaknesses, interests, learning style via multi-turn chat |
+| LTG Agent | `ltg_agent.py` | gpt-5 | Suggests 3 long-term goals aligned with course content (uses vector store file search) |
+| HW Agent | `agent.py::HWAgent` | gpt-5 | Generates personalised quest title, instructions, and rubric per student (async) |
+| Grading Orchestrator | `grading_agent.py::GradingOrchestrator` | gpt-5 | 4 sequential sub-agents: numerical grade, written feedback, skill mastery scores, homework recommendations |
+| Schedule Agent | `schedule_agent.py::ScheduleAgent` | gpt-5 | Generates a weekly schedule from course documents |
+| Teacher Feedback Agent | `teacher_feedback_agent.py` | gpt-5 | Turns teacher notes into structured feedback for students |
+
+Content safety is applied via `bots/guardrails.py::check_student_output_safety()` before returning agent responses to the client.
+
+`bots/ltg_conversation_service.py` is a backwards-compatibility re-export shim — it exists only to preserve old import paths and contains no logic.
+
+---
+
 ## Data Tables Reference
 
-See [data_access/data_tables.md](data_access/DATA_TABLES.md).
+See [data_access/DATA_TABLES.md](data_access/DATA_TABLES.md).
