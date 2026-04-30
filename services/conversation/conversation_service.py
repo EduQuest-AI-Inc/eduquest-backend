@@ -2,36 +2,36 @@
 Conversation service — orchestrates profile gathering, grading, and
 teacher-feedback flows by delegating to specialised agent services.
 """
-import logging
-import uuid
-import os
 import json
+import logging
+import os
+import time
+import uuid
 from typing import Optional
-
-logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 
-from data_access.session_dao import SessionDAO
-from data_access.period_dao import PeriodDAO
-from data_access.student_dao import StudentDAO
 from data_access.conversation_dao import ConversationDAO
+from data_access.period_dao import PeriodDAO
+from data_access.session_dao import SessionDAO
+from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
-from models.conversation import Conversation
 from integrations.s3_service import upload_file_to_s3
-
-from services.conversation.profile_service import (
-    initiate_profile_conversation,
-    continue_profile_conversation,
-)
-from services.conversation.grading_service import grade_student_submission
+from models.conversation import Conversation
 from services.auth_utils import require_auth
+from services.conversation.grading_service import grade_student_submission
+from services.conversation.profile_service import (
+    continue_profile_conversation,
+    initiate_profile_conversation,
+)
 from services.conversation.teacher_feedback_service import (
-    initiate_teacher_feedback,
     continue_teacher_feedback,
+    initiate_teacher_feedback,
 )
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationService:
@@ -190,7 +190,6 @@ class ConversationService:
         # Upload submission to S3
         s3_key = None
         if submission_file and period_id and user_id and individual_quest_id:
-            import time
             timestamp = int(time.time())
             filename = f"{timestamp}_{os.path.basename(submission_file)}"
             folder = f"periods/{period_id}/students/{user_id}/{individual_quest_id}"
