@@ -109,29 +109,22 @@ class ConversationService:
         auth_token: str,
         quests_file: str,
         is_instructor: bool,
+        caller_user_id: str,
         week: Optional[int] = None,
         submission_file: Optional[str] = None,
         user_id: Optional[str] = None,
         period_id: Optional[str] = None,
         individual_quest_id: Optional[str] = None,
     ):
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-
-        session = sessions[0]
-        user_id = session.get("user_id")
-        role = session.get("role")
-        if not user_id or not role:
-            raise Exception("Session missing user_id or role")
+        user_id = caller_user_id
 
         user = (
             self.teacher_dao.get_teacher_by_id(user_id)
-            if role == "teacher"
+            if is_instructor
             else self.student_dao.get_student_by_id(user_id)
         )
         if not user:
-            raise Exception(f"{role.capitalize()} not found")
+            raise Exception(f"{'Instructor' if is_instructor else 'Student'} not found")
 
         # Resolve period_id
         if is_instructor:
