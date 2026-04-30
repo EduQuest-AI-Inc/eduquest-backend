@@ -41,6 +41,78 @@ class BotProvider:
         from bots.schedule_agent import PeriodScheduleAgent
         return PeriodScheduleAgent(vector_store_id=vector_store_id, course_name=course_name)
 
+    def create_profile_agent(self):
+        from bots.profile_agent import create_profile_agent
+        return create_profile_agent()
+
+    def create_ltg_agent(self, vector_store_id: str):
+        from bots.ltg_agent import create_ltg_agent
+        return create_ltg_agent(vector_store_id)
+
+    def create_teacher_feedback_agent(self):
+        from bots.teacher_feedback_agent import create_teacher_feedback_agent
+        return create_teacher_feedback_agent()
+
+    async def grade_submission(self, quest_data: dict, submission_text: str) -> dict:
+        grading_input = self._build_grading_input(quest_data, submission_text)
+        orchestrator = self.create_grading_orchestrator()
+        result = await orchestrator.grade_submission(grading_input)
+        return self._format_grading_result(result)
+
+    @staticmethod
+    def _build_grading_input(quest_data: dict, submission_text: str):
+        import json
+        from bots.grading_agent import GradingInput
+        rubric = quest_data.get("rubric", {})
+        if isinstance(rubric, str):
+            try:
+                rubric = json.loads(rubric)
+            except json.JSONDecodeError:
+                rubric = {"raw": rubric}
+        skills_raw = quest_data.get("skills", "")
+        if isinstance(skills_raw, str):
+            skills = [s.strip() for s in skills_raw.split(";") if s.strip()]
+        elif isinstance(skills_raw, list):
+            skills = skills_raw
+        else:
+            skills = []
+        instructions = quest_data.get("instructions", quest_data.get("description", ""))
+        return GradingInput(
+            submission=submission_text,
+            rubric=rubric,
+            skills=skills,
+            instructions=instructions,
+        )
+
+    @staticmethod
+    def _format_grading_result(result) -> dict:
+        from typing import Optional
+        recommended_change_text: Optional[str] = None
+        if result.recommended_changes:
+            recommended_change_text = "; ".join(result.recommended_changes)
+        return {
+            "grade": result.skill_mastery,
+            "overall_score": result.numerical_grade,
+            "feedback": result.feedback,
+            "change": result.homework_changes_recommended,
+            "recommended_change": recommended_change_text,
+            "response": (
+                f"Grade: {result.numerical_grade}\n"
+                f"Feedback: {result.feedback}\n"
+                f"Changes recommended: {result.homework_changes_recommended}"
+            ),
+        }
+
+    async def run_conversation(self, agent, message: str, **kwargs):
+        from agents import Runner
+        return await Runner.run(agent, message, **kwargs)
+
+    def make_conversations_session(self, conversation_id=None):
+        from agents import OpenAIConversationsSession
+        if conversation_id:
+            return OpenAIConversationsSession(conversation_id=conversation_id)
+        return OpenAIConversationsSession()
+
     @property
     def runner(self):
         from agents import Runner
@@ -53,7 +125,7 @@ class MockBotProvider(BotProvider):
     read agent.output_type to dispatch the right response type."""
 
     def create_hw_agent(self, student, period, schedule, conversation_id=None, previous_response_id=None):
-        from bots.mocks import MockHWAgent
+        from bots._mocks import MockHWAgent
         return MockHWAgent(
             student, period, schedule,
             conversation_id=conversation_id,
@@ -61,16 +133,36 @@ class MockBotProvider(BotProvider):
         )
 
     def create_grading_orchestrator(self):
-        from bots.mocks import MockGradingOrchestrator
+        from bots._mocks import MockGradingOrchestrator
         return MockGradingOrchestrator()
 
     def create_schedule_agent(self, vector_store_id: Optional[str], course_name: Optional[str] = None):
-        from bots.mocks import MockPeriodScheduleAgent
+        from bots._mocks import MockPeriodScheduleAgent
         return MockPeriodScheduleAgent(vector_store_id=vector_store_id, course_name=course_name)
+
+    def create_profile_agent(self):
+        from bots.profile_agent import create_profile_agent
+        return create_profile_agent()
+
+    def create_ltg_agent(self, vector_store_id: str):
+        from bots.ltg_agent import create_ltg_agent
+        return create_ltg_agent(vector_store_id)
+
+    def create_teacher_feedback_agent(self):
+        from bots.teacher_feedback_agent import create_teacher_feedback_agent
+        return create_teacher_feedback_agent()
+
+    async def run_conversation(self, agent, message: str, **kwargs):
+        from bots._mocks import MockRunner
+        return await MockRunner.run(agent, message, **kwargs)
+
+    def make_conversations_session(self, conversation_id=None):
+        from bots._mocks import MockConversationsSession
+        return MockConversationsSession(conversation_id=conversation_id)
 
     @property
     def runner(self):
-        from bots.mocks import MockRunner
+        from bots._mocks import MockRunner
         return MockRunner
 
 

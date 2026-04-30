@@ -43,14 +43,12 @@ def _profile_svc(previous_response_id=None):
     svc = ProfileConversationService.__new__(ProfileConversationService)
     svc.agent = MagicMock()
     svc.previous_response_id = previous_response_id
-    svc._runner = MagicMock()
     return svc
 
 
 def _feedback_svc():
     svc = TeacherFeedbackConversationService.__new__(TeacherFeedbackConversationService)
     svc.agent = MagicMock()
-    svc._runner = MagicMock()
     svc.session = MagicMock()
     return svc
 
@@ -121,13 +119,15 @@ def test_check_profile_no_profile_attr():
 def test_profile_initiate_happy_path():
     svc = _profile_svc()
     response = _make_profile_response("Welcome!")
-    svc._runner.run = AsyncMock(return_value=_make_runner_result(response, "rid1"))
-    result = asyncio.run(svc.initiate({"first_name": "Alice", "last_name": "Smith"}))
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_make_runner_result(response, "rid1"))
+    with patch("services.conversation.profile_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.initiate({"first_name": "Alice", "last_name": "Smith"}))
     assert result["response"] == "Welcome!"
     assert result["response_id"] == "rid1"
     assert result["profile_complete"] is False
     assert "profile" not in result
-    call_message = svc._runner.run.call_args[0][1]
+    call_message = mock_provider.run_conversation.call_args[0][1]
     assert "Alice" in call_message
     assert "Smith" in call_message
 
@@ -136,8 +136,10 @@ def test_profile_initiate_happy_path():
 def test_profile_initiate_with_complete_profile():
     svc = _profile_svc()
     response = _make_profile_response("Done!", profile=_make_full_profile())
-    svc._runner.run = AsyncMock(return_value=_make_runner_result(response))
-    result = asyncio.run(svc.initiate({"first_name": "Bob", "last_name": ""}))
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_make_runner_result(response))
+    with patch("services.conversation.profile_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.initiate({"first_name": "Bob", "last_name": ""}))
     assert result["profile_complete"] is True
     assert "profile" in result
     assert result["profile"]["strength"] == ["math"]
@@ -147,9 +149,11 @@ def test_profile_initiate_with_complete_profile():
 def test_profile_initiate_missing_name_uses_default():
     svc = _profile_svc()
     response = _make_profile_response("Hi")
-    svc._runner.run = AsyncMock(return_value=_make_runner_result(response))
-    asyncio.run(svc.initiate({}))
-    call_message = svc._runner.run.call_args[0][1]
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_make_runner_result(response))
+    with patch("services.conversation.profile_service.get_bot_provider", return_value=mock_provider):
+        asyncio.run(svc.initiate({}))
+    call_message = mock_provider.run_conversation.call_args[0][1]
     assert "Student" in call_message
 
 
@@ -157,9 +161,11 @@ def test_profile_initiate_missing_name_uses_default():
 def test_profile_continue_passes_previous_response_id():
     svc = _profile_svc(previous_response_id="rid-prev")
     response = _make_profile_response("Continuing")
-    svc._runner.run = AsyncMock(return_value=_make_runner_result(response, "rid2"))
-    result = asyncio.run(svc.continue_conversation("I like reading"))
-    assert svc._runner.run.call_args[1]["previous_response_id"] == "rid-prev"
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_make_runner_result(response, "rid2"))
+    with patch("services.conversation.profile_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.continue_conversation("I like reading"))
+    assert mock_provider.run_conversation.call_args[1]["previous_response_id"] == "rid-prev"
     assert "response_id" in result
     assert "response" in result
     assert "profile_complete" in result
@@ -169,9 +175,11 @@ def test_profile_continue_passes_previous_response_id():
 def test_profile_continue_no_previous_id():
     svc = _profile_svc(previous_response_id=None)
     response = _make_profile_response("Hello")
-    svc._runner.run = AsyncMock(return_value=_make_runner_result(response))
-    asyncio.run(svc.continue_conversation("Hi"))
-    assert svc._runner.run.call_args[1]["previous_response_id"] is None
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_make_runner_result(response))
+    with patch("services.conversation.profile_service.get_bot_provider", return_value=mock_provider):
+        asyncio.run(svc.continue_conversation("Hi"))
+    assert mock_provider.run_conversation.call_args[1]["previous_response_id"] is None
 
 
 @pytest.mark.unit
@@ -235,13 +243,15 @@ def test_feedback_initiate_happy_path():
     tf_resp = MagicMock()
     tf_resp.response = "Here is my feedback"
     tf_resp.suggested_change = None
-    svc._runner.run = AsyncMock(return_value=MagicMock(final_output=tf_resp))
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=MagicMock(final_output=tf_resp))
     svc._extract_conversation_id = AsyncMock(return_value="cid-1")
-    result = asyncio.run(svc.initiate({"first_name": "Alice", "last_name": "Smith"}, "quest json"))
+    with patch("services.conversation.teacher_feedback_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.initiate({"first_name": "Alice", "last_name": "Smith"}, "quest json"))
     assert result["response"] == "Here is my feedback"
     assert result["conversation_id"] == "cid-1"
     assert "suggested_change" in result
-    call_args = svc._runner.run.call_args
+    call_args = mock_provider.run_conversation.call_args
     assert call_args[0][0] is svc.agent
     assert "Alice Smith" in call_args[0][1]
     assert "quest json" in call_args[0][1]
@@ -254,10 +264,12 @@ def test_feedback_initiate_missing_name():
     tf_resp = MagicMock()
     tf_resp.response = "feedback"
     tf_resp.suggested_change = None
-    svc._runner.run = AsyncMock(return_value=MagicMock(final_output=tf_resp))
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=MagicMock(final_output=tf_resp))
     svc._extract_conversation_id = AsyncMock(return_value=None)
-    asyncio.run(svc.initiate({}, "summary"))
-    call_message = svc._runner.run.call_args[0][1]
+    with patch("services.conversation.teacher_feedback_service.get_bot_provider", return_value=mock_provider):
+        asyncio.run(svc.initiate({}, "summary"))
+    call_message = mock_provider.run_conversation.call_args[0][1]
     assert "summary" in call_message
 
 
@@ -267,11 +279,13 @@ def test_feedback_continue_happy_path():
     tf_resp = MagicMock()
     tf_resp.response = "Updated"
     tf_resp.suggested_change = {"week": 3}
-    svc._runner.run = AsyncMock(return_value=MagicMock(final_output=tf_resp))
-    result = asyncio.run(svc.continue_conversation("Adjust week 3"))
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=MagicMock(final_output=tf_resp))
+    with patch("services.conversation.teacher_feedback_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.continue_conversation("Adjust week 3"))
     assert result["response"] == "Updated"
     assert result["suggested_change"] == {"week": 3}
-    call_args = svc._runner.run.call_args
+    call_args = mock_provider.run_conversation.call_args
     assert call_args[0][0] is svc.agent
     assert call_args[0][1] == "Adjust week 3"
     assert call_args[1]["session"] is svc.session
@@ -283,8 +297,10 @@ def test_feedback_continue_returns_no_conversation_id():
     tf_resp = MagicMock()
     tf_resp.response = "Done"
     tf_resp.suggested_change = None
-    svc._runner.run = AsyncMock(return_value=MagicMock(final_output=tf_resp))
-    result = asyncio.run(svc.continue_conversation("Hi"))
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=MagicMock(final_output=tf_resp))
+    with patch("services.conversation.teacher_feedback_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.continue_conversation("Hi"))
     assert "conversation_id" not in result
 
 

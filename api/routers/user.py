@@ -1,7 +1,6 @@
 import logging
 from typing import Optional
 
-from canvasapi import Canvas
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -45,6 +44,7 @@ def _fetch_user_profile(user_id: str) -> Optional[dict]:
         profile.pop("canvas_api_key", None)
     if role == "teacher":
         profile.setdefault("pilot_approved", False)
+        profile.pop("canvas_api_key", None)
     return profile
 
 
@@ -97,45 +97,3 @@ def get_tutorial_status(auth: AuthPayload = Depends(get_auth)):
         raise HTTPException(status_code=500, detail="Failed to get tutorial status")
 
 
-class CanvasConnectRequest(BaseModel):
-    api_url: str
-    api_key: str
-
-
-@router.post("/canvas/connect")
-def canvas_connect(body: CanvasConnectRequest, auth: AuthPayload = Depends(get_auth)):
-    try:
-        canvas = Canvas(body.api_url, body.api_key)
-        canvas.get_current_user()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid Canvas credentials. Check your URL and token.")
-    student_dao.update_canvas_credentials(auth.sub, body.api_url, body.api_key)
-    return {"message": "Canvas connected"}
-
-
-@router.get("/canvas/courses")
-def canvas_courses(auth: AuthPayload = Depends(get_auth)):
-    student = student_dao.get_student_by_id(auth.sub)
-    if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
-    api_url = student.get("canvas_api_url")
-    api_key = student.get("canvas_api_key")
-    if not api_url or not api_key:
-        raise HTTPException(status_code=400, detail="Canvas not connected")
-    try:
-        canvas = Canvas(api_url, api_key)
-        current_user = canvas.get_current_user()
-        courses = [
-            {"id": c.id, "name": getattr(c, "name", f"Course {c.id}")}
-            for c in current_user.get_courses(enrollment_type="student")
-        ]
-        return {"courses": courses}
-    except Exception as e:
-        logger.error("Error fetching Canvas courses: %s", e, exc_info=True)
-        raise HTTPException(status_code=400, detail="Failed to fetch Canvas courses")
-
-
-@router.delete("/canvas/disconnect")
-def canvas_disconnect(auth: AuthPayload = Depends(get_auth)):
-    student_dao.clear_canvas_credentials(auth.sub)
-    return {"message": "Canvas disconnected"}

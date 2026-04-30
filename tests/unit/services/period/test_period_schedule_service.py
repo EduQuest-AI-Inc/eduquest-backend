@@ -67,27 +67,30 @@ def test_get_schedule_no_schedule():
 
 
 @pytest.mark.unit
-def test_update_schedule_checks_ownership_first():
+def test_save_schedule_and_quest_weeks_checks_ownership_first():
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = None  # triggers ValueError
 
     with pytest.raises(ValueError):
-        svc.update_schedule("p1", "u1", {})
+        svc.save_schedule_and_quest_weeks("p1", "u1", {}, [])
 
     svc.period_schedule_dao.update_period_schedule.assert_not_called()
 
 
 @pytest.mark.unit
-def test_set_quest_weeks_success():
+def test_save_schedule_and_quest_weeks_normalizes_weeks(monkeypatch):
     svc = _svc()
-    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "u1"}
+    svc.period_dao.get_period_by_id.return_value = {
+        "period_id": "p1", "owner_id": "u1", "vector_store_id": "vs1"
+    }
     existing = MagicMock()
     existing.schedule_openai_file_id = None
     svc.period_schedule_dao.get_by_period_id.return_value = existing
 
-    result = svc.set_quest_weeks("p1", "u1", [3, 1, 2])
+    monkeypatch.setattr(svc, "_upload_schedule_to_vector_store", lambda *_: "file-new")
 
-    svc.period_schedule_dao.update_period_schedule.assert_called_once_with(
-        "p1", {"quest_enabled_weeks": [1, 2, 3]}
-    )
+    result = svc.save_schedule_and_quest_weeks("p1", "u1", {}, [3, 1, 2])
+
+    call_kwargs = svc.period_schedule_dao.update_period_schedule.call_args[0][1]
+    assert call_kwargs["quest_enabled_weeks"] == [1, 2, 3]
     assert result["quest_enabled_weeks"] == [1, 2, 3]

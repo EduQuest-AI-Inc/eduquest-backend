@@ -7,7 +7,6 @@ via the Responses API, avoiding the Conversations API entirely.
 import asyncio
 from typing import Optional, Dict, Any
 
-from bots.profile_agent import create_profile_agent, ProfileResponse
 from bots.provider import get_bot_provider
 
 
@@ -17,9 +16,8 @@ class ProfileConversationService:
     """
 
     def __init__(self, previous_response_id: Optional[str] = None) -> None:
-        self.agent = create_profile_agent()
+        self.agent = get_bot_provider().create_profile_agent()
         self.previous_response_id = previous_response_id
-        self._runner = get_bot_provider().runner
 
     async def initiate(self, student: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -32,9 +30,9 @@ class ProfileConversationService:
         first_name = student.get("first_name", "Student")
         last_name = student.get("last_name", "")
         initial_message = f"Hello, I'm {first_name} {last_name}."
-        result = await self._runner.run(self.agent, initial_message)
+        result = await get_bot_provider().run_conversation(self.agent, initial_message)
 
-        response: ProfileResponse = result.final_output
+        response = result.final_output
         profile_complete, profile = self._check_profile(response)
 
         return {
@@ -52,13 +50,13 @@ class ProfileConversationService:
             Dict with ``response_id``, ``response``, ``profile_complete``,
             and optionally ``profile``.
         """
-        result = await self._runner.run(
+        result = await get_bot_provider().run_conversation(
             self.agent,
             user_message,
             previous_response_id=self.previous_response_id,
         )
 
-        response: ProfileResponse = result.final_output
+        response = result.final_output
         profile_complete, profile = self._check_profile(response)
 
         return {
@@ -69,7 +67,7 @@ class ProfileConversationService:
         }
 
     @staticmethod
-    def _check_profile(response: ProfileResponse):
+    def _check_profile(response):
         p = response.profile
         if p and p.strengths and p.weaknesses and p.interests and p.learning_styles:
             return True, {

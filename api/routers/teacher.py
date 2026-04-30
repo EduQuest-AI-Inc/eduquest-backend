@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from api.deps import AuthPayload, get_auth
 from data_access.aggregated_metrics_dao import AggregatedMetricsDAO
 from data_access.period_dao import PeriodDAO
+from data_access.teacher_dao import TeacherDAO
 from services.period.period_management_service import PeriodManagementService
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,7 @@ router = APIRouter()
 period_management_service = PeriodManagementService()
 aggregated_metrics_dao = AggregatedMetricsDAO()
 period_dao_t = PeriodDAO()
+teacher_dao = TeacherDAO()
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +59,13 @@ def list_canvas_courses(
                 })
             except Exception:
                 continue
+        try:
+            teacher_dao.update_canvas_credentials(auth.sub, body.api_url, body.api_key)
+        except Exception as e:
+            logger.warning("Failed to persist Canvas credentials for %s: %s", auth.sub, e)
         return {"courses": courses}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to connect to Canvas: {e}")
 

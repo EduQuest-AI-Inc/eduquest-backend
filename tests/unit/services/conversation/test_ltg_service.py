@@ -14,7 +14,6 @@ from exceptions.not_found_error import NotFoundError
 def _svc(previous_response_id=None):
     svc = LTGConversationService.__new__(LTGConversationService)
     svc.agent = MagicMock()
-    svc._runner = MagicMock()
     svc.previous_response_id = previous_response_id
     return svc
 
@@ -74,24 +73,27 @@ def test_format_list_field_falsy_non_list():
 @pytest.mark.unit
 def test_initiate_happy_path():
     svc = _svc()
-    svc._runner.run = AsyncMock(return_value=_ltg_result())
-    result = asyncio.run(svc.initiate(_STUDENT))
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_ltg_result())
+    with patch("services.conversation.ltg_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.initiate(_STUDENT))
     assert result["response_id"] == "resp-1"
     assert result["message"] == "Hello!"
     assert result["goal_1"] == "G1"
     assert result["goal_2"] == "G2"
     assert result["goal_3"] == "G3"
     assert result["chosen_goal"] is None
-    svc._runner.run.assert_called_once()
+    mock_provider.run_conversation.assert_called_once()
 
 
 @pytest.mark.unit
 def test_initiate_message_includes_name_and_grade():
     svc = _svc()
-    svc._runner.run = AsyncMock(return_value=_ltg_result())
-    asyncio.run(svc.initiate(_STUDENT))
-    call_args = svc._runner.run.call_args
-    message_arg = call_args[0][1]
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_ltg_result())
+    with patch("services.conversation.ltg_service.get_bot_provider", return_value=mock_provider):
+        asyncio.run(svc.initiate(_STUDENT))
+    message_arg = mock_provider.run_conversation.call_args[0][1]
     assert "Alice Smith" in message_arg
     assert "10th grade" in message_arg
 
@@ -99,10 +101,12 @@ def test_initiate_message_includes_name_and_grade():
 @pytest.mark.unit
 def test_initiate_no_grade_skips_grade_fragment():
     svc = _svc()
-    svc._runner.run = AsyncMock(return_value=_ltg_result())
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_ltg_result())
     student = {**_STUDENT, "grade": ""}
-    asyncio.run(svc.initiate(student))
-    message_arg = svc._runner.run.call_args[0][1]
+    with patch("services.conversation.ltg_service.get_bot_provider", return_value=mock_provider):
+        asyncio.run(svc.initiate(student))
+    message_arg = mock_provider.run_conversation.call_args[0][1]
     assert "th grade" not in message_arg
 
 
@@ -113,8 +117,10 @@ def test_initiate_no_grade_skips_grade_fragment():
 @pytest.mark.unit
 def test_continue_conversation_no_goal_chosen():
     svc = _svc()
-    svc._runner.run = AsyncMock(return_value=_ltg_result(chosen_goal=None))
-    result = asyncio.run(svc.continue_conversation("Tell me more"))
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_ltg_result(chosen_goal=None))
+    with patch("services.conversation.ltg_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.continue_conversation("Tell me more"))
     assert result["goal_chosen"] is False
     assert result["message"] == "Hello!"
     assert result["chosen_goal"] is None
@@ -123,20 +129,23 @@ def test_continue_conversation_no_goal_chosen():
 @pytest.mark.unit
 def test_continue_conversation_goal_chosen():
     svc = _svc(previous_response_id="prev-99")
-    svc._runner.run = AsyncMock(return_value=_ltg_result(message="Ignore", chosen_goal="Master algebra"))
-    result = asyncio.run(svc.continue_conversation("I pick goal 1"))
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_ltg_result(message="Ignore", chosen_goal="Master algebra"))
+    with patch("services.conversation.ltg_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.continue_conversation("I pick goal 1"))
     assert result["goal_chosen"] is True
     assert result["message"] == "Master algebra"
     assert result["chosen_goal"] == "Master algebra"
-    call_kwargs = svc._runner.run.call_args[1]
-    assert call_kwargs["previous_response_id"] == "prev-99"
+    assert mock_provider.run_conversation.call_args[1]["previous_response_id"] == "prev-99"
 
 
 @pytest.mark.unit
 def test_continue_conversation_chosen_goal_literal_null():
     svc = _svc()
-    svc._runner.run = AsyncMock(return_value=_ltg_result(chosen_goal="null"))
-    result = asyncio.run(svc.continue_conversation("msg"))
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_ltg_result(chosen_goal="null"))
+    with patch("services.conversation.ltg_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.continue_conversation("msg"))
     assert result["goal_chosen"] is False
     assert result["chosen_goal"] is None
 
@@ -144,8 +153,10 @@ def test_continue_conversation_chosen_goal_literal_null():
 @pytest.mark.unit
 def test_continue_conversation_chosen_goal_literal_none():
     svc = _svc()
-    svc._runner.run = AsyncMock(return_value=_ltg_result(chosen_goal="none"))
-    result = asyncio.run(svc.continue_conversation("msg"))
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_ltg_result(chosen_goal="none"))
+    with patch("services.conversation.ltg_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.continue_conversation("msg"))
     assert result["goal_chosen"] is False
 
 

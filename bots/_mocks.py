@@ -151,6 +151,13 @@ class MockGradingOrchestrator:
         )
 
 
+class MockConversationsSession:
+    """Duck-typed stand-in for agents.OpenAIConversationsSession."""
+
+    def __init__(self, conversation_id=None):
+        self._session_id = conversation_id or "mock-conversation-id-001"
+
+
 class MockPeriodScheduleAgent:
     """Fast replacement for PeriodScheduleAgent."""
 
