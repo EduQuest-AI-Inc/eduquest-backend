@@ -13,12 +13,10 @@ from dotenv import load_dotenv
 
 from data_access.conversation_dao import ConversationDAO
 from data_access.period_dao import PeriodDAO
-from data_access.session_dao import SessionDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
 from integrations.s3_service import upload_file_to_s3
 from models.conversation import Conversation
-from services.auth_utils import require_auth
 from services.conversation.grading_service import grade_student_submission
 from services.conversation.profile_service import (
     continue_profile_conversation,
@@ -36,7 +34,6 @@ logger = logging.getLogger(__name__)
 
 class ConversationService:
     def __init__(self) -> None:
-        self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()
         self.conversation_dao = ConversationDAO()
         self.teacher_dao = TeacherDAO()
@@ -46,9 +43,7 @@ class ConversationService:
     # Profile assistant
     # ------------------------------------------------------------------
 
-    def start_profile_assistant(self, auth_token: str):
-        user_id = require_auth(self.session_dao, auth_token, ["student"])
-
+    def start_profile_assistant(self, user_id: str):
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
             raise Exception("Student not found")
@@ -72,9 +67,7 @@ class ConversationService:
             "response": result.get("response"),
         }
 
-    def continue_profile_assistant(self, auth_token, conversation_type, conversation_id, message):
-        user_id = require_auth(self.session_dao, auth_token, ["student"])
-
+    def continue_profile_assistant(self, user_id: str, conversation_type, conversation_id, message):
         conversation = self.conversation_dao.get_conversation_by_id_user_type(
             conversation_id, user_id, conversation_type
         )
@@ -106,10 +99,10 @@ class ConversationService:
 
     def start_update_assistant(
         self,
-        auth_token: str,
         quests_file: str,
         is_instructor: bool,
         caller_user_id: str,
+        caller_role: str,
         week: Optional[int] = None,
         submission_file: Optional[str] = None,
         user_id: Optional[str] = None,
@@ -176,7 +169,7 @@ class ConversationService:
             raw_response = result.get("response", "")
             suggested_change = result.get("suggested_change")
             if suggested_change and period_id:
-                self._apply_quest_change(auth_token, user_id, period_id, suggested_change)
+                self._apply_quest_change(caller_user_id, caller_role, period_id, suggested_change)
 
             return {
                 "conversation_id": conversation_id,
@@ -216,7 +209,7 @@ class ConversationService:
 
         # PRIORITY 2: apply recommended quest changes
         if change and recommended_change and period_id:
-            self._apply_quest_change(auth_token, user_id or user_id, period_id, recommended_change)
+            self._apply_quest_change(caller_user_id, caller_role, period_id, recommended_change)
 
         # Save a conversation record for auditing
         conversation_id = str(uuid.uuid4())
@@ -235,23 +228,13 @@ class ConversationService:
 
     def continue_update_assistant(
         self,
-        auth_token: str,
+        user_id: str,
+        caller_role: str,
         conversation_id: str,
         message: str,
-        user_id: Optional[str] = None,
     ):
-        sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
-        if not sessions:
-            raise Exception("Invalid auth token")
-        user_id = sessions[0]["user_id"]
-        if not isinstance(user_id, str):
-            raise Exception("Invalid auth token")
-        role = sessions[0].get("role", "student")
-
-        target_user_id = user_id if (role == "teacher" and user_id) else user_id
-
         conversation = self.conversation_dao.get_conversation_by_id_user_type(
-            conversation_id, target_user_id, "update"
+            conversation_id, user_id, "update"
         )
         if not conversation:
             raise Exception("Conversation not found")
@@ -262,7 +245,7 @@ class ConversationService:
 
         suggested_change = result.get("suggested_change")
         if suggested_change and period_id:
-            self._apply_quest_change(auth_token, target_user_id, period_id, suggested_change)
+            self._apply_quest_change(user_id, caller_role, period_id, suggested_change)
 
         return {"response": result.get("response", "")}
 
@@ -312,13 +295,13 @@ class ConversationService:
         except Exception as e:
             logger.error("Error saving grade: %s", e, exc_info=True)
 
-    def _apply_quest_change(self, auth_token, user_id, period_id, recommended_change) -> None:
+    def _apply_quest_change(self, caller_id: str, caller_role: str, period_id: str, recommended_change: str) -> None:
         """Delegate recommended changes to PeriodService."""
         try:
             from services.period.period_service import PeriodService
             period_service = PeriodService()
             quest_update_result = period_service.update_quests_with_recommended_change(
-                auth_token, user_id, period_id, recommended_change,
+                caller_id, caller_role, period_id, recommended_change,
             )
             logger.info("Quest update: %s", quest_update_result.get('message', ''))
         except Exception as e:

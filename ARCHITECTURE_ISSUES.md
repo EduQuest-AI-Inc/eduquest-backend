@@ -4,54 +4,7 @@ Architectural issues and risks identified from the current codebase. Ordered rou
 
 ---
 
-## 1. `period.py` Router Is a God Object
-
-**Problem:** `api/routers/period.py` is 388 lines and handles at least six unrelated concerns: LTG conversations, homework generation, file upload/management, period schedule CRUD, enrollment (verify, unenroll, accept parent invite), and period creation/listing. This is more than any other router and conflates boundaries that exist at the service layer.
-
-**Why it's a problem:** Adding a feature to any one of these areas requires reasoning about the entire file. Bugs in the period schedule handler are buried next to enrollment logic. The router already has a private helper `_validate_pilot_access_p` (note the `_p` suffix suggesting it was distinguished from another `_validate_pilot_access` somewhere) — a sign the file is already working around its own naming collisions.
-
-**Fix:** Split into at least three routers:
-- `period.py` — period CRUD and file management
-- `enrollment.py` (extend the existing one) — verify, unenroll, parent invite acceptance
-- `schedule.py` — schedule generation and CRUD
-- `ltg.py` — LTG conversation routes (could stay on period or move to conversation)
-
----
-
-## 2. Two Parallel Auth Validation Patterns
-
-**Problem:** The codebase has two ways to validate authentication:
-
-1. `get_auth()` FastAPI dependency in `api/deps.py` — the idiomatic FastAPI approach, injected via `Depends(get_auth)` in router function signatures.
-2. `require_auth(session_dao, auth_token, allowed_roles)` in `services/auth_utils.py` — an imperative helper that accepts a raw token and returns a `user_id`.
-
-Both are used in router handlers. Some routes use `Depends(get_auth)`, others call `require_auth()` directly.
-
-**Why it's a problem:** Two code paths means two places to update if auth logic changes (e.g. token format, expiry, role naming). It also means inconsistent error types — `get_auth()` raises `AuthError` (→ 401) but a caller of `require_auth()` might wrap or swallow the error differently.
-
-**Fix:** Standardise on `Depends(get_auth)` for all route handlers. `require_auth()` in `auth_utils.py` is a service-layer concern that pre-dates FastAPI's DI system — remove it or restrict it to tests.
-
----
-
-## 3. DynamoDB Dead Code Throughout Codebase
-
-**Problem:** The app uses Supabase exclusively, but DynamoDB artifacts remain:
-
-- `utils/conversion_utils.py::convert_decimals()` — docstring says "Recursively convert DynamoDB Decimal values to float". Still actively imported and called in `api/routers/conversation.py:108`.
-- `services/waitlist/WaitlistService.py:53` — comment says "pass teacher_email for DynamoDB sort key".
-- `data_access/password_reset_rate_limit_dao.py:31` — comment says "same signatures as DynamoDB version".
-- `tests/conftest.py:62-63` — explicitly mocks `boto3.dynamodb` and `boto3.dynamodb.conditions` modules.
-- `USE_SUPABASE` env flag — implies DynamoDB is a valid alternative when it isn't.
-
-**Why it's a problem:** `convert_decimals()` in the grading path is dead transformation logic — Supabase returns Python floats, not `Decimal` objects. It passes silently but obscures intent. The DynamoDB comments mislead anyone trying to understand the DAO contracts.
-
-**Fix:** Delete `convert_decimals()` and its call sites. Remove `USE_SUPABASE` flag (the app is always Supabase). Clean up DynamoDB comments and test mocks.
-
-**Status: Fixed.**
-
----
-
-## 4. `bots/ltg_conversation_service.py` Backward-Compat Shim
+## 1. `bots/ltg_conversation_service.py` Backward-Compat Shim
 
 **Problem:** `bots/ltg_conversation_service.py` is a re-export shim — it exists only to preserve old import paths with no logic of its own (per `CLAUDE.md`). It lives inside `bots/` (the AI agents package) rather than `services/`, adding to the confusion about where LTG business logic lives.
 
@@ -61,7 +14,7 @@ Both are used in router handlers. Some routes use `Depends(get_auth)`, others ca
 
 ---
 
-## 5. `services/teacher/` Is an Empty Package
+## 2. `services/teacher/` Is an Empty Package
 
 **Problem:** `services/teacher/` contains only `__init__.py`. There is no `teacher_service.py` inside it. `CLAUDE.md` lists `teacher/` as containing `teacher_service.py` and `period_schedule_service.py`, but only an empty `__init__.py` exists.
 
@@ -71,7 +24,7 @@ Both are used in router handlers. Some routes use `Depends(get_auth)`, others ca
 
 ---
 
-## 6. `bots/guardrails.py` Called Across Layer Boundary
+## 3. `bots/guardrails.py` Called Across Layer Boundary
 
 **Problem:** `services/conversation/profile_service.py` imports and calls `bots/guardrails.py::check_student_output_safety()`. The services layer depends on the bots layer.
 
@@ -81,7 +34,7 @@ Both are used in router handlers. Some routes use `Depends(get_auth)`, others ca
 
 ---
 
-## 7. Three Overlapping Frontend API Client Abstractions
+## 4. Three Overlapping Frontend API Client Abstractions
 
 **Problem:** The frontend has three files in `lib/` that handle backend communication:
 
@@ -97,7 +50,7 @@ Both `api-client.ts` and `api.ts` wrap the same proxy function with different me
 
 ---
 
-## 8. Enrollment Ownership Split Across Two Services
+## 5. Enrollment Ownership Split Across Two Services
 
 **Problem:** Enrollment logic is split between two service files in different packages:
 
@@ -112,7 +65,7 @@ The `enrollment/` router delegates to the first; the `period/` router delegates 
 
 ---
 
-## 9. `aggregated_metrics` Table Read Directly by Frontend
+## 6. `aggregated_metrics` Table Read Directly by Frontend
 
 **Problem:** The frontend reads the `aggregated_metrics` Supabase table directly via the Supabase JS client, bypassing the FastAPI backend entirely. There is no `/metrics` API endpoint. The table schema is exposed as an implicit API contract in `types/database.ts`.
 
@@ -122,7 +75,7 @@ The `enrollment/` router delegates to the first; the `period/` router delegates 
 
 ---
 
-## 10. `WaitlistService.py` Breaks Naming Convention
+## 7. `WaitlistService.py` Breaks Naming Convention
 
 **Problem:** The waitlist service file is `services/waitlist/WaitlistService.py` (PascalCase). Every other service file in the project uses `snake_case` (e.g. `auth_service.py`, `period_management_service.py`, `quest_retrieval_service.py`).
 
@@ -132,7 +85,7 @@ The `enrollment/` router delegates to the first; the `period/` router delegates 
 
 ---
 
-## 11. `bots/mocks.py` Lives in Production Code
+## 8. `bots/mocks.py` Lives in Production Code
 
 **Problem:** `bots/mocks.py` is a file containing test mocks for the bots package. It sits in the main package directory alongside production agent code.
 
@@ -142,9 +95,9 @@ The `enrollment/` router delegates to the first; the `period/` router delegates 
 
 ---
 
-## 12. Known Unresolved Bug in `grading_agent.py`
+## 9. Known Unresolved Bug in `grading_agent.py`
 
-**Problem:** The most recent commit message reads: *"Error in grading found in bots, but I won't touch it yet to prevent merge conflicts"*. The bug is acknowledged but not fixed or tracked in code.
+**Problem:** The most recent commit message reads: _"Error in grading found in bots, but I won't touch it yet to prevent merge conflicts"_. The bug is acknowledged but not fixed or tracked in code.
 
 **Why it's a problem:** Grading is a core, user-visible feature. An unfixed, uncommitted bug in `bots/grading_agent.py` means grading results may be silently wrong. The deferral reason (merge conflicts) suggests the fix exists somewhere but hasn't landed.
 
@@ -152,7 +105,17 @@ The `enrollment/` router delegates to the first; the `period/` router delegates 
 
 ---
 
-## 13. `bots/provider.py` — Unknown Purpose
+## 10. Router Error Handling Leaks Internal Messages
+
+**Problem:** Several routers (e.g. `api/routers/ltg.py`) catch `ValueError`, `LookupError`, and bare `Exception` and re-raise them as `HTTPException` with `detail=str(e)`. This pattern appears in at least the three routes in `ltg.py`.
+
+**Why it's a problem:** `str(e)` on an unexpected exception exposes internal stack details, module paths, or data values to the client. It also duplicates error-mapping logic that already exists — `main.py` registers global handlers for `ValidationError` → 400, `NotFoundError` → 404, and `AuthError` → 401. Routes that re-implement this mapping by hand will drift from the global policy and produce inconsistent status codes.
+
+**Fix:** Remove the `try/except` blocks from router handlers. Raise `ValidationError`, `NotFoundError`, or `AuthError` (from `exceptions/`) in the service layer and let the global handlers in `main.py` catch them. Reserve inline `try/except` only for truly route-specific logic that cannot be expressed as a typed exception.
+
+---
+
+## 11. `bots/provider.py` — Unknown Purpose
 
 **Problem:** `bots/provider.py` exists but is not mentioned in `CLAUDE.md` or `ARCHITECTURE.md`. Its role in the agent system is unclear without reading it.
 
