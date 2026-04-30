@@ -1,5 +1,5 @@
 """
-LTG conversation service — wires the LTG agent into Flask.
+LTG conversation service — wires the LTG agent into Fast API.
 
 Uses previous_response_id tracking for multi-turn stateful conversations
 via the Responses API, avoiding the Conversations API entirely.

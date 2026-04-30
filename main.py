@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
 
-from api.routers import conversation, period, teacher, waitlist
+from api.routers import conversation, period, schedule, ltg, teacher, waitlist
 from api.routers import auth, user, enrollment, quest, parent
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
@@ -60,6 +60,8 @@ app.include_router(conversation.router, prefix="/conversation")
 app.include_router(enrollment.router, prefix="/enrollment")
 app.include_router(parent.router, prefix="/parent")
 app.include_router(period.router, prefix="/period")
+app.include_router(schedule.router, prefix="/period")
+app.include_router(ltg.router, prefix="/period")
 app.include_router(quest.router, prefix="/quest")
 app.include_router(teacher.router, prefix="/teacher")
 app.include_router(user.router, prefix="/user")

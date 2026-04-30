@@ -53,6 +53,71 @@ def test_read_submission_text_file_error():
     assert "no such file" in result
 
 
+@pytest.mark.unit
+def test_read_submission_text_pdf_happy_path(tmp_path):
+    mock_page = MagicMock()
+    mock_page.extract_text.return_value = "Hello, world!"
+    mock_reader = MagicMock()
+    mock_reader.is_encrypted = False
+    mock_reader.pages = [mock_page]
+    with patch("services.conversation.grading_service.PdfReader", return_value=mock_reader):
+        result = _read_submission_text(str(tmp_path / "essay.pdf"))
+    assert result == "Hello, world!"
+
+
+@pytest.mark.unit
+def test_read_submission_text_pdf_encrypted():
+    mock_reader = MagicMock()
+    mock_reader.is_encrypted = True
+    with patch("services.conversation.grading_service.PdfReader", return_value=mock_reader):
+        result = _read_submission_text("/tmp/locked.pdf")
+    assert "password-protected" in result
+
+
+@pytest.mark.unit
+def test_read_submission_text_pdf_no_text():
+    mock_page = MagicMock()
+    mock_page.extract_text.return_value = None
+    mock_reader = MagicMock()
+    mock_reader.is_encrypted = False
+    mock_reader.pages = [mock_page]
+    with patch("services.conversation.grading_service.PdfReader", return_value=mock_reader):
+        result = _read_submission_text("/tmp/scanned.pdf")
+    assert "no extractable text" in result
+
+
+@pytest.mark.unit
+def test_read_submission_text_pdf_corrupted():
+    from pypdf.errors import PdfReadError
+    with patch("services.conversation.grading_service.PdfReader", side_effect=PdfReadError("bad xref")):
+        result = _read_submission_text("/tmp/corrupted.pdf")
+    assert "Corrupted" in result
+
+
+@pytest.mark.unit
+def test_read_submission_text_pdf_partial_page_failure():
+    good_page = MagicMock()
+    good_page.extract_text.return_value = "Good content"
+    bad_page = MagicMock()
+    bad_page.extract_text.side_effect = Exception("decode error")
+    mock_reader = MagicMock()
+    mock_reader.is_encrypted = False
+    mock_reader.pages = [good_page, bad_page]
+    with patch("services.conversation.grading_service.PdfReader", return_value=mock_reader):
+        result = _read_submission_text("/tmp/partial.pdf")
+    assert "Good content" in result
+    assert "unreadable" in result
+
+
+@pytest.mark.unit
+def test_read_submission_text_pdf_case_insensitive():
+    mock_reader = MagicMock()
+    mock_reader.is_encrypted = True
+    with patch("services.conversation.grading_service.PdfReader", return_value=mock_reader):
+        result = _read_submission_text("/tmp/upload.PDF")
+    assert "password-protected" in result
+
+
 # ---------------------------------------------------------------------------
 # _build_grading_input
 # ---------------------------------------------------------------------------

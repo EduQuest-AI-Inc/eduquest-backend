@@ -28,7 +28,7 @@ class PasswordResetRateLimitDAO(SupabaseBaseDAO):
     def _get_cooldown_key(self, email_lc: str) -> str:
         return f"cooldown:email:{email_lc}"
 
-    # -- public API (same signatures as DynamoDB version) ----------------------
+    # -- public API ------------------------------------------------------------
 
     def check_rate_limit(self, ip: str, email_lc: str) -> Tuple[bool, str]:
         if self._is_on_cooldown(email_lc):

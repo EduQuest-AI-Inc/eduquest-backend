@@ -63,7 +63,6 @@ eduquest-backend/
 │   ├── canvas_service.py           # Canvas LMS integration (canvasapi library)
 │   └── email_service.py            # SES email sending
 ├── utils/
-│   ├── conversion_utils.py         # convert_decimals() for DynamoDB Decimal→float
 │   ├── token_utils.py              # extract_auth_token(), get_user_id_from_token(), set_auth_cookie()
 │   └── validation_utils.py         # get_client_ip(request), normalize_email(email)
 ├── exceptions/                     # Custom exception classes → global HTTP status mappings
@@ -150,7 +149,7 @@ pip install -r requirements.txt
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 - `OPENAI_API_KEY`
 - `API_GATEWAY_URL` (optional)
-- `USE_SUPABASE=true` to enable Supabase DAOs
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 
 **Run**:
 
