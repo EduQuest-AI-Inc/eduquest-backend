@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
-from services.waitlist.WaitlistService import WaitlistService
+from services.waitlist.waitlist_service import WaitlistService
 
 router = APIRouter()
 svc = WaitlistService()

@@ -1,4 +1,4 @@
-"""API-level tests for /user routes (profile, tutorial). Canvas endpoints skipped."""
+"""API-level tests for /user routes (profile, tutorial, canvas removal)."""
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
@@ -107,3 +107,25 @@ class TestGetTutorialStatus:
         resp = client.get("/user/tutorial-status")
         assert resp.status_code == 200
         assert resp.json()["completed_tutorial"] is False
+
+
+# ---------------------------------------------------------------------------
+# Student Canvas endpoints removed
+# ---------------------------------------------------------------------------
+
+class TestStudentCanvasEndpointsRemoved:
+
+    @pytest.mark.api
+    def test_canvas_connect_returns_404(self, client):
+        resp = client.post("/user/canvas/connect", json={"api_url": "https://x.com", "api_key": "tok"})
+        assert resp.status_code in (404, 405)
+
+    @pytest.mark.api
+    def test_canvas_courses_returns_404(self, client):
+        resp = client.get("/user/canvas/courses")
+        assert resp.status_code in (404, 405)
+
+    @pytest.mark.api
+    def test_canvas_disconnect_returns_404(self, client):
+        resp = client.delete("/user/canvas/disconnect")
+        assert resp.status_code in (404, 405)

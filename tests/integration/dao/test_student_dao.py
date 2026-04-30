@@ -55,22 +55,6 @@ def test_update_tutorial_status(supabase_required):
 
 
 @pytest.mark.integration
-def test_update_canvas_credentials(supabase_required):
-    dao = StudentDAO()
-    try:
-        dao.add_student(_student())
-        dao.update_student(_ID, {"canvas_api_url": "https://canvas.example.com", "canvas_api_key": "key123"})
-        result = dao.get_student_by_id(_ID)
-        assert result["canvas_api_url"] == "https://canvas.example.com"
-        # Clear credentials
-        dao.update_student(_ID, {"canvas_api_url": None, "canvas_api_key": None})
-        result2 = dao.get_student_by_id(_ID)
-        assert result2["canvas_api_url"] is None
-    finally:
-        dao.delete_student(_ID)
-
-
-@pytest.mark.integration
 def test_delete_student(supabase_required):
     dao = StudentDAO()
     dao.add_student(_student())

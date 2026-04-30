@@ -6,8 +6,7 @@ if TYPE_CHECKING:
     from models.user import User
 
 SHARED_USER_FIELDS = {
-    "first_name", "last_name", "email",
-    "password", "last_login", "canvas_api_url", "canvas_api_key",
+    "first_name", "last_name", "email", "password", "last_login",
 }
 
 

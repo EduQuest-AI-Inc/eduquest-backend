@@ -2,7 +2,7 @@
 Thin orchestrator — delegates to focused sub-services.
 Kept for backwards compatibility so routes.py imports remain unchanged.
 """
-from services.period.period_enrollment_service import PeriodEnrollmentService
+from services.enrollment.enrollment_service import EnrollmentService
 from services.period.period_quest_service import PeriodQuestService
 from services.conversation.ltg_service import run_initiate_ltg, run_continue_ltg
 
@@ -10,7 +10,7 @@ from services.conversation.ltg_service import run_initiate_ltg, run_continue_ltg
 class PeriodService:
 
     def __init__(self) -> None:
-        self._enrollment = PeriodEnrollmentService()
+        self._enrollment = EnrollmentService()
         self._quest = PeriodQuestService()
         self.period_dao = self._enrollment.period_dao
 
