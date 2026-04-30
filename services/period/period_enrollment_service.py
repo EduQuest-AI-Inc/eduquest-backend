@@ -12,10 +12,9 @@ from data_access.quest_dao import QuestDAO
 from data_access.ltg_conversation_dao import LtgConversationDAO
 from data_access.conversation_dao import ConversationDAO
 from data_access.student_long_term_goal_dao import StudentLongTermGoalDAO
+from models.enrollment import Enrollment
 
 logger = logging.getLogger(__name__)
-
-from models.enrollment import Enrollment
 
 TUTORIAL_PERIOD_ID = "PRECALC-58F9-88F5"
 
