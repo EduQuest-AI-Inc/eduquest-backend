@@ -21,7 +21,7 @@ class PeriodQuestService:
 
     def _assert_enrolled(self, caller_id: str, period_id: str) -> None:
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
-        if not any(e['caller_id'] == caller_id for e in enrollments):
+        if not any(e['user_id'] == caller_id for e in enrollments):
             raise Exception(f"Student {caller_id} is not enrolled in period {period_id}")
 
     def start_homework_agent(self, caller_id: str, period_id: str) -> Dict[str, Any]:
