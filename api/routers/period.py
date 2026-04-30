@@ -16,7 +16,7 @@ from services.period.period_file_helpers import (
     try_generate_schedule,
 )
 from services.period.period_management_service import PeriodManagementService
-from services.waitlist.WaitlistService import WaitlistService
+from services.waitlist.waitlist_service import WaitlistService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

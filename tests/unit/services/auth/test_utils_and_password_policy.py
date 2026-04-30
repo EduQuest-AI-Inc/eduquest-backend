@@ -180,7 +180,7 @@ def test_validate_required_fields_all_missing_lists_all_in_message():
 
 @pytest.mark.unit
 def test_normalize_email_lowercases_and_strips():
-    assert normalize_email("  Alice@Example.COM  ") == "alice@eduquestai.org"
+    assert normalize_email("  Alice@EduQuestAI.ORG  ") == "alice@eduquestai.org"
 
 
 @pytest.mark.unit
@@ -241,7 +241,7 @@ def test_validate_password_empty_string():
 
 @pytest.mark.unit
 def test_validate_password_none():
-    valid, msg = validate_password(None)
+    valid, msg = validate_password(None)  # type: ignore[arg-type]
     assert valid is False
     assert "required" in msg.lower()
 

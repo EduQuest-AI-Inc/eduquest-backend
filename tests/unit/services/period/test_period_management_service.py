@@ -7,6 +7,7 @@ from services.period.period_management_service import PeriodManagementService
 def _svc():
     svc = PeriodManagementService.__new__(PeriodManagementService)
     svc.period_dao = MagicMock()
+    svc.period_schedule_dao = MagicMock()
     return svc
 
 
@@ -73,11 +74,12 @@ def test_create_period_propagates_canvas_fields():
 def test_get_periods_by_owner():
     svc = _svc()
     svc.period_dao.get_periods_by_owner_id.return_value = [{"period_id": "p1"}]
+    svc.period_schedule_dao.get_by_period_id.return_value = None
 
     result = svc.get_periods_by_owner("u1")
 
     svc.period_dao.get_periods_by_owner_id.assert_called_once_with("u1")
-    assert result == [{"period_id": "p1"}]
+    assert result == [{"period_id": "p1", "has_schedule": False}]
 
 
 @pytest.mark.unit
