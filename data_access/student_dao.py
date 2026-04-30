@@ -20,8 +20,6 @@ class StudentDAO(SupabaseBaseDAO):
             'email': student.email,
             'password': student.password,
             'role': 'student',
-            'canvas_api_url': getattr(student, 'canvas_api_url', None),
-            'canvas_api_key': getattr(student, 'canvas_api_key', None),
         })
         try:
             self._insert({
@@ -79,8 +77,3 @@ class StudentDAO(SupabaseBaseDAO):
     def needs_tutorial(self, user_id: str) -> bool:
         return not self.get_tutorial_status(user_id)
 
-    def update_canvas_credentials(self, user_id: str, api_url: str, api_key: str) -> None:
-        self._user_dao.update(user_id, {'canvas_api_url': api_url, 'canvas_api_key': api_key})
-
-    def clear_canvas_credentials(self, user_id: str) -> None:
-        self._user_dao.update(user_id, {'canvas_api_url': None, 'canvas_api_key': None})

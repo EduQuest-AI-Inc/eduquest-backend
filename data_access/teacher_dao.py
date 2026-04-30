@@ -40,5 +40,11 @@ class TeacherDAO(SupabaseBaseDAO):
         if teacher_updates:
             self._update({'user_id': user_id}, teacher_updates)
 
+    def update_canvas_credentials(self, user_id: str, api_url: str, api_key: str) -> None:
+        self._update({'user_id': user_id}, {'canvas_api_url': api_url, 'canvas_api_key': api_key})
+
+    def clear_canvas_credentials(self, user_id: str) -> None:
+        self._update({'user_id': user_id}, {'canvas_api_url': None, 'canvas_api_key': None})
+
     def delete_teacher(self, user_id: str) -> None:
         self._user_dao.delete(user_id)

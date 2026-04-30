@@ -94,6 +94,11 @@ def create_period(
             canvas_course_name=canvas_course_name,
         )
         period_id = period["period_id"]
+        if role == "teacher" and canvas_api_url and canvas_api_key:
+            try:
+                teacher_dao.update_canvas_credentials(auth.sub, canvas_api_url, canvas_api_key)
+            except Exception as e:
+                logger.warning("Failed to persist Canvas credentials for teacher %s: %s", auth.sub, e)
         s3_urls = upload_period_files(file_paths, period_id)
         period_management_service.update_file_urls(period_id, [u for u in s3_urls if u])
 
