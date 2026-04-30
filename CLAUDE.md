@@ -24,15 +24,15 @@ eduquest-backend/
 │   ├── auth/                       # auth_service.py, password_reset_service.py, password_policy.py
 │   ├── conversation/               # conversation_service.py, grading_service.py,
 │   │                               #   ltg_service.py, profile_service.py, teacher_feedback_service.py
-│   ├── enrollment/                 # enrollment_service.py
-│   ├── period/                     # period_service.py, period_enrollment_service.py,
-│   │                               #   period_quest_service.py, period_schedule_service.py,
+│   ├── enrollment/                 # enrollment_service.py (CRUD, verify_and_enroll, unenroll,
+│   │                               #   get_my_periods, assert_enrolled)
+│   ├── period/                     # period_service.py, period_quest_service.py,
+│   │                               #   period_schedule_service.py,
 │   │                               #   period_management_service.py, period_file_helpers.py
 │   ├── quest/                      # quest_service.py, quest_creation_service.py,
 │   │                               #   quest_retrieval_service.py, quest_grading_service.py
-│   ├── teacher/                    # teacher_service.py, period_schedule_service.py
 │   ├── user/                       # user_service.py
-│   ├── waitlist/                   # WaitlistService.py
+│   ├── waitlist/                   # waitlist_service.py
 │   └── parent/                     # parent_service.py
 ├── models/                         # Pydantic domain models
 │   ├── user.py                     # Base User model
@@ -56,7 +56,6 @@ eduquest-backend/
 │   ├── profile_agent.py            # Student profile agent
 │   ├── schedule_agent.py           # Schedule generation agent
 │   ├── teacher_feedback_agent.py   # Teacher feedback agent
-│   ├── ltg_conversation_service.py # Re-export shim (backwards compat for old imports)
 │   └── schemas/rubric.py           # Rubric Pydantic schema
 ├── integrations/                   # External service adapters (shared across features)
 │   ├── s3_service.py               # AWS S3 upload helpers

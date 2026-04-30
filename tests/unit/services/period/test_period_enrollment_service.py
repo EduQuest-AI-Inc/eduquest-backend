@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 from typing import Dict, List, Optional, Union
 
-from services.period.period_enrollment_service import PeriodEnrollmentService
+from services.enrollment.enrollment_service import EnrollmentService
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 
@@ -24,8 +24,8 @@ def _build_period(period_id: str = "MATH-101") -> Dict[str, str]:
     return {"period_id": period_id, "name": "Precalculus"}
 
 
-def _make_service() -> PeriodEnrollmentService:
-    svc = PeriodEnrollmentService.__new__(PeriodEnrollmentService)
+def _make_service() -> EnrollmentService:
+    svc = EnrollmentService.__new__(EnrollmentService)
     svc.period_dao = MagicMock()
     svc.period_schedule_dao = MagicMock()
     svc.student_dao = MagicMock()
@@ -44,7 +44,7 @@ def _setup_service(
     enrollments: Optional[List[Dict[str, str]]] = None,
     quests: Optional[List[Dict[str, str]]] = None,
     conversation_id: str = "conv-abc",
-) -> PeriodEnrollmentService:
+) -> EnrollmentService:
     svc = _make_service()
     svc.student_dao.get_student_by_id.return_value = student
     svc.period_dao.get_period_by_id.return_value = period
@@ -161,7 +161,7 @@ def test_get_my_periods_skips_missing_periods():
     assert result == []
 
 
-def _setup_verify(svc: PeriodEnrollmentService, *, owner_role: str = "teacher") -> None:
+def _setup_verify(svc: EnrollmentService, *, owner_role: str = "teacher") -> None:
     schedule_mock = MagicMock()
     schedule_mock.quest_enabled_weeks = True
     svc.period_schedule_dao.get_by_period_id.return_value = schedule_mock
