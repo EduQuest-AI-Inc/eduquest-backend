@@ -7,6 +7,7 @@ multi-turn conversation), so no OpenAIConversationsSession is needed.
 """
 import asyncio
 import json
+import logging
 from typing import Dict, Any, Optional
 
 from pypdf import PdfReader
@@ -14,6 +15,8 @@ from pypdf.errors import PdfReadError
 
 from bots.grading_agent import GradingInput, GradingResult
 from bots.provider import get_bot_provider
+
+logger = logging.getLogger(__name__)
 
 
 def _read_submission_text(submission_path: str) -> str:
@@ -113,8 +116,18 @@ def grade_student_submission(
             raise ValueError("Either submission_path or submission_text is required")
         submission_text = _read_submission_text(submission_path)
 
+    logger.info(
+        "Starting grading — quest_id=%s submission_path=%s submission_text_len=%d",
+        quest_data.get("individual_quest_id") or quest_data.get("quest_id"),
+        submission_path,
+        len(submission_text),
+    )
     grading_input = _build_grading_input(quest_data, submission_text)
-    result: GradingResult = asyncio.run(_grade(grading_input))
+    try:
+        result: GradingResult = asyncio.run(_grade(grading_input))
+    except Exception as e:
+        logger.error("Grading agent failed: %s", e, exc_info=True)
+        raise
 
     recommended_change_text: Optional[str] = None
     if result.recommended_changes:

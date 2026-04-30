@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import tempfile
 from typing import Optional, cast
@@ -14,6 +15,7 @@ from data_access.quest_dao import QuestDAO
 from services.conversation.conversation_service import ConversationService
 from utils.conversion_utils import convert_decimals as _convert_decimals
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 conversation_service = ConversationService()
 
@@ -186,6 +188,7 @@ async def initiate_update_assistant(
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.error("initiate-update-assistant failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
