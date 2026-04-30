@@ -53,6 +53,56 @@ class BotProvider:
         from bots.teacher_feedback_agent import create_teacher_feedback_agent
         return create_teacher_feedback_agent()
 
+    async def grade_submission(self, quest_data: dict, submission_text: str) -> dict:
+        grading_input = self._build_grading_input(quest_data, submission_text)
+        orchestrator = self.create_grading_orchestrator()
+        result = await orchestrator.grade_submission(grading_input)
+        return self._format_grading_result(result)
+
+    @staticmethod
+    def _build_grading_input(quest_data: dict, submission_text: str):
+        import json
+        from bots.grading_agent import GradingInput
+        rubric = quest_data.get("rubric", {})
+        if isinstance(rubric, str):
+            try:
+                rubric = json.loads(rubric)
+            except json.JSONDecodeError:
+                rubric = {"raw": rubric}
+        skills_raw = quest_data.get("skills", "")
+        if isinstance(skills_raw, str):
+            skills = [s.strip() for s in skills_raw.split(";") if s.strip()]
+        elif isinstance(skills_raw, list):
+            skills = skills_raw
+        else:
+            skills = []
+        instructions = quest_data.get("instructions", quest_data.get("description", ""))
+        return GradingInput(
+            submission=submission_text,
+            rubric=rubric,
+            skills=skills,
+            instructions=instructions,
+        )
+
+    @staticmethod
+    def _format_grading_result(result) -> dict:
+        from typing import Optional
+        recommended_change_text: Optional[str] = None
+        if result.recommended_changes:
+            recommended_change_text = "; ".join(result.recommended_changes)
+        return {
+            "grade": result.skill_mastery,
+            "overall_score": result.numerical_grade,
+            "feedback": result.feedback,
+            "change": result.homework_changes_recommended,
+            "recommended_change": recommended_change_text,
+            "response": (
+                f"Grade: {result.numerical_grade}\n"
+                f"Feedback: {result.feedback}\n"
+                f"Changes recommended: {result.homework_changes_recommended}"
+            ),
+        }
+
     async def run_conversation(self, agent, message: str, **kwargs):
         from agents import Runner
         return await Runner.run(agent, message, **kwargs)
