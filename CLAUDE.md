@@ -13,14 +13,15 @@ eduquest-backend/
 │       ├── auth.py                 # /auth — login, register, password reset
 │       ├── conversation.py         # /conversation — profile assistant, update assistant
 │       ├── enrollment.py           # /enrollment — enroll/unenroll students
+│       ├── ltg.py                  # /period — LTG conversation routes (mounted under /period)
 │       ├── parent.py               # /parent — parent invite, child lookup
-│       ├── period.py               # /period — LTG conversation, homework agent
+│       ├── period.py               # /period — period CRUD, homework agent
 │       ├── quest.py                # /quest — quest retrieval, submission
+│       ├── schedule.py             # /period — period schedule routes (mounted under /period)
 │       ├── teacher.py              # /teacher — Canvas courses (teacher-only)
 │       ├── user.py                 # /user — user profile
 │       └── waitlist.py             # /pilot-waitlist — status, join
 ├── services/                         # Service/business logic layer (imported by api/routers/)
-│   ├── auth_utils.py               # Shared auth helpers used across service modules
 │   ├── auth/                       # auth_service.py, password_reset_service.py, password_policy.py
 │   ├── conversation/               # conversation_service.py, grading_service.py,
 │   │                               #   ltg_service.py, profile_service.py, teacher_feedback_service.py
@@ -54,8 +55,10 @@ eduquest-backend/
 │   ├── ltg_agent.py                # Long-term goal agent
 │   ├── guardrails.py               # Content safety guardrails
 │   ├── profile_agent.py            # Student profile agent
+│   ├── provider.py                 # Bot provider — factory for real and mock bot instances
 │   ├── schedule_agent.py           # Schedule generation agent
 │   ├── teacher_feedback_agent.py   # Teacher feedback agent
+│   ├── _mocks.py                   # Mock bot instances for testing
 │   └── schemas/rubric.py           # Rubric Pydantic schema
 ├── integrations/                   # External service adapters (shared across features)
 │   ├── s3_service.py               # AWS S3 upload helpers
@@ -81,7 +84,7 @@ eduquest-backend/
 - `/conversation` — profile assistant, update assistant
 - `/enrollment` — student enrollment
 - `/parent` — parent invite and child lookup
-- `/period` — LTG conversation, homework agent, period schedule CRUD (teacher + parent)
+- `/period` — period CRUD, homework agent; also the prefix for `schedule.py` (period schedule CRUD) and `ltg.py` (LTG conversation), which are separate router files mounted under `/period`
 - `/quest` — quest retrieval, submission
 - `/teacher` — Canvas courses (teacher-only)
 - `/user` — user profile
