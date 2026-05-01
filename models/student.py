@@ -12,4 +12,3 @@ class Student(User):
     learning_style: Optional[str] = None
     completed_tutorial: bool = False
     school_name: Optional[str] = None
-    created_at: Optional[str] = None

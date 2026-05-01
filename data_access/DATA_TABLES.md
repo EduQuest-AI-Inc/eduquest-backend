@@ -59,9 +59,10 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `first_name` | text | NOT NULL |                                          |
 | `last_name`  | text | NOT NULL |                                          |
 | `email`      | text | NOT NULL |                                          |
-| `password`   | text | NOT NULL | Hashed (werkzeug)                        |
-| `last_login` | text | nullable | ISO timestamp                            |
-| `role`       | text | NOT NULL | `"student"` \| `"teacher"` \| `"parent"` |
+| `password`   | text        | NOT NULL | Hashed (werkzeug)                        |
+| `last_login` | text        | nullable | ISO timestamp                            |
+| `role`       | text        | NOT NULL | `"student"` \| `"teacher"` \| `"parent"` |
+| `created_at` | timestamptz | NOT NULL | Account creation time (DEFAULT now())    |
 
 ---
 
@@ -78,7 +79,6 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `interest`           | string[]  | nullable    | Self-reported interests                 |
 | `learning_style`     | text      | nullable    |                                         |
 | `completed_tutorial` | boolean   | NOT NULL    | Whether the onboarding tutorial is done |
-| `created_at`         | timestamp | NOT NULL    |                                         |
 | `school_name`        | text      | nullable    |                                         |
 
 ---
@@ -91,7 +91,6 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | ---------------- | --------- | ----------- | ------------------------------- |
 | `user_id`        | text      | PK → `user` |                                 |
 | `pilot_approved` | boolean   | NOT NULL    | Whether teacher is in the pilot |
-| `created_at`     | timestamp | NOT NULL    |                                 |
 | `school_name`    | text      | nullable    |                                 |
 | `canvas_api_url` | text      | nullable    | Canvas LMS base URL             |
 | `canvas_api_key` | text      | nullable    | Canvas personal access token    |
@@ -106,7 +105,6 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | -------------------- | --------- | ----------- | ---------------------------------------------------------------- |
 | `user_id`            | text      | PK → `user` |                                                                  |
 | `linked_student_ids` | string[]  | nullable    | `user_id`s of linked student accounts                            |
-| `created_at`         | timestamp | NOT NULL    |                                                                  |
 | `vpc_verified_at`    | timestamp | nullable    | COPPA 2025 compliance — set when parent accepts a student invite |
 
 ---

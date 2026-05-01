@@ -40,8 +40,6 @@ def _fetch_user_profile(user_id: str) -> Optional[dict]:
     if not profile:
         return None
     profile["role"] = role
-    if role == "student":
-        profile.pop("canvas_api_key", None)
     if role == "teacher":
         profile.setdefault("pilot_approved", False)
         profile.pop("canvas_api_key", None)

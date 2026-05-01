@@ -50,15 +50,16 @@ class TestGetProfile:
 
     @pytest.mark.api
     @patch("api.routers.user.user_dao")
-    @patch("api.routers.user.student_dao")
-    def test_get_profile_strips_canvas_key(self, mock_student_dao, mock_user_dao, client):
-        mock_user_dao.get_by_id.return_value = {"user_id": "stu-1", "role": "student"}
-        mock_student_dao.get_student_by_id.return_value = {
-            "user_id": "stu-1",
+    @patch("api.routers.user.teacher_dao")
+    def test_get_profile_strips_teacher_canvas_key(self, mock_teacher_dao, mock_user_dao, client):
+        app.dependency_overrides[get_auth] = lambda: AuthPayload(sub="tch-1", role="teacher", token="fake-token")
+        mock_user_dao.get_by_id.return_value = {"user_id": "tch-1", "role": "teacher"}
+        mock_teacher_dao.get_teacher_by_id.return_value = {
+            "user_id": "tch-1",
             "canvas_api_key": "secret",
-            "grade": "10",
         }
         resp = client.get("/user/profile")
+        app.dependency_overrides[get_auth] = _student_auth
         assert resp.status_code == 200
         assert "canvas_api_key" not in resp.json()
 

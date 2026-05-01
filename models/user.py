@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class User(BaseModel):
@@ -11,9 +11,7 @@ class User(BaseModel):
     password: str
     last_login: Optional[str] = None
     role: str
-    canvas_api_url: Optional[str] = None
-    canvas_api_key: Optional[str] = None
-    created_at: Optional[datetime] = None
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_item(self):
         return self.model_dump()
