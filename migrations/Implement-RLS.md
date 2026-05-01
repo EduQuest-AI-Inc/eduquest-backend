@@ -103,7 +103,7 @@ Identity expression throughout: `(auth.jwt() ->> 'sub')` — returns the `sub` c
 | ------------- | ------------------- | -------------------------------------------------- |
 | SELECT        | Self                | `user_id = (auth.jwt() ->> 'sub')`                 |
 | SELECT        | Parent of student   | EXISTS parent where sub is in `linked_student_ids` |
-| SELECT        | Teacher of student  | EXISTS enrollment+period where `owner_id = sub`    |
+| SELECT        | Period owner        | EXISTS enrollment+period where `owner_id = sub`    |
 | UPDATE        | Self                | `user_id = (auth.jwt() ->> 'sub')`                 |
 | INSERT/DELETE | Nobody via frontend | FastAPI only                                       |
 
@@ -127,13 +127,10 @@ Identity expression throughout: `(auth.jwt() ->> 'sub')` — returns the `sub` c
 
 | Operation     | Who                    | Condition                                                       |
 | ------------- | ---------------------- | --------------------------------------------------------------- |
-| SELECT        | Owner (teacher)        | `owner_id = (auth.jwt() ->> 'sub')`                             |
-| SELECT        | Enrolled student       | EXISTS enrollment where `user_id = sub` and `period_id` matches |
-| SELECT        | Any authenticated user | `(auth.jwt() ->> 'sub') is not null` — needed for period/verify |
-| UPDATE        | Owner                  | `owner_id = (auth.jwt() ->> 'sub')`                             |
-| INSERT/DELETE | Nobody via frontend    | FastAPI only                                                    |
-
-Note: Three separate SELECT policies — Postgres ORs them automatically.
+| SELECT        | Owner (teacher)     | `owner_id = (auth.jwt() ->> 'sub')`                             |
+| SELECT        | Enrolled student    | EXISTS enrollment where `user_id = sub` and `period_id` matches |
+| UPDATE        | Owner               | `owner_id = (auth.jwt() ->> 'sub')`                             |
+| INSERT/DELETE | Nobody via frontend | FastAPI only                                                    |
 
 #### `period_schedule`
 
@@ -150,7 +147,7 @@ Note: Three separate SELECT policies — Postgres ORs them automatically.
 | --------- | ---------------------- | ------------------------------------ |
 | SELECT    | Period owner           | EXISTS period where `owner_id = sub` |
 | SELECT    | Enrolled student       | `user_id = (auth.jwt() ->> 'sub')`   |
-| INSERT    | Any authenticated user | `(auth.jwt() ->> 'sub') is not null` |
+| INSERT    | Self only              | `user_id = (auth.jwt() ->> 'sub')`   |
 | DELETE    | Enrolled student       | `user_id = (auth.jwt() ->> 'sub')`   |
 
 #### `quest` (formerly `individual_quest`)
@@ -158,9 +155,9 @@ Note: Three separate SELECT policies — Postgres ORs them automatically.
 | Operation     | Who                      | Condition                                          |
 | ------------- | ------------------------ | -------------------------------------------------- |
 | SELECT        | The student              | `user_id = (auth.jwt() ->> 'sub')`                 |
-| SELECT        | Teacher                  | EXISTS enrollment+period where `owner_id = sub`    |
+| SELECT        | Period owner             | EXISTS enrollment+period where `owner_id = sub`    |
 | SELECT        | Parent                   | EXISTS parent where sub is in `linked_student_ids` |
-| UPDATE        | Teacher (grade/feedback) | EXISTS enrollment+period where `owner_id = sub`    |
+| UPDATE        | Period owner (grade/feedback) | EXISTS enrollment+period where `owner_id = sub`    |
 | UPDATE        | Student (status)         | `user_id = (auth.jwt() ->> 'sub')`                 |
 | INSERT/DELETE | Nobody via frontend      | FastAPI only                                       |
 
@@ -171,7 +168,7 @@ Note: Column-level restriction (student can only update `status`, teacher only `
 | Operation            | Who                 | Condition                                                                   |
 | -------------------- | ------------------- | --------------------------------------------------------------------------- |
 | SELECT               | The student         | `student_id = (auth.jwt() ->> 'sub')`                                       |
-| SELECT               | Teacher             | EXISTS period where `owner_id = sub` and `period_id` matches                |
+| SELECT               | Period owner        | EXISTS period where `owner_id = sub` and `period_id` matches                |
 | SELECT               | Parent              | EXISTS parent where sub is in `linked_student_ids` and `student_id` matches |
 | INSERT/UPDATE/DELETE | Nobody via frontend | FastAPI only                                                                |
 
@@ -189,7 +186,8 @@ Note: The PK column is `student_id`, not `user_id`. The identity expression comp
 | Operation            | Who                 | Condition                                                    |
 | -------------------- | ------------------- | ------------------------------------------------------------ |
 | SELECT               | The student         | `user_id = (auth.jwt() ->> 'sub')`                           |
-| SELECT               | Teacher             | EXISTS period where `owner_id = sub` and `period_id` matches |
+| SELECT               | Period owner        | EXISTS period where `owner_id = sub` and `period_id` matches |
+| SELECT               | Parent              | EXISTS parent where sub is in `linked_student_ids` and `user_id` matches |
 | INSERT/UPDATE/DELETE | Nobody via frontend | FastAPI only                                                 |
 
 #### `ltg_conversation`
@@ -197,17 +195,16 @@ Note: The PK column is `student_id`, not `user_id`. The identity expression comp
 | Operation            | Who                 | Condition                                                    |
 | -------------------- | ------------------- | ------------------------------------------------------------ |
 | SELECT               | The student         | `user_id = (auth.jwt() ->> 'sub')`                           |
-| SELECT               | Teacher             | EXISTS period where `owner_id = sub` and `period_id` matches |
 | INSERT/UPDATE/DELETE | Nobody via frontend | FastAPI only                                                 |
 
 #### `parent_invite`
 
-| Operation            | Who                        | Condition                          |
-| -------------------- | -------------------------- | ---------------------------------- |
-| SELECT               | The student (invite owner) | `user_id = (auth.jwt() ->> 'sub')` |
-| INSERT/UPDATE/DELETE | Nobody via frontend        | FastAPI only                       |
+| Operation            | Who                 | Condition                          |
+| -------------------- | ------------------- | ---------------------------------- |
+| SELECT               | The parent          | `user_id = (auth.jwt() ->> 'sub')` |
+| INSERT/UPDATE/DELETE | Nobody via frontend | FastAPI only                       |
 
-**Important:** `parent_invite.user_id` is the **student's** user ID (the person the invite is for), not the parent's. All invite creation and redemption goes through FastAPI service role.
+**Important:** `parent_invite.user_id` is the **parent's** user ID (the invite creator), not the student's. Students never query this table — redemption goes through FastAPI service role, which looks up the invite by code using the service role key.
 
 #### `session`
 
@@ -294,7 +291,7 @@ create policy "student: parent select"
     )
   );
 
-create policy "student: teacher select"
+create policy "student: period owner select"
   on student
   for select
   using (
@@ -346,7 +343,6 @@ create policy "parent: self update"
 
 -- ============================================================
 -- TABLE: period
--- Three SELECT policies — Postgres ORs them automatically.
 -- ============================================================
 alter table period enable row level security;
 
@@ -365,13 +361,6 @@ create policy "period: enrolled student select"
         and e.user_id = (auth.jwt() ->> 'sub')
     )
   );
-
--- Required for period/verify route — any authenticated user can
--- check whether a period exists to support enrollment flow.
-create policy "period: any auth select"
-  on period
-  for select
-  using ((auth.jwt() ->> 'sub') is not null);
 
 create policy "period: owner update"
   on period
@@ -439,11 +428,11 @@ create policy "enrollment: enrolled student select"
   for select
   using (user_id = (auth.jwt() ->> 'sub'));
 
--- Any authenticated user can enroll (student self-enrollment flow).
-create policy "enrollment: any auth insert"
+-- Student self-enrollment only — user_id must match the caller's sub.
+create policy "enrollment: self insert"
   on enrollment
   for insert
-  with check ((auth.jwt() ->> 'sub') is not null);
+  with check (user_id = (auth.jwt() ->> 'sub'));
 
 create policy "enrollment: student delete"
   on enrollment
@@ -463,7 +452,7 @@ create policy "quest: student select"
   for select
   using (user_id = (auth.jwt() ->> 'sub'));
 
-create policy "quest: teacher select"
+create policy "quest: period owner select"
   on quest
   for select
   using (
@@ -491,7 +480,7 @@ create policy "quest: student update"
   for update
   using (user_id = (auth.jwt() ->> 'sub'));
 
-create policy "quest: teacher update"
+create policy "quest: period owner update"
   on quest
   for update
   using (
@@ -516,7 +505,7 @@ create policy "student_skill_mastery: student select"
   for select
   using (student_id = (auth.jwt() ->> 'sub'));
 
-create policy "student_skill_mastery: teacher select"
+create policy "student_skill_mastery: period owner select"
   on student_skill_mastery
   for select
   using (
@@ -560,7 +549,7 @@ create policy "student_long_term_goal: student select"
   for select
   using (user_id = (auth.jwt() ->> 'sub'));
 
-create policy "student_long_term_goal: teacher select"
+create policy "student_long_term_goal: period owner select"
   on student_long_term_goal
   for select
   using (
@@ -568,6 +557,17 @@ create policy "student_long_term_goal: teacher select"
       select 1 from period p
       where p.period_id = student_long_term_goal.period_id
         and p.owner_id = (auth.jwt() ->> 'sub')
+    )
+  );
+
+create policy "student_long_term_goal: parent select"
+  on student_long_term_goal
+  for select
+  using (
+    exists (
+      select 1 from parent
+      where parent.user_id = (auth.jwt() ->> 'sub')
+        and student_long_term_goal.user_id = any(parent.linked_student_ids)
     )
   );
 
@@ -582,26 +582,16 @@ create policy "ltg_conversation: student select"
   for select
   using (user_id = (auth.jwt() ->> 'sub'));
 
-create policy "ltg_conversation: teacher select"
-  on ltg_conversation
-  for select
-  using (
-    exists (
-      select 1 from period p
-      where p.period_id = ltg_conversation.period_id
-        and p.owner_id = (auth.jwt() ->> 'sub')
-    )
-  );
-
 
 -- ============================================================
 -- TABLE: parent_invite
--- user_id = the student the invite belongs to (NOT the parent).
+-- user_id = the parent who created the invite (NOT the student).
 -- Invite creation and redemption go through FastAPI service role.
+-- Students never query this table directly.
 -- ============================================================
 alter table parent_invite enable row level security;
 
-create policy "parent_invite: student select"
+create policy "parent_invite: parent select"
   on parent_invite
   for select
   using (user_id = (auth.jwt() ->> 'sub'));
@@ -731,7 +721,6 @@ Execute in this exact order. Do not run step N+1 until step N is verified.
 - [ ] Student sees only their own rows in `quest`, `student`, `enrollment`, `conversation`
 - [ ] Teacher sees enrolled students' rows in `quest`, `student`, `student_skill_mastery`
 - [ ] Parent sees linked students' rows in `student`, `quest`, `student_skill_mastery`
-- [ ] Unenrolled student can verify a period exists (`period/verify` returns 200)
 - [ ] Student cannot see another student's `quest` rows
 - [ ] Teacher cannot see quests from a student not in their period
 - [ ] Parent cannot see a student not in `linked_student_ids`
