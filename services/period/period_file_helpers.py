@@ -2,7 +2,6 @@
 import logging
 import os
 
-import boto3
 from openai import OpenAI
 
 from integrations.s3_service import upload_file_to_s3
@@ -76,20 +75,3 @@ def try_generate_schedule(period_id: str, user_id: str):
     except Exception as schedule_error:
         logger.warning("Failed to auto-generate schedule for %s: %s", period_id, schedule_error)
         return None
-
-
-def get_file_presigned_url(key: str) -> str:
-    """Return a presigned S3 URL for the given object key."""
-    s3 = boto3.client(
-        "s3",
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        region_name=os.getenv("AWS_REGION"),
-    )
-    bucket_name = os.getenv("S3_BUCKET_NAME")
-    url = s3.generate_presigned_url(
-        "get_object",
-        Params={"Bucket": bucket_name, "Key": key},
-        ExpiresIn=3600,
-    )
-    return url

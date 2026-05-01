@@ -55,3 +55,12 @@ def upload_file_to_s3(file_path, filename=None, folder=None):
     except (NoCredentialsError, ClientError) as e:
         logger.error("S3 upload failed: %s", e)
         return None
+
+
+def get_file_presigned_url(key: str, expires_in: int = 3600) -> str:
+    """Return a presigned S3 URL for the given object key."""
+    return s3.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": BUCKET_NAME, "Key": key},
+        ExpiresIn=expires_in,
+    )

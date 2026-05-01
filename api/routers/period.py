@@ -8,10 +8,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from api.deps import AuthPayload, get_auth
 from data_access.teacher_dao import TeacherDAO
+from integrations.s3_service import get_file_presigned_url
 from services.period.period_file_helpers import (
     append_canvas_file,
     create_vector_store,
-    get_file_presigned_url,
     upload_period_files,
     try_generate_schedule,
 )

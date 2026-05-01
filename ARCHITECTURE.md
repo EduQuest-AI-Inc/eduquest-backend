@@ -1,5 +1,18 @@
 # EduQuest Backend Architecture
 
+## Architecture Decisions
+
+### All S3 access goes through `integrations/s3_service.py`
+AWS credentials, bucket config, and error handling live in one place. Services must never
+instantiate `boto3.client` directly — import helpers from `integrations/s3_service.py` instead.
+
+### The frontend never calls Supabase directly — all database access goes through FastAPI
+The frontend must not use the Supabase client SDK or call Supabase endpoints directly. All data
+reads and writes must go through the FastAPI backend. This keeps auth enforcement, business logic,
+and RLS policy in one place and prevents clients from bypassing server-side validation.
+
+---
+
 ## Layers at a Glance
 
 ### Architecture Overview
@@ -60,7 +73,7 @@ graph LR
         Auth_t["session<br/>password_reset_token<br/>password_reset_rate_limit"]
         Identity_t["user · student<br/>teacher · parent"]
         Course_t["period · period_schedule<br/>enrollment"]
-        AI_t["conversation · ltg_conversation<br/>quest · student_skill_mastery<br/>aggregated_metrics"]
+        AI_t["conversation · ltg_conversation<br/>quest · student_skill_mastery · aggregated_metrics"]
         Onboard_t["parent_invite · waitlist"]
     end
 
@@ -282,7 +295,6 @@ sequenceDiagram
     end
 ```
 
-> **Skill metrics note:** After grading, the frontend reads aggregated skill metrics directly from the `aggregated_metrics` Supabase table — there is no `/metrics` API endpoint. This table is populated by `GradingOrchestrator` via `AggregatedMetricsDAO`.
 
 ---
 
@@ -619,7 +631,7 @@ All agents live in `bots/` and use the OpenAI Agents SDK (`from agents import Ag
 
 Content safety is applied via `bots/guardrails.py::check_student_output_safety()` before returning agent responses to the client.
 
-`bots/ltg_conversation_service.py` is a backwards-compatibility re-export shim — it exists only to preserve old import paths and contains no logic.
+**All agent instantiation goes through `bots/provider.py::get_bot_provider()`** — services never import agent classes directly. This is what makes `MOCK_AI=true` (env) and `set_bot_provider(MockBotProvider())` (tests) work: swapping the provider swaps every agent at once without touching service code.
 
 ---
 
