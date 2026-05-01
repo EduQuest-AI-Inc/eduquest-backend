@@ -43,7 +43,7 @@ class PasswordResetTokenDAO(SupabaseBaseDAO):
     def increment_attempts(self, token_hash: str) -> bool:
         result = self._rpc('increment_token_attempts', {'p_token_hash': token_hash})
         if result and len(result) > 0:
-            return result[0].get('burned_at') is not None
+            return result[0].get('burned_at') is not None  # type: ignore[index]
         return False
 
     def burn_token(self, token_hash: str) -> None:
@@ -56,7 +56,7 @@ class PasswordResetTokenDAO(SupabaseBaseDAO):
     def consume_token(self, token_hash: str) -> Tuple[bool, Optional[Dict], Optional[str]]:
         result = self._rpc('consume_password_reset_token', {'p_token_hash': token_hash})
         if result and len(result) > 0:
-            return True, result[0], None
+            return True, result[0], None  # type: ignore[index]
 
         # Token was not consumed — figure out why
         token_data = self.get_token(token_hash)

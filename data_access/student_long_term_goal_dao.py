@@ -1,5 +1,4 @@
 from typing import Optional
-from datetime import datetime, timezone
 
 from data_access.base_dao import SupabaseBaseDAO
 from models.student_long_term_goal import StudentLongTermGoal

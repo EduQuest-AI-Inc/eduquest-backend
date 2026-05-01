@@ -1,2 +1,3 @@
 autotyping
 monkeytype
+pyright

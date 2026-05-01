@@ -5,11 +5,9 @@ import tempfile
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
 from data_access.teacher_dao import TeacherDAO
-from services.parent.parent_service import ParentService
 from services.period.period_file_helpers import (
     append_canvas_file,
     create_vector_store,
@@ -18,87 +16,36 @@ from services.period.period_file_helpers import (
     try_generate_schedule,
 )
 from services.period.period_management_service import PeriodManagementService
-from services.period.period_service import PeriodService
-from services.waitlist.WaitlistService import WaitlistService
+from services.waitlist.waitlist_service import WaitlistService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-period_service = PeriodService()
 period_management_service = PeriodManagementService()
-parent_service_p = ParentService()
-teacher_dao_p = TeacherDAO()
-waitlist_service_p = WaitlistService()
+teacher_dao = TeacherDAO()
+waitlist_service = WaitlistService()
 
 
-class InitiateLTGRequest(BaseModel):
-    period_id: str
+# ─── Private helpers ──────────────────────────────────────────────────────────
 
-
-class ContinueLTGRequest(BaseModel):
-    conversation_type: str
-    conversation_id: str
-    message: str
-    period_id: Optional[str] = None
-
-
-class InitiateHomeworkRequest(BaseModel):
-    period_id: str
-    user_id: str | None = None
-
-
-@router.post("/initiate-ltg-conversation")
-def initiate_ltg_conversation(
-    body: InitiateLTGRequest,
-    auth: AuthPayload = Depends(get_auth),
-):
-    try:
-        return period_service.initiate_ltg_conversation(auth.token, body.period_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/continue-ltg-conversation")
-def continue_ltg_conversation(
-    body: ContinueLTGRequest,
-    auth: AuthPayload = Depends(get_auth),
-):
-    try:
-        return period_service.continue_ltg_conversation(
-            auth.token,
-            body.conversation_type,
-            body.conversation_id,
-            body.message,
-            body.period_id,
+def _validate_pilot_access(user_id: str):
+    """Raise HTTPException 403 if teacher lacks pilot access."""
+    pilot_enabled = os.getenv("PILOT_WAITLIST_ENABLED", "true").lower() == "true"
+    if not pilot_enabled:
+        return
+    teacher = teacher_dao.get_teacher_by_id(user_id)
+    if not teacher or not teacher.get("pilot_approved", False):
+        waitlist_status = waitlist_service.get_status(user_id)
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Pilot access required to create a class. Please join the pilot waitlist.",
+                "code": "PILOT_WAITLIST_REQUIRED",
+                "waitlist": waitlist_status,
+            },
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/initiate-homework-agent")
-def initiate_homework_agent(
-    body: InitiateHomeworkRequest,
-    auth: AuthPayload = Depends(get_auth),
-):
-    try:
-        user_id = body.user_id or auth.sub
-        return period_service.start_homework_agent(auth.token, user_id, body.period_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ─── Owner-facing period list ─────────────────────────────────────────────────
+# ─── Period management ────────────────────────────────────────────────────────
 
 @router.get("/periods")
 def list_periods(auth: AuthPayload = Depends(get_auth)):
@@ -110,80 +57,8 @@ def list_periods(auth: AuthPayload = Depends(get_auth)):
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
-# ─── Student-facing period routes ─────────────────────────────────────────────
-
-@router.get("/my-periods")
-def my_periods(auth: AuthPayload = Depends(get_auth)):
-    return period_service.get_my_periods(auth.sub)
-
-
-class VerifyPeriodRequest(BaseModel):
-    period_id: str
-
-
-@router.post("/verify-period")
-def verify_period(body: VerifyPeriodRequest, auth: AuthPayload = Depends(get_auth)):
-    period = period_service.verify_period_id(auth.sub, body.period_id)
-    return {"message": "Period verified and added to enrollments", "period": period}
-
-
-class UnenrollRequest(BaseModel):
-    period_id: str
-
-
-@router.post("/unenroll")
-def unenroll(body: UnenrollRequest, auth: AuthPayload = Depends(get_auth)):
-    return period_service.unenroll_from_period(auth.sub, body.period_id)
-
-
-# ─── Accept parent invite ──────────────────────────────────────────────────────
-
-class AcceptInviteRequest(BaseModel):
-    code: str
-
-
-@router.post("/accept-parent-invite")
-def accept_parent_invite(body: AcceptInviteRequest, auth: AuthPayload = Depends(get_auth)):
-    code = body.code.strip().upper()
-    if not code:
-        raise HTTPException(status_code=400, detail="Invite code is required")
-    try:
-        result = parent_service_p.accept_invite(auth.sub, code)
-        return result
-    except ValueError as ve:
-        msg = str(ve)
-        if "expired" in msg or "already been used" in msg:
-            raise HTTPException(status_code=410, detail=msg)
-        if "not found" in msg.lower() or "invalid" in msg.lower():
-            raise HTTPException(status_code=404, detail=msg)
-        raise HTTPException(status_code=400, detail=msg)
-    except Exception as e:
-        logger.error("Error in accept-parent-invite: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-# ─── Period creation (teacher + parent, role-aware) ───────────────────────────
-
-def _validate_pilot_access_p(user_id: str):
-    """Raise HTTPException 403 if teacher lacks pilot access."""
-    pilot_enabled = os.getenv("PILOT_WAITLIST_ENABLED", "true").lower() == "true"
-    if not pilot_enabled:
-        return
-    teacher = teacher_dao_p.get_teacher_by_id(user_id)
-    if not teacher or not teacher.get("pilot_approved", False):
-        waitlist_status = waitlist_service_p.get_status(user_id)
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "error": "Pilot access required to create a class. Please join the pilot waitlist.",
-                "code": "PILOT_WAITLIST_REQUIRED",
-                "waitlist": waitlist_status,
-            },
-        )
-
-
 @router.post("/create-period", status_code=201)
-def create_period_unified(
+def create_period(
     name: str = Form(...),
     files: List[UploadFile] = File(default=[]),
     canvas_api_url: Optional[str] = Form(default=None),
@@ -194,13 +69,13 @@ def create_period_unified(
 ):
     role = auth.role
     if role == "teacher":
-        _validate_pilot_access_p(auth.sub)
+        _validate_pilot_access(auth.sub)
 
     temp_dir = tempfile.mkdtemp()
     try:
         file_paths: List[str] = []
         for upload in files:
-            file_path = os.path.join(temp_dir, upload.filename)
+            file_path = os.path.join(temp_dir, upload.filename or "")
             with open(file_path, "wb") as dest:
                 shutil.copyfileobj(upload.file, dest)
             file_paths.append(file_path)
@@ -219,6 +94,11 @@ def create_period_unified(
             canvas_course_name=canvas_course_name,
         )
         period_id = period["period_id"]
+        if role == "teacher" and canvas_api_url and canvas_api_key:
+            try:
+                teacher_dao.update_canvas_credentials(auth.sub, canvas_api_url, canvas_api_key)
+            except Exception as e:
+                logger.warning("Failed to persist Canvas credentials for teacher %s: %s", auth.sub, e)
         s3_urls = upload_period_files(file_paths, period_id)
         period_management_service.update_file_urls(period_id, [u for u in s3_urls if u])
 
@@ -239,20 +119,6 @@ def create_period_unified(
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-# ─── File access (presigned URL) ──────────────────────────────────────────────
-
-@router.get("/get-file/{key:path}")
-def get_file_presigned(key: str, auth: AuthPayload = Depends(get_auth)):
-    try:
-        url = get_file_presigned_url(key)
-        return {"url": url}
-    except Exception as e:
-        logger.error("Error generating presigned URL for %s: %s", key, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to retrieve file")
-
-
-# ─── Add files to existing period ─────────────────────────────────────────────
-
 @router.post("/add-files-to-period")
 def add_files_to_period(
     period_id: str = Form(...),
@@ -269,7 +135,7 @@ def add_files_to_period(
     try:
         file_paths: List[str] = []
         for upload in files:
-            file_path = os.path.join(temp_dir, upload.filename)
+            file_path = os.path.join(temp_dir, upload.filename or "")
             with open(file_path, "wb") as dest:
                 shutil.copyfileobj(upload.file, dest)
             file_paths.append(file_path)
@@ -285,3 +151,15 @@ def add_files_to_period(
         shutil.rmtree(temp_dir, ignore_errors=True)
 
     return {"message": f"Successfully added {len(new_file_urls)} files to period", "added_files": new_file_urls}
+
+
+# ─── Files ────────────────────────────────────────────────────────────────────
+
+@router.get("/get-file/{key:path}")
+def get_file_presigned(key: str, auth: AuthPayload = Depends(get_auth)):
+    try:
+        url = get_file_presigned_url(key)
+        return {"url": url}
+    except Exception as e:
+        logger.error("Error generating presigned URL for %s: %s", key, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve file")

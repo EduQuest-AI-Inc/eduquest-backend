@@ -3,7 +3,7 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      - production  # or your deployment branch
+      - production
 
 jobs:
   deploy:
@@ -18,25 +18,8 @@ jobs:
         echo "${{ secrets.EC2_KEY }}" | base64 -d > ec2_key.pem
         chmod 600 ec2_key.pem
 
+    - name: Copy deploy script
+      run: scp -o StrictHostKeyChecking=no -i ec2_key.pem scripts/remote_deploy.sh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/remote_deploy.sh
+
     - name: Deploy to EC2
-      run: |
-        ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          set -e
-          cd /home/ubuntu/eduquest-backend
-          echo "Pulling latest changes..."
-          git pull origin production
-
-          echo "Activating virtual environment..."
-          source venv/bin/activate
-          pip install -r requirements.txt
-
-          echo "Stopping existing backend process (if any)..."
-          pkill -f "uvicorn main:app" || true
-          pkill -f "python app.py" || true  # legacy Flask cleanup
-
-          echo "Starting FastAPI app (uvicorn) in background..."
-          nohup venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
-          sleep 2
-          echo "Health check..."
-          curl -fsS http://127.0.0.1:8000/helloworld || (echo "Server failed to start"; tail -50 app.log; exit 1)
-        EOF
+      run: ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'bash /tmp/remote_deploy.sh'

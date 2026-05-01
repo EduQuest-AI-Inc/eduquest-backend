@@ -1,5 +1,5 @@
 """
-LTG conversation service — wires the LTG agent into Flask.
+LTG conversation service — wires the LTG agent into Fast API.
 
 Uses previous_response_id tracking for multi-turn stateful conversations
 via the Responses API, avoiding the Conversations API entirely.
@@ -8,9 +8,7 @@ import asyncio
 import uuid
 from typing import Optional, Dict, Any
 
-from agents import Runner
-
-from bots.ltg_agent import create_ltg_agent, LTGResponse
+from bots.provider import get_bot_provider
 from data_access.period_dao import PeriodDAO
 from data_access.student_dao import StudentDAO
 from data_access.ltg_conversation_dao import LtgConversationDAO
@@ -30,7 +28,7 @@ class LTGConversationService:
     def __init__(self, vector_store_id: str, previous_response_id: Optional[str] = None) -> None:
         self.vector_store_id = vector_store_id
         self.previous_response_id = previous_response_id
-        self.agent = create_ltg_agent(vector_store_id)
+        self.agent = get_bot_provider().create_ltg_agent(vector_store_id)
 
     async def initiate(self, student: Dict[str, Any]) -> Dict[str, Any]:
         """Start a new LTG conversation for a student."""
@@ -52,9 +50,9 @@ class LTGConversationService:
             f"that incorporate what I'll learn in this class."
         )
 
-        result = await Runner.run(self.agent, initial_message)
+        result = await get_bot_provider().run_conversation(self.agent, initial_message)
 
-        response: LTGResponse = result.final_output
+        response = result.final_output
 
         return {
             "response_id": result.last_response_id,
@@ -67,13 +65,13 @@ class LTGConversationService:
 
     async def continue_conversation(self, user_message: str) -> Dict[str, Any]:
         """Continue an existing LTG conversation."""
-        result = await Runner.run(
+        result = await get_bot_provider().run_conversation(
             self.agent,
             user_message,
             previous_response_id=self.previous_response_id,
         )
 
-        response: LTGResponse = result.final_output
+        response = result.final_output
         goal_chosen = bool(
             response.chosen_goal
             and response.chosen_goal.lower() not in ("null", "none", "")
@@ -106,7 +104,7 @@ def initiate_ltg_conversation(
 
 def continue_ltg_conversation(
     vector_store_id: str,
-    previous_response_id: str,
+    previous_response_id: Optional[str],
     user_message: str,
 ) -> Dict[str, Any]:
     service = LTGConversationService(vector_store_id, previous_response_id)
@@ -178,7 +176,7 @@ def run_initiate_ltg(user_id: str, period_id: str) -> Dict[str, Any]:
 
 def run_continue_ltg(
     user_id: str, conversation_type: str, conversation_id: str,
-    message: str, period_id: str = None,
+    message: str, period_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     period_dao = PeriodDAO()
     ltg_conversation_dao = LtgConversationDAO()

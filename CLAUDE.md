@@ -13,26 +13,27 @@ eduquest-backend/
 │       ├── auth.py                 # /auth — login, register, password reset
 │       ├── conversation.py         # /conversation — profile assistant, update assistant
 │       ├── enrollment.py           # /enrollment — enroll/unenroll students
+│       ├── ltg.py                  # /period — LTG conversation routes (mounted under /period)
 │       ├── parent.py               # /parent — parent invite, child lookup
-│       ├── period.py               # /period — LTG conversation, homework agent
+│       ├── period.py               # /period — period CRUD, homework agent
 │       ├── quest.py                # /quest — quest retrieval, submission
-│       ├── teacher.py              # /teacher — create period, S3 file, Canvas, period schedule
+│       ├── schedule.py             # /period — period schedule routes (mounted under /period)
+│       ├── teacher.py              # /teacher — Canvas courses (teacher-only)
 │       ├── user.py                 # /user — user profile
 │       └── waitlist.py             # /pilot-waitlist — status, join
 ├── services/                         # Service/business logic layer (imported by api/routers/)
-│   ├── auth_utils.py               # Shared auth helpers used across service modules
 │   ├── auth/                       # auth_service.py, password_reset_service.py, password_policy.py
 │   ├── conversation/               # conversation_service.py, grading_service.py,
 │   │                               #   ltg_service.py, profile_service.py, teacher_feedback_service.py
-│   ├── enrollment/                 # enrollment_service.py
-│   ├── period/                     # period_service.py, period_enrollment_service.py,
-│   │                               #   period_quest_service.py, period_schedule_service.py,
+│   ├── enrollment/                 # enrollment_service.py (CRUD, verify_and_enroll, unenroll,
+│   │                               #   get_my_periods, assert_enrolled)
+│   ├── period/                     # period_service.py, period_quest_service.py,
+│   │                               #   period_schedule_service.py,
 │   │                               #   period_management_service.py, period_file_helpers.py
 │   ├── quest/                      # quest_service.py, quest_creation_service.py,
 │   │                               #   quest_retrieval_service.py, quest_grading_service.py
-│   ├── teacher/                    # teacher_service.py, period_schedule_service.py
 │   ├── user/                       # user_service.py
-│   ├── waitlist/                   # WaitlistService.py
+│   ├── waitlist/                   # waitlist_service.py
 │   └── parent/                     # parent_service.py
 ├── models/                         # Pydantic domain models
 │   ├── user.py                     # Base User model
@@ -54,16 +55,16 @@ eduquest-backend/
 │   ├── ltg_agent.py                # Long-term goal agent
 │   ├── guardrails.py               # Content safety guardrails
 │   ├── profile_agent.py            # Student profile agent
+│   ├── provider.py                 # Bot provider — factory for real and mock bot instances
 │   ├── schedule_agent.py           # Schedule generation agent
 │   ├── teacher_feedback_agent.py   # Teacher feedback agent
-│   ├── ltg_conversation_service.py # Re-export shim (backwards compat for old imports)
+│   ├── _mocks.py                   # Mock bot instances for testing
 │   └── schemas/rubric.py           # Rubric Pydantic schema
 ├── integrations/                   # External service adapters (shared across features)
 │   ├── s3_service.py               # AWS S3 upload helpers
 │   ├── canvas_service.py           # Canvas LMS integration (canvasapi library)
 │   └── email_service.py            # SES email sending
 ├── utils/
-│   ├── conversion_utils.py         # convert_decimals() for DynamoDB Decimal→float
 │   ├── token_utils.py              # extract_auth_token(), get_user_id_from_token(), set_auth_cookie()
 │   └── validation_utils.py         # get_client_ip(request), normalize_email(email)
 ├── exceptions/                     # Custom exception classes → global HTTP status mappings
@@ -83,9 +84,9 @@ eduquest-backend/
 - `/conversation` — profile assistant, update assistant
 - `/enrollment` — student enrollment
 - `/parent` — parent invite and child lookup
-- `/period` — LTG conversation, homework agent
+- `/period` — period CRUD, homework agent; also the prefix for `schedule.py` (period schedule CRUD) and `ltg.py` (LTG conversation), which are separate router files mounted under `/period`
 - `/quest` — quest retrieval, submission
-- `/teacher` — create period, S3 file retrieval, Canvas courses, period schedule CRUD
+- `/teacher` — Canvas courses (teacher-only)
 - `/user` — user profile
 - `/pilot-waitlist` — status, join
 
@@ -150,7 +151,7 @@ pip install -r requirements.txt
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 - `OPENAI_API_KEY`
 - `API_GATEWAY_URL` (optional)
-- `USE_SUPABASE=true` to enable Supabase DAOs
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 
 **Run**:
 

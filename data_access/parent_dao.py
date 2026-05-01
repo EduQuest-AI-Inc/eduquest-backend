@@ -53,3 +53,11 @@ class ParentDAO(SupabaseBaseDAO):
         if not parent:
             return []
         return parent.get('linked_student_ids', [])
+
+    def get_parents_by_student_id(self, student_id: str) -> List[Dict[str, Any]]:
+        response = self._execute(
+            self._table()
+            .select('*')
+            .contains('linked_student_ids', [student_id])
+        )
+        return self._rows(response.data)

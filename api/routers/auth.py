@@ -109,7 +109,7 @@ def login(body: LoginRequest, response: Response):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = _mint_token(body.username, body.role)
-    session = Session(auth_token=token, user_id=body.username, role=body.role)
+    session = Session(auth_token=token, user_id=body.username, role=body.role)  # type: ignore[arg-type]
     session_dao.add_session(session)
 
     response_data: dict = {"token": token}

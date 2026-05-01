@@ -55,15 +55,13 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 
 | Field            | Type | Constraints | Notes                                    |
 | ---------------- | ---- | ----------- | ---------------------------------------- |
-| `user_id`        | text | PK          |                                          |
-| `first_name`     | text | NOT NULL    |                                          |
-| `last_name`      | text | NOT NULL    |                                          |
-| `email`          | text | NOT NULL    |                                          |
-| `password`       | text | NOT NULL    | Hashed (werkzeug)                        |
-| `last_login`     | text | nullable    | ISO timestamp                            |
-| `role`           | text | NOT NULL    | `"student"` \| `"teacher"` \| `"parent"` |
-| `canvas_api_url` | text | nullable    | Teacher's Canvas LMS base URL            |
-| `canvas_api_key` | text | nullable    | Teacher's Canvas API token               |
+| `user_id`    | text | PK       |                                          |
+| `first_name` | text | NOT NULL |                                          |
+| `last_name`  | text | NOT NULL |                                          |
+| `email`      | text | NOT NULL |                                          |
+| `password`   | text | NOT NULL | Hashed (werkzeug)                        |
+| `last_login` | text | nullable | ISO timestamp                            |
+| `role`       | text | NOT NULL | `"student"` \| `"teacher"` \| `"parent"` |
 
 ---
 
@@ -95,6 +93,8 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `pilot_approved` | boolean   | NOT NULL    | Whether teacher is in the pilot |
 | `created_at`     | timestamp | NOT NULL    |                                 |
 | `school_name`    | text      | nullable    |                                 |
+| `canvas_api_url` | text      | nullable    | Canvas LMS base URL             |
+| `canvas_api_key` | text      | nullable    | Canvas personal access token    |
 
 ---
 
@@ -219,11 +219,23 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `instructions`    | text         | NOT NULL    | Step-by-step completion instructions                      |
 | `rubric`          | json         | NOT NULL    | Grading criteria keyed by skill                           |
 | `status`          | quest_status | NOT NULL    | Enum: `"not_started"` \| `"in_progress"` \| `"completed"` |
-| `grade`           | json         | nullable    | Grading output: `{ detailed_grade, overall_score }`       |
+| `grade`           | jsonb        | nullable    | Grading output — see shape below                          |
 | `feedback`        | text         | nullable    | AI or teacher feedback                                    |
 | `due_date`        | timestamp    | nullable    |                                                           |
 | `created_at`      | timestamp    | NOT NULL    |                                                           |
 | `last_updated_at` | timestamp    | NOT NULL    | Auto-updated on every write                               |
+
+**`grade` JSONB shape:**
+
+```json
+{
+  "detailed_grade": { "<criterion>": <int>, ... },
+  "overall_score": <int>
+}
+```
+
+- `detailed_grade` — per-criterion scores produced by the grading agent (e.g. `{"Clarity": 18, "Analysis": 22}`)
+- `overall_score` — total points rolled up from all criteria
 
 ---
 

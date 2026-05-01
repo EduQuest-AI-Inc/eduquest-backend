@@ -1,16 +1,19 @@
 import asyncio
 import json
+import logging
 import os
 import tempfile
-from typing import Optional
+from typing import Optional, cast
+
+from fastapi import UploadFile
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from api.deps import AuthPayload, get_auth
+from data_access.quest_dao import QuestDAO
 from services.conversation.conversation_service import ConversationService
-from utils.conversion_utils import convert_decimals as _convert_decimals
-
+logger = logging.getLogger(__name__)
 router = APIRouter()
 conversation_service = ConversationService()
 
@@ -21,8 +24,10 @@ conversation_service = ConversationService()
 
 @router.post("/initiate-profile-assistant")
 def initiate_profile_assistant(auth: AuthPayload = Depends(get_auth)):
+    if auth.role != "student":
+        raise HTTPException(status_code=403, detail="Students only")
     try:
-        return conversation_service.start_profile_assistant(auth.token)
+        return conversation_service.start_profile_assistant(auth.sub)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -40,7 +45,7 @@ def continue_profile_assistant(
 ):
     try:
         return conversation_service.continue_profile_assistant(
-            auth.token,
+            auth.sub,
             body.conversation_type,
             body.conversation_id,
             body.message,
@@ -84,6 +89,11 @@ async def initiate_update_assistant(
                     status_code=400,
                     detail="individual_quest_id is required for student submissions",
                 )
+            if not isinstance(individual_quest_id, str):
+                raise HTTPException(
+                    status_code=400,
+                    detail="individual_quest_id must be a string",
+                )
             if not week:
                 raise HTTPException(
                     status_code=400,
@@ -92,11 +102,9 @@ async def initiate_update_assistant(
 
             # Fetch quest data to build quests_file JSON
             try:
-                from data_access.individual_quest_dao import IndividualQuestDAO
-                quest_data = IndividualQuestDAO().get_individual_quest_by_id(individual_quest_id)
+                quest_data = QuestDAO().get_quest_by_id(individual_quest_id)
                 if not quest_data:
                     raise HTTPException(status_code=404, detail="Quest not found")
-                quest_data = _convert_decimals(quest_data)
                 quests_file = json.dumps([quest_data])
             except HTTPException:
                 raise
@@ -104,6 +112,7 @@ async def initiate_update_assistant(
                 raise HTTPException(status_code=500, detail=f"Failed to fetch quest: {e}")
 
             # Save uploaded file to a temp path synchronously via SpooledTemporaryFile
+            upload_file = cast(UploadFile, upload_file)
             suffix = os.path.splitext(upload_file.filename)[1] if upload_file.filename else ""
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
             tmp.write(upload_file.file.read())
@@ -114,14 +123,15 @@ async def initiate_update_assistant(
                 result = await loop.run_in_executor(
                     None,
                     lambda: conversation_service.start_update_assistant(
-                        auth_token=auth.token,
                         quests_file=quests_file,
                         is_instructor=False,
-                        week=int(week),
+                        caller_user_id=auth.sub,
+                        caller_role=auth.role,
+                        week=int(str(week)),
                         submission_file=temp_path,
-                        user_id=user_id,
-                        period_id=period_id,
-                        individual_quest_id=individual_quest_id,
+                        user_id=str(user_id) if user_id else None,
+                        period_id=str(period_id) if period_id else None,
+                        individual_quest_id=str(individual_quest_id),
                     ),
                 )
             finally:
@@ -158,9 +168,10 @@ async def initiate_update_assistant(
             result = await loop.run_in_executor(
                 None,
                 lambda: conversation_service.start_update_assistant(
-                    auth_token=auth.token,
                     quests_file=quests_file,
                     is_instructor=is_instructor,
+                    caller_user_id=auth.sub,
+                    caller_role=auth.role,
                     week=week,
                     submission_file=submission_file,
                     user_id=user_id,
@@ -176,6 +187,7 @@ async def initiate_update_assistant(
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.error("initiate-update-assistant failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -192,10 +204,10 @@ def continue_update_assistant(
 ):
     try:
         return conversation_service.continue_update_assistant(
-            auth_token=auth.token,
+            user_id=auth.sub,
+            caller_role=auth.role,
             conversation_id=body.conversation_id,
             message=body.message,
-            user_id=body.user_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

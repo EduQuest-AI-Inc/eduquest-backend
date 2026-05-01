@@ -8,12 +8,7 @@ of the legacy ``update`` class from assistants.py.
 import asyncio
 from typing import Optional, Dict, Any
 
-from agents import Runner, OpenAIConversationsSession
-
-from bots.teacher_feedback_agent import (
-    create_teacher_feedback_agent,
-    TeacherFeedbackResponse,
-)
+from bots.provider import get_bot_provider
 
 
 class TeacherFeedbackConversationService:
@@ -23,11 +18,8 @@ class TeacherFeedbackConversationService:
     """
 
     def __init__(self, conversation_id: Optional[str] = None) -> None:
-        self.agent = create_teacher_feedback_agent()
-        if conversation_id:
-            self.session = OpenAIConversationsSession(conversation_id=conversation_id)
-        else:
-            self.session = OpenAIConversationsSession()
+        self.agent = get_bot_provider().create_teacher_feedback_agent()
+        self.session = get_bot_provider().make_conversations_session(conversation_id)
 
     async def _extract_conversation_id(self) -> Optional[str]:
         try:
@@ -68,13 +60,13 @@ class TeacherFeedbackConversationService:
             f"What have you noticed about this student?"
         )
 
-        result = await Runner.run(
+        result = await get_bot_provider().run_conversation(
             self.agent,
             initial_message,
             session=self.session,
         )
 
-        response: TeacherFeedbackResponse = result.final_output
+        response = result.final_output
         conversation_id = await self._extract_conversation_id()
 
         return {
@@ -85,13 +77,13 @@ class TeacherFeedbackConversationService:
 
     async def continue_conversation(self, user_message: str) -> Dict[str, Any]:
         """Continue an existing teacher-feedback conversation."""
-        result = await Runner.run(
+        result = await get_bot_provider().run_conversation(
             self.agent,
             user_message,
             session=self.session,
         )
 
-        response: TeacherFeedbackResponse = result.final_output
+        response = result.final_output
 
         return {
             "response": response.response,
