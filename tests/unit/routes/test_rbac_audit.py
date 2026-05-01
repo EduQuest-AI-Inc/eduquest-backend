@@ -14,7 +14,6 @@ EXPLICITLY_PUBLIC_ROUTES = {
     "/auth/login",
     "/auth/password-reset/request",
     "/auth/password-reset/confirm",
-    "/quest/grade/parse",   # stateless grade-format validator, no user data
     "/helloworld",
 }
 

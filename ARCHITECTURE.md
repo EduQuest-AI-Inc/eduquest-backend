@@ -6,6 +6,24 @@
 AWS credentials, bucket config, and error handling live in one place. Services must never
 instantiate `boto3.client` directly — import helpers from `integrations/s3_service.py` instead.
 
+### Frontend role and ownership checks are UX only — the backend is the enforcement boundary
+The frontend may hide buttons, redirect routes, or skip rendering components based on role or ownership. These checks exist to avoid confusing users with options that would fail, not to enforce access control. Every protected action must be independently enforced at the API layer via `require_roles` or an explicit ownership check. Removing a frontend gate should never expose a security gap.
+
+### Auth & Role-Based Access Control
+
+Role enforcement lives exclusively at the **router layer** via FastAPI `Depends()`. Service methods never raise errors for role checks — they assume the caller is already authorized. Service-layer `PermissionError` is reserved for **ownership checks** only (e.g. a teacher editing another teacher's period).
+
+Three roles: `Role.STUDENT`, `Role.TEACHER`, `Role.PARENT` — defined as a `str, Enum` in `api/deps.py` alongside `AuthPayload` and `get_auth()`.
+
+Canonical dependencies (all in `api/deps.py`):
+- `get_auth()` — validates JWT, returns `AuthPayload`; use when any authenticated user is allowed.
+- `require_roles(Role.X, ...)` — restricts to one or more roles; declare in the route's `Depends()`.
+- `require_student_viewer("param_name")` — use when a parent or teacher may optionally pass a student `user_id` to view that student's data.
+
+Supabase RLS is the secondary enforcement layer. Do not duplicate RLS logic in Python.
+
+Audit: `pytest tests/unit/routes/test_rbac_audit.py` verifies every route either has an auth dependency or is listed in `EXPLICITLY_PUBLIC_ROUTES`.
+
 ### The frontend never calls Supabase directly — all database access goes through FastAPI
 The frontend must not use the Supabase client SDK or call Supabase endpoints directly. All data
 reads and writes must go through the FastAPI backend. This keeps auth enforcement, business logic,

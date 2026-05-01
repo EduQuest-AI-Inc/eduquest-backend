@@ -111,6 +111,9 @@ class PeriodScheduleService:
         if not period_schedule:
             raise ValueError("No schedule exists for this period. Generate one first.")
 
+        if not quest_enabled_weeks:
+            raise ValueError("At least one quest-enabled week is required")
+
         # Normalize quest weeks to unique sorted ints
         normalized_weeks = sorted({int(v) for v in quest_enabled_weeks if str(v).lstrip("-").isdigit()})
 

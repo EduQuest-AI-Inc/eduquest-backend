@@ -79,8 +79,6 @@ async def initiate_update_assistant(
 
             individual_quest_id = form.get("individual_quest_id")
             week = form.get("week")
-            user_id = form.get("user_id")
-            period_id = form.get("period_id")
 
             if not individual_quest_id:
                 raise HTTPException(
@@ -103,11 +101,16 @@ async def initiate_update_assistant(
                 quest_data = QuestDAO().get_quest_by_id(individual_quest_id)
                 if not quest_data:
                     raise HTTPException(status_code=404, detail="Quest not found")
+                if auth.role == Role.STUDENT and quest_data["user_id"] != auth.sub:
+                    raise HTTPException(status_code=403, detail="Not your quest")
                 quests_file = json.dumps([quest_data])
             except HTTPException:
                 raise
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Failed to fetch quest: {e}")
+
+            user_id = quest_data["user_id"]
+            period_id = quest_data.get("period_id")
 
             # Save uploaded file to a temp path synchronously via SpooledTemporaryFile
             upload_file = cast(UploadFile, upload_file)

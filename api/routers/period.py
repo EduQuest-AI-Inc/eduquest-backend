@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from api.deps import AuthPayload, get_auth
+from api.deps import AuthPayload, Role, get_auth, require_roles
 from data_access.teacher_dao import TeacherDAO
 from integrations.s3_service import get_file_presigned_url
 from services.period.period_file_helpers import (
@@ -48,7 +48,7 @@ def _validate_pilot_access(user_id: str):
 # ─── Period management ────────────────────────────────────────────────────────
 
 @router.get("/periods")
-def list_periods(auth: AuthPayload = Depends(get_auth)):
+def list_periods(auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT))):
     try:
         result = period_management_service.get_periods_by_owner(auth.sub)
         return {"periods": result}
@@ -65,10 +65,9 @@ def create_period(
     canvas_api_key: Optional[str] = Form(default=None),
     canvas_course_id: Optional[str] = Form(default=None),
     canvas_course_name: Optional[str] = Form(default=None),
-    auth: AuthPayload = Depends(get_auth),
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
 ):
-    role = auth.role
-    if role == "teacher":
+    if auth.role == Role.TEACHER:
         _validate_pilot_access(auth.sub)
 
     temp_dir = tempfile.mkdtemp()
@@ -80,7 +79,7 @@ def create_period(
                 shutil.copyfileobj(upload.file, dest)
             file_paths.append(file_path)
 
-        if role == "teacher":
+        if auth.role == Role.TEACHER:
             append_canvas_file(temp_dir, file_paths, canvas_api_url, canvas_api_key, canvas_course_id)
 
         vector_store, file_streams = create_vector_store(name, file_paths)
@@ -94,7 +93,7 @@ def create_period(
             canvas_course_name=canvas_course_name,
         )
         period_id = period["period_id"]
-        if role == "teacher" and canvas_api_url and canvas_api_key:
+        if auth.role == Role.TEACHER and canvas_api_url and canvas_api_key:
             try:
                 teacher_dao.update_canvas_credentials(auth.sub, canvas_api_url, canvas_api_key)
             except Exception as e:

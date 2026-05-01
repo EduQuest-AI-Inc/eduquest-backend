@@ -43,10 +43,6 @@ class QuestRetrievalService:
         return {"detailed_grade": None, "overall_score": str(grade), "display_grade": str(grade)}
 
     @staticmethod
-    def format_grade_for_display(grade) -> str:
-        return QuestRetrievalService.parse_grade_data(grade)["display_grade"]
-
-    @staticmethod
     def attach_grade_display(quest: dict) -> None:
         """Parse grade data and attach display fields to a quest dict in-place."""
         grade_info = QuestRetrievalService.parse_grade_data(quest.get('grade'))

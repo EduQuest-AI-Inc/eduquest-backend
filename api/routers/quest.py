@@ -111,20 +111,6 @@ def grade_quest(
         raise HTTPException(status_code=500, detail="Failed to grade quest")
 
 
-class ParseGradeRequest(BaseModel):
-    grade: object
-
-
-@router.post("/grade/parse")  # Intentionally public — stateless grade-format validator, no user data involved.
-def parse_grade_data(body: ParseGradeRequest):
-    try:
-        grade_info = quest_service.parse_grade_data(body.grade)
-        return {"parsed_grade": grade_info, "display_grade": grade_info["display_grade"]}
-    except Exception as e:
-        logger.error("Error parsing grade data: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to parse grade data")
-
-
 @router.get("/verify-quest-structure/{period_id}")
 def verify_quest_structure(period_id: str, auth: AuthPayload = Depends(get_auth)):
     try:
