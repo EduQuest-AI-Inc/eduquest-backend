@@ -10,7 +10,7 @@ from fastapi import UploadFile
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from api.deps import AuthPayload, get_auth
+from api.deps import AuthPayload, Role, get_auth, require_roles
 from data_access.quest_dao import QuestDAO
 from services.conversation.conversation_service import ConversationService
 logger = logging.getLogger(__name__)
@@ -23,9 +23,7 @@ conversation_service = ConversationService()
 # ---------------------------------------------------------------------------
 
 @router.post("/initiate-profile-assistant")
-def initiate_profile_assistant(auth: AuthPayload = Depends(get_auth)):
-    if auth.role != "student":
-        raise HTTPException(status_code=403, detail="Students only")
+def initiate_profile_assistant(auth: AuthPayload = Depends(require_roles(Role.STUDENT))):
     try:
         return conversation_service.start_profile_assistant(auth.sub)
     except Exception as e:

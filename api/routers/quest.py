@@ -115,7 +115,7 @@ class ParseGradeRequest(BaseModel):
     grade: object
 
 
-@router.post("/grade/parse")
+@router.post("/grade/parse")  # Intentionally public — stateless grade-format validator, no user data involved.
 def parse_grade_data(body: ParseGradeRequest):
     try:
         grade_info = quest_service.parse_grade_data(body.grade)

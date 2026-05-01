@@ -1,13 +1,16 @@
+import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from api.deps import AuthPayload, get_auth
+from api.deps import AuthPayload, Role, get_auth, require_roles
 from services.waitlist.waitlist_service import WaitlistService
 
 router = APIRouter()
 svc = WaitlistService()
+
+ADMIN_IDS = set(filter(None, os.getenv("ADMIN_USER_IDS", "").split(",")))
 
 
 @router.get("/status")
@@ -38,8 +41,12 @@ def join_pilot_waitlist(
 
 
 @router.post("/approve/{user_id}")
-def approve_teacher(user_id: str, auth: AuthPayload = Depends(get_auth)):
-    # TODO: add admin role check
+def approve_teacher(
+    user_id: str,
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
+):
+    if auth.sub not in ADMIN_IDS:
+        raise HTTPException(status_code=403, detail="Admin access required")
     try:
         result = svc.approve(user_id)
         if result.get("success"):
