@@ -4,6 +4,8 @@ Pre-launch audit of all type issues and inconsistencies in the Supabase schema.
 
 ---
 
+Note recently guest.instructions was changed from text to jsonb. This was done purposefully in order to store a list of steps. Some of this document was written prior to that knoeledge and is outdated.
+
 ## Issues by Priority
 
 ### High — Live Bugs
@@ -12,9 +14,10 @@ Pre-launch audit of all type issues and inconsistencies in the Supabase schema.
 
 DATA_TABLES.md documents this as `text`, but the frontend is receiving a parsed object `{step, text}` at runtime, which means the actual Supabase column is `json` or `jsonb`. Supabase never parses a `text` column as JSON — if an object is coming back, the column is not `text`.
 
-**Why `text` is correct here:** `instructions` is a blob of prose/numbered text meant to be displayed as-is. `jsonb` is valuable when you need to query *into* the structure (e.g. `WHERE instructions->>'step' = '3'`), which never happens for instructions. `text` is simpler, has no parsing overhead, and can't accidentally receive a structured object — if you write a dict to a `text` column, Supabase errors or stores a literal string, both of which are easier to debug than silently storing a parsed object. Compare: `rubric` and `grade` legitimately use `jsonb` because the code reads fields out of them. `instructions` is just a string you display.
+**Why `text` is correct here:** `instructions` is a blob of prose/numbered text meant to be displayed as-is. `jsonb` is valuable when you need to query _into_ the structure (e.g. `WHERE instructions->>'step' = '3'`), which never happens for instructions. `text` is simpler, has no parsing overhead, and can't accidentally receive a structured object — if you write a dict to a `text` column, Supabase errors or stores a literal string, both of which are easier to debug than silently storing a parsed object. Compare: `rubric` and `grade` legitimately use `jsonb` because the code reads fields out of them. `instructions` is just a string you display.
 
 **Fix:** Confirm the actual column type in Supabase. If it is `json`/`jsonb`, either:
+
 - Convert it to `text` and extract the string content from any stored objects, or
 - Accept `jsonb` and always write plain strings into it going forward (Supabase stores plain strings in jsonb fine)
 
@@ -110,23 +113,23 @@ All timestamp columns should be `timestamptz`.
 
 **Affected columns:**
 
-| Table | Column |
-|---|---|
-| `period` | `created_at` |
-| `period_schedule` | `created_at`, `last_updated_at` |
-| `enrollment` | `enrolled_at` |
-| `parent_invite` | `expires_at`, `created_at` |
-| `quest` | `created_at`, `due_date`, `last_updated_at` |
-| `student_skill_mastery` | `updated_at` |
-| `aggregated_metrics` | `updated_at` |
-| `student_long_term_goal` | `updated_at` |
-| `conversation` | `created_at` |
-| `ltg_conversation` | `created_at` |
-| `session` | `expires_at` |
-| `password_reset_token` | `created_at`, `expires_at`, `used_at`, `burned_at` |
-| `password_reset_rate_limit` | `expires_at` |
-| `waitlist` | `joined_at` |
-| `parent` | `vpc_verified_at` |
+| Table                       | Column                                             |
+| --------------------------- | -------------------------------------------------- |
+| `period`                    | `created_at`                                       |
+| `period_schedule`           | `created_at`, `last_updated_at`                    |
+| `enrollment`                | `enrolled_at`                                      |
+| `parent_invite`             | `expires_at`, `created_at`                         |
+| `quest`                     | `created_at`, `due_date`, `last_updated_at`        |
+| `student_skill_mastery`     | `updated_at`                                       |
+| `aggregated_metrics`        | `updated_at`                                       |
+| `student_long_term_goal`    | `updated_at`                                       |
+| `conversation`              | `created_at`                                       |
+| `ltg_conversation`          | `created_at`                                       |
+| `session`                   | `expires_at`                                       |
+| `password_reset_token`      | `created_at`, `expires_at`, `used_at`, `burned_at` |
+| `password_reset_rate_limit` | `expires_at`                                       |
+| `waitlist`                  | `joined_at`                                        |
+| `parent`                    | `vpc_verified_at`                                  |
 
 **Fix (repeat for each column):**
 
@@ -150,15 +153,15 @@ PostgreSQL has no `string[]` type; the correct notation is `text[]`. The actual 
 
 ## Summary Table
 
-| # | Issue | Table.Column | Severity | Action |
-|---|---|---|---|---|
-| 1 | `instructions` stored as JSON object, not text | `quest.instructions` | High | Migration to confirm/fix type + clean data |
-| 2 | `quest_enabled_weeks` is `integer` not `integer[]` | `period_schedule.quest_enabled_weeks` | High | Confirm actual type; migrate if needed |
-| 3 | No PK constraint | `aggregated_metrics` | Medium | Add composite PK |
-| 4 | `role` uses `text` not `user_role` enum | `user.role` | Medium | Migrate to enum |
-| 5 | `last_login` stored as `text` | `user.last_login` | Low | Migrate to `timestamptz` |
-| 6 | `timestamp` instead of `timestamptz` | 15+ columns across 14 tables | Low | Migrate all to `timestamptz` |
-| 7 | `string[]` in docs (should be `text[]`) | docs only | None | Update DATA_TABLES.md |
+| #   | Issue                                              | Table.Column                          | Severity | Action                                     |
+| --- | -------------------------------------------------- | ------------------------------------- | -------- | ------------------------------------------ |
+| 1   | `instructions` stored as JSON object, not text     | `quest.instructions`                  | High     | Migration to confirm/fix type + clean data |
+| 2   | `quest_enabled_weeks` is `integer` not `integer[]` | `period_schedule.quest_enabled_weeks` | High     | Confirm actual type; migrate if needed     |
+| 3   | No PK constraint                                   | `aggregated_metrics`                  | Medium   | Add composite PK                           |
+| 4   | `role` uses `text` not `user_role` enum            | `user.role`                           | Medium   | Migrate to enum                            |
+| 5   | `last_login` stored as `text`                      | `user.last_login`                     | Low      | Migrate to `timestamptz`                   |
+| 6   | `timestamp` instead of `timestamptz`               | 15+ columns across 14 tables          | Low      | Migrate all to `timestamptz`               |
+| 7   | `string[]` in docs (should be `text[]`)            | docs only                             | None     | Update DATA_TABLES.md                      |
 
 ---
 
