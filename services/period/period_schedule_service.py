@@ -45,6 +45,8 @@ class PeriodScheduleService:
         agent = get_bot_provider().create_schedule_agent(
             vector_store_id=agent_vector_store_id,
             course_name=course_name,
+            start_date=period.get("start_date"),
+            end_date=period.get("end_date"),
         )
         schedule_dict = agent.run_and_get_json()
 
