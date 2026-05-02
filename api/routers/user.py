@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from api.deps import AuthPayload, get_auth
+from api.deps import AuthPayload, get_auth, require_student_viewer
 from data_access.parent_dao import ParentDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
@@ -46,25 +46,11 @@ def _fetch_user_profile(user_id: str) -> Optional[dict]:
     return profile
 
 
-def _check_student_viewer_access(auth: AuthPayload, user_id: str) -> None:
-    if auth.role == "parent":
-        linked = parent_dao.get_linked_student_ids(auth.sub)
-        if user_id not in linked:
-            raise HTTPException(status_code=403, detail="Access denied")
-    elif auth.role == "teacher":
-        if not period_service_u.has_teacher_access_to_student(auth.sub, user_id):
-            raise HTTPException(status_code=403, detail="Access denied")
-    else:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-
 @router.get("/profile")
 def get_profile(
     user_id: Optional[str] = None,
-    auth: AuthPayload = Depends(get_auth),
+    auth: AuthPayload = Depends(require_student_viewer("user_id")),
 ):
-    if user_id:
-        _check_student_viewer_access(auth, user_id)
     profile = _fetch_user_profile(user_id or auth.sub)
     if not profile:
         raise HTTPException(status_code=404, detail="User not found")

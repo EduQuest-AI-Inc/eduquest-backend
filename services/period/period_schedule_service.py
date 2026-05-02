@@ -45,6 +45,8 @@ class PeriodScheduleService:
         agent = get_bot_provider().create_schedule_agent(
             vector_store_id=agent_vector_store_id,
             course_name=course_name,
+            start_date=period.get("start_date"),
+            end_date=period.get("end_date"),
         )
         schedule_dict = agent.run_and_get_json()
 
@@ -110,6 +112,9 @@ class PeriodScheduleService:
         period_schedule = self.period_schedule_dao.get_by_period_id(period_id)
         if not period_schedule:
             raise ValueError("No schedule exists for this period. Generate one first.")
+
+        if not quest_enabled_weeks:
+            raise ValueError("At least one quest-enabled week is required")
 
         # Normalize quest weeks to unique sorted ints
         normalized_weeks = sorted({int(v) for v in quest_enabled_weeks if str(v).lstrip("-").isdigit()})
