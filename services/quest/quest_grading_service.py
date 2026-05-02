@@ -41,15 +41,15 @@ class QuestGradingService:
                         self.quest_dao.update_quest(existing['quest_id'], {'skills': new_skills})
                     preserved_count += 1
                 else:
-                    self.quest_dao.update_quest(
-                        existing['quest_id'],
-                        {
-                            "description": homework_quest.get("Name", quest_data.get("Name", "")),
-                            "skills": quest_data.get("Skills", ""),
-                            "instructions": homework_quest.get("instructions", ""),
-                            "rubric": homework_quest.get("rubric", {}),
-                        },
-                    )
+                    update_fields = {
+                        "description": homework_quest.get("Name", quest_data.get("Name", "")),
+                        "skills": quest_data.get("Skills", ""),
+                        "instructions": homework_quest.get("instructions", ""),
+                        "rubric": homework_quest.get("rubric", {}),
+                    }
+                    if quest_data.get("DueDate"):
+                        update_fields["due_date"] = quest_data["DueDate"]
+                    self.quest_dao.update_quest(existing['quest_id'], update_fields)
                     updated_count += 1
             else:
                 quest = Quest(
@@ -62,6 +62,7 @@ class QuestGradingService:
                     instructions=homework_quest.get("instructions", ""),
                     rubric=homework_quest.get("rubric", {}),
                     status="not_started",
+                    due_date=quest_data.get("DueDate"),
                 )
                 self.quest_dao.add_quest(quest)
                 created_count += 1

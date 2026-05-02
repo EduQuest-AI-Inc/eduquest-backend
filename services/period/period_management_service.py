@@ -28,6 +28,8 @@ class PeriodManagementService:
         file_urls: list,
         canvas_course_id: Optional[int] = None,
         canvas_course_name: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> dict:
         period_id = self.generate_period_id(course)
         existing = self.period_dao.get_period_by_id(period_id)
@@ -47,6 +49,8 @@ class PeriodManagementService:
             file_urls=file_urls,
             canvas_course_id=canvas_course_id,
             canvas_course_name=canvas_course_name,
+            start_date=start_date,
+            end_date=end_date,
         )
         self.period_dao.add_period(new_period)
         return new_period.to_item()

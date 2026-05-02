@@ -1,4 +1,5 @@
-from typing import Dict, Any
+from datetime import date, timedelta
+from typing import Dict, Any, Optional
 from data_access.period_dao import PeriodDAO
 from data_access.student_dao import StudentDAO
 from data_access.enrollment_dao import EnrollmentDAO
@@ -7,6 +8,13 @@ from data_access.ltg_conversation_dao import LtgConversationDAO
 
 from bots.provider import get_bot_provider
 from services.quest.quest_service import QuestService
+
+
+def _friday_of_week(start: date, week_num: int) -> date:
+    """Return the Friday of the calendar week that starts `(week_num-1)` weeks after `start`."""
+    days_until_friday = (4 - start.weekday()) % 7
+    first_friday = start + timedelta(days=days_until_friday)
+    return first_friday + timedelta(weeks=week_num - 1)
 
 
 class PeriodQuestService:
@@ -48,6 +56,14 @@ class PeriodQuestService:
         if not schedule_weeks:
             raise Exception("Period schedule has no weeks data. Teacher must generate a schedule.")
 
+        period_start_date: Optional[date] = None
+        raw_start = period.get("start_date")
+        if raw_start:
+            try:
+                period_start_date = date.fromisoformat(raw_start)
+            except ValueError:
+                pass
+
         schedule_quests = []
         for week_data in schedule_weeks:
             week_num = week_data.get("week_number")
@@ -56,7 +72,10 @@ class PeriodQuestService:
                 skills = week_data.get("skills", [])
                 quest_name = f"Week {week_num}: " + "; ".join(lessons[:3]) if lessons else f"Week {week_num} Quest"
                 quest_skills = "; ".join(skills) if skills else "Practice skills from this week"
-                schedule_quests.append({"Name": quest_name, "Skills": quest_skills, "Week": week_num})
+                quest_entry: Dict[str, Any] = {"Name": quest_name, "Skills": quest_skills, "Week": week_num}
+                if period_start_date is not None:
+                    quest_entry["DueDate"] = _friday_of_week(period_start_date, week_num).isoformat()
+                schedule_quests.append(quest_entry)
 
         if not schedule_quests:
             raise Exception("No quests could be built from enabled weeks. Check period schedule data.")

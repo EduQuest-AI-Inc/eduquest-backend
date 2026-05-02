@@ -2,12 +2,14 @@ import logging
 import sys
 import os
 from typing import Optional
+import math
 
 logger = logging.getLogger(__name__)
 
 # Add the parent directory to Python path so we can import from eduquest-backend
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from datetime import date, timedelta
 from pydantic import BaseModel, Field
 from typing import List
 from agents import Agent, Runner, FileSearchTool, trace
@@ -39,35 +41,58 @@ class PeriodScheduleAgent:
     This is teacher/period scoped (not student-specific).
     """
 
-    def __init__(self, vector_store_id: Optional[str], course_name: Optional[str] = None) -> None:
-        """
-        Initialize the period schedule agent.
 
-        Args:
-            vector_store_id: The OpenAI vector store ID containing course materials.
-            course_name: Optional course name for context.
-        """
+    def __init__(
+        self,
+        vector_store_id: str,
+        course_name: str = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> None:
         self.vector_store_id = vector_store_id
         self.course_name = course_name or "the course"
 
-        # Instructions aligned with JSON schema output (not markdown tables)
-        instructions = """You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from course materials.
+        # Compute week count and calendar from dates when provided
+        num_weeks = 18
+        calendar_section = "- Missing term dates → use \"Not specified\" for start_date/end_date"
+        if start_date and end_date:
+            try:
+                start = date.fromisoformat(start_date)
+                end = date.fromisoformat(end_date)
+                num_weeks = max(1, math.ceil((end - start).days / 7))
+                rows = []
+                for w in range(1, num_weeks + 1):
+                    week_start = start + timedelta(weeks=w - 1)
+                    week_end = week_start + timedelta(days=6)
+                    rows.append(f"  Week {w}: {week_start.isoformat()} to {week_end.isoformat()}")
+                calendar_section = (
+                    "The class runs for EXACTLY {num_weeks} weeks. Use these exact dates:\n"
+                    "{rows}\n"
+                    "Copy the start_date and end_date exactly from this table for each week."
+                ).format(num_weeks=num_weeks, rows="\n".join(rows))
+            except ValueError:
+                pass
+
+        instructions = f"""You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from course materials.
 
 MISSION
 Transform course inputs into a weekly schedule with:
 - Week number (integer starting from 1)
-- Week start date (from teacher's calendar, or "Not specified" if not provided)
-- Week end date (or "Not specified" if not provided)
+- Week start date
+- Week end date
 - Lessons (list of what is taught that week)
 - Skills (list of measurable outcomes)
 
 Your output must be accurate to the provided materials and must not invent content not present in the inputs.
 
 OPERATING PRINCIPLES
-1) Evidence-first: Prefer explicit evidence from the provided course materials. If something isn't in the inputs, use "Not specified" rather than guessing.
+1) Evidence-first: Prefer explicit evidence from the provided course materials.
 2) Weekly clarity: Each week must have a coherent theme, manageable lessons, and skills stated as observable outcomes.
 3) Non-hallucination: Do not create readings, videos, quizzes, or policies that aren't referenced.
-4) Default to 18 weeks if no term length is specified.
+4) The schedule must have EXACTLY {num_weeks} weeks — no more, no fewer.
+
+TERM CALENDAR
+{calendar_section}
 
 OUTPUT FORMAT
 Return a JSON object with a "weeks" array. Each week has:
@@ -80,14 +105,12 @@ Return a JSON object with a "weeks" array. Each week has:
 PROCESS
 1. Search the course materials to understand the curriculum structure.
 2. Identify modules, units, assignments, and their sequence.
-3. Allocate content to weeks based on module order and any due dates.
+3. Allocate content across exactly {num_weeks} weeks based on module order.
 4. For each week, extract lesson topics and derive measurable skills.
 5. Ensure every major module appears in some week.
 
 HANDLING MISSING INFO
-- Missing term dates → use "Not specified" for start_date/end_date
-- Missing content for a week → describe as "Review/Catch-up week" or similar
-- Default to 18 weeks unless materials specify otherwise"""
+- Missing content for a week → describe as "Review/Catch-up week" or similar"""
 
         tools = (
             [FileSearchTool(vector_store_ids=[self.vector_store_id])]
