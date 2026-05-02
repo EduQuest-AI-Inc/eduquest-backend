@@ -37,6 +37,7 @@ def db_user(supabase_required):
         password="hashed",
         role="student",
     )
+    dao.delete(u.user_id)
     dao.add_user(u)
     yield u
     dao.delete(u.user_id)
