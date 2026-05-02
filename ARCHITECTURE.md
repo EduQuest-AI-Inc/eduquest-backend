@@ -24,9 +24,9 @@ Supabase RLS is the secondary enforcement layer. Do not duplicate RLS logic in P
 
 Audit: `pytest tests/unit/routes/test_rbac_audit.py` verifies every route either has an auth dependency or is listed in `EXPLICITLY_PUBLIC_ROUTES`.
 
-### The frontend never calls Supabase directly — all database access goes through FastAPI
-The frontend must not use the Supabase client SDK or call Supabase endpoints directly. All data
-reads and writes must go through the FastAPI backend. This keeps auth enforcement, business logic,
+### The frontend never calls Supabase for data reads or writes — all domain data goes through FastAPI
+The frontend uses the Supabase client SDK for auth only (sign-up, sign-in, session management).
+All domain data reads and writes must go through the FastAPI backend. This keeps business logic
 and RLS policy in one place and prevents clients from bypassing server-side validation.
 
 ---
@@ -184,8 +184,6 @@ sequenceDiagram
 ---
 
 ## User / Profile Flows
-
-> **Frontend caching note:** The profile response is stored in React Query's in-memory cache (`staleTime: Infinity`) in `contexts/user-context.tsx`. It is fetched once on page load and held for the session — subsequent reads come from the cache, not Supabase. The cache is explicitly invalidated via `refetch()` after any action that mutates the profile (profile conversation complete, LTG goal confirmed, Canvas connect/disconnect).
 
 ### Get Profile
 
