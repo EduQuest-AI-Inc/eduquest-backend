@@ -23,6 +23,16 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 import asyncio
 from bots.schemas.rubric import Rubric
+from bots.schemas.instructions import Instructions
+import re
+
+
+def _clean_step_text(text: str) -> str:
+    """Strip common AI text artifacts from a step's text."""
+    text = text.replace('\\n', ' ').replace('\\r', ' ')
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'^[\-\*\^#>\s]+', '', text)
+    return text.strip()
 
 
 class IndividualQuest(BaseModel):
@@ -30,7 +40,7 @@ class IndividualQuest(BaseModel):
     Name: str = Field(description="Name of the quest")
     Skills: str = Field(description="Skills the student will practice through this quest")
     Week: int = Field(description="Week the student will work on this quest")
-    instructions: str = Field(description="Detailed instructions for completing the quest")
+    instructions: list[Dict[str, Any]] = Field(description="Ordered list of step dicts [{step, text}]")
     rubric: Dict[str, Any] = Field(description="Grading criteria and expectations for the quest")
 
 
@@ -111,18 +121,17 @@ class HWAgent:
             )
             return result.final_output.strip()
 
-    async def generate_instructions(self, quest) -> str:
-        """Generate detailed instructions for a quest"""
+    async def generate_instructions(self, quest) -> list[dict]:
+        """Generate detailed step-by-step instructions for a quest as structured data."""
         with trace("generate_instructions"):
-            # Handle both dict and object formats
             quest_name = quest.get("Name") if isinstance(quest, dict) else getattr(quest, "name", "")
             quest_skills = quest.get("Skills") if isinstance(quest, dict) else getattr(quest, "skills", "")
-            
+
             instruction_agent = Agent(
                 name="Instruction Generator",
                 instructions=f"""
                 You create detailed step-by-step instructions for a quest.
-                
+
                 Student Information:
                 - Name: {self.student["first_name"]} {self.student["last_name"]}
                 - Strengths: {self.student["strength"]}
@@ -130,25 +139,30 @@ class HWAgent:
                 - Interests: {self.student["interest"]}
                 - Learning Style: {self.student["learning_style"]}
                 - Grade: {self.student["grade"]}
-                
-                Create instructions that:
-                1. Are clear and numbered (1, 2, 3, etc.)
-                2. Align with the quest skills: {quest_skills}
-                3. Consider the student's profile above
-                4. Are practical and actionable
-                5. Connect to the student's interests where possible
-                
-                Return ONLY the instructions as a numbered list. No headers or extra text.
+
+                Create 4-7 steps that:
+                - Are clear and actionable
+                - Align with the quest skills: {quest_skills}
+                - Consider the student's profile above
+                - Connect to the student's interests where possible
+
+                IMPORTANT formatting rules for each step's text:
+                - Write plain prose sentences only
+                - No markdown (no *, **, #, -, ^, >)
+                - No escape sequences (no \\n, \\r, \\t)
+                - No numbered prefixes in the text (the step number is stored separately)
                 """,
-                model="gpt-5.5"
+                model="gpt-5.5",
+                output_type=Instructions,
             )
-            
+
             result = await Runner.run(
                 instruction_agent,
                 f"Create detailed instructions for this quest: {quest_name} - Skills: {quest_skills}",
             )
 
-            return result.final_output
+            steps = result.final_output.steps
+            return [{"step": s.step, "text": _clean_step_text(s.text)} for s in steps]
     
     async def generate_rubric(self, quest) -> Rubric:
         """Generate a rubric for a quest"""

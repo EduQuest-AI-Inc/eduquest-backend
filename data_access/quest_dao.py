@@ -23,6 +23,7 @@ class QuestDAO(SupabaseBaseDAO):
             'status': quest.status,
             'grade': quest.grade,
             'feedback': quest.feedback,
+            'completed_steps': quest.completed_steps,
         })
 
     def get_quest_by_id(self, quest_id: str) -> Optional[Dict[str, Any]]:
@@ -47,6 +48,9 @@ class QuestDAO(SupabaseBaseDAO):
 
     def update_quest_status(self, quest_id: str, status: str) -> None:
         self.update_quest(quest_id, {'status': status})
+
+    def update_completed_steps(self, quest_id: str, completed_steps: list) -> None:
+        self.update_quest(quest_id, {'completed_steps': completed_steps})
 
     def delete_quest(self, quest_id: str) -> None:
         self._delete({'quest_id': quest_id})
