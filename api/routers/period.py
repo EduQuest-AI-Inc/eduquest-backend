@@ -65,6 +65,8 @@ def create_period(
     canvas_api_key: Optional[str] = Form(default=None),
     canvas_course_id: Optional[str] = Form(default=None),
     canvas_course_name: Optional[str] = Form(default=None),
+    start_date: Optional[str] = Form(default=None),
+    end_date: Optional[str] = Form(default=None),
     auth: AuthPayload = Depends(get_auth),
 ):
     role = auth.role
@@ -92,6 +94,8 @@ def create_period(
             file_urls=[],
             canvas_course_id=int(canvas_course_id) if canvas_course_id else None,
             canvas_course_name=canvas_course_name,
+            start_date=start_date or None,
+            end_date=end_date or None,
         )
         period_id = period["period_id"]
         if role == "teacher" and canvas_api_url and canvas_api_key:
