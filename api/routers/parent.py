@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.deps import AuthPayload, get_auth
+from api.deps import AuthPayload, Role, require_roles
 from services.parent.parent_service import ParentService
 from services.period.period_management_service import PeriodManagementService
 
@@ -13,7 +13,7 @@ period_management_service = PeriodManagementService()
 
 
 @router.get("/my-periods")
-def my_periods(auth: AuthPayload = Depends(get_auth)):
+def my_periods(auth: AuthPayload = Depends(require_roles(Role.PARENT))):
     try:
         periods = period_management_service.get_periods_by_owner(auth.sub)
         return {"periods": periods}
@@ -23,7 +23,7 @@ def my_periods(auth: AuthPayload = Depends(get_auth)):
 
 
 @router.post("/generate-invite", status_code=201)
-def generate_invite(auth: AuthPayload = Depends(get_auth)):
+def generate_invite(auth: AuthPayload = Depends(require_roles(Role.PARENT))):
     try:
         invite = parent_service.generate_invite(auth.sub)
         return invite
@@ -33,7 +33,7 @@ def generate_invite(auth: AuthPayload = Depends(get_auth)):
 
 
 @router.get("/students")
-def get_students(auth: AuthPayload = Depends(get_auth)):
+def get_students(auth: AuthPayload = Depends(require_roles(Role.PARENT))):
     try:
         students = parent_service.get_linked_students(auth.sub)
         return {"students": students}

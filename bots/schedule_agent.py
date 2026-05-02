@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from datetime import date, timedelta
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List
 from agents import Agent, Runner, FileSearchTool, trace
 from openai import OpenAI
 import asyncio

@@ -133,7 +133,7 @@ Route handlers raise these exceptions — do **not** add `except` clauses for th
 
 All agent code in `bots/` (not `EQ_agents/` — that directory no longer exists). Agents use OpenAI's Agents SDK (`from agents import Agent, Runner`).
 
-- `bots/grading_agent.py` (`GradingOrchestrator`) — produces per-skill float scores (0.0–1.0). The frontend reads aggregated skill metrics from the Supabase `aggregated_metrics` table directly.
+- `bots/grading_agent.py` (`GradingOrchestrator`) — produces per-skill float scores (0.0–1.0). Results are written to `aggregated_metrics` via `AggregatedMetricsDAO`.
 
 ## Development
 

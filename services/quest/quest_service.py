@@ -2,7 +2,7 @@
 from services.quest.quest_creation_service import QuestCreationService
 from services.quest.quest_retrieval_service import QuestRetrievalService
 from services.quest.quest_grading_service import QuestGradingService
-from typing import Any, Dict, List
+from typing import Any, List
 
 
 class QuestService:
@@ -31,14 +31,6 @@ class QuestService:
 
     def verify_quest_structure(self, user_id, period_id):
         return self._retrieval.verify_quest_structure(user_id, period_id)
-
-    @staticmethod
-    def parse_grade_data(grade) -> Dict[str, Any]:
-        return QuestRetrievalService.parse_grade_data(grade)
-
-    @staticmethod
-    def format_grade_for_display(grade) -> str:
-        return QuestRetrievalService.format_grade_for_display(grade)
 
     # Grading / updates
     def update_quest_status(self, quest_id: str, status: str):

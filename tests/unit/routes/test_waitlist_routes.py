@@ -90,10 +90,12 @@ class TestJoinWaitlist:
 
 
 class TestApproveTeacher:
+    # teacher-1 is the sub used by the module fixture; patch ADMIN_IDS so it passes the admin check.
 
     @pytest.mark.api
     def test_approve_success(self, client):
-        with patch("api.routers.waitlist.svc") as mock_svc:
+        with patch("api.routers.waitlist.ADMIN_IDS", {"teacher-1"}), \
+             patch("api.routers.waitlist.svc") as mock_svc:
             mock_svc.approve.return_value = {
                 "success": True, "waitlist_updated": True, "teacher_updated": True
             }
@@ -104,7 +106,8 @@ class TestApproveTeacher:
 
     @pytest.mark.api
     def test_approve_service_returns_failure_returns_400(self, client):
-        with patch("api.routers.waitlist.svc") as mock_svc:
+        with patch("api.routers.waitlist.ADMIN_IDS", {"teacher-1"}), \
+             patch("api.routers.waitlist.svc") as mock_svc:
             mock_svc.approve.return_value = {
                 "success": False, "waitlist_updated": False, "teacher_updated": False
             }
@@ -114,7 +117,8 @@ class TestApproveTeacher:
 
     @pytest.mark.api
     def test_approve_exception_returns_500(self, client):
-        with patch("api.routers.waitlist.svc") as mock_svc:
+        with patch("api.routers.waitlist.ADMIN_IDS", {"teacher-1"}), \
+             patch("api.routers.waitlist.svc") as mock_svc:
             mock_svc.approve.side_effect = RuntimeError("crash")
             resp = client.post("/pilot-waitlist/approve/target-teacher")
         assert resp.status_code == 500
@@ -122,7 +126,8 @@ class TestApproveTeacher:
 
     @pytest.mark.api
     def test_approve_uses_path_param_user_id(self, client):
-        with patch("api.routers.waitlist.svc") as mock_svc:
+        with patch("api.routers.waitlist.ADMIN_IDS", {"teacher-1"}), \
+             patch("api.routers.waitlist.svc") as mock_svc:
             mock_svc.approve.return_value = {"success": True}
             resp = client.post("/pilot-waitlist/approve/completely-different-user")
         assert resp.status_code == 200

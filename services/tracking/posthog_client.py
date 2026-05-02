@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
+from typing import Any
 
 try:
     from posthog import Posthog  # type: ignore[import-not-found]
@@ -18,7 +18,7 @@ except Exception:  # pragma: no cover - import-time fallback for envs without th
 
 logger = logging.getLogger(__name__)
 
-_posthog: Optional["Posthog"] = None
+_posthog: Any = None
 
 
 class _NullPosthog:
@@ -35,7 +35,7 @@ class _NullPosthog:
     def shutdown(self) -> None: ...
 
 
-def get_posthog():
+def get_posthog() -> Any:
     """Return the active PostHog client (real or null)."""
     global _posthog
     if _posthog is not None:

@@ -189,25 +189,6 @@ class TestGradeQuest:
         assert resp.status_code == 500
 
 
-class TestParseGradeData:
-
-    @pytest.mark.api
-    def test_parse_grade_data_success(self, client):
-        with patch("api.routers.quest.quest_service") as mock_qs:
-            mock_qs.parse_grade_data.return_value = {"display_grade": "A", "overall_score": "95%"}
-            resp = client.post("/quest/grade/parse", json={"grade": {"skill1": 0.95}})
-        assert resp.status_code == 200
-        assert "parsed_grade" in resp.json()
-        assert "display_grade" in resp.json()
-
-    @pytest.mark.api
-    def test_parse_grade_data_service_error_returns_500(self, client):
-        with patch("api.routers.quest.quest_service") as mock_qs:
-            mock_qs.parse_grade_data.side_effect = RuntimeError("crash")
-            resp = client.post("/quest/grade/parse", json={"grade": {"skill1": 0.95}})
-        assert resp.status_code == 500
-
-
 class TestVerifyQuestStructure:
 
     @pytest.mark.api

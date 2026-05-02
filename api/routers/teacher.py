@@ -4,7 +4,7 @@ from canvasapi import Canvas
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from api.deps import AuthPayload, get_auth
+from api.deps import AuthPayload, Role, require_roles
 from data_access.aggregated_metrics_dao import AggregatedMetricsDAO
 from data_access.period_dao import PeriodDAO
 from data_access.teacher_dao import TeacherDAO
@@ -24,7 +24,7 @@ teacher_dao = TeacherDAO()
 # ---------------------------------------------------------------------------
 
 @router.get("/periods")
-def get_teacher_periods(auth: AuthPayload = Depends(get_auth)):
+def get_teacher_periods(auth: AuthPayload = Depends(require_roles(Role.TEACHER))):
     try:
         result = period_management_service.get_periods_by_owner(auth.sub)
         return {"periods": result}
@@ -45,7 +45,7 @@ class CanvasCoursesRequest(BaseModel):
 @router.post("/canvas/courses")
 def list_canvas_courses(
     body: CanvasCoursesRequest,
-    auth: AuthPayload = Depends(get_auth),
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
 ):
     try:
         canvas = Canvas(body.api_url, body.api_key)
@@ -77,10 +77,8 @@ def list_canvas_courses(
 @router.get("/skill-mastery")
 def get_skill_mastery(
     period_id: str = Query(...),
-    auth: AuthPayload = Depends(get_auth),
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
 ):
-    if auth.role != "teacher":
-        raise HTTPException(status_code=403, detail="Only teachers can view skill mastery metrics")
     period = period_dao_t.get_period_by_id(period_id)
     if not period:
         raise HTTPException(status_code=404, detail="Period not found")
