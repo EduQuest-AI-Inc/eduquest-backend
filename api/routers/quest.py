@@ -55,7 +55,11 @@ def get_quest(quest_id: str, auth: AuthPayload = Depends(get_auth)):
 
 
 @router.get("/quests/student/{user_id}")
-def get_student_quests(user_id: str, auth: AuthPayload = Depends(get_auth)):
+def get_student_quests(
+    user_id: str,
+    period_id: Optional[str] = Query(default=None),
+    auth: AuthPayload = Depends(get_auth),
+):
     """Teacher/parent route: fetch quests for a specific student."""
     if auth.sub != user_id:
         if auth.role == Role.PARENT:
@@ -70,7 +74,10 @@ def get_student_quests(user_id: str, auth: AuthPayload = Depends(get_auth)):
             if not any(pid in caller_period_ids for pid in period_ids):
                 raise HTTPException(status_code=403, detail="Not authorized")
     try:
-        quests = quest_service.get_quests_for_student(user_id)
+        if period_id:
+            quests = quest_service.get_quests_for_student_and_period(user_id, period_id)
+        else:
+            quests = quest_service.get_quests_for_student(user_id)
         for quest in quests:
             QuestRetrievalService.attach_grade_display(quest)
         return quests
