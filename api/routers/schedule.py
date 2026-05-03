@@ -26,7 +26,7 @@ class SaveAllScheduleRequest(BaseModel):
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
-@router.post("/period-schedule/generate")
+@router.post("/period-schedule")
 def generate_period_schedule(
     body: GenerateScheduleRequest,
     auth: AuthPayload = Depends(get_auth),
@@ -68,7 +68,7 @@ def get_period_schedule(
         raise HTTPException(status_code=500, detail="Failed to get schedule")
 
 
-@router.put("/period-schedule/save-all")
+@router.put("/period-schedule")
 def save_period_schedule_and_quest_weeks(
     body: SaveAllScheduleRequest,
     auth: AuthPayload = Depends(get_auth),
