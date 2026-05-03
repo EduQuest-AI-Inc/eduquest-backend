@@ -15,9 +15,16 @@ class Quest(BaseModel):
     feedback: Optional[str] = Field(default=None)
     skills: str = Field(description="Skills the student will practice through this quest")
     week: int = Field(description="Week the student will work on this quest")
-    instructions: str = Field(description="Detailed instructions for completing the quest")
+    instructions: Any = Field(
+        default=[],
+        description="List of step dicts [{step, text}], or legacy plain string.",
+    )
     rubric: Dict[str, Any] = Field(description="Grading criteria and expectations for the quest")
     status: Literal["not_started", "in_progress", "completed"] = Field(default="not_started")
+    completed_steps: list[int] = Field(
+        default=[],
+        description="0-based indices of steps the student has checked off.",
+    )
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     due_date: Optional[str] = None
     last_updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

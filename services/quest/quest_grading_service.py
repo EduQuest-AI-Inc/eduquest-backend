@@ -44,7 +44,7 @@ class QuestGradingService:
                     update_fields = {
                         "description": homework_quest.get("Name", quest_data.get("Name", "")),
                         "skills": quest_data.get("Skills", ""),
-                        "instructions": homework_quest.get("instructions", ""),
+                        "instructions": homework_quest.get("instructions", []),
                         "rubric": homework_quest.get("rubric", {}),
                     }
                     if quest_data.get("DueDate"):
@@ -59,7 +59,7 @@ class QuestGradingService:
                     description=homework_quest.get("Name", quest_data.get("Name", "")),
                     skills=quest_data.get("Skills", ""),
                     week=week,
-                    instructions=homework_quest.get("instructions", ""),
+                    instructions=homework_quest.get("instructions", []),
                     rubric=homework_quest.get("rubric", {}),
                     status="not_started",
                     due_date=quest_data.get("DueDate"),

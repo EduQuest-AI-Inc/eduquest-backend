@@ -55,7 +55,11 @@ def get_quest(quest_id: str, auth: AuthPayload = Depends(get_auth)):
 
 
 @router.get("/quests/student/{user_id}")
-def get_student_quests(user_id: str, auth: AuthPayload = Depends(get_auth)):
+def get_student_quests(
+    user_id: str,
+    period_id: Optional[str] = Query(default=None),
+    auth: AuthPayload = Depends(get_auth),
+):
     """Teacher/parent route: fetch quests for a specific student."""
     if auth.sub != user_id:
         if auth.role == Role.PARENT:
@@ -70,13 +74,34 @@ def get_student_quests(user_id: str, auth: AuthPayload = Depends(get_auth)):
             if not any(pid in caller_period_ids for pid in period_ids):
                 raise HTTPException(status_code=403, detail="Not authorized")
     try:
-        quests = quest_service.get_quests_for_student(user_id)
+        if period_id:
+            quests = quest_service.get_quests_for_student_and_period(user_id, period_id)
+        else:
+            quests = quest_service.get_quests_for_student(user_id)
         for quest in quests:
             QuestRetrievalService.attach_grade_display(quest)
         return quests
     except Exception as e:
         logger.error("Error getting student quests: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to get student quests")
+
+
+class UpdateStepsRequest(BaseModel):
+    completed_steps: list[int]
+
+
+@router.put("/quests/{quest_id}/steps")
+def update_quest_steps(
+    quest_id: str,
+    body: UpdateStepsRequest,
+    auth: AuthPayload = Depends(get_auth),
+):
+    try:
+        quest_dao.update_completed_steps(quest_id, body.completed_steps)
+        return {"message": "Steps updated", "quest_id": quest_id, "completed_steps": body.completed_steps}
+    except Exception as e:
+        logger.error("Error updating quest steps: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update quest steps")
 
 
 class UpdateQuestStatusRequest(BaseModel):
