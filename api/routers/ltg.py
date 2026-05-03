@@ -81,4 +81,5 @@ def initiate_homework_agent(
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Quest generation failed for user=%s period=%s: %s", body.user_id, body.period_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An error occurred while generating quests. Please try again.")
