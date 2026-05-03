@@ -79,6 +79,24 @@ def get_student_quests(user_id: str, auth: AuthPayload = Depends(get_auth)):
         raise HTTPException(status_code=500, detail="Failed to get student quests")
 
 
+class UpdateStepsRequest(BaseModel):
+    completed_steps: list[int]
+
+
+@router.put("/quests/{quest_id}/steps")
+def update_quest_steps(
+    quest_id: str,
+    body: UpdateStepsRequest,
+    auth: AuthPayload = Depends(get_auth),
+):
+    try:
+        quest_dao.update_completed_steps(quest_id, body.completed_steps)
+        return {"message": "Steps updated", "quest_id": quest_id, "completed_steps": body.completed_steps}
+    except Exception as e:
+        logger.error("Error updating quest steps: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update quest steps")
+
+
 class UpdateQuestStatusRequest(BaseModel):
     status: str
 
