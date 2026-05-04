@@ -29,6 +29,8 @@ class PeriodScheduleService:
         period = self._verify_period_ownership(period_id, user_id)
 
         vector_store_id = period.get("vector_store_id")
+        if not vector_store_id:
+            raise ValueError("Period does not have a vector store configured")
         course_name = period.get("name", "Course")
 
         # Only search files if any were actually uploaded — empty vector stores cause API errors
