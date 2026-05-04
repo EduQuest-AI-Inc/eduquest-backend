@@ -19,6 +19,7 @@ class PeriodDAO(SupabaseBaseDAO):
             'start_date': getattr(period, 'start_date', None),
             'end_date': getattr(period, 'end_date', None),
             'course_description': getattr(period, 'course_description', None),
+            'file_vector_store_ids': getattr(period, 'file_vector_store_ids', []),
             'processing_status': getattr(period, 'processing_status', 'pending'),
         })
 

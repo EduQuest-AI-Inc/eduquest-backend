@@ -13,6 +13,7 @@ class Period(BaseModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     course_description: Optional[str] = None
+    file_vector_store_ids: List[str] = []
     processing_status: str = "pending"
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 

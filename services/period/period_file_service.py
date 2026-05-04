@@ -45,10 +45,44 @@ class PeriodFileService:
             keys.append(key)
         return keys
 
-    def ingest_to_openai(self, vector_store_id: str, file_paths: list) -> None:
-        """Upload file_paths into an existing vector store, preprocessing large PDFs first."""
-        processed = [preprocess_pdf(p) if p.lower().endswith(".pdf") else p for p in file_paths]
-        openai_vector_store.upload_files(vector_store_id, processed)
+    def ingest_to_openai(self, period_vector_store_id: str, file_paths: list) -> list:
+        """Ingest files into vector stores with deduplication by SHA-256 hash.
+
+        JSON files (Canvas data) go to the per-period VS. All other files get their own
+        shared vector store — if a file was previously uploaded by any period, its existing
+        VS is reused with no re-upload and no re-embedding.
+
+        Returns list of file-level vector store IDs."""
+        import hashlib
+        import json
+        from data_access.material_files_dao import MaterialFilesDAO
+
+        dao = MaterialFilesDAO()
+        file_vs_ids = []
+
+        for original_path in file_paths:
+            if original_path.lower().endswith(".json"):
+                with open(original_path) as f:
+                    openai_vector_store.upload_json(period_vector_store_id, json.load(f))
+                continue
+
+            with open(original_path, "rb") as f:
+                file_hash = hashlib.sha256(f.read()).hexdigest()
+
+            existing = dao.get_by_hash(file_hash)
+            if existing:
+                logger.info("Dedup hit for %s — reusing VS %s", os.path.basename(original_path), existing["vector_store_id"])
+                file_vs_ids.append(existing["vector_store_id"])
+                continue
+
+            processed_path = preprocess_pdf(original_path) if original_path.lower().endswith(".pdf") else original_path
+            vs_id, file_id = openai_vector_store.create_file_store(
+                processed_path, name=os.path.basename(original_path)
+            )
+            dao.insert(file_hash, file_id, vs_id)
+            file_vs_ids.append(vs_id)
+
+        return file_vs_ids
 
     def run_pipeline(self, period_id: str, user_id: str):
         """Generate and save schedule; log and return None on failure."""

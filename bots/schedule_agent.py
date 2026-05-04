@@ -43,13 +43,13 @@ class PeriodScheduleAgent:
 
     def __init__(
         self,
-        vector_store_id: str,
+        vector_store_ids: list,
         course_name: str = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         course_description: Optional[str] = None,
     ) -> None:
-        self.vector_store_id = vector_store_id
+        self.vector_store_ids = vector_store_ids or []
         self.course_description = course_description
         self.course_name = course_name or "the course"
 
@@ -74,14 +74,14 @@ class PeriodScheduleAgent:
             except ValueError:
                 pass
 
-        if vector_store_id:
+        if self.vector_store_ids:
             instructions = self._files_instructions(num_weeks, calendar_section)
         else:
             instructions = self._description_instructions(num_weeks, calendar_section)
 
         tools = (
-            [FileSearchTool(vector_store_ids=[self.vector_store_id])]
-            if self.vector_store_id
+            [FileSearchTool(vector_store_ids=self.vector_store_ids)]
+            if self.vector_store_ids
             else []
         )
         self.agent = Agent(
@@ -177,7 +177,7 @@ PROCESS
 
     async def _run_async(self) -> PeriodScheduleSchema:
         """Run the agent asynchronously."""
-        if self.vector_store_id:
+        if self.vector_store_ids:
             prompt = f"""Please create a weekly semester schedule for {self.course_name} based on the course materials in the vector store.
 
 Search the course materials to understand:

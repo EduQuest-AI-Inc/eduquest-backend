@@ -39,7 +39,7 @@ class BotProvider:
 
     def create_schedule_agent(
         self,
-        vector_store_id: Optional[str],
+        vector_store_ids: Optional[list] = None,
         course_name: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
@@ -47,7 +47,7 @@ class BotProvider:
     ):
         from bots.schedule_agent import PeriodScheduleAgent
         return PeriodScheduleAgent(
-            vector_store_id=vector_store_id,
+            vector_store_ids=vector_store_ids,
             course_name=course_name,
             start_date=start_date,
             end_date=end_date,
@@ -151,7 +151,7 @@ class MockBotProvider(BotProvider):
 
     def create_schedule_agent(
         self,
-        vector_store_id: Optional[str],
+        vector_store_ids: Optional[list] = None,
         course_name: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
@@ -159,7 +159,7 @@ class MockBotProvider(BotProvider):
     ):
         from bots._mocks import MockPeriodScheduleAgent
         return MockPeriodScheduleAgent(
-            vector_store_id=vector_store_id,
+            vector_store_ids=vector_store_ids,
             course_name=course_name,
             start_date=start_date,
             end_date=end_date,

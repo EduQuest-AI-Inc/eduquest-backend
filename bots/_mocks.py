@@ -163,7 +163,7 @@ class MockPeriodScheduleAgent:
 
     def __init__(
         self,
-        vector_store_id: Optional[str] = None,
+        vector_store_ids: Optional[list] = None,
         course_name: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,

@@ -36,7 +36,8 @@ async def _process_period_files(
         s3_urls = period_file_service.archive_to_s3(file_paths, period_id)
         period_management_service.update_file_urls(period_id, [u for u in s3_urls if u])
 
-        period_file_service.ingest_to_openai(vector_store_id, file_paths)
+        file_vs_ids = period_file_service.ingest_to_openai(vector_store_id, file_paths)
+        period_management_service.update_file_vector_store_ids(period_id, file_vs_ids)
 
         loop = asyncio.get_event_loop()
         try:

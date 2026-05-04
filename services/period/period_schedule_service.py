@@ -32,10 +32,8 @@ class PeriodScheduleService:
         if not vector_store_id:
             raise ValueError("Period does not have a vector store configured")
         course_name = period.get("name", "Course")
-
-        # Only search files if any were actually uploaded — empty vector stores cause API errors
         file_urls = period.get("file_urls") or []
-        agent_vector_store_id = vector_store_id if file_urls else None
+        file_vector_store_ids = period.get("file_vector_store_ids") or []
 
         # Prefer request-time description; fall back to what was stored at period creation
         course_description = course_description or period.get("course_description")
@@ -43,9 +41,19 @@ class PeriodScheduleService:
         if not file_urls and not course_description:
             raise ValueError("Provide course materials or a description of what students should learn.")
 
+        # Period VS has content if Canvas data was fetched or a schedule was previously generated
+        existing = self.period_schedule_dao.get_by_period_id(period_id)
+        has_canvas = bool(period.get("canvas_course_id"))
+        period_vs_has_content = has_canvas or bool(existing)
+
+        all_vs_ids = []
+        if period_vs_has_content:
+            all_vs_ids.append(vector_store_id)
+        all_vs_ids.extend(file_vector_store_ids)
+
         # Generate schedule using the agent
         agent = get_bot_provider().create_schedule_agent(
-            vector_store_id=agent_vector_store_id,
+            vector_store_ids=all_vs_ids or None,
             course_name=course_name,
             start_date=period.get("start_date"),
             end_date=period.get("end_date"),
@@ -59,7 +67,6 @@ class PeriodScheduleService:
         )
 
         # Create or update period_schedule record
-        existing = self.period_schedule_dao.get_by_period_id(period_id)
         if existing:
             # Delete old file from vector store if it exists
             if existing.schedule_openai_file_id:
