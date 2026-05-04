@@ -4,6 +4,7 @@ import os
 from integrations.canvas_service import Course as CanvasCourse, course_to_json
 from integrations.s3_service import upload_file_to_s3
 from integrations import openai_vector_store
+from integrations.pdf_processor import preprocess_pdf
 from services.period.period_schedule_service import PeriodScheduleService
 
 logger = logging.getLogger(__name__)
@@ -45,8 +46,9 @@ class PeriodFileService:
         return keys
 
     def ingest_to_openai(self, vector_store_id: str, file_paths: list) -> None:
-        """Upload file_paths into an existing vector store."""
-        openai_vector_store.upload_files(vector_store_id, file_paths)
+        """Upload file_paths into an existing vector store, preprocessing large PDFs first."""
+        processed = [preprocess_pdf(p) if p.lower().endswith(".pdf") else p for p in file_paths]
+        openai_vector_store.upload_files(vector_store_id, processed)
 
     def run_pipeline(self, period_id: str, user_id: str):
         """Generate and save schedule; log and return None on failure."""
