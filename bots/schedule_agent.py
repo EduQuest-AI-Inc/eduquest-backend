@@ -75,10 +75,33 @@ class PeriodScheduleAgent:
             except ValueError:
                 pass
 
-        instructions = f"""You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from course materials.
+        if vector_store_id:
+            instructions = self._files_instructions(num_weeks, calendar_section)
+        else:
+            instructions = self._description_instructions(num_weeks, calendar_section)
+
+        tools = (
+            [FileSearchTool(vector_store_ids=[self.vector_store_id])]
+            if self.vector_store_id
+            else []
+        )
+        self.agent = Agent(
+            name="Period Schedule Agent",
+            instructions=instructions,
+            model="gpt-5",
+            tools=tools,  # type: ignore[arg-type]
+            output_type=PeriodScheduleSchema
+        )
+
+    # ── Mode A: uploaded files → search the vector store ────────────────────────
+
+    @staticmethod
+    def _files_instructions(num_weeks: int, calendar_section: str) -> str:
+        return f"""\
+You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from uploaded course materials.
 
 MISSION
-Transform course inputs into a weekly schedule with:
+Transform course materials into a weekly schedule with:
 - Week number (integer starting from 1)
 - Week start date
 - Week end date
@@ -88,9 +111,9 @@ Transform course inputs into a weekly schedule with:
 Your output must be accurate to the provided materials and must not invent content not present in the inputs.
 
 OPERATING PRINCIPLES
-1) Evidence-first: Prefer explicit evidence from the provided course materials.
+1) Evidence-first: Prefer explicit evidence from the uploaded course materials.
 2) Weekly clarity: Each week must have a coherent theme, manageable lessons, and skills stated as observable outcomes.
-3) Non-hallucination: Do not create readings, videos, quizzes, or policies that aren't referenced.
+3) Non-hallucination: Do not create readings, videos, quizzes, or policies that aren't referenced in the materials.
 4) The schedule must have EXACTLY {num_weeks} weeks — no more, no fewer.
 
 TERM CALENDAR
@@ -114,18 +137,44 @@ PROCESS
 HANDLING MISSING INFO
 - Missing content for a week → describe as "Review/Catch-up week" or similar"""
 
-        tools = (
-            [FileSearchTool(vector_store_ids=[self.vector_store_id])]
-            if self.vector_store_id
-            else []
-        )
-        self.agent = Agent(
-            name="Period Schedule Agent",
-            instructions=instructions,
-            model="gpt-5",
-            tools=tools,  # type: ignore[arg-type]
-            output_type=PeriodScheduleSchema
-        )
+    # ── Mode B: no files → build from course description alone ──────────────────
+
+    @staticmethod
+    def _description_instructions(num_weeks: int, calendar_section: str) -> str:
+        return f"""\
+You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from a teacher-provided course description.
+
+MISSION
+Build a complete, specific weekly schedule using the course description as your sole curriculum blueprint:
+- Week number (integer starting from 1)
+- Week start date
+- Week end date
+- Lessons (list of what is taught that week)
+- Skills (list of measurable outcomes)
+
+OPERATING PRINCIPLES
+1) Description-driven: The course description IS the curriculum. Extract topics, units, and progression from it.
+2) Infer a logical sequence: if the description names broad topics, expand them into a coherent weekly arc with specific lesson titles.
+3) Every week must have real, specific lesson content — never write placeholder text like "Awaiting curriculum," "Review/Catch-up," or "Hold for materials."
+4) Skills must be concrete and measurable (e.g. "Analyze causes of WWI" not "Understand history").
+5) The schedule must have EXACTLY {num_weeks} weeks — no more, no fewer.
+
+TERM CALENDAR
+{calendar_section}
+
+OUTPUT FORMAT
+Return a JSON object with a "weeks" array. Each week has:
+- week_number: integer (1, 2, 3, ...)
+- start_date: string (date or "Not specified")
+- end_date: string (date or "Not specified")
+- lessons: list of strings (3-8 lesson titles/descriptions per week)
+- skills: list of strings
+
+PROCESS
+1. Read the course description to identify the subject, major topics, and any stated goals or units.
+2. Divide the topics into a logical instructional sequence across {num_weeks} weeks.
+3. For each week, write specific lesson titles that a teacher would actually use in class.
+4. Derive 2-4 measurable skills per week directly from that week's lesson content."""
 
     async def _run_async(self) -> PeriodScheduleSchema:
         """Run the agent asynchronously."""
