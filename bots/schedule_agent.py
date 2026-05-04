@@ -3,12 +3,6 @@ import sys
 import os
 from typing import Optional
 import math
-
-logger = logging.getLogger(__name__)
-
-# Add the parent directory to Python path so we can import from eduquest-backend
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from datetime import date, timedelta
 from pydantic import BaseModel, Field
 from typing import List
@@ -17,6 +11,11 @@ from openai import OpenAI
 import asyncio
 import json
 import tempfile
+
+logger = logging.getLogger(__name__)
+
+# Add the parent directory to Python path so we can import from eduquest-backend
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
