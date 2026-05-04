@@ -64,6 +64,7 @@ def create_period(
     canvas_course_name: Optional[str] = Form(default=None),
     start_date: Optional[str] = Form(default=None),
     end_date: Optional[str] = Form(default=None),
+    course_description: Optional[str] = Form(default=None),
     auth: AuthPayload = Depends(get_auth),
 ):
     if auth.role == Role.TEACHER:
@@ -94,6 +95,7 @@ def create_period(
             canvas_course_name=canvas_course_name,
             start_date=start_date or None,
             end_date=end_date or None,
+            course_description=course_description or None,
         )
         period_id = period["period_id"]
 

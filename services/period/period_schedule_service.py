@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from data_access.period_schedule_dao import PeriodScheduleDAO
 from data_access.period_dao import PeriodDAO
@@ -24,17 +25,21 @@ class PeriodScheduleService:
             raise PermissionError("Not authorized to access this period")
         return period
 
-    def generate_and_save_schedule(self, period_id: str, user_id: str) -> dict:
+    def generate_and_save_schedule(self, period_id: str, user_id: str, course_description: Optional[str] = None) -> dict:
         period = self._verify_period_ownership(period_id, user_id)
 
         vector_store_id = period.get("vector_store_id")
-        if not vector_store_id:
-            raise ValueError("Period has no vector store. Re-create the class to fix this.")
         course_name = period.get("name", "Course")
 
         # Only search files if any were actually uploaded — empty vector stores cause API errors
         file_urls = period.get("file_urls") or []
         agent_vector_store_id = vector_store_id if file_urls else None
+
+        # Prefer request-time description; fall back to what was stored at period creation
+        course_description = course_description or period.get("course_description")
+
+        if not file_urls and not course_description:
+            raise ValueError("Provide course materials or a description of what students should learn.")
 
         # Generate schedule using the agent
         agent = get_bot_provider().create_schedule_agent(
@@ -42,6 +47,7 @@ class PeriodScheduleService:
             course_name=course_name,
             start_date=period.get("start_date"),
             end_date=period.get("end_date"),
+            course_description=course_description,
         )
         schedule_dict = agent.run_and_get_json()
 

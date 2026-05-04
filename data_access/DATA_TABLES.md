@@ -126,6 +126,7 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `canvas_course_name` | text      | nullable    |                                           |
 | `start_date`         | text      | nullable    |                                           |
 | `end_date`           | text      | nullable    |                                           |
+| `course_description` | text      | nullable    | Teacher-provided description used when no files are uploaded |
 | `created_at`         | timestamptz | NOT NULL    |                                           |
 
 ---

@@ -18,6 +18,7 @@ class PeriodDAO(SupabaseBaseDAO):
             'canvas_course_name': getattr(period, 'canvas_course_name', None),
             'start_date': getattr(period, 'start_date', None),
             'end_date': getattr(period, 'end_date', None),
+            'course_description': getattr(period, 'course_description', None),
         })
 
     def get_period_by_id(self, period_id: str) -> Optional[Dict[str, Any]]:

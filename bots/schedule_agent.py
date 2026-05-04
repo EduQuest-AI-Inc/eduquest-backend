@@ -48,8 +48,10 @@ class PeriodScheduleAgent:
         course_name: str = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        course_description: Optional[str] = None,
     ) -> None:
         self.vector_store_id = vector_store_id
+        self.course_description = course_description
         self.course_name = course_name or "the course"
 
         # Compute week count and calendar from dates when provided
@@ -127,7 +129,8 @@ HANDLING MISSING INFO
 
     async def _run_async(self) -> PeriodScheduleSchema:
         """Run the agent asynchronously."""
-        prompt = f"""Please create a weekly semester schedule for {self.course_name} based on the course materials in the vector store.
+        if self.vector_store_id:
+            prompt = f"""Please create a weekly semester schedule for {self.course_name} based on the course materials in the vector store.
 
 Search the course materials to understand:
 - What modules/units exist
@@ -136,6 +139,14 @@ Search the course materials to understand:
 - The sequence and structure of the curriculum
 
 Then produce a complete weekly schedule covering the entire semester."""
+        else:
+            prompt = f"""Please create a weekly semester schedule for {self.course_name}.
+
+No course files were uploaded. Use the following teacher-provided description as your sole curriculum source:
+
+{self.course_description}
+
+Do not invent content beyond what is described above. Base the schedule entirely on this description."""
 
         with trace("period_schedule_generation"):
             result = await Runner.run(

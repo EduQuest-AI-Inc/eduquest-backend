@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -16,6 +16,7 @@ period_schedule_service = PeriodScheduleService()
 
 class GenerateScheduleRequest(BaseModel):
     period_id: str
+    course_description: Optional[str] = None
 
 
 class SaveAllScheduleRequest(BaseModel):
@@ -33,7 +34,9 @@ def generate_period_schedule(
 ):
     try:
         result = period_schedule_service.generate_and_save_schedule(
-            period_id=body.period_id, user_id=auth.sub
+            period_id=body.period_id,
+            user_id=auth.sub,
+            course_description=body.course_description,
         )
         return {"message": "Schedule generated successfully", **result}
     except ValueError as e:

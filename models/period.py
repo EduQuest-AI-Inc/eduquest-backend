@@ -12,6 +12,7 @@ class Period(BaseModel):
     canvas_course_name: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
+    course_description: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_item(self):
