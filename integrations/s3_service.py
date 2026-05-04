@@ -57,6 +57,17 @@ def upload_file_to_s3(file_path, filename=None, folder=None):
         return None
 
 
+def delete_files_from_s3(keys: list) -> None:
+    """Delete a list of S3 object keys from the bucket. Logs on failure."""
+    if not BUCKET_NAME or not keys:
+        return
+    objects = [{"Key": k} for k in keys]
+    try:
+        s3.delete_objects(Bucket=BUCKET_NAME, Delete={"Objects": objects})
+    except ClientError as e:
+        logger.error("S3 delete_objects failed: %s", e)
+
+
 def get_file_presigned_url(key: str, expires_in: int = 3600) -> str:
     """Return a presigned S3 URL for the given object key."""
     return s3.generate_presigned_url(

@@ -1,17 +1,12 @@
-import json
 import logging
-import tempfile
-import os
-from openai import OpenAI
 
 from data_access.period_schedule_dao import PeriodScheduleDAO
 from data_access.period_dao import PeriodDAO
+from integrations import openai_vector_store
 from models.period_schedule import PeriodSchedule
 from bots.provider import get_bot_provider
 
 logger = logging.getLogger(__name__)
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 class PeriodScheduleService:
@@ -138,33 +133,7 @@ class PeriodScheduleService:
         }
 
     def _upload_schedule_to_vector_store(self, vector_store_id: str, schedule_dict: dict) -> str:
-        """Upload schedule JSON to vector store."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(schedule_dict, f, indent=2)
-            temp_path = f.name
-
-        try:
-            with open(temp_path, 'rb') as f:
-                file_response = client.files.create(
-                    file=f,
-                    purpose="assistants"
-                )
-
-            client.vector_stores.files.create(
-                vector_store_id=vector_store_id,
-                file_id=file_response.id
-            )
-
-            return file_response.id
-        finally:
-            os.unlink(temp_path)
+        return openai_vector_store.upload_json(vector_store_id, schedule_dict)
 
     def _delete_file_from_vector_store(self, vector_store_id: str, file_id: str) -> None:
-        """Delete a file from the vector store."""
-        try:
-            client.vector_stores.files.delete(
-                vector_store_id=vector_store_id,
-                file_id=file_id
-            )
-        except Exception as e:
-            logger.warning("Failed to delete file %s from vector store: %s", file_id, e)
+        openai_vector_store.delete_file(vector_store_id, file_id)

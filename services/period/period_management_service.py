@@ -4,6 +4,8 @@ from typing import Optional
 
 from data_access.period_dao import PeriodDAO
 from data_access.period_schedule_dao import PeriodScheduleDAO
+from integrations import openai_vector_store
+from integrations.s3_service import delete_files_from_s3
 from models.period import Period
 
 
@@ -73,3 +75,17 @@ class PeriodManagementService:
         if not period:
             raise ValueError("Period not found")
         return period['vector_store_id']
+
+    def delete_period(self, period_id: str, user_id: str) -> None:
+        period = self.period_dao.get_period_by_id(period_id)
+        if not period:
+            raise ValueError("Period not found")
+        if period.get("owner_id") != user_id:
+            raise PermissionError("Not authorized to delete this period")
+        vector_store_id = period.get("vector_store_id")
+        if vector_store_id:
+            openai_vector_store.delete_store(vector_store_id)
+        file_keys = [u for u in (period.get("file_urls") or []) if not u.startswith("local/")]
+        if file_keys:
+            delete_files_from_s3(file_keys)
+        self.period_dao.delete_period(period_id)
