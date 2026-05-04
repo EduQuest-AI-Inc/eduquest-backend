@@ -1,10 +1,11 @@
+import asyncio
 import logging
 import os
 import shutil
 import tempfile
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 
 from api.deps import AuthPayload, Role, get_auth, require_roles
 from data_access.teacher_dao import TeacherDAO
@@ -23,6 +24,36 @@ waitlist_service = WaitlistService()
 
 
 # ─── Private helpers ──────────────────────────────────────────────────────────
+
+async def _process_period_files(
+    period_id: str,
+    vector_store_id: str,
+    file_paths: list,
+    temp_dir: str,
+    user_id: str,
+):
+    try:
+        s3_urls = period_file_service.archive_to_s3(file_paths, period_id)
+        period_management_service.update_file_urls(period_id, [u for u in s3_urls if u])
+
+        period_file_service.ingest_to_openai(vector_store_id, file_paths)
+
+        loop = asyncio.get_event_loop()
+        try:
+            await asyncio.wait_for(
+                loop.run_in_executor(None, period_file_service.run_pipeline, period_id, user_id),
+                timeout=300.0,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Schedule generation timed out for period %s — marking ready anyway", period_id)
+
+        period_management_service.update_processing_status(period_id, "ready")
+    except Exception as e:
+        logger.error("Background processing failed for period %s: %s", period_id, e, exc_info=True)
+        period_management_service.update_processing_status(period_id, "failed")
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
 
 def _validate_pilot_access(user_id: str):
     """Raise HTTPException 403 if teacher lacks pilot access."""
@@ -56,6 +87,7 @@ def list_periods(auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PA
 
 @router.post("/create-period", status_code=201)
 def create_period(
+    background_tasks: BackgroundTasks,
     name: str = Form(...),
     files: List[UploadFile] = File(default=[]),
     canvas_api_url: Optional[str] = Form(default=None),
@@ -96,6 +128,7 @@ def create_period(
             start_date=start_date or None,
             end_date=end_date or None,
             course_description=course_description or None,
+            processing_status="pending",
         )
         period_id = period["period_id"]
 
@@ -105,23 +138,25 @@ def create_period(
             except Exception as e:
                 logger.warning("Failed to persist Canvas credentials for teacher %s: %s", auth.sub, e)
 
-        s3_urls = period_file_service.archive_to_s3(file_paths, period_id)
-        period_management_service.update_file_urls(period_id, [u for u in s3_urls if u])
+        background_tasks.add_task(
+            _process_period_files,
+            period_id=period_id,
+            vector_store_id=vector_store_id,
+            file_paths=file_paths,
+            temp_dir=temp_dir,
+            user_id=auth.sub,
+        )
 
-        period_file_service.ingest_to_openai(vector_store_id, file_paths)
-
-        schedule_result = period_file_service.run_pipeline(period_id, auth.sub)
-        return {"message": "Period created successfully", "period": period, "schedule": schedule_result}
+        return {"message": "Period created", "period": period, "status": "pending"}
 
     except HTTPException:
         raise
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
+        shutil.rmtree(temp_dir, ignore_errors=True)
         logger.error("Error in create-period: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @router.post("/add-files-to-period")
