@@ -202,38 +202,25 @@ def create_period(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+class _AddFilesRequest(BaseModel):
+    period_id: str
+    file_keys: List[str]
+
+
 @router.post("/add-files-to-period")
 def add_files_to_period(
-    period_id: str = Form(...),
-    files: List[UploadFile] = File(...),
+    payload: _AddFilesRequest,
     auth: AuthPayload = Depends(get_auth),
 ):
-    period = period_management_service.get_period_by_id(period_id)
+    period = period_management_service.get_period_by_id(payload.period_id)
     if not period:
         raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
-    temp_dir = tempfile.mkdtemp()
-    try:
-        file_paths: List[str] = []
-        for upload in files:
-            file_path = os.path.join(temp_dir, upload.filename or "")
-            with open(file_path, "wb") as dest:
-                shutil.copyfileobj(upload.file, dest)
-            file_paths.append(file_path)
-
-        new_file_urls = [u for u in period_file_service.archive_to_s3(file_paths, period_id) if u]
-        period_management_service.update_file_urls(
-            period_id, (period.get("file_urls") or []) + new_file_urls
-        )
-    except Exception as e:
-        logger.error("Error in add-files-to-period: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to add files to period")
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
-
-    return {"message": f"Successfully added {len(new_file_urls)} files to period", "added_files": new_file_urls}
+    existing = period.get("file_urls") or []
+    period_management_service.update_file_urls(payload.period_id, existing + payload.file_keys)
+    return {"message": f"Successfully added {len(payload.file_keys)} files to period", "added_files": payload.file_keys}
 
 
 @router.delete("/period/{period_id}", status_code=204)
