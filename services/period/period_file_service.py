@@ -71,7 +71,7 @@ class PeriodFileService:
 
             existing = dao.get_by_hash(file_hash)
             if existing:
-                logger.info("Dedup hit for %s — reusing VS %s", os.path.basename(original_path), existing["vector_store_id"])
+                logger.warning("Dedup hit for %s — reusing VS %s", os.path.basename(original_path), existing["vector_store_id"])
                 file_vs_ids.append(existing["vector_store_id"])
                 continue
 
