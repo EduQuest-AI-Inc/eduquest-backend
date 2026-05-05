@@ -16,7 +16,7 @@ class PeriodScheduleDAO(SupabaseBaseDAO):
             'schedule_openai_file_id': getattr(period_schedule, 'schedule_openai_file_id', None),
             'quest_enabled_weeks': getattr(period_schedule, 'quest_enabled_weeks', []),
         }
-        self._insert(data)
+        self._upsert(data)
 
     def get_by_period_id(self, period_id: str) -> Optional[PeriodSchedule]:
         row = self._select_by_id('period_id', period_id)
