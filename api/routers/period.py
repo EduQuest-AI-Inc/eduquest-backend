@@ -6,11 +6,12 @@ import tempfile
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel
 
 from api.deps import AuthPayload, Role, get_auth, require_roles
 from data_access.teacher_dao import TeacherDAO
 from integrations import openai_vector_store
-from integrations.s3_service import get_file_presigned_url
+from integrations.s3_service import download_file_from_s3, generate_presigned_upload_url, get_file_presigned_url
 from services.period.period_file_service import PeriodFileService
 from services.period.period_management_service import PeriodManagementService
 from services.waitlist.waitlist_service import WaitlistService
@@ -31,12 +32,27 @@ async def _process_period_files(
     file_paths: list,
     temp_dir: str,
     user_id: str,
+    file_keys: list = [],
 ):
     try:
-        s3_urls = period_file_service.archive_to_s3(file_paths, period_id)
-        period_management_service.update_file_urls(period_id, [u for u in s3_urls if u])
+        # Download presigned-uploaded files from S3 into temp_dir for local processing
+        s3_local_paths = []
+        for key in file_keys:
+            filename = key.split("/")[-1]
+            dest = os.path.join(temp_dir, filename)
+            if download_file_from_s3(key, dest):
+                s3_local_paths.append(dest)
+            else:
+                logger.warning("Skipping key %s — S3 download failed", key)
 
-        file_vs_ids = period_file_service.ingest_to_openai(vector_store_id, file_paths)
+        all_local_paths = file_paths + s3_local_paths
+
+        # Archive only server-generated files (e.g. Canvas JSON); presigned files already in S3
+        archived_keys = period_file_service.archive_to_s3(file_paths, period_id)
+        all_s3_keys = [k for k in archived_keys if k] + file_keys
+        period_management_service.update_file_urls(period_id, all_s3_keys)
+
+        file_vs_ids = period_file_service.ingest_to_openai(vector_store_id, all_local_paths)
         period_management_service.update_file_vector_store_ids(period_id, file_vs_ids)
 
         loop = asyncio.get_event_loop()
@@ -76,6 +92,30 @@ def _validate_pilot_access(user_id: str):
 
 # ─── Period management ────────────────────────────────────────────────────────
 
+class _FileInfo(BaseModel):
+    filename: str
+    content_type: str = "application/octet-stream"
+
+
+class _PresignedUploadRequest(BaseModel):
+    files: List[_FileInfo]
+
+
+@router.post("/presigned-upload")
+def get_presigned_upload_urls(
+    payload: _PresignedUploadRequest,
+    auth: AuthPayload = Depends(get_auth),
+):
+    """Return presigned S3 PUT URLs for direct browser-to-S3 upload."""
+    import uuid
+    result = []
+    for f in payload.files:
+        key = f"uploads/{auth.sub}/{uuid.uuid4().hex}/{f.filename}"
+        url = generate_presigned_upload_url(key, f.content_type)
+        result.append({"filename": f.filename, "key": key, "url": url})
+    return {"uploads": result}
+
+
 @router.get("/periods")
 def list_periods(auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT))):
     try:
@@ -91,6 +131,7 @@ def create_period(
     background_tasks: BackgroundTasks,
     name: str = Form(...),
     files: List[UploadFile] = File(default=[]),
+    file_keys: List[str] = Form(default=[]),
     canvas_api_url: Optional[str] = Form(default=None),
     canvas_api_key: Optional[str] = Form(default=None),
     canvas_course_id: Optional[str] = Form(default=None),
@@ -146,6 +187,7 @@ def create_period(
             file_paths=file_paths,
             temp_dir=temp_dir,
             user_id=auth.sub,
+            file_keys=file_keys,
         )
 
         return {"message": "Period created", "period": period, "status": "pending"}

@@ -75,3 +75,25 @@ def get_file_presigned_url(key: str, expires_in: int = 3600) -> str:
         Params={"Bucket": BUCKET_NAME, "Key": key},
         ExpiresIn=expires_in,
     )
+
+
+def generate_presigned_upload_url(key: str, content_type: str, expires_in: int = 3600) -> str:
+    """Return a presigned S3 PUT URL the browser can upload to directly."""
+    return s3.generate_presigned_url(
+        "put_object",
+        Params={"Bucket": BUCKET_NAME, "Key": key, "ContentType": content_type},
+        ExpiresIn=expires_in,
+    )
+
+
+def download_file_from_s3(key: str, dest_path: str) -> bool:
+    """Download an S3 object to dest_path. Returns False on failure."""
+    try:
+        if not BUCKET_NAME:
+            logger.warning("S3 download skipped: S3_BUCKET_NAME environment variable not set")
+            return False
+        s3.download_file(BUCKET_NAME, key, dest_path)
+        return True
+    except (NoCredentialsError, ClientError) as e:
+        logger.error("S3 download failed for key %s: %s", key, e)
+        return False
