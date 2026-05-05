@@ -42,9 +42,9 @@ async def _process_period_files(
     temp_dir: str,
     user_id: str,
     file_keys: list = [],
-    canvas_api_url: str = None,
-    canvas_api_key: str = None,
-    canvas_course_id: str = None,
+    canvas_api_url: str | None = None,
+    canvas_api_key: str | None = None,
+    canvas_course_id: str | None = None,
 ):
     try:
         period_file_service.append_canvas_data(
