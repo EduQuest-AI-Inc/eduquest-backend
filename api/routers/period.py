@@ -71,7 +71,11 @@ async def _process_period_files(
         all_s3_keys = [k for k in archived_keys if k] + file_keys
         period_management_service.update_file_urls(period_id, all_s3_keys)
 
-        file_vs_ids = period_file_service.ingest_to_openai(vector_store_id, all_local_paths)
+        try:
+            file_vs_ids = period_file_service.ingest_to_openai(vector_store_id, all_local_paths)
+        except Exception as e:
+            logger.error("ingest_to_openai failed for period %s: %s", period_id, e, exc_info=True)
+            raise
         period_management_service.update_file_vector_store_ids(period_id, file_vs_ids)
 
         loop = asyncio.get_event_loop()
