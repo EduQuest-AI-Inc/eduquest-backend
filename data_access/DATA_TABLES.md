@@ -20,6 +20,10 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 7. [enrollment](#enrollment) — student ↔ period membership
 8. [parent_invite](#parent_invite) — invite codes for parents to link to a student and view their progress
 
+**File Deduplication**
+
+19. [material_files](#material_files) — dedup registry: SHA-256 hash → OpenAI file + vector store
+
 **AI Conversations**
 
 9. [conversation](#conversation) — general AI chat session metadata
@@ -120,12 +124,15 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `period_id`          | text      | PK          |                                           |
 | `name`               | text      | NOT NULL    | Display name for the period               |
 | `owner_id`           | text      | NOT NULL    | FK → `user.user_id` (teacher or parent)   |
-| `vector_store_id`    | text      | nullable    | OpenAI vector store ID for course content |
-| `file_url`           | text[]  | nullable    | S3 URLs of uploaded course files          |
-| `canvas_course_id`   | integer   | nullable    | Canvas course ID for LMS sync             |
+| `vector_store_id`         | text    | nullable    | OpenAI vector store ID for period-specific content (Canvas JSON, schedule JSON) |
+| `file_vector_store_ids`   | text[]  | NOT NULL DEFAULT '{}' | Per-file vector store IDs for uploaded course materials (deduped across periods) |
+| `file_url`                | text[]  | nullable    | S3 URLs of uploaded course files          |
+| `canvas_course_id`        | integer | nullable    | Canvas course ID for LMS sync             |
 | `canvas_course_name` | text      | nullable    |                                           |
 | `start_date`         | text      | nullable    |                                           |
 | `end_date`           | text      | nullable    |                                           |
+| `course_description` | text      | nullable    | Teacher-provided description used when no files are uploaded |
+| `processing_status`  | text      | NOT NULL DEFAULT 'ready' | `pending` while files process; `ready` on success; `failed` on error |
 | `created_at`         | timestamptz | NOT NULL    |                                           |
 
 ---
@@ -378,3 +385,19 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `password_reset_rate_limit` | `key`                                 | Rate-limit counters for reset requests    |
 | `waitlist`                  | `waitlist_id`                         | Teacher pilot study waitlist              |
 | `parent_invite`             | `code`                                | Invite codes for parents to link to a student and view their progress |
+| `material_files`            | `file_hash`                           | SHA-256 dedup registry for uploaded course files |
+
+---
+
+## File Deduplication
+
+### `material_files`
+
+> Deduplication registry for uploaded course files. Each unique file (by SHA-256 hash) is stored once with its own OpenAI vector store. Periods reference these shared vector stores via `period.file_vector_store_ids`.
+
+| Field              | Type        | Constraints | Notes                                            |
+| ------------------ | ----------- | ----------- | ------------------------------------------------ |
+| `file_hash`        | text        | PK          | SHA-256 hex of the original file bytes           |
+| `openai_file_id`   | text        | NOT NULL UNIQUE | OpenAI Files API ID                          |
+| `vector_store_id`  | text        | NOT NULL UNIQUE | Per-file vector store; embeddings live here  |
+| `created_at`       | timestamptz | NOT NULL    | Auto-set on first upload                         |
