@@ -1,8 +1,11 @@
 import asyncio
 import logging
+import math
 import os
+import re
 import shutil
 import tempfile
+import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
@@ -11,7 +14,13 @@ from pydantic import BaseModel
 from api.deps import AuthPayload, Role, get_auth, require_roles
 from data_access.teacher_dao import TeacherDAO
 from integrations import openai_vector_store
-from integrations.s3_service import download_file_from_s3, generate_presigned_upload_url, get_file_presigned_url
+from integrations.s3_service import (
+    complete_multipart_upload,
+    create_multipart_upload,
+    download_file_from_s3,
+    generate_presigned_part_url,
+    get_file_presigned_url,
+)
 from services.period.period_file_service import PeriodFileService
 from services.period.period_management_service import PeriodManagementService
 from services.waitlist.waitlist_service import WaitlistService
@@ -28,13 +37,23 @@ waitlist_service = WaitlistService()
 
 async def _process_period_files(
     period_id: str,
-    vector_store_id: str,
+    course_name: str,
     file_paths: list,
     temp_dir: str,
     user_id: str,
     file_keys: list = [],
+    canvas_api_url: str | None = None,
+    canvas_api_key: str | None = None,
+    canvas_course_id: str | None = None,
 ):
     try:
+        period_file_service.append_canvas_data(
+            temp_dir, file_paths, canvas_api_url, canvas_api_key, canvas_course_id
+        )
+
+        vector_store_id = openai_vector_store.create_empty(course_name)
+        period_management_service.update_vector_store_id(period_id, vector_store_id)
+
         # Download presigned-uploaded files from S3 into temp_dir for local processing
         s3_local_paths = []
         for key in file_keys:
@@ -92,28 +111,47 @@ def _validate_pilot_access(user_id: str):
 
 # ─── Period management ────────────────────────────────────────────────────────
 
-class _FileInfo(BaseModel):
+_PART_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+class _MultipartInitRequest(BaseModel):
     filename: str
     content_type: str = "application/octet-stream"
+    file_size: int
 
 
-class _PresignedUploadRequest(BaseModel):
-    files: List[_FileInfo]
+class _PartInfo(BaseModel):
+    part_number: int
+    etag: str
 
 
-@router.post("/presigned-upload")
-def get_presigned_upload_urls(
-    payload: _PresignedUploadRequest,
-    auth: AuthPayload = Depends(get_auth),
-):
-    """Return presigned S3 PUT URLs for direct browser-to-S3 upload."""
-    import uuid
-    result = []
-    for f in payload.files:
-        key = f"uploads/{auth.sub}/{uuid.uuid4().hex}/{f.filename}"
-        url = generate_presigned_upload_url(key, f.content_type)
-        result.append({"filename": f.filename, "key": key, "url": url})
-    return {"uploads": result}
+class _MultipartCompleteRequest(BaseModel):
+    key: str
+    upload_id: str
+    parts: List[_PartInfo]
+
+
+def _safe_filename(filename: str) -> str:
+    name = os.path.basename(filename)
+    return re.sub(r"[^\w.\-]", "_", name) or "upload"
+
+
+@router.post("/multipart-init")
+def multipart_init(payload: _MultipartInitRequest, auth: AuthPayload = Depends(get_auth)):
+    """Create a multipart upload and return presigned PUT URLs for all parts."""
+    safe_name = _safe_filename(payload.filename)
+    key = f"uploads/{auth.sub}/{uuid.uuid4().hex}/{safe_name}"
+    upload_id = create_multipart_upload(key, payload.content_type)
+    total_parts = max(1, math.ceil(payload.file_size / _PART_SIZE))
+    part_urls = [generate_presigned_part_url(key, upload_id, i + 1) for i in range(total_parts)]
+    return {"key": key, "upload_id": upload_id, "part_urls": part_urls}
+
+
+@router.post("/multipart-complete")
+def multipart_complete(payload: _MultipartCompleteRequest, auth: AuthPayload = Depends(get_auth)):
+    parts = [{"PartNumber": p.part_number, "ETag": p.etag} for p in payload.parts]
+    key = complete_multipart_upload(payload.key, payload.upload_id, parts)
+    return {"key": key}
 
 
 @router.get("/periods")
@@ -153,17 +191,10 @@ def create_period(
                 shutil.copyfileobj(upload.file, dest)
             file_paths.append(file_path)
 
-        if auth.role == Role.TEACHER:
-            period_file_service.append_canvas_data(
-                temp_dir, file_paths, canvas_api_url, canvas_api_key, canvas_course_id
-            )
-
-        vector_store_id = openai_vector_store.create_empty(name)
-
         period = period_management_service.create_period(
             course=name,
             user_id=auth.sub,
-            vector_store_id=vector_store_id,
+            vector_store_id="",
             file_urls=[],
             canvas_course_id=int(canvas_course_id) if canvas_course_id else None,
             canvas_course_name=canvas_course_name,
@@ -183,11 +214,14 @@ def create_period(
         background_tasks.add_task(
             _process_period_files,
             period_id=period_id,
-            vector_store_id=vector_store_id,
+            course_name=name,
             file_paths=file_paths,
             temp_dir=temp_dir,
             user_id=auth.sub,
             file_keys=file_keys,
+            canvas_api_url=canvas_api_url if auth.role == Role.TEACHER else None,
+            canvas_api_key=canvas_api_key if auth.role == Role.TEACHER else None,
+            canvas_course_id=canvas_course_id if auth.role == Role.TEACHER else None,
         )
 
         return {"message": "Period created", "period": period, "status": "pending"}

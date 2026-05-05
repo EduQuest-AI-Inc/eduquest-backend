@@ -86,6 +86,30 @@ def generate_presigned_upload_url(key: str, content_type: str, expires_in: int =
     )
 
 
+def create_multipart_upload(key: str, content_type: str) -> str:
+    resp = s3.create_multipart_upload(Bucket=BUCKET_NAME, Key=key, ContentType=content_type)
+    return resp["UploadId"]
+
+
+def generate_presigned_part_url(key: str, upload_id: str, part_number: int, expires_in: int = 3600) -> str:
+    return s3.generate_presigned_url(
+        "upload_part",
+        Params={"Bucket": BUCKET_NAME, "Key": key, "UploadId": upload_id, "PartNumber": part_number},
+        ExpiresIn=expires_in,
+    )
+
+
+def complete_multipart_upload(key: str, upload_id: str, parts: list) -> str:
+    """parts: [{"PartNumber": int, "ETag": str}, ...]"""
+    s3.complete_multipart_upload(
+        Bucket=BUCKET_NAME,
+        Key=key,
+        UploadId=upload_id,
+        MultipartUpload={"Parts": parts},
+    )
+    return key
+
+
 def download_file_from_s3(key: str, dest_path: str) -> bool:
     """Download an S3 object to dest_path. Returns False on failure."""
     try:
