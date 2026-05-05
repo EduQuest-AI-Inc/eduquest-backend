@@ -13,7 +13,7 @@ s3 = boto3.client(
     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
     region_name=_region,
     endpoint_url=f"https://s3.{_region}.amazonaws.com",
-    config=Config(signature_version="s3v4"),
+    config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"}),
 )
 
 BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
