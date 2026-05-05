@@ -67,6 +67,9 @@ class PeriodManagementService:
     def update_processing_status(self, period_id: str, status: str) -> None:
         self.period_dao.update_period(period_id, {"processing_status": status})
 
+    def update_vector_store_id(self, period_id: str, vector_store_id: str) -> None:
+        self.period_dao.update_period(period_id, {"vector_store_id": vector_store_id})
+
     def update_file_vector_store_ids(self, period_id: str, file_vector_store_ids: list) -> None:
         self.period_dao.update_period(period_id, {"file_vector_store_ids": file_vector_store_ids})
 
