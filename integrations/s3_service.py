@@ -6,11 +6,13 @@ from botocore.exceptions import NoCredentialsError, ClientError
 
 logger = logging.getLogger(__name__)
 
+_region = os.getenv("AWS_REGION", "us-east-1")
 s3 = boto3.client(
     "s3",
     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-    region_name=os.getenv("AWS_REGION"),
+    region_name=_region,
+    endpoint_url=f"https://s3.{_region}.amazonaws.com",
     config=Config(signature_version="s3v4"),
 )
 
