@@ -1,17 +1,13 @@
-import json
 import logging
-import tempfile
-import os
-from openai import OpenAI
+from typing import Optional
 
 from data_access.period_schedule_dao import PeriodScheduleDAO
 from data_access.period_dao import PeriodDAO
+from integrations import openai_vector_store
 from models.period_schedule import PeriodSchedule
 from bots.provider import get_bot_provider
 
 logger = logging.getLogger(__name__)
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 class PeriodScheduleService:
@@ -29,24 +25,39 @@ class PeriodScheduleService:
             raise PermissionError("Not authorized to access this period")
         return period
 
-    def generate_and_save_schedule(self, period_id: str, user_id: str) -> dict:
+    def generate_and_save_schedule(self, period_id: str, user_id: str, course_description: Optional[str] = None) -> dict:
         period = self._verify_period_ownership(period_id, user_id)
 
         vector_store_id = period.get("vector_store_id")
         if not vector_store_id:
-            raise ValueError("Period has no vector store. Re-create the class to fix this.")
+            raise ValueError("Period does not have a vector store configured")
         course_name = period.get("name", "Course")
-
-        # Only search files if any were actually uploaded — empty vector stores cause API errors
         file_urls = period.get("file_urls") or []
-        agent_vector_store_id = vector_store_id if file_urls else None
+        file_vector_store_ids = period.get("file_vector_store_ids") or []
+
+        # Prefer request-time description; fall back to what was stored at period creation
+        course_description = course_description or period.get("course_description")
+
+        if not file_urls and not course_description:
+            raise ValueError("Provide course materials or a description of what students should learn.")
+
+        # Period VS has content if Canvas data was fetched or a schedule was previously generated
+        existing = self.period_schedule_dao.get_by_period_id(period_id)
+        has_canvas = bool(period.get("canvas_course_id"))
+        period_vs_has_content = has_canvas or bool(existing)
+
+        all_vs_ids = []
+        if period_vs_has_content:
+            all_vs_ids.append(vector_store_id)
+        all_vs_ids.extend(file_vector_store_ids)
 
         # Generate schedule using the agent
         agent = get_bot_provider().create_schedule_agent(
-            vector_store_id=agent_vector_store_id,
+            vector_store_ids=all_vs_ids or None,
             course_name=course_name,
             start_date=period.get("start_date"),
             end_date=period.get("end_date"),
+            course_description=course_description,
         )
         schedule_dict = agent.run_and_get_json()
 
@@ -56,7 +67,6 @@ class PeriodScheduleService:
         )
 
         # Create or update period_schedule record
-        existing = self.period_schedule_dao.get_by_period_id(period_id)
         if existing:
             # Delete old file from vector store if it exists
             if existing.schedule_openai_file_id:
@@ -113,6 +123,9 @@ class PeriodScheduleService:
         if not period_schedule:
             raise ValueError("No schedule exists for this period. Generate one first.")
 
+        if not quest_enabled_weeks:
+            raise ValueError("At least one quest-enabled week is required")
+
         # Normalize quest weeks to unique sorted ints
         normalized_weeks = sorted({int(v) for v in quest_enabled_weeks if str(v).lstrip("-").isdigit()})
 
@@ -135,33 +148,7 @@ class PeriodScheduleService:
         }
 
     def _upload_schedule_to_vector_store(self, vector_store_id: str, schedule_dict: dict) -> str:
-        """Upload schedule JSON to vector store."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(schedule_dict, f, indent=2)
-            temp_path = f.name
-
-        try:
-            with open(temp_path, 'rb') as f:
-                file_response = client.files.create(
-                    file=f,
-                    purpose="assistants"
-                )
-
-            client.vector_stores.files.create(
-                vector_store_id=vector_store_id,
-                file_id=file_response.id
-            )
-
-            return file_response.id
-        finally:
-            os.unlink(temp_path)
+        return openai_vector_store.upload_json(vector_store_id, schedule_dict)
 
     def _delete_file_from_vector_store(self, vector_store_id: str, file_id: str) -> None:
-        """Delete a file from the vector store."""
-        try:
-            client.vector_stores.files.delete(
-                vector_store_id=vector_store_id,
-                file_id=file_id
-            )
-        except Exception as e:
-            logger.warning("Failed to delete file %s from vector store: %s", file_id, e)
+        openai_vector_store.delete_file(vector_store_id, file_id)

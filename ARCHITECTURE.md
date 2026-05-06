@@ -1,5 +1,36 @@
 # EduQuest Backend Architecture
 
+## Architecture Decisions
+
+### All S3 access goes through `integrations/s3_service.py`
+AWS credentials, bucket config, and error handling live in one place. Services must never
+instantiate `boto3.client` directly — import helpers from `integrations/s3_service.py` instead.
+
+### Frontend role and ownership checks are UX only — the backend is the enforcement boundary
+The frontend may hide buttons, redirect routes, or skip rendering components based on role or ownership. These checks exist to avoid confusing users with options that would fail, not to enforce access control. Every protected action must be independently enforced at the API layer via `require_roles` or an explicit ownership check. Removing a frontend gate should never expose a security gap.
+
+### Auth & Role-Based Access Control
+
+Role enforcement lives exclusively at the **router layer** via FastAPI `Depends()`. Service methods never raise errors for role checks — they assume the caller is already authorized. Service-layer `PermissionError` is reserved for **ownership checks** only (e.g. a teacher editing another teacher's period).
+
+Three roles: `Role.STUDENT`, `Role.TEACHER`, `Role.PARENT` — defined as a `str, Enum` in `api/deps.py` alongside `AuthPayload` and `get_auth()`.
+
+Canonical dependencies (all in `api/deps.py`):
+- `get_auth()` — validates JWT, returns `AuthPayload`; use when any authenticated user is allowed.
+- `require_roles(Role.X, ...)` — restricts to one or more roles; declare in the route's `Depends()`.
+- `require_student_viewer("param_name")` — use when a parent or teacher may optionally pass a student `user_id` to view that student's data.
+
+Supabase RLS is the secondary enforcement layer. Do not duplicate RLS logic in Python.
+
+Audit: `pytest tests/unit/routes/test_rbac_audit.py` verifies every route either has an auth dependency or is listed in `EXPLICITLY_PUBLIC_ROUTES`.
+
+### The frontend never calls Supabase for data reads or writes — all domain data goes through FastAPI
+The frontend uses the Supabase client SDK for auth only (sign-up, sign-in, session management).
+All domain data reads and writes must go through the FastAPI backend. This keeps business logic
+and RLS policy in one place and prevents clients from bypassing server-side validation.
+
+---
+
 ## Layers at a Glance
 
 ### Architecture Overview
@@ -60,7 +91,7 @@ graph LR
         Auth_t["session<br/>password_reset_token<br/>password_reset_rate_limit"]
         Identity_t["user · student<br/>teacher · parent"]
         Course_t["period · period_schedule<br/>enrollment"]
-        AI_t["conversation · ltg_conversation<br/>quest · student_skill_mastery<br/>aggregated_metrics"]
+        AI_t["conversation · ltg_conversation<br/>quest · student_skill_mastery · aggregated_metrics"]
         Onboard_t["parent_invite · waitlist"]
     end
 
@@ -153,8 +184,6 @@ sequenceDiagram
 ---
 
 ## User / Profile Flows
-
-> **Frontend caching note:** The profile response is stored in React Query's in-memory cache (`staleTime: Infinity`) in `contexts/user-context.tsx`. It is fetched once on page load and held for the session — subsequent reads come from the cache, not Supabase. The cache is explicitly invalidated via `refetch()` after any action that mutates the profile (profile conversation complete, LTG goal confirmed, Canvas connect/disconnect).
 
 ### Get Profile
 
@@ -282,7 +311,6 @@ sequenceDiagram
     end
 ```
 
-> **Skill metrics note:** After grading, the frontend reads aggregated skill metrics directly from the `aggregated_metrics` Supabase table — there is no `/metrics` API endpoint. This table is populated by `GradingOrchestrator` via `AggregatedMetricsDAO`.
 
 ---
 
@@ -619,7 +647,7 @@ All agents live in `bots/` and use the OpenAI Agents SDK (`from agents import Ag
 
 Content safety is applied via `bots/guardrails.py::check_student_output_safety()` before returning agent responses to the client.
 
-`bots/ltg_conversation_service.py` is a backwards-compatibility re-export shim — it exists only to preserve old import paths and contains no logic.
+**All agent instantiation goes through `bots/provider.py::get_bot_provider()`** — services never import agent classes directly. This is what makes `MOCK_AI=true` (env) and `set_bot_provider(MockBotProvider())` (tests) work: swapping the provider swaps every agent at once without touching service code.
 
 ---
 

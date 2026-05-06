@@ -4,8 +4,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from api.deps import AuthPayload, get_auth
+from api.deps import AuthPayload, Role, get_auth
 from data_access.enrollment_dao import EnrollmentDAO
+from data_access.parent_dao import ParentDAO
 from data_access.period_dao import PeriodDAO
 from data_access.quest_dao import QuestDAO
 from services.quest.quest_retrieval_service import QuestRetrievalService
@@ -16,6 +17,7 @@ router = APIRouter()
 quest_service = QuestService()
 quest_dao = QuestDAO()
 enrollment_dao = EnrollmentDAO()
+parent_dao = ParentDAO()
 period_dao = PeriodDAO()
 
 
@@ -53,17 +55,29 @@ def get_quest(quest_id: str, auth: AuthPayload = Depends(get_auth)):
 
 
 @router.get("/quests/student/{user_id}")
-def get_student_quests(user_id: str, auth: AuthPayload = Depends(get_auth)):
+def get_student_quests(
+    user_id: str,
+    period_id: Optional[str] = Query(default=None),
+    auth: AuthPayload = Depends(get_auth),
+):
     """Teacher/parent route: fetch quests for a specific student."""
     if auth.sub != user_id:
-        enrollments = enrollment_dao.get_enrollments_by_student(user_id)
-        period_ids = [e["period_id"] for e in enrollments]
-        caller_periods = period_dao.get_periods_by_owner_id(auth.sub)
-        caller_period_ids = {p["period_id"] for p in caller_periods}
-        if not any(pid in caller_period_ids for pid in period_ids):
-            raise HTTPException(status_code=403, detail="Not authorized")
+        if auth.role == Role.PARENT:
+            linked = parent_dao.get_linked_student_ids(auth.sub)
+            if user_id not in linked:
+                raise HTTPException(status_code=403, detail="Not authorized")
+        else:
+            enrollments = enrollment_dao.get_enrollments_by_student(user_id)
+            period_ids = [e["period_id"] for e in enrollments]
+            caller_periods = period_dao.get_periods_by_owner_id(auth.sub)
+            caller_period_ids = {p["period_id"] for p in caller_periods}
+            if not any(pid in caller_period_ids for pid in period_ids):
+                raise HTTPException(status_code=403, detail="Not authorized")
     try:
-        quests = quest_service.get_quests_for_student(user_id)
+        if period_id:
+            quests = quest_service.get_quests_for_student_and_period(user_id, period_id)
+        else:
+            quests = quest_service.get_quests_for_student(user_id)
         for quest in quests:
             QuestRetrievalService.attach_grade_display(quest)
         return quests
@@ -127,20 +141,6 @@ def grade_quest(
     except Exception as e:
         logger.error("Error grading quest: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to grade quest")
-
-
-class ParseGradeRequest(BaseModel):
-    grade: object
-
-
-@router.post("/grade/parse")
-def parse_grade_data(body: ParseGradeRequest):
-    try:
-        grade_info = quest_service.parse_grade_data(body.grade)
-        return {"parsed_grade": grade_info, "display_grade": grade_info["display_grade"]}
-    except Exception as e:
-        logger.error("Error parsing grade data: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to parse grade data")
 
 
 @router.get("/verify-quest-structure/{period_id}")

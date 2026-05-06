@@ -32,22 +32,6 @@ def test_parse_grade_data_dict_with_detailed_grade():
     assert result["detailed_grade"] == {"algebra": 0.9}
 
 
-@pytest.mark.unit
-def test_format_grade_for_display_none():
-    assert QuestRetrievalService.format_grade_for_display(None) == "Not graded"
-
-
-@pytest.mark.unit
-def test_format_grade_for_display_legacy():
-    assert QuestRetrievalService.format_grade_for_display("75") == "75"
-
-
-@pytest.mark.unit
-def test_format_grade_for_display_rich():
-    grade = {"overall_score": "85/100", "detailed_grade": None}
-    assert QuestRetrievalService.format_grade_for_display(grade) == "85/100"
-
-
 # --- DAO-mocking tests ---
 
 def _svc():

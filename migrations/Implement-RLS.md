@@ -2,6 +2,8 @@
 
 ---
 
+THIS MIGRATION HAS BEEN COMPLETED May 1st, 2026
+
 ## Is This Feasible, Or Should You Just Do It In Application Code?
 
 **Short answer: RLS is still worth doing, but its role has changed.** Every frontend route now proxies through FastAPI — zero routes query Supabase directly. FastAPI enforces all authorization. RLS is therefore pure defense-in-depth: a database-level backstop that catches bugs in FastAPI route handlers and makes the intended access model explicit in the schema.
@@ -125,8 +127,8 @@ Identity expression throughout: `(auth.jwt() ->> 'sub')` — returns the `sub` c
 
 #### `period`
 
-| Operation     | Who                    | Condition                                                       |
-| ------------- | ---------------------- | --------------------------------------------------------------- |
+| Operation     | Who                 | Condition                                                       |
+| ------------- | ------------------- | --------------------------------------------------------------- |
 | SELECT        | Owner (teacher)     | `owner_id = (auth.jwt() ->> 'sub')`                             |
 | SELECT        | Enrolled student    | EXISTS enrollment where `user_id = sub` and `period_id` matches |
 | UPDATE        | Owner               | `owner_id = (auth.jwt() ->> 'sub')`                             |
@@ -143,23 +145,23 @@ Identity expression throughout: `(auth.jwt() ->> 'sub')` — returns the `sub` c
 
 #### `enrollment`
 
-| Operation | Who                    | Condition                            |
-| --------- | ---------------------- | ------------------------------------ |
-| SELECT    | Period owner           | EXISTS period where `owner_id = sub` |
-| SELECT    | Enrolled student       | `user_id = (auth.jwt() ->> 'sub')`   |
-| INSERT    | Self only              | `user_id = (auth.jwt() ->> 'sub')`   |
-| DELETE    | Enrolled student       | `user_id = (auth.jwt() ->> 'sub')`   |
+| Operation | Who              | Condition                            |
+| --------- | ---------------- | ------------------------------------ |
+| SELECT    | Period owner     | EXISTS period where `owner_id = sub` |
+| SELECT    | Enrolled student | `user_id = (auth.jwt() ->> 'sub')`   |
+| INSERT    | Self only        | `user_id = (auth.jwt() ->> 'sub')`   |
+| DELETE    | Enrolled student | `user_id = (auth.jwt() ->> 'sub')`   |
 
 #### `quest` (formerly `individual_quest`)
 
-| Operation     | Who                      | Condition                                          |
-| ------------- | ------------------------ | -------------------------------------------------- |
-| SELECT        | The student              | `user_id = (auth.jwt() ->> 'sub')`                 |
-| SELECT        | Period owner             | EXISTS enrollment+period where `owner_id = sub`    |
-| SELECT        | Parent                   | EXISTS parent where sub is in `linked_student_ids` |
+| Operation     | Who                           | Condition                                          |
+| ------------- | ----------------------------- | -------------------------------------------------- |
+| SELECT        | The student                   | `user_id = (auth.jwt() ->> 'sub')`                 |
+| SELECT        | Period owner                  | EXISTS enrollment+period where `owner_id = sub`    |
+| SELECT        | Parent                        | EXISTS parent where sub is in `linked_student_ids` |
 | UPDATE        | Period owner (grade/feedback) | EXISTS enrollment+period where `owner_id = sub`    |
-| UPDATE        | Student (status)         | `user_id = (auth.jwt() ->> 'sub')`                 |
-| INSERT/DELETE | Nobody via frontend      | FastAPI only                                       |
+| UPDATE        | Student (status)              | `user_id = (auth.jwt() ->> 'sub')`                 |
+| INSERT/DELETE | Nobody via frontend           | FastAPI only                                       |
 
 Note: Column-level restriction (student can only update `status`, teacher only `grade`/`feedback`) is enforced at the FastAPI layer, not RLS. RLS only controls row-level access.
 
@@ -183,19 +185,19 @@ Note: The PK column is `student_id`, not `user_id`. The identity expression comp
 
 #### `student_long_term_goal`
 
-| Operation            | Who                 | Condition                                                    |
-| -------------------- | ------------------- | ------------------------------------------------------------ |
-| SELECT               | The student         | `user_id = (auth.jwt() ->> 'sub')`                           |
-| SELECT               | Period owner        | EXISTS period where `owner_id = sub` and `period_id` matches |
+| Operation            | Who                 | Condition                                                                |
+| -------------------- | ------------------- | ------------------------------------------------------------------------ |
+| SELECT               | The student         | `user_id = (auth.jwt() ->> 'sub')`                                       |
+| SELECT               | Period owner        | EXISTS period where `owner_id = sub` and `period_id` matches             |
 | SELECT               | Parent              | EXISTS parent where sub is in `linked_student_ids` and `user_id` matches |
-| INSERT/UPDATE/DELETE | Nobody via frontend | FastAPI only                                                 |
+| INSERT/UPDATE/DELETE | Nobody via frontend | FastAPI only                                                             |
 
 #### `ltg_conversation`
 
-| Operation            | Who                 | Condition                                                    |
-| -------------------- | ------------------- | ------------------------------------------------------------ |
-| SELECT               | The student         | `user_id = (auth.jwt() ->> 'sub')`                           |
-| INSERT/UPDATE/DELETE | Nobody via frontend | FastAPI only                                                 |
+| Operation            | Who                 | Condition                          |
+| -------------------- | ------------------- | ---------------------------------- |
+| SELECT               | The student         | `user_id = (auth.jwt() ->> 'sub')` |
+| INSERT/UPDATE/DELETE | Nobody via frontend | FastAPI only                       |
 
 #### `parent_invite`
 

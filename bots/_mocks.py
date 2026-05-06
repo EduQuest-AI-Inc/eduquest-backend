@@ -111,11 +111,11 @@ class MockHWAgent:
                 Name=f"[MOCK] {name}",
                 Skills=skills,
                 Week=week,
-                instructions=(
-                    "[MOCK] Step 1: Review the week's material carefully.\n"
-                    "Step 2: Complete the main activity described in class.\n"
-                    "Step 3: Reflect on what you learned and submit your work."
-                ),
+                instructions=[
+                    {"step": 1, "text": "[MOCK] Review the week's material carefully."},
+                    {"step": 2, "text": "Complete the main activity described in class."},
+                    {"step": 3, "text": "Reflect on what you learned and submit your work."},
+                ],
                 rubric={
                     "Criteria": {
                         "Understanding": {
@@ -163,10 +163,11 @@ class MockPeriodScheduleAgent:
 
     def __init__(
         self,
-        vector_store_id: Optional[str] = None,
+        vector_store_ids: Optional[list] = None,
         course_name: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        course_description: Optional[str] = None,
     ):
         self.course_name = course_name or "Course"
         self.start_date = start_date

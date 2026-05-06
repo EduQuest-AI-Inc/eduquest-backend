@@ -20,6 +20,10 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 7. [enrollment](#enrollment) — student ↔ period membership
 8. [parent_invite](#parent_invite) — invite codes for parents to link to a student and view their progress
 
+**File Deduplication**
+
+19. [material_files](#material_files) — dedup registry: SHA-256 hash → OpenAI file + vector store
+
 **AI Conversations**
 
 9. [conversation](#conversation) — general AI chat session metadata
@@ -59,8 +63,8 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `first_name` | text | NOT NULL |                                          |
 | `last_name`  | text | NOT NULL |                                          |
 | `email`      | text | NOT NULL |                                          |
-| `password`   | text        | NOT NULL | Hashed (werkzeug)                        |
-| `last_login` | text        | nullable | ISO timestamp                            |
+| `password`   | text        | NOT NULL | Hashed (bcrypt)                        |
+| `last_login` | timestamptz | nullable |                                          |
 | `role`       | text        | NOT NULL | `"student"` \| `"teacher"` \| `"parent"` |
 | `created_at` | timestamptz | NOT NULL | Account creation time (DEFAULT now())    |
 
@@ -74,9 +78,9 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | -------------------- | --------- | ----------- | --------------------------------------- |
 | `user_id`            | text      | PK → `user` |                                         |
 | `grade`              | integer   | NOT NULL    | Grade level (e.g. `9`)                  |
-| `strength`           | string[]  | nullable    | Self-reported strengths                 |
-| `weakness`           | string[]  | nullable    | Self-reported weaknesses                |
-| `interest`           | string[]  | nullable    | Self-reported interests                 |
+| `strength`           | text[]  | nullable    | Self-reported strengths                 |
+| `weakness`           | text[]  | nullable    | Self-reported weaknesses                |
+| `interest`           | text[]  | nullable    | Self-reported interests                 |
 | `learning_style`     | text      | nullable    |                                         |
 | `completed_tutorial` | boolean   | NOT NULL    | Whether the onboarding tutorial is done |
 | `school_name`        | text      | nullable    |                                         |
@@ -104,8 +108,8 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | Field                | Type      | Constraints | Notes                                                            |
 | -------------------- | --------- | ----------- | ---------------------------------------------------------------- |
 | `user_id`            | text      | PK → `user` |                                                                  |
-| `linked_student_ids` | string[]  | nullable    | `user_id`s of linked student accounts                            |
-| `vpc_verified_at`    | timestamp | nullable    | COPPA 2025 compliance — set when parent accepts a student invite |
+| `linked_student_ids` | text[]  | nullable    | `user_id`s of linked student accounts                            |
+| `vpc_verified_at`    | timestamptz | nullable    | COPPA 2025 compliance — set when parent accepts a student invite |
 
 ---
 
@@ -120,11 +124,19 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `period_id`          | text      | PK          |                                           |
 | `name`               | text      | NOT NULL    | Display name for the period               |
 | `owner_id`           | text      | NOT NULL    | FK → `user.user_id` (teacher or parent)   |
-| `vector_store_id`    | text      | nullable    | OpenAI vector store ID for course content |
-| `file_url`           | string[]  | nullable    | S3 URLs of uploaded course files          |
-| `canvas_course_id`   | integer   | nullable    | Canvas course ID for LMS sync             |
+| `vector_store_id`         | text    | nullable    | OpenAI vector store ID for period-specific content (Canvas JSON, schedule JSON) |
+| `file_vector_store_ids`   | text[]  | NOT NULL DEFAULT '{}' | Per-file vector store IDs for uploaded course materials (deduped across periods) |
+| `file_url`                | text[]  | nullable    | S3 URLs of uploaded course files          |
+| `canvas_course_id`        | integer | nullable    | Canvas course ID for LMS sync             |
 | `canvas_course_name` | text      | nullable    |                                           |
-| `created_at`         | timestamp | NOT NULL    |                                           |
+| `start_date`         | date      | nullable    |                                           |
+| `end_date`           | date      | nullable    |                                           |
+| `grade_level`        | text      | nullable    | Grade level of the course, e.g. "9", "AP", "College" |
+| `mastery_threshold`  | float4    | nullable, default 0.8 | Score (0.0–1.0) required to flip mastered = true; applies to all weeks in the period |
+| `course_description` | text      | nullable    | Teacher-provided description used when no files are uploaded |
+| `course_metadata`    | jsonb     | nullable    | Structured class metadata: learning_objectives, primary_standard, additional_standards, specific_standard_codes |
+| `processing_status`  | text      | NOT NULL DEFAULT 'ready' | `pending` while files process; `ready` on success; `failed` on error |
+| `created_at`         | timestamptz | NOT NULL    |                                           |
 
 ---
 
@@ -137,9 +149,9 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `period_id`               | text      | PK → `period` |                                                 |
 | `schedule_json`           | json      | NOT NULL      | Full AI-generated schedule payload              |
 | `schedule_openai_file_id` | text      | nullable      | OpenAI Files API ID used to create the schedule |
-| `quest_enabled_weeks`     | integer   | nullable      | Bitmask or count of weeks with quests enabled   |
-| `created_at`              | timestamp | NOT NULL      |                                                 |
-| `last_updated_at`         | timestamp | NOT NULL      | Auto-updated on every write                     |
+| `quest_enabled_weeks`     | integer[] | nullable      | List of week numbers that have quests enabled   |
+| `created_at`              | timestamptz | NOT NULL      |                                                 |
+| `last_updated_at`         | timestamptz | NOT NULL      | Auto-updated on every write                     |
 
 ---
 
@@ -152,7 +164,7 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `user_id`       | text      | PK (composite) → `user`   |                    |
 | `period_id`     | text      | PK (composite) → `period` |                    |
 | `semester`      | text      | NOT NULL                  | e.g. `"Fall 2025"` |
-| `enrolled_at`   | timestamp | NOT NULL                  | Auto-set on insert |
+| `enrolled_at`   | timestamptz | NOT NULL                  | Auto-set on insert |
 | `enrollment_id` | uuid      | UNIQUE                    | Surrogate ID       |
 
 ### `parent_invite`
@@ -163,9 +175,9 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | ------------ | --------- | ----------- | ----------------------------------- |
 | `code`       | text      | PK          | 8-char random token sent to parent  |
 | `user_id`    | text      | NOT NULL    | FK → `user.user_id` (the student)   |
-| `expires_at` | timestamp | NOT NULL    | Default: 24 hours from creation     |
-| `used`       | boolean   | NOT NULL    | Flipped to `true` on redemption     |
-| `created_at` | timestamp | NOT NULL    |                                     |
+| `expires_at` | timestamptz | NOT NULL    | Default: 24 hours from creation     |
+| `used`       | boolean     | NOT NULL    | Flipped to `true` on redemption     |
+| `created_at` | timestamptz | NOT NULL    |                                     |
 
 ---
 
@@ -181,8 +193,8 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `user_id`           | text      | NOT NULL    | FK → `user.user_id`                                 |
 | `conversation_type` | text      | NOT NULL    | e.g. `"profile"`, `"update"`, `"quest_grading"`     |
 | `period_id`         | text      | nullable    |                                                     |
-| `created_at`        | timestamp | NOT NULL    |                                                     |
-| `last_response_id`  | text      | nullable    | Last OpenAI response ID — used for message chaining |
+| `created_at`        | timestamptz | NOT NULL    |                                                     |
+| `last_response_id`  | text        | nullable    | Last OpenAI response ID — used for message chaining |
 
 ---
 
@@ -190,12 +202,12 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 
 > Tracks the long-term goal AI conversation for each (student, period) pair. One row per student per period.
 
-| Field              | Type      | Constraints               | Notes                                               |
-| ------------------ | --------- | ------------------------- | --------------------------------------------------- |
-| `user_id`          | text      | PK (composite) → `user`   |                                                     |
-| `period_id`        | text      | PK (composite) → `period` |                                                     |
-| `conversation_id`  | text      | NOT NULL                  | OpenAI conversation ID                              |
-| `created_at`       | timestamp | NOT NULL                  |                                                     |
+| Field              | Type        | Constraints               | Notes                                               |
+| ------------------ | ----------- | ------------------------- | --------------------------------------------------- |
+| `user_id`          | text        | PK (composite) → `user`   |                                                     |
+| `period_id`        | text        | PK (composite) → `period` |                                                     |
+| `conversation_id`  | text        | NOT NULL                  | OpenAI conversation ID                              |
+| `created_at`       | timestamptz | NOT NULL                  |                                                     |
 | `last_response_id` | text      | nullable                  | Last OpenAI response ID — used for message chaining |
 
 ---
@@ -214,14 +226,14 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `description`     | text         | NOT NULL    | Short summary of the quest                                |
 | `skills`          | text         | NOT NULL    | Skills this quest targets                                 |
 | `week`            | integer      | NOT NULL    | Week number within the period                             |
-| `instructions`    | text         | NOT NULL    | Step-by-step completion instructions                      |
+| `instructions`    | jsonb        | NOT NULL    | Step-by-step completion instructions                      |
 | `rubric`          | json         | NOT NULL    | Grading criteria keyed by skill                           |
 | `status`          | quest_status | NOT NULL    | Enum: `"not_started"` \| `"in_progress"` \| `"completed"` |
 | `grade`           | jsonb        | nullable    | Grading output — see shape below                          |
 | `feedback`        | text         | nullable    | AI or teacher feedback                                    |
-| `due_date`        | timestamp    | nullable    |                                                           |
-| `created_at`      | timestamp    | NOT NULL    |                                                           |
-| `last_updated_at` | timestamp    | NOT NULL    | Auto-updated on every write                               |
+| `due_date`        | timestamptz  | nullable    |                                                           |
+| `created_at`      | timestamptz  | NOT NULL    |                                                           |
+| `last_updated_at` | timestamptz  | NOT NULL    | Auto-updated on every write                               |
 
 **`grade` JSONB shape:**
 
@@ -247,8 +259,8 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `period_id`  | text      | PK (composite) → `period` |                                     |
 | `skill_name` | text      | PK (composite)            |                                     |
 | `mastered`   | boolean   | NOT NULL                  |                                     |
-| `score`      | numeric   | NOT NULL                  | Latest aggregated score (0.0 – 1.0) |
-| `updated_at` | timestamp | NOT NULL                  |                                     |
+| `score`      | numeric     | NOT NULL                  | Latest aggregated score (0.0 – 1.0) |
+| `updated_at` | timestamptz | NOT NULL                  |                                     |
 
 ---
 
@@ -256,13 +268,13 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 
 > Weekly class-wide skill percentage rollups. Used by the teacher dashboard to track class progress over time.
 
-| Field        | Type      | Constraints | Notes                                        |
-| ------------ | --------- | ----------- | -------------------------------------------- |
-| `period_id`  | text      | NOT NULL    | FK → `period.period_id`                      |
-| `week`       | integer   | NOT NULL    | Week number                                  |
-| `skill_name` | text      | NOT NULL    | The skill being tracked                      |
-| `percentage` | numeric   | NOT NULL    | Fraction of students who mastered this skill |
-| `updated_at` | timestamp | NOT NULL    |                                              |
+| Field        | Type        | Constraints             | Notes                                        |
+| ------------ | ----------- | ----------------------- | -------------------------------------------- |
+| `period_id`  | text        | PRIMARY KEY, NOT NULL   | FK → `period.period_id`                      |
+| `week`       | integer     | PRIMARY KEY, NOT NULL   | Week number                                  |
+| `skill_name` | text        | PRIMARY KEY, NOT NULL   | The skill being tracked                      |
+| `percentage` | numeric     | NOT NULL                | Fraction of students who mastered this skill |
+| `updated_at` | timestamptz | NOT NULL                |                                              |
 
 ---
 
@@ -277,7 +289,7 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `user_id`    | text      | PK (composite) → `user`   |                                 |
 | `period_id`  | text      | PK (composite) → `period` |                                 |
 | `goal_text`  | text      | NOT NULL                  | Student's stated long-term goal |
-| `updated_at` | timestamp | NOT NULL                  | Set on every upsert             |
+| `updated_at` | timestamptz | NOT NULL                  | Set on every upsert             |
 
 ---
 
@@ -292,7 +304,7 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `auth_token` | text      | PK          | JWT token value                                |
 | `user_id`    | text      | NOT NULL    | FK → `user.user_id`                            |
 | `role`       | user_role | NOT NULL    | Enum: `"student"` \| `"teacher"` \| `"parent"` |
-| `expires_at` | timestamp | NOT NULL    | Token expiry (default: 1 hour from creation)   |
+| `expires_at` | timestamptz | NOT NULL    | Token expiry (default: 1 hour from creation)   |
 
 ---
 
@@ -305,10 +317,10 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `token_hash` | text      | PK          | SHA-256 hash of the raw token sent to the user |
 | `user_id`    | text      | NOT NULL    | FK → `user.user_id`                            |
 | `email`      | text      | NOT NULL    | Email at time of request                       |
-| `created_at` | timestamp | NOT NULL    |                                                |
-| `expires_at` | timestamp | NOT NULL    | Auto-expires after 45 minutes                  |
-| `used_at`    | timestamp | nullable    | Set when the token is consumed                 |
-| `burned_at`  | timestamp | nullable    | Set when the token is invalidated due to abuse |
+| `created_at` | timestamptz | NOT NULL    |                                                |
+| `expires_at` | timestamptz | NOT NULL    | Auto-expires after 45 minutes                  |
+| `used_at`    | timestamptz | nullable    | Set when the token is consumed                 |
+| `burned_at`  | timestamptz | nullable    | Set when the token is invalidated due to abuse |
 | `attempts`   | integer   | NOT NULL    | Confirmation attempts; token burns after 5     |
 | `request_ip` | text      | nullable    |                                                |
 | `user_agent` | text      | nullable    |                                                |
@@ -323,7 +335,7 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | ------------ | --------- | ----------- | ------------------------------------------------- |
 | `key`        | text      | PK          | Composite key — format varies by tier (see below) |
 | `count`      | integer   | NOT NULL    | Number of requests in the current window          |
-| `expires_at` | timestamp | NOT NULL    | Window expiry; row is stale after this            |
+| `expires_at` | timestamptz | NOT NULL    | Window expiry; row is stale after this            |
 
 **Key formats by tier:**
 
@@ -346,7 +358,7 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `waitlist_id`   | uuid      | PK          |                                   |
 | `user_id`       | text      | nullable    | FK → `user.user_id` if registered |
 | `email`         | text      | NOT NULL    |                                   |
-| `joined_at`     | timestamp | NOT NULL    |                                   |
+| `joined_at`     | timestamptz | NOT NULL    |                                   |
 | `position`      | integer   | NOT NULL    | Queue position                    |
 | `referral_code` | text      | nullable    | Unique 8-char code for sharing    |
 | `referred_by`   | text      | nullable    | `user_id` of the referrer         |
@@ -376,3 +388,19 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `password_reset_rate_limit` | `key`                                 | Rate-limit counters for reset requests    |
 | `waitlist`                  | `waitlist_id`                         | Teacher pilot study waitlist              |
 | `parent_invite`             | `code`                                | Invite codes for parents to link to a student and view their progress |
+| `material_files`            | `file_hash`                           | SHA-256 dedup registry for uploaded course files |
+
+---
+
+## File Deduplication
+
+### `material_files`
+
+> Deduplication registry for uploaded course files. Each unique file (by SHA-256 hash) is stored once with its own OpenAI vector store. Periods reference these shared vector stores via `period.file_vector_store_ids`.
+
+| Field              | Type        | Constraints | Notes                                            |
+| ------------------ | ----------- | ----------- | ------------------------------------------------ |
+| `file_hash`        | text        | PK          | SHA-256 hex of the original file bytes           |
+| `openai_file_id`   | text        | NOT NULL UNIQUE | OpenAI Files API ID                          |
+| `vector_store_id`  | text        | NOT NULL UNIQUE | Per-file vector store; embeddings live here  |
+| `created_at`       | timestamptz | NOT NULL    | Auto-set on first upload                         |
