@@ -1,6 +1,8 @@
 # Supabase Table Reference
 
-Quick reference for all 18 tables in the EduQuest Supabase database, grouped by domain.
+Quick reference for all 24 tables in the EduQuest Supabase database, grouped by domain.
+
+**RLS identity expression:** All policies use `(auth.jwt() ->> 'sub')` — reads the JWT `sub` claim as text, directly matching `user_id` values. Do **not** use `auth.uid()` — it casts to UUID and silently returns null for username-format IDs.
 
 ---
 
@@ -19,6 +21,14 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 6. [period_schedule](#period_schedule) — AI-generated weekly schedule for a period
 7. [enrollment](#enrollment) — student ↔ period membership
 8. [parent_invite](#parent_invite) — invite codes for parents to link to a student and view their progress
+
+**Curriculum**
+
+20. [week](#week) — week rows within a period (start/end dates)
+21. [lesson](#lesson) — a lesson belonging to a week within a period
+22. [concept](#concept) — a concept taught in a lesson, with rich metadata
+23. [skill](#skill) — a measurable skill for a period with mastery config
+24. [concept_skill](#concept_skill) — junction: which concepts develop which skills
 
 **File Deduplication**
 
@@ -68,6 +78,14 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `role`       | text        | NOT NULL | `"student"` \| `"teacher"` \| `"parent"` |
 | `created_at` | timestamptz | NOT NULL | Account creation time (DEFAULT now())    |
 
+**RLS:** Enabled
+
+| Operation     | Who  |
+| ------------- | ---- |
+| SELECT        | Self (`user_id = sub`) |
+| UPDATE        | Self (`user_id = sub`) |
+| INSERT/DELETE | FastAPI only |
+
 ---
 
 ### `student`
@@ -85,6 +103,16 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `completed_tutorial` | boolean   | NOT NULL    | Whether the onboarding tutorial is done |
 | `school_name`        | text      | nullable    |                                         |
 
+**RLS:** Enabled
+
+| Operation     | Who  |
+| ------------- | ---- |
+| SELECT        | Self (`user_id = sub`) |
+| SELECT        | Parent of student (EXISTS parent where sub ∈ `linked_student_ids`) |
+| SELECT        | Period owner (EXISTS enrollment JOIN period where `owner_id = sub`) |
+| UPDATE        | Self (`user_id = sub`) |
+| INSERT/DELETE | FastAPI only |
+
 ---
 
 ### `teacher`
@@ -99,6 +127,14 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `canvas_api_url` | text      | nullable    | Canvas LMS base URL             |
 | `canvas_api_key` | text      | nullable    | Canvas personal access token    |
 
+**RLS:** Enabled
+
+| Operation     | Who  |
+| ------------- | ---- |
+| SELECT        | Self (`user_id = sub`) |
+| UPDATE        | Self (`user_id = sub`) |
+| INSERT/DELETE | FastAPI only |
+
 ---
 
 ### `parent`
@@ -110,6 +146,14 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `user_id`            | text      | PK → `user` |                                                                  |
 | `linked_student_ids` | text[]  | nullable    | `user_id`s of linked student accounts                            |
 | `vpc_verified_at`    | timestamptz | nullable    | COPPA 2025 compliance — set when parent accepts a student invite |
+
+**RLS:** Enabled
+
+| Operation     | Who  |
+| ------------- | ---- |
+| SELECT        | Self (`user_id = sub`) |
+| UPDATE        | Self (`user_id = sub`) |
+| INSERT/DELETE | FastAPI only |
 
 ---
 
@@ -136,7 +180,17 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `course_description` | text      | nullable    | Teacher-provided description used when no files are uploaded |
 | `course_metadata`    | jsonb     | nullable    | Structured class metadata: learning_objectives, primary_standard, additional_standards, specific_standard_codes |
 | `processing_status`  | text      | NOT NULL DEFAULT 'ready' | `pending` while files process; `ready` on success; `failed` on error |
+| `status`             | text      | NOT NULL DEFAULT 'pending' | Curriculum lifecycle: `"pending"` → `"draft"` (bot wrote rows) → `"approved"` (teacher confirmed) |
 | `created_at`         | timestamptz | NOT NULL    |                                           |
+
+**RLS:** Enabled
+
+| Operation     | Who  |
+| ------------- | ---- |
+| SELECT        | Owner (`owner_id = sub`) |
+| SELECT        | Enrolled student (EXISTS enrollment where `user_id = sub`) |
+| UPDATE        | Owner (`owner_id = sub`) |
+| INSERT/DELETE | FastAPI only |
 
 ---
 
@@ -153,6 +207,15 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `created_at`              | timestamptz | NOT NULL      |                                                 |
 | `last_updated_at`         | timestamptz | NOT NULL      | Auto-updated on every write                     |
 
+**RLS:** Enabled
+
+| Operation | Who  |
+| --------- | ---- |
+| SELECT    | Period owner (EXISTS period where `owner_id = sub`) |
+| INSERT    | Period owner (WITH CHECK) |
+| UPDATE    | Period owner |
+| DELETE    | FastAPI only |
+
 ---
 
 ### `enrollment`
@@ -167,6 +230,15 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `enrolled_at`   | timestamptz | NOT NULL                  | Auto-set on insert |
 | `enrollment_id` | uuid      | UNIQUE                    | Surrogate ID       |
 
+**RLS:** Enabled
+
+| Operation | Who  |
+| --------- | ---- |
+| SELECT    | Period owner (EXISTS period where `owner_id = sub`) |
+| SELECT    | Enrolled student (self — `user_id = sub`) |
+| INSERT    | Self only (`user_id = sub` WITH CHECK) |
+| DELETE    | Self only (`user_id = sub`) |
+
 ### `parent_invite`
 
 > Single-use invite codes that let a parent link to a student account. Once redeemed, the parent gains read access to that student's grades, skill mastery, and quest progress — the same view a teacher has for an enrolled student.
@@ -178,6 +250,129 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `expires_at` | timestamptz | NOT NULL    | Default: 24 hours from creation     |
 | `used`       | boolean     | NOT NULL    | Flipped to `true` on redemption     |
 | `created_at` | timestamptz | NOT NULL    |                                     |
+
+**RLS:** Enabled
+
+| Operation     | Who  |
+| ------------- | ---- |
+| SELECT        | Parent creator (`user_id = sub`) — note: `user_id` here is the **parent**, not the student |
+| INSERT/UPDATE/DELETE | FastAPI only — invite creation and redemption always go through the service role |
+
+---
+
+## Curriculum
+
+### `week`
+
+> One row per week within a period. Written by the curriculum bot; referenced by `lesson`.
+
+| Field         | Type    | Constraints               | Notes                        |
+| ------------- | ------- | ------------------------- | ---------------------------- |
+| `period_id`   | text    | PK (composite) → `period` |                              |
+| `week_number` | integer | PK (composite)            | 1-based week index           |
+| `week_start`  | date    | nullable                  | First day of the week        |
+| `week_end`    | date    | nullable                  | Last day of the week         |
+
+**RLS:** Enabled
+
+| Operation            | Who  |
+| -------------------- | ---- |
+| SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
+| SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
+| SELECT               | Parent (EXISTS parent where sub ∈ `linked_student_ids` AND student enrolled in period) |
+| INSERT/UPDATE/DELETE | FastAPI only |
+
+---
+
+### `lesson`
+
+> A named lesson belonging to a specific week in a period.
+
+| Field         | Type    | Constraints                              | Notes |
+| ------------- | ------- | ---------------------------------------- | ----- |
+| `period_id`   | text    | PK (composite) → `period`                |       |
+| `lesson_name` | text    | PK (composite)                           |       |
+| `week_number` | integer | NOT NULL → FK `week(period_id, week_number)` |       |
+
+**RLS:** Enabled
+
+| Operation            | Who  |
+| -------------------- | ---- |
+| SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
+| SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
+| INSERT/UPDATE/DELETE | FastAPI only |
+
+---
+
+### `concept`
+
+> A concept taught within a lesson. Rich metadata fields populated by the curriculum bot; editable by the teacher before approval.
+
+| Field                  | Type        | Constraints                               | Notes                                     |
+| ---------------------- | ----------- | ----------------------------------------- | ----------------------------------------- |
+| `period_id`            | text        | PK (composite) → `period`                 |                                           |
+| `concept_name`         | text        | PK (composite)                            |                                           |
+| `lesson_name`          | text        | NOT NULL → FK `lesson(period_id, lesson_name)` |                                      |
+| `description`          | text        | nullable                                  | Plain-text summary of the concept         |
+| `prerequisites`        | jsonb       | nullable                                  | List of prerequisite concepts/skills      |
+| `common_misconceptions`| jsonb       | nullable                                  | Common student errors                     |
+| `key_takeaways`        | jsonb       | nullable                                  | Core points to remember                   |
+| `metadata`             | jsonb       | nullable                                  | Arbitrary extra data from the bot         |
+| `created_at`           | timestamptz | NOT NULL DEFAULT now()                    |                                           |
+| `last_updated_at`      | timestamptz | NOT NULL DEFAULT now()                    | Set on every write                        |
+
+**RLS:** Enabled
+
+| Operation            | Who  |
+| -------------------- | ---- |
+| SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
+| SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
+| INSERT/UPDATE/DELETE | FastAPI only |
+
+---
+
+### `skill`
+
+> A measurable skill scoped to a period. Defines mastery config and optional taxonomy metadata.
+
+| Field               | Type    | Constraints               | Notes                                          |
+| ------------------- | ------- | ------------------------- | ---------------------------------------------- |
+| `period_id`         | text    | PK (composite) → `period` |                                                |
+| `skill_name`        | text    | PK (composite)            |                                                |
+| `description`       | text    | nullable                  |                                                |
+| `bloom_level`       | text    | nullable                  | Bloom's taxonomy level (e.g. `"Apply"`)        |
+| `difficulty`        | text    | nullable                  | e.g. `"beginner"`, `"intermediate"`, `"advanced"` |
+| `mastery_threshold` | float   | NOT NULL DEFAULT 0.8      | Score (0.0–1.0) required to mark mastered      |
+| `mastery_criteria`  | jsonb   | nullable                  | Detailed rubric criteria for mastery           |
+| `metadata`          | jsonb   | nullable                  | Arbitrary extra data from the bot              |
+
+**RLS:** Enabled
+
+| Operation            | Who  |
+| -------------------- | ---- |
+| SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
+| SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
+| INSERT/UPDATE/DELETE | FastAPI only |
+
+---
+
+### `concept_skill`
+
+> Junction table mapping concepts to the skills they develop. One row per (period, concept, skill) triple.
+
+| Field          | Type | Constraints                                          | Notes |
+| -------------- | ---- | ---------------------------------------------------- | ----- |
+| `period_id`    | text | PK (composite)                                       |       |
+| `concept_name` | text | PK (composite) → FK `concept(period_id, concept_name)` ON DELETE CASCADE |       |
+| `skill_name`   | text | PK (composite) → FK `skill(period_id, skill_name)` ON DELETE CASCADE |       |
+
+**RLS:** Enabled
+
+| Operation            | Who  |
+| -------------------- | ---- |
+| SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
+| SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
+| INSERT/UPDATE/DELETE | FastAPI only |
 
 ---
 
@@ -196,6 +391,13 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `created_at`        | timestamptz | NOT NULL    |                                                     |
 | `last_response_id`  | text        | nullable    | Last OpenAI response ID — used for message chaining |
 
+**RLS:** Enabled
+
+| Operation     | Who  |
+| ------------- | ---- |
+| SELECT        | Self (`user_id = sub`) |
+| INSERT/UPDATE/DELETE | FastAPI only |
+
 ---
 
 ### `ltg_conversation`
@@ -209,6 +411,13 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `conversation_id`  | text        | NOT NULL                  | OpenAI conversation ID                              |
 | `created_at`       | timestamptz | NOT NULL                  |                                                     |
 | `last_response_id` | text      | nullable                  | Last OpenAI response ID — used for message chaining |
+
+**RLS:** Enabled
+
+| Operation     | Who  |
+| ------------- | ---- |
+| SELECT        | The student (self — `user_id = sub`) |
+| INSERT/UPDATE/DELETE | FastAPI only |
 
 ---
 
@@ -247,6 +456,17 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 - `detailed_grade` — per-criterion scores produced by the grading agent (e.g. `{"Clarity": 18, "Analysis": 22}`)
 - `overall_score` — total points rolled up from all criteria
 
+**RLS:** Enabled
+
+| Operation     | Who  |
+| ------------- | ---- |
+| SELECT        | The student (`user_id = sub`) |
+| SELECT        | Period owner (EXISTS enrollment JOIN period where `owner_id = sub`) |
+| SELECT        | Parent (EXISTS parent where sub ∈ `linked_student_ids`) |
+| UPDATE        | Student — `status` column only (enforced at FastAPI layer, not RLS) |
+| UPDATE        | Period owner — `grade`/`feedback` columns only (enforced at FastAPI layer, not RLS) |
+| INSERT/DELETE | FastAPI only |
+
 ---
 
 ### `student_skill_mastery`
@@ -262,6 +482,15 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `score`      | numeric     | NOT NULL                  | Latest aggregated score (0.0 – 1.0) |
 | `updated_at` | timestamptz | NOT NULL                  |                                     |
 
+**RLS:** Enabled — note: PK column is `student_id`, not `user_id`
+
+| Operation     | Who  |
+| ------------- | ---- |
+| SELECT        | The student (`student_id = sub`) |
+| SELECT        | Period owner (EXISTS period where `owner_id = sub`) |
+| SELECT        | Parent (EXISTS parent where sub ∈ `linked_student_ids` and `student_id` matches) |
+| INSERT/UPDATE/DELETE | FastAPI only |
+
 ---
 
 ### `aggregated_metrics`
@@ -275,6 +504,8 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `skill_name` | text        | PRIMARY KEY, NOT NULL   | The skill being tracked                      |
 | `percentage` | numeric     | NOT NULL                | Fraction of students who mastered this skill |
 | `updated_at` | timestamptz | NOT NULL                |                                              |
+
+**RLS:** Disabled — FastAPI service role only
 
 ---
 
@@ -291,6 +522,15 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `goal_text`  | text      | NOT NULL                  | Student's stated long-term goal |
 | `updated_at` | timestamptz | NOT NULL                  | Set on every upsert             |
 
+**RLS:** Enabled
+
+| Operation     | Who  |
+| ------------- | ---- |
+| SELECT        | The student (`user_id = sub`) |
+| SELECT        | Period owner (EXISTS period where `owner_id = sub`) |
+| SELECT        | Parent (EXISTS parent where sub ∈ `linked_student_ids` and `user_id` matches) |
+| INSERT/UPDATE/DELETE | FastAPI only |
+
 ---
 
 ## Auth & Sessions
@@ -305,6 +545,14 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `user_id`    | text      | NOT NULL    | FK → `user.user_id`                            |
 | `role`       | user_role | NOT NULL    | Enum: `"student"` \| `"teacher"` \| `"parent"` |
 | `expires_at` | timestamptz | NOT NULL    | Token expiry (default: 1 hour from creation)   |
+
+**RLS:** Enabled
+
+| Operation | Who  |
+| --------- | ---- |
+| SELECT    | Self (`user_id = sub`) |
+| DELETE    | Self (`user_id = sub`) |
+| INSERT    | FastAPI only — JWT doesn't exist yet at login time |
 
 ---
 
@@ -324,6 +572,8 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `attempts`   | integer   | NOT NULL    | Confirmation attempts; token burns after 5     |
 | `request_ip` | text      | nullable    |                                                |
 | `user_agent` | text      | nullable    |                                                |
+
+**RLS:** Disabled — FastAPI service role only
 
 ---
 
@@ -345,6 +595,8 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | IP only        | `ip:{ip}\|w:{window_start}`                | 20 per 15 min  |
 | Email cooldown | `cooldown:email:{email}`                   | 5 min cooldown |
 
+**RLS:** Disabled — FastAPI service role only
+
 ---
 
 ## Onboarding
@@ -364,6 +616,8 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `referred_by`   | text      | nullable    | `user_id` of the referrer         |
 | `status`        | text      | NOT NULL    | `"pending"` \| `"approved"`       |
 
+**RLS:** Disabled — public signup list, no per-user scoping needed
+
 ---
 
 ## Quick Reference
@@ -374,7 +628,7 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `student`                   | `user_id`                             | Student profile fields                    |
 | `teacher`                   | `user_id`                             | Teacher profile fields                    |
 | `parent`                    | `user_id`                             | Parent profile + linked student IDs       |
-| `period`                    | `period_id`                           | Class period owned by a teacher or parent |
+| `period`                    | `period_id`                           | Class period owned by a teacher or parent (`status`: pending→draft→approved) |
 | `period_schedule`           | `period_id`                           | AI-generated weekly schedule for a period |
 | `enrollment`                | `(user_id, period_id)`                | Student ↔ period membership               |
 | `session`                   | `auth_token`                          | Active JWT sessions                       |
@@ -388,6 +642,11 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `password_reset_rate_limit` | `key`                                 | Rate-limit counters for reset requests    |
 | `waitlist`                  | `waitlist_id`                         | Teacher pilot study waitlist              |
 | `parent_invite`             | `code`                                | Invite codes for parents to link to a student and view their progress |
+| `week`                      | `(period_id, week_number)`            | Week rows within a period (start/end dates)       |
+| `lesson`                    | `(period_id, lesson_name)`            | Lesson belonging to a week within a period        |
+| `concept`                   | `(period_id, concept_name)`           | Concept taught in a lesson with rich metadata     |
+| `skill`                     | `(period_id, skill_name)`             | Measurable skill with mastery config              |
+| `concept_skill`             | `(period_id, concept_name, skill_name)` | Junction: concepts → skills they develop        |
 | `material_files`            | `file_hash`                           | SHA-256 dedup registry for uploaded course files |
 
 ---
@@ -404,3 +663,5 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `openai_file_id`   | text        | NOT NULL UNIQUE | OpenAI Files API ID                          |
 | `vector_store_id`  | text        | NOT NULL UNIQUE | Per-file vector store; embeddings live here  |
 | `created_at`       | timestamptz | NOT NULL    | Auto-set on first upload                         |
+
+**RLS:** Disabled — FastAPI service role only
