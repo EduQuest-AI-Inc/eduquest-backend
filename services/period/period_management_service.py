@@ -1,6 +1,5 @@
 import re
 import uuid
-from datetime import date
 from typing import Optional
 
 from data_access.period_dao import PeriodDAO
@@ -57,8 +56,8 @@ class PeriodManagementService:
             file_urls=file_urls,
             canvas_course_id=canvas_course_id,
             canvas_course_name=canvas_course_name,
-            start_date=date.fromisoformat(start_date) if start_date else None,
-            end_date=date.fromisoformat(end_date) if end_date else None,
+            start_date=start_date,
+            end_date=end_date,
             grade_level=grade_level,
             mastery_threshold=mastery_threshold,
             course_description=course_description,
