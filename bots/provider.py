@@ -54,6 +54,17 @@ class BotProvider:
             course_description=course_description,
         )
 
+    def create_curriculum_bot(
+        self,
+        start_date: str,
+        end_date: str,
+        grade_level: str,
+        course_description: str,
+        course_metadata: dict,
+    ):
+        from bots.curriculum_agent import CurriculumBot
+        return CurriculumBot(start_date, end_date, grade_level, course_description, course_metadata)
+
     def create_profile_agent(self):
         from bots.profile_agent import create_profile_agent
         return create_profile_agent()
@@ -165,6 +176,17 @@ class MockBotProvider(BotProvider):
             end_date=end_date,
             course_description=course_description,
         )
+
+    def create_curriculum_bot(
+        self,
+        start_date: str,
+        end_date: str,
+        grade_level: str,
+        course_description: str,
+        course_metadata: dict,
+    ):
+        from bots._mocks import MockCurriculumBot
+        return MockCurriculumBot(start_date, end_date, grade_level, course_description, course_metadata)
 
     def create_profile_agent(self):
         from bots.profile_agent import create_profile_agent

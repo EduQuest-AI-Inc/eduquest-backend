@@ -5,6 +5,8 @@ Activated when MOCK_AI=true via bots/provider.py. All classes return
 realistic-shaped data (real Pydantic types) so downstream service logic
 runs unchanged.
 """
+import math
+from datetime import date
 from typing import Any, Optional
 
 
@@ -148,6 +150,114 @@ class MockGradingOrchestrator:
             skill_mastery=skill_mastery,
             homework_changes_recommended=False,
             recommended_changes=None,
+        )
+
+
+_RESEARCH_TOPICS = [
+    "Research-based Topic A",
+    "Research-based Topic B",
+    "Research-based Topic C",
+]
+
+_MIN_KEYWORD_LENGTH = 4
+_MAX_KEYWORDS = 5
+
+
+def _extract_topics(course_description: str) -> list[str]:
+    """Derive up to 5 keywords from course_description, falling back to research placeholders."""
+    words = [w for w in course_description.split() if len(w) >= _MIN_KEYWORD_LENGTH]
+    return words[:_MAX_KEYWORDS] if words else _RESEARCH_TOPICS
+
+
+class MockCurriculumBot:
+    """
+    Deterministic replacement for CurriculumBot. Returns a fully structured
+    CurriculumResult with no randomness, no network calls, and no DB writes.
+    The service layer is responsible for persisting the result.
+
+    Determinism rules:
+      - Week count  = ceil((end_date - start_date).days / 7)
+      - Lessons     = 1 if week_number is odd, 2 if even
+      - Concepts    = 1 if lesson_index is odd (1-based), 2 if even
+      - Skills      = 1 if concept_index is odd (1-based), 2 if even
+      - Topics      = keywords cycled from course_description (or research placeholders)
+    """
+
+    def __init__(
+        self,
+        start_date: str,
+        end_date: str,
+        grade_level: str,
+        course_description: str,
+        course_metadata: dict,
+    ):
+        self.start_date = date.fromisoformat(start_date)
+        self.end_date = date.fromisoformat(end_date)
+        self.grade_level = grade_level
+        self.course_description = course_description
+        self.course_metadata = course_metadata
+
+    def run(self):
+        from bots.schemas.curriculum import (
+            CurriculumConcept,
+            CurriculumLesson,
+            CurriculumResult,
+            CurriculumSkill,
+            CurriculumWeek,
+        )
+
+        total_weeks = max(1, math.ceil((self.end_date - self.start_date).days / 7))
+        topics = _extract_topics(self.course_description)
+        weeks = []
+
+        for w in range(1, total_weeks + 1):
+            topic = topics[(w - 1) % len(topics)]
+            lesson_count = 1 if w % 2 != 0 else 2
+            lessons = []
+
+            for lesson_num in range(1, lesson_count + 1):
+                concept_count = 1 if lesson_num % 2 != 0 else 2
+                concepts = []
+
+                for c in range(1, concept_count + 1):
+                    skill_count = 1 if c % 2 != 0 else 2
+                    skills = [
+                        CurriculumSkill(
+                            skill_id=f"{w}.{lesson_num}.{c}.{s}",
+                            title=f"Skill {w}.{lesson_num}.{c}.{s}",
+                        )
+                        for s in range(1, skill_count + 1)
+                    ]
+                    concepts.append(
+                        CurriculumConcept(
+                            concept_id=f"{w}.{lesson_num}.{c}",
+                            title=f"Concept {w}.{lesson_num}.{c}",
+                            skills=skills,
+                        )
+                    )
+
+                lessons.append(
+                    CurriculumLesson(
+                        lesson_id=f"{w}.{lesson_num}",
+                        title=f"Lesson {w}.{lesson_num}",
+                        concepts=concepts,
+                    )
+                )
+
+            weeks.append(
+                CurriculumWeek(
+                    week_number=w,
+                    week_id=str(w),
+                    title=f"Week {w}: {topic}",
+                    lessons=lessons,
+                )
+            )
+
+        return CurriculumResult(
+            grade_level=self.grade_level,
+            course=self.course_description,
+            total_weeks=total_weeks,
+            weeks=weeks,
         )
 
 
