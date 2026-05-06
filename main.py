@@ -7,8 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
 
-from api.routers import conversation, period, schedule, ltg, teacher, waitlist
-from api.routers import auth, user, enrollment, quest, parent
+from routers import conversation, period, schedule, ltg, teacher, waitlist
+from routers import auth, user, enrollment, quest, parent
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from exceptions.auth_error import AuthError

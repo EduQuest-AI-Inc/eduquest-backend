@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from main import app
-from api.deps import get_auth, AuthPayload
+from routers.deps import get_auth, AuthPayload
 
 OWNED_PERIOD = {"period_id": "p1", "owner_id": "user-1", "file_urls": []}
 OTHER_PERIOD = {"period_id": "p1", "owner_id": "other-user", "file_urls": []}

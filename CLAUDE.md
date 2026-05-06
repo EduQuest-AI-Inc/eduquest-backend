@@ -7,21 +7,20 @@ See also: [data_access/CLAUDE.md](data_access/CLAUDE.md) for DAO and database pa
 ```
 eduquest-backend/
 ├── main.py                         # FastAPI app factory and entry point (sole server — Flask migration complete)
-├── api/                            # FastAPI layer
+├── routers/                        # FastAPI layer
 │   ├── deps.py                     # get_auth() dependency → AuthPayload (JWT from header or cookie)
-│   └── routers/
-│       ├── auth.py                 # /auth — login, register, password reset
-│       ├── conversation.py         # /conversation — profile assistant, update assistant
-│       ├── enrollment.py           # /enrollment — enroll/unenroll students
-│       ├── ltg.py                  # /period — LTG conversation routes (mounted under /period)
-│       ├── parent.py               # /parent — parent invite, child lookup
-│       ├── period.py               # /period — period CRUD, homework agent
-│       ├── quest.py                # /quest — quest retrieval, submission
-│       ├── schedule.py             # /period — period schedule routes (mounted under /period)
-│       ├── teacher.py              # /teacher — Canvas courses (teacher-only)
-│       ├── user.py                 # /user — user profile
-│       └── waitlist.py             # /pilot-waitlist — status, join
-├── services/                         # Service/business logic layer (imported by api/routers/)
+│   ├── auth.py                     # /auth — login, register, password reset
+│   ├── conversation.py             # /conversation — profile assistant, update assistant
+│   ├── enrollment.py               # /enrollment — enroll/unenroll students
+│   ├── ltg.py                      # /period — LTG conversation routes (mounted under /period)
+│   ├── parent.py                   # /parent — parent invite, child lookup
+│   ├── period.py                   # /period — period CRUD, homework agent
+│   ├── quest.py                    # /quest — quest retrieval, submission
+│   ├── schedule.py                 # /period — period schedule routes (mounted under /period)
+│   ├── teacher.py                  # /teacher — Canvas courses (teacher-only)
+│   ├── user.py                     # /user — user profile
+│   └── waitlist.py                 # /pilot-waitlist — status, join
+├── services/                         # Service/business logic layer (imported by routers/)
 │   ├── auth/                       # auth_service.py, password_reset_service.py, password_policy.py
 │   ├── conversation/               # conversation_service.py, grading_service.py,
 │   │                               #   ltg_service.py, profile_service.py, teacher_feedback_service.py
@@ -92,10 +91,10 @@ eduquest-backend/
 
 ## Route Pattern
 
-FastAPI routers live in `api/routers/[feature].py`. Each imports service classes from `services/[feature]/`:
+FastAPI routers live in `routers/[feature].py`. Each imports service classes from `services/[feature]/`:
 
 ```
-api/routers/[feature].py       # FastAPI router — HTTP boundary only
+routers/[feature].py       # FastAPI router — HTTP boundary only
 services/[feature]/
   ├── [feature]_service.py     # Business logic (thin orchestrator)
   ├── [feature]_*_service.py   # Sub-services for specific concerns

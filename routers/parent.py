@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.deps import AuthPayload, Role, require_roles
+from routers.deps import AuthPayload, Role, require_roles
 from services.parent.parent_service import ParentService
 from services.period.period_management_service import PeriodManagementService
 

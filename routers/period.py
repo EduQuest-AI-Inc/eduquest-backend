@@ -11,7 +11,7 @@ from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from api.deps import AuthPayload, Role, get_auth, require_roles
+from routers.deps import AuthPayload, Role, get_auth, require_roles
 from data_access.teacher_dao import TeacherDAO
 from integrations import openai_vector_store
 from integrations.s3_service import (
