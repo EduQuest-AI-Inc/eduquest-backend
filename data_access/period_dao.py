@@ -40,3 +40,6 @@ class PeriodDAO(SupabaseBaseDAO):
 
     def get_periods_by_owner_id(self, owner_id: str) -> List:
         return self._select_eq('owner_id', owner_id)
+
+    def update_status(self, period_id: str, status: str) -> None:
+        self._update({'period_id': period_id}, {'status': status})
