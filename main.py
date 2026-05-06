@@ -55,6 +55,18 @@ async def auth_error_handler(request: Request, exc: AuthError):
     return JSONResponse(status_code=401, content={"error": str(exc)})
 
 
+@app.on_event("startup")
+async def check_s3_connectivity():
+    from integrations.s3_service import s3, BUCKET_NAME
+    import logging
+    _log = logging.getLogger(__name__)
+    try:
+        s3.head_bucket(Bucket=BUCKET_NAME)
+        _log.info("S3 OK — bucket=%s endpoint=%s", BUCKET_NAME, s3.meta.endpoint_url)
+    except Exception as e:
+        _log.error("S3 connectivity FAILED — bucket=%s error=%s", BUCKET_NAME, e)
+
+
 app.include_router(auth.router, prefix="/auth")
 app.include_router(conversation.router, prefix="/conversation")
 app.include_router(enrollment.router, prefix="/enrollment")

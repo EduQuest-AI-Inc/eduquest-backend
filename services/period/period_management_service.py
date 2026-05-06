@@ -1,12 +1,13 @@
 import re
 import uuid
+from datetime import date
 from typing import Optional
 
 from data_access.period_dao import PeriodDAO
 from data_access.period_schedule_dao import PeriodScheduleDAO
 from integrations import openai_vector_store
 from integrations.s3_service import delete_files_from_s3
-from models.period import Period
+from models.period import CourseMetadata, Period
 
 
 class PeriodManagementService:
@@ -32,7 +33,10 @@ class PeriodManagementService:
         canvas_course_name: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        grade_level: Optional[str] = None,
+        mastery_threshold: Optional[float] = None,
         course_description: Optional[str] = None,
+        course_metadata: Optional[CourseMetadata] = None,
         processing_status: str = "pending",
     ) -> dict:
         period_id = self.generate_period_id(course)
@@ -53,9 +57,12 @@ class PeriodManagementService:
             file_urls=file_urls,
             canvas_course_id=canvas_course_id,
             canvas_course_name=canvas_course_name,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=date.fromisoformat(start_date) if start_date else None,
+            end_date=date.fromisoformat(end_date) if end_date else None,
+            grade_level=grade_level,
+            mastery_threshold=mastery_threshold,
             course_description=course_description,
+            course_metadata=course_metadata,
             processing_status=processing_status,
         )
         self.period_dao.add_period(new_period)
