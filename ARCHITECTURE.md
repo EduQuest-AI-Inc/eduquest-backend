@@ -4,7 +4,7 @@
 
 ### Routers are HTTP-boundary-only — no business logic lives there
 
-Route handlers in `routersesponsible for parsing requests, enforcing auth via `Depends()`, and returning responses. All business logic belongs in the service layer. A router handler should do nothing more than call a service method and return its result (plus any private `\_helper()` functions scoped to that file for multi-step request wiring, capped at 20 lines each).
+Route handlers in `routers` are responsible for parsing requests, enforcing auth via `Depends()`, and returning responses. All business logic belongs in the service layer. A router handler should do nothing more than call a service method and return its result (plus any private `_helper()` functions scoped to that file for multi-step request wiring, capped at 20 lines each).
 
 ### All S3 access goes through `integrations/s3_service.py`
 
@@ -19,9 +19,9 @@ The frontend may hide buttons, redirect routes, or skip rendering components bas
 
 Role enforcement lives exclusively at the **router layer** via FastAPI `Depends()`. Service methods never raise errors for role checks — they assume the caller is already authorized. Service-layer `PermissionError` is reserved for **ownership checks** only (e.g. a teacher editing another teacher's period).
 
-Three roles: `Role.STUDENT`, `Role.TEACHER`, `Role.PARENT` — defined as a `str, Enum` in `routers/deps.py` alongside `AuthPayload` and `get_auth()`.
+Three roles: `Role.STUDENT`, `Role.TEACHER`, `Role.PARENT` — defined as a `str, Enum` in `api/deps.py` alongside `AuthPayload` and `get_auth()`.
 
-Canonical dependencies (all in `routers/deps.py`):
+Canonical dependencies (all in `api/deps.py`):
 
 - `get_auth()` — validates JWT, returns `AuthPayload`; use when any authenticated user is allowed.
 - `require_roles(Role.X, ...)` — restricts to one or more roles; declare in the route's `Depends()`.
