@@ -239,7 +239,7 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 
 ### `student_skill_mastery`
 
-> Tracks whether a student has mastered each skill in a period. Updated by the grading pipeline after each quest.
+> Tracks whether a student has mastered each skill in a period. Written through `KnowledgeGraphService.update_mastery` (one row per (student, period, skill)). Read by `KnowledgeGraphService.get_graph` and the agent function tools in `bots/tools/knowledge_graph_tools.py`. Wiring from the grading pipeline is a follow-up.
 
 | Field        | Type      | Constraints               | Notes                               |
 | ------------ | --------- | ------------------------- | ----------------------------------- |
