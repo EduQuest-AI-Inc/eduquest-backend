@@ -129,9 +129,12 @@ Quick reference for all 18 tables in the EduQuest Supabase database, grouped by 
 | `file_url`                | text[]  | nullable    | S3 URLs of uploaded course files          |
 | `canvas_course_id`        | integer | nullable    | Canvas course ID for LMS sync             |
 | `canvas_course_name` | text      | nullable    |                                           |
-| `start_date`         | text      | nullable    |                                           |
-| `end_date`           | text      | nullable    |                                           |
+| `start_date`         | date      | nullable    |                                           |
+| `end_date`           | date      | nullable    |                                           |
+| `grade_level`        | text      | nullable    | Grade level of the course, e.g. "9", "AP", "College" |
+| `mastery_threshold`  | float4    | nullable, default 0.8 | Score (0.0–1.0) required to flip mastered = true; applies to all weeks in the period |
 | `course_description` | text      | nullable    | Teacher-provided description used when no files are uploaded |
+| `course_metadata`    | jsonb     | nullable    | Structured class metadata: learning_objectives, primary_standard, additional_standards, specific_standard_codes |
 | `processing_status`  | text      | NOT NULL DEFAULT 'ready' | `pending` while files process; `ready` on success; `failed` on error |
 | `created_at`         | timestamptz | NOT NULL    |                                           |
 

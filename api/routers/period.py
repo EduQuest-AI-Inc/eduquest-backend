@@ -22,6 +22,7 @@ from integrations.s3_service import (
     get_file_presigned_url,
 )
 from services.period.period_file_service import PeriodFileService
+from models.period import CourseMetadata
 from services.period.period_management_service import PeriodManagementService
 from services.waitlist.waitlist_service import WaitlistService
 
@@ -181,10 +182,24 @@ def create_period(
     start_date: Optional[str] = Form(default=None),
     end_date: Optional[str] = Form(default=None),
     course_description: Optional[str] = Form(default=None),
+    grade_level: Optional[str] = Form(default=None),
+    mastery_threshold: Optional[float] = Form(default=None),
+    learning_objectives: Optional[str] = Form(default=None),
+    primary_standard: Optional[str] = Form(default=None),
+    additional_standards: List[str] = Form(default=[]),
+    specific_standard_codes: Optional[str] = Form(default=None),
     auth: AuthPayload = Depends(get_auth),
 ):
     if auth.role == Role.TEACHER:
         _validate_pilot_access(auth.sub)
+
+    raw_metadata = CourseMetadata(
+        learning_objectives=learning_objectives,
+        primary_standard=primary_standard,
+        additional_standards=additional_standards or [],
+        specific_standard_codes=specific_standard_codes,
+    )
+    course_metadata = raw_metadata if raw_metadata.model_dump(exclude_none=True) else None
 
     temp_dir = tempfile.mkdtemp()
     try:
@@ -204,7 +219,10 @@ def create_period(
             canvas_course_name=canvas_course_name,
             start_date=start_date or None,
             end_date=end_date or None,
+            grade_level=grade_level or None,
+            mastery_threshold=mastery_threshold,
             course_description=course_description or None,
+            course_metadata=course_metadata,
             processing_status="pending",
         )
         period_id = period["period_id"]

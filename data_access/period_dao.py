@@ -18,7 +18,10 @@ class PeriodDAO(SupabaseBaseDAO):
             'canvas_course_name': getattr(period, 'canvas_course_name', None),
             'start_date': getattr(period, 'start_date', None),
             'end_date': getattr(period, 'end_date', None),
+            'grade_level': getattr(period, 'grade_level', None),
+            'mastery_threshold': getattr(period, 'mastery_threshold', None),
             'course_description': getattr(period, 'course_description', None),
+            'course_metadata': period.course_metadata.model_dump() if period.course_metadata else None,
             'file_vector_store_ids': getattr(period, 'file_vector_store_ids', []),
             'processing_status': getattr(period, 'processing_status', 'pending'),
         })
