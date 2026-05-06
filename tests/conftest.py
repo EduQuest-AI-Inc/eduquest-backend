@@ -60,6 +60,7 @@ mock_boto3.resource = MagicMock(return_value=MagicMock())
 mock_boto3.client = MagicMock(return_value=MagicMock())
 sys.modules['boto3'] = mock_boto3
 sys.modules['botocore'] = MagicMock()
+sys.modules['botocore.config'] = MagicMock()
 sys.modules['botocore.exceptions'] = MagicMock()
 
 # Prevent RuntimeError from get_supabase_client() during unit test imports.
