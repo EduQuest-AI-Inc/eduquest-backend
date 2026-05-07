@@ -118,7 +118,7 @@ class PeriodScheduleAgent:
         self.agent = Agent(
             name="Period Schedule Agent",
             instructions=instructions,
-            model="gpt-5",
+            model="gpt-5.5",
             tools=tools,  # type: ignore[arg-type]
             output_type=PeriodScheduleSchema
         )
@@ -135,7 +135,7 @@ MISSION
 Transform course materials into a fully structured weekly schedule using this hierarchy:
   Week → Lessons → Concepts → Skills
 
-Each week must have 2-5 lessons. Each lesson must have 1-3 concepts. Each concept must have 1-4 skills.
+Each week must have 2-5 lessons. Each lesson must have 2-5 concepts. Each concept must have 2-5 skills.
 
 Your output must be accurate to the provided materials and must not invent content not present in the inputs.
 
