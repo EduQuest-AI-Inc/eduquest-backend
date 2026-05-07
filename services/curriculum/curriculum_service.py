@@ -97,7 +97,7 @@ class CurriculumService:
 
             bot = get_bot_provider().create_curriculum_agent(
                 vector_store_ids=vector_store_ids,
-                course_name=period.get("name"),
+                course_name=period.get("name") or "",
                 start_date=str(start_date),
                 end_date=str(end_date),
                 course_description=course_description,
