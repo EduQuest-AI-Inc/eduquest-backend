@@ -7,7 +7,6 @@ from data_access.enrollment_dao import EnrollmentDAO
 from data_access.ltg_conversation_dao import LtgConversationDAO
 from data_access.parent_dao import ParentDAO
 from data_access.period_dao import PeriodDAO
-from data_access.period_schedule_dao import PeriodScheduleDAO
 from data_access.quest_dao import QuestDAO
 from data_access.student_dao import StudentDAO
 from data_access.student_long_term_goal_dao import StudentLongTermGoalDAO
@@ -28,7 +27,6 @@ class EnrollmentService:
         self.period_dao = PeriodDAO()
         self.parent_dao = ParentDAO()
         self.user_dao = UserDAO()
-        self.period_schedule_dao = PeriodScheduleDAO()
         self.quest_dao = QuestDAO()
         self.ltg_conversation_dao = LtgConversationDAO()
         self.conversation_dao = ConversationDAO()
@@ -118,8 +116,7 @@ class EnrollmentService:
             for p in self.period_dao.get_periods_by_owner_id(parent['user_id']):
                 if p['period_id'] in enrolled:
                     continue
-                schedule = self.period_schedule_dao.get_by_period_id(p['period_id'])
-                if schedule and schedule.quest_enabled_weeks:
+                if p.get('status') in ('draft', 'approved'):
                     periods.append(p)
         return periods
 
@@ -147,8 +144,7 @@ class EnrollmentService:
         if owner["role"] != "teacher" and not allow_parent_period:
             raise NotFoundError("Invalid period ID")
 
-        schedule = self.period_schedule_dao.get_by_period_id(period_id)
-        if not schedule or not schedule.quest_enabled_weeks:
+        if period.get('status') != 'approved':
             raise NotFoundError("Invalid period ID")
 
         student = self.student_dao.get_student_by_id(user_id)

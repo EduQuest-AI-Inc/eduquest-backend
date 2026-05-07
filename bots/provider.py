@@ -37,23 +37,6 @@ class BotProvider:
         from bots.grading_agent import GradingOrchestrator
         return GradingOrchestrator()
 
-    def create_schedule_agent(
-        self,
-        vector_store_ids: Optional[list] = None,
-        course_name: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        course_description: Optional[str] = None,
-    ):
-        from bots.schedule_agent import PeriodScheduleAgent
-        return PeriodScheduleAgent(
-            vector_store_ids=vector_store_ids,
-            course_name=course_name,
-            start_date=start_date,
-            end_date=end_date,
-            course_description=course_description,
-        )
-
     def create_curriculum_bot(
         self,
         start_date: str,
@@ -160,23 +143,6 @@ class MockBotProvider(BotProvider):
     def create_grading_orchestrator(self):
         from bots._mocks import MockGradingOrchestrator
         return MockGradingOrchestrator()
-
-    def create_schedule_agent(
-        self,
-        vector_store_ids: Optional[list] = None,
-        course_name: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        course_description: Optional[str] = None,
-    ):
-        from bots._mocks import MockPeriodScheduleAgent
-        return MockPeriodScheduleAgent(
-            vector_store_ids=vector_store_ids,
-            course_name=course_name,
-            start_date=start_date,
-            end_date=end_date,
-            course_description=course_description,
-        )
 
     def create_curriculum_bot(
         self,

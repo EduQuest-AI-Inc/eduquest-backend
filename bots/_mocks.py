@@ -7,7 +7,7 @@ runs unchanged.
 """
 import math
 from datetime import date
-from typing import Any, Optional
+from typing import Any
 
 
 class MockRunResult:
@@ -289,50 +289,3 @@ class MockConversationsSession:
     def __init__(self, conversation_id=None):
         self._session_id = conversation_id or "mock-conversation-id-001"
 
-
-class MockPeriodScheduleAgent:
-    """Fast replacement for PeriodScheduleAgent."""
-
-    def __init__(
-        self,
-        vector_store_ids: Optional[list] = None,
-        course_name: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        course_description: Optional[str] = None,
-    ):
-        self.course_name = course_name or "Course"
-        self.start_date = start_date
-        self.end_date = end_date
-
-    def run_and_get_json(self) -> dict:
-        return {
-            "weeks": [
-                {
-                    "week_number": 1,
-                    "start_date": "Not specified",
-                    "end_date": "Not specified",
-                    "lessons": [
-                        f"[MOCK] Introduction to {self.course_name} concepts",
-                        "Overview of key themes and objectives",
-                    ],
-                    "skills": [
-                        "Identify core vocabulary",
-                        "Understand course structure and expectations",
-                    ],
-                },
-                {
-                    "week_number": 2,
-                    "start_date": "Not specified",
-                    "end_date": "Not specified",
-                    "lessons": [
-                        "[MOCK] Deep dive into primary topics",
-                        "Guided practice and discussion exercises",
-                    ],
-                    "skills": [
-                        "Apply concepts to worked examples",
-                        "Demonstrate foundational understanding",
-                    ],
-                },
-            ]
-        }
