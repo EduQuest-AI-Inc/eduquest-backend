@@ -57,12 +57,14 @@ eduquest-backend/
 │   ├── profile_agent.py            # Student profile agent
 │   ├── provider.py                 # Bot provider — factory for real and mock bot instances
 │   ├── schedule_agent.py           # Schedule generation agent
+│   ├── coverage_evaluator.py       # Evaluates whether course materials are sufficient; returns research queries
 │   ├── teacher_feedback_agent.py   # Teacher feedback agent
 │   ├── _mocks.py                   # Mock bot instances for testing
 │   └── schemas/rubric.py           # Rubric Pydantic schema
 ├── integrations/                   # External service adapters (shared across features)
 │   ├── s3_service.py               # AWS S3 upload helpers
 │   ├── canvas_service.py           # Canvas LMS integration (canvasapi library)
+│   ├── perplexity_service.py       # Perplexity Agent API (deep-research preset) for curriculum research
 │   └── email_service.py            # SES email sending
 ├── utils/
 │   ├── token_utils.py              # extract_auth_token(), get_user_id_from_token(), set_auth_cookie()
@@ -134,6 +136,9 @@ Route handlers raise these exceptions — do **not** add `except` clauses for th
 All agent code in `bots/` (not `EQ_agents/` — that directory no longer exists). Agents use OpenAI's Agents SDK (`from agents import Agent, Runner`).
 
 - `bots/grading_agent.py` (`GradingOrchestrator`) — produces per-skill float scores (0.0–1.0). Results are written to `aggregated_metrics` via `AggregatedMetricsDAO`.
+- `bots/schedule_agent.py` (`PeriodScheduleAgent`) — generates Week→Lesson→Concept→Skill schedule hierarchy. Accepts `research_context` (from Perplexity) to fill curriculum gaps when no files are uploaded.
+- `bots/coverage_evaluator.py` (`CoverageEvaluator`) — single `gpt-4o-mini` structured call; returns `sufficient`, `gaps`, and `research_queries`. Used before schedule generation to decide whether to call Perplexity.
+- `integrations/perplexity_service.py` (`PerplexityService`) — calls `POST https://api.perplexity.ai/v1/agent` with `{"preset": "deep-research", "input": ...}` via `httpx`. Response text is in `output[-1]["content"][0]["text"]` (last item of type "message" in the `output` array). NOT the OpenAI-compatible `/chat/completions` endpoint.
 
 ## Development
 
@@ -150,6 +155,7 @@ pip install -r requirements.txt
 - `JWT_SECRET_KEY`
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 - `OPENAI_API_KEY`
+- `PERPLEXITY_API_KEY` — required for `PerplexityService` (Perplexity Agent API)
 - `API_GATEWAY_URL` (optional)
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 
@@ -163,6 +169,13 @@ uvicorn main:app --reload
 **Testing**:
 
 ```bash
+# Load .env before running one-off Python tests (venv doesn't auto-load it):
+set -a && source .env && set +a && python -c "..."
+
+# All pytest runs fail with ModuleNotFoundError: No module named 'supabase' in local dev
+# — supabase is not installed in the venv. Tests requiring DAO access cannot be run locally.
+# Use standalone python -c scripts for agent/integration layer testing.
+
 pytest
 pytest -m unit
 pytest -m integration

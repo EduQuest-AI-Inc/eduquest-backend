@@ -159,7 +159,7 @@ class MockConversationsSession:
 
 
 class MockPeriodScheduleAgent:
-    """Fast replacement for PeriodScheduleAgent."""
+    """Fast replacement for PeriodScheduleAgent — returns new nested schema shape."""
 
     def __init__(
         self,
@@ -168,6 +168,7 @@ class MockPeriodScheduleAgent:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         course_description: Optional[str] = None,
+        research_context: Optional[str] = None,
     ):
         self.course_name = course_name or "Course"
         self.start_date = start_date
@@ -181,12 +182,64 @@ class MockPeriodScheduleAgent:
                     "start_date": "Not specified",
                     "end_date": "Not specified",
                     "lessons": [
-                        f"[MOCK] Introduction to {self.course_name} concepts",
-                        "Overview of key themes and objectives",
-                    ],
-                    "skills": [
-                        "Identify core vocabulary",
-                        "Understand course structure and expectations",
+                        {
+                            "lesson_name": f"[MOCK] Introduction to {self.course_name}",
+                            "concepts": [
+                                {
+                                    "concept_name": "Course Overview",
+                                    "description": f"Foundational introduction to {self.course_name} and its key themes.",
+                                    "prerequisites": [],
+                                    "common_misconceptions": [
+                                        "Students often assume prior knowledge is required."
+                                    ],
+                                    "key_takeaways": [
+                                        f"{self.course_name} builds on logical reasoning.",
+                                        "Active participation improves outcomes.",
+                                    ],
+                                    "skills": [
+                                        {
+                                            "skill_name": "Identify Core Vocabulary",
+                                            "description": "Recognize and define key terms used throughout the course.",
+                                            "bloom_level": "Remember",
+                                            "difficulty": "beginner",
+                                            "mastery_criteria": {
+                                                "descriptor": "Student can correctly define at least 80% of core vocabulary terms.",
+                                                "passing_score": 0.8,
+                                            },
+                                        }
+                                    ],
+                                }
+                            ],
+                        },
+                        {
+                            "lesson_name": "[MOCK] Key Themes and Objectives",
+                            "concepts": [
+                                {
+                                    "concept_name": "Learning Objectives",
+                                    "description": "Understanding the goals and expectations for the course.",
+                                    "prerequisites": ["Course Overview"],
+                                    "common_misconceptions": [
+                                        "Objectives are merely administrative — they don't guide daily learning."
+                                    ],
+                                    "key_takeaways": [
+                                        "Clear objectives focus effort.",
+                                        "Objectives align assessments with instruction.",
+                                    ],
+                                    "skills": [
+                                        {
+                                            "skill_name": "Interpret Learning Goals",
+                                            "description": "Explain course objectives in their own words.",
+                                            "bloom_level": "Understand",
+                                            "difficulty": "beginner",
+                                            "mastery_criteria": {
+                                                "descriptor": "Student can paraphrase each major course objective accurately.",
+                                                "passing_score": 0.75,
+                                            },
+                                        }
+                                    ],
+                                }
+                            ],
+                        },
                     ],
                 },
                 {
@@ -194,12 +247,74 @@ class MockPeriodScheduleAgent:
                     "start_date": "Not specified",
                     "end_date": "Not specified",
                     "lessons": [
-                        "[MOCK] Deep dive into primary topics",
-                        "Guided practice and discussion exercises",
-                    ],
-                    "skills": [
-                        "Apply concepts to worked examples",
-                        "Demonstrate foundational understanding",
+                        {
+                            "lesson_name": "[MOCK] Deep Dive into Primary Topics",
+                            "concepts": [
+                                {
+                                    "concept_name": "Core Principles",
+                                    "description": "The foundational principles that underpin the subject area.",
+                                    "prerequisites": ["Course Overview", "Learning Objectives"],
+                                    "common_misconceptions": [
+                                        "Core principles are abstract and not practically useful."
+                                    ],
+                                    "key_takeaways": [
+                                        "Principles provide a framework for solving novel problems.",
+                                        "Mastery requires both recall and application.",
+                                    ],
+                                    "skills": [
+                                        {
+                                            "skill_name": "Apply Core Principles",
+                                            "description": "Use foundational principles to solve structured problems.",
+                                            "bloom_level": "Apply",
+                                            "difficulty": "intermediate",
+                                            "mastery_criteria": {
+                                                "descriptor": "Student can apply core principles correctly to at least 3 worked examples.",
+                                                "passing_score": 0.8,
+                                            },
+                                        },
+                                        {
+                                            "skill_name": "Analyze Principle Relationships",
+                                            "description": "Identify how core principles interact and depend on each other.",
+                                            "bloom_level": "Analyze",
+                                            "difficulty": "intermediate",
+                                            "mastery_criteria": {
+                                                "descriptor": "Student can diagram relationships between at least 2 core principles.",
+                                                "passing_score": 0.75,
+                                            },
+                                        },
+                                    ],
+                                }
+                            ],
+                        },
+                        {
+                            "lesson_name": "[MOCK] Guided Practice and Discussion",
+                            "concepts": [
+                                {
+                                    "concept_name": "Collaborative Problem Solving",
+                                    "description": "Using peer discussion to deepen understanding of course material.",
+                                    "prerequisites": ["Core Principles"],
+                                    "common_misconceptions": [
+                                        "Group work means one person does all the thinking."
+                                    ],
+                                    "key_takeaways": [
+                                        "Articulating reasoning strengthens understanding.",
+                                        "Diverse perspectives reveal blind spots.",
+                                    ],
+                                    "skills": [
+                                        {
+                                            "skill_name": "Demonstrate Foundational Understanding",
+                                            "description": "Explain a concept clearly enough that a peer can understand it.",
+                                            "bloom_level": "Understand",
+                                            "difficulty": "beginner",
+                                            "mastery_criteria": {
+                                                "descriptor": "Student can explain a concept without reference to notes.",
+                                                "passing_score": 0.7,
+                                            },
+                                        }
+                                    ],
+                                }
+                            ],
+                        },
                     ],
                 },
             ]

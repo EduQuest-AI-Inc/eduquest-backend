@@ -20,18 +20,40 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-class ScheduleWeekItem(BaseModel):
-    """Schema for a single week in the period schedule."""
-    week_number: int = Field(description="Week number (1, 2, 3, etc.)")
-    start_date: str = Field(description="Start date of the week (or 'Not specified' if unknown)")
-    end_date: str = Field(description="End date of the week (or 'Not specified' if unknown)")
-    lessons: List[str] = Field(description="List of lesson titles and short descriptions for this week")
-    skills: List[str] = Field(description="List of measurable skills students will learn")
+# ── Output schema (normalized hierarchy) ────────────────────────────────────
+
+class SkillSchema(BaseModel):
+    skill_name: str = Field(description="Short, unique skill name")
+    description: str = Field(description="What this skill means in practice")
+    bloom_level: str = Field(description="One of: Remember, Understand, Apply, Analyze, Evaluate, Create")
+    difficulty: str = Field(description="One of: beginner, intermediate, advanced")
+    mastery_criteria: dict = Field(description='e.g. {"descriptor": "Student can ...", "passing_score": 0.8}')
+
+
+class ConceptSchema(BaseModel):
+    concept_name: str
+    description: str
+    prerequisites: List[str] = Field(description="Names of other concepts that must be learned first")
+    common_misconceptions: List[str]
+    key_takeaways: List[str]
+    skills: List[SkillSchema] = Field(description="1-4 skills associated with this concept")
+
+
+class LessonSchema(BaseModel):
+    lesson_name: str
+    concepts: List[ConceptSchema] = Field(description="1-3 concepts covered in this lesson")
+
+
+class WeekSchema(BaseModel):
+    week_number: int
+    start_date: str
+    end_date: str
+    lessons: List[LessonSchema] = Field(description="2-5 lessons per week")
 
 
 class PeriodScheduleSchema(BaseModel):
     """Schema for the full period schedule output."""
-    weeks: List[ScheduleWeekItem] = Field(description="List of weeks in the semester schedule")
+    weeks: List[WeekSchema]
 
 
 class PeriodScheduleAgent:
@@ -40,7 +62,6 @@ class PeriodScheduleAgent:
     This is teacher/period scoped (not student-specific).
     """
 
-
     def __init__(
         self,
         vector_store_ids: list,
@@ -48,10 +69,12 @@ class PeriodScheduleAgent:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         course_description: Optional[str] = None,
+        research_context: Optional[str] = None,
     ) -> None:
         self.vector_store_ids = vector_store_ids or []
         self.course_description = course_description
         self.course_name = course_name or "the course"
+        self.research_context = research_context
 
         # Compute week count and calendar from dates when provided
         num_weeks = 18
@@ -74,8 +97,11 @@ class PeriodScheduleAgent:
             except ValueError:
                 pass
 
+        # Mode selection
         if self.vector_store_ids:
             instructions = self._files_instructions(num_weeks, calendar_section)
+        elif self.research_context:
+            instructions = self._research_instructions(num_weeks, calendar_section)
         else:
             instructions = self._description_instructions(num_weeks, calendar_section)
 
@@ -91,6 +117,7 @@ class PeriodScheduleAgent:
             tools=tools,  # type: ignore[arg-type]
             output_type=PeriodScheduleSchema
         )
+        self._num_weeks = num_weeks
 
     # ── Mode A: uploaded files → search the vector store ────────────────────────
 
@@ -100,37 +127,42 @@ class PeriodScheduleAgent:
 You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from uploaded course materials.
 
 MISSION
-Transform course materials into a weekly schedule with:
-- Week number (integer starting from 1)
-- Week start date
-- Week end date
-- Lessons (list of what is taught that week)
-- Skills (list of measurable outcomes)
+Transform course materials into a fully structured weekly schedule using this hierarchy:
+  Week → Lessons → Concepts → Skills
+
+Each week must have 2-5 lessons. Each lesson must have 1-3 concepts. Each concept must have 1-4 skills.
 
 Your output must be accurate to the provided materials and must not invent content not present in the inputs.
 
 OPERATING PRINCIPLES
 1) Evidence-first: Prefer explicit evidence from the uploaded course materials.
 2) Weekly clarity: Each week must have a coherent theme, manageable lessons, and skills stated as observable outcomes.
-3) Non-hallucination: Do not create readings, videos, quizzes, or policies that aren't referenced in the materials.
+3) Non-hallucination: Do not create content that isn't referenced in the materials.
 4) The schedule must have EXACTLY {num_weeks} weeks — no more, no fewer.
 
 TERM CALENDAR
 {calendar_section}
 
-OUTPUT FORMAT
-Return a JSON object with a "weeks" array. Each week has:
-- week_number: integer (1, 2, 3, ...)
-- start_date: string (date or "Not specified")
-- end_date: string (date or "Not specified")
-- lessons: list of strings (3-8 lesson titles/descriptions per week)
-- skills: list of strings
+SCHEMA REQUIREMENTS
+For each skill, provide:
+- skill_name: short, unique identifier
+- description: what this skill means in practice
+- bloom_level: exactly one of: Remember, Understand, Apply, Analyze, Evaluate, Create
+- difficulty: exactly one of: beginner, intermediate, advanced
+- mastery_criteria: dict with "descriptor" (string: "Student can ...") and "passing_score" (float 0.0-1.0)
+
+For each concept, provide:
+- concept_name, description
+- prerequisites: list of other concept names that must come first (empty list if none)
+- common_misconceptions: list of strings
+- key_takeaways: list of strings
+- skills: 1-4 SkillSchema objects
 
 PROCESS
 1. Search the course materials to understand the curriculum structure.
 2. Identify modules, units, assignments, and their sequence.
 3. Allocate content across exactly {num_weeks} weeks based on module order.
-4. For each week, extract lesson topics and derive measurable skills.
+4. For each week, create 2-5 lessons. For each lesson, create 1-3 concepts. For each concept, create 1-4 skills.
 5. Ensure every major module appears in some week.
 
 HANDLING MISSING INFO
@@ -144,12 +176,10 @@ HANDLING MISSING INFO
 You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from a teacher-provided course description.
 
 MISSION
-Build a complete, specific weekly schedule using the course description as your sole curriculum blueprint:
-- Week number (integer starting from 1)
-- Week start date
-- Week end date
-- Lessons (list of what is taught that week)
-- Skills (list of measurable outcomes)
+Build a complete, specific weekly schedule using this hierarchy:
+  Week → Lessons → Concepts → Skills
+
+Each week must have 2-5 lessons. Each lesson must have 1-3 concepts. Each concept must have 1-4 skills.
 
 OPERATING PRINCIPLES
 1) Description-driven: The course description IS the curriculum. Extract topics, units, and progression from it.
@@ -161,24 +191,78 @@ OPERATING PRINCIPLES
 TERM CALENDAR
 {calendar_section}
 
-OUTPUT FORMAT
-Return a JSON object with a "weeks" array. Each week has:
-- week_number: integer (1, 2, 3, ...)
-- start_date: string (date or "Not specified")
-- end_date: string (date or "Not specified")
-- lessons: list of strings (3-8 lesson titles/descriptions per week)
-- skills: list of strings
+SCHEMA REQUIREMENTS
+For each skill, provide:
+- skill_name: short, unique identifier
+- description: what this skill means in practice
+- bloom_level: exactly one of: Remember, Understand, Apply, Analyze, Evaluate, Create
+- difficulty: exactly one of: beginner, intermediate, advanced
+- mastery_criteria: dict with "descriptor" (string: "Student can ...") and "passing_score" (float 0.0-1.0)
+
+For each concept, provide:
+- concept_name, description
+- prerequisites: list of other concept names that must come first (empty list if none)
+- common_misconceptions: list of strings
+- key_takeaways: list of strings
+- skills: 1-4 SkillSchema objects
 
 PROCESS
 1. Read the course description to identify the subject, major topics, and any stated goals or units.
 2. Divide the topics into a logical instructional sequence across {num_weeks} weeks.
-3. For each week, write specific lesson titles that a teacher would actually use in class.
-4. Derive 2-4 measurable skills per week directly from that week's lesson content."""
+3. For each week, create 2-5 lessons with specific titles a teacher would actually use.
+4. For each lesson, create 1-3 concepts with full metadata.
+5. For each concept, derive 1-4 measurable skills with bloom_level and difficulty."""
+
+    # ── Mode C: description + Perplexity research context ───────────────────────
+
+    @staticmethod
+    def _research_instructions(num_weeks: int, calendar_section: str) -> str:
+        return f"""\
+You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from a teacher-provided course description supplemented by web research.
+
+MISSION
+Build a complete, specific, research-informed weekly schedule using this hierarchy:
+  Week → Lessons → Concepts → Skills
+
+Each week must have 2-5 lessons. Each lesson must have 1-3 concepts. Each concept must have 1-4 skills.
+
+OPERATING PRINCIPLES
+1) Description-first: The teacher's course description defines the overall curriculum intent.
+2) Research-informed: The RESEARCH CONTEXT (provided in the user prompt) fills in curriculum gaps with authoritative, web-sourced content. Use it to produce rich, accurate concept definitions, misconceptions, and skills.
+3) Every week must have real, specific lesson content — never write placeholder text.
+4) Skills must be concrete and measurable (e.g. "Solve linear equations using substitution" not "Understand algebra").
+5) The schedule must have EXACTLY {num_weeks} weeks — no more, no fewer.
+
+TERM CALENDAR
+{calendar_section}
+
+SCHEMA REQUIREMENTS
+For each skill, provide:
+- skill_name: short, unique identifier
+- description: what this skill means in practice
+- bloom_level: exactly one of: Remember, Understand, Apply, Analyze, Evaluate, Create
+- difficulty: exactly one of: beginner, intermediate, advanced
+- mastery_criteria: dict with "descriptor" (string: "Student can ...") and "passing_score" (float 0.0-1.0)
+
+For each concept, provide:
+- concept_name, description
+- prerequisites: list of other concept names that must come first (empty list if none)
+- common_misconceptions: list of strings (draw from the research context where relevant)
+- key_takeaways: list of strings
+- skills: 1-4 SkillSchema objects
+
+PROCESS
+1. Read the course description to identify the subject, major topics, and goals.
+2. Consult the RESEARCH CONTEXT to enrich concepts with accurate terminology, common misconceptions, and learning progressions.
+3. Divide the topics into a logical instructional sequence across {num_weeks} weeks.
+4. For each week, create 2-5 lessons with specific titles a teacher would actually use.
+5. For each lesson, create 1-3 concepts with full metadata informed by the research.
+6. For each concept, derive 1-4 measurable skills with bloom_level and difficulty."""
 
     async def _run_async(self) -> PeriodScheduleSchema:
         """Run the agent asynchronously."""
         if self.vector_store_ids:
-            prompt = f"""Please create a weekly semester schedule for {self.course_name} based on the course materials in the vector store.
+            base_prompt = f"""Please create a weekly semester schedule for {self.course_name} based on the course materials in the vector store.
 
 Search the course materials to understand:
 - What modules/units exist
@@ -188,13 +272,20 @@ Search the course materials to understand:
 
 Then produce a complete weekly schedule covering the entire semester."""
         else:
-            prompt = f"""Please create a weekly semester schedule for {self.course_name}.
+            base_prompt = f"""Please create a weekly semester schedule for {self.course_name}.
 
-No course files were uploaded. Use the following teacher-provided description as your sole curriculum source:
+No course files were uploaded. Use the following teacher-provided description as your primary curriculum source:
 
-{self.course_description}
+{self.course_description}"""
 
-Do not invent content beyond what is described above. Base the schedule entirely on this description."""
+        if self.research_context:
+            prompt = f"""{base_prompt}
+
+RESEARCH CONTEXT (gathered from Perplexity Sonar — use this to fill curriculum gaps):
+{self.research_context}
+"""
+        else:
+            prompt = base_prompt
 
         with trace("period_schedule_generation"):
             result = await Runner.run(
