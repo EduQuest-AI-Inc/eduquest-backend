@@ -15,4 +15,4 @@ class Concept(BaseModel):
     last_updated_at: Optional[str] = None
 
     def to_item(self):
-        return self.model_dump()
+        return self.model_dump(exclude={'created_at', 'last_updated_at'})

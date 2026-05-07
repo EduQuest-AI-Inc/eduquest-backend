@@ -1,14 +1,23 @@
+from typing import Optional
 from pydantic import BaseModel
 
 
 class CurriculumSkill(BaseModel):
     skill_id: str
     title: str
+    description: Optional[str] = None
+    bloom_level: Optional[str] = None
+    difficulty: Optional[str] = None
+    mastery_threshold: float = 0.8
 
 
 class CurriculumConcept(BaseModel):
     concept_id: str
     title: str
+    description: Optional[str] = None
+    prerequisites: list[str] = []
+    key_takeaways: list[str] = []
+    common_misconceptions: list[str] = []
     skills: list[CurriculumSkill]
 
 

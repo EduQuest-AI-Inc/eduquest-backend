@@ -140,19 +140,19 @@ class CurriculumService:
                     concepts.append({
                         "concept_name": concept.title,
                         "lesson_name": lesson.title,
-                        "description": None,
-                        "prerequisites": [],
-                        "key_takeaways": [],
-                        "common_misconceptions": [],
+                        "description": getattr(concept, "description", None),
+                        "prerequisites": getattr(concept, "prerequisites", []),
+                        "key_takeaways": getattr(concept, "key_takeaways", []),
+                        "common_misconceptions": getattr(concept, "common_misconceptions", []),
                     })
                     for skill in concept.skills:
                         if skill.title not in seen_skills:
                             skills.append({
                                 "skill_name": skill.title,
-                                "description": None,
-                                "bloom_level": None,
-                                "difficulty": None,
-                                "mastery_threshold": 0.8,
+                                "description": getattr(skill, "description", None),
+                                "bloom_level": getattr(skill, "bloom_level", None),
+                                "difficulty": getattr(skill, "difficulty", None),
+                                "mastery_threshold": getattr(skill, "mastery_threshold", 0.8),
                             })
                             seen_skills.add(skill.title)
                         concept_skills.append({

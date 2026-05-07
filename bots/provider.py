@@ -62,8 +62,9 @@ class BotProvider:
         course_description: str,
         course_metadata: dict,
     ):
-        from bots.curriculum_agent import CurriculumBot
-        return CurriculumBot(start_date, end_date, grade_level, course_description, course_metadata)
+        # Real CurriculumBot not yet implemented — always use mock
+        from bots._mocks import MockCurriculumBot
+        return MockCurriculumBot(start_date, end_date, grade_level, course_description, course_metadata)
 
     def create_profile_agent(self):
         from bots.profile_agent import create_profile_agent

@@ -162,6 +162,9 @@ _RESEARCH_TOPICS = [
 _MIN_KEYWORD_LENGTH = 4
 _MAX_KEYWORDS = 5
 
+_BLOOM_LEVELS = ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"]
+_DIFFICULTIES = ["beginner", "intermediate", "advanced"]
+
 
 def _extract_topics(course_description: str) -> list[str]:
     """Derive up to 5 keywords from course_description, falling back to research placeholders."""
@@ -206,7 +209,7 @@ class MockCurriculumBot:
             CurriculumWeek,
         )
 
-        total_weeks = max(1, math.ceil((self.end_date - self.start_date).days / 7))
+        total_weeks = math.ceil((self.end_date - self.start_date).days / 7) or 3
         topics = _extract_topics(self.course_description)
         weeks = []
 
@@ -221,17 +224,36 @@ class MockCurriculumBot:
 
                 for c in range(1, concept_count + 1):
                     skill_count = 1 if c % 2 != 0 else 2
-                    skills = [
-                        CurriculumSkill(
+                    skills = []
+                    for s in range(1, skill_count + 1):
+                        idx = w + lesson_num + c + s
+                        skills.append(CurriculumSkill(
                             skill_id=f"{w}.{lesson_num}.{c}.{s}",
                             title=f"Skill {w}.{lesson_num}.{c}.{s}",
-                        )
-                        for s in range(1, skill_count + 1)
-                    ]
+                            description=f"Students can demonstrate {_BLOOM_LEVELS[(idx) % len(_BLOOM_LEVELS)].lower()}-level mastery of skill {w}.{lesson_num}.{c}.{s}.",
+                            bloom_level=_BLOOM_LEVELS[idx % len(_BLOOM_LEVELS)],
+                            difficulty=_DIFFICULTIES[(w + s) % len(_DIFFICULTIES)],
+                            mastery_threshold=0.8 if s % 2 != 0 else 0.7,
+                        ))
+
+                    cidx = w + lesson_num + c
+                    prereqs = [f"Familiarity with Week {w - 1} material"] if w > 1 else []
+                    if c > 1:
+                        prereqs.append(f"Concept {w}.{lesson_num}.{c - 1}")
                     concepts.append(
                         CurriculumConcept(
                             concept_id=f"{w}.{lesson_num}.{c}",
                             title=f"Concept {w}.{lesson_num}.{c}",
+                            description=f"An exploration of concept {w}.{lesson_num}.{c} within {topic}, focusing on core principles and real-world application.",
+                            prerequisites=prereqs,
+                            key_takeaways=[
+                                f"Understand the foundational principles of concept {w}.{lesson_num}.{c}.",
+                                f"Apply concept {w}.{lesson_num}.{c} to solve problems in {topic}.",
+                            ] + ([f"Evaluate trade-offs when using concept {w}.{lesson_num}.{c}."] if cidx % 2 == 0 else []),
+                            common_misconceptions=(
+                                [f"Students often confuse concept {w}.{lesson_num}.{c} with adjacent ideas from earlier weeks."]
+                                if cidx % 3 != 0 else []
+                            ),
                             skills=skills,
                         )
                     )
