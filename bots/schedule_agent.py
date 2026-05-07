@@ -42,12 +42,12 @@ class ConceptSchema(BaseModel):
     prerequisites: List[str] = Field(description="Names of other concepts that must be learned first")
     common_misconceptions: List[str]
     key_takeaways: List[str]
-    skills: List[SkillSchema] = Field(description="1-4 skills associated with this concept")
+    skills: List[SkillSchema] = Field(description="3-5 skills associated with this concept")
 
 
 class LessonSchema(BaseModel):
     lesson_name: str
-    concepts: List[ConceptSchema] = Field(description="1-3 concepts covered in this lesson")
+    concepts: List[ConceptSchema] = Field(description="2-4 concepts covered in this lesson")
 
 
 class WeekSchema(BaseModel):
@@ -163,13 +163,13 @@ For each concept, provide:
 - prerequisites: list of other concept names that must come first (empty list if none)
 - common_misconceptions: list of strings
 - key_takeaways: list of strings
-- skills: 1-4 SkillSchema objects
+- skills: 3-5 SkillSchema objects
 
 PROCESS
 1. Search the course materials to understand the curriculum structure.
 2. Identify modules, units, assignments, and their sequence.
 3. Allocate content across exactly {num_weeks} weeks based on module order.
-4. For each week, create 2-5 lessons. For each lesson, create 1-3 concepts. For each concept, create 1-4 skills.
+4. For each week, create 2-5 lessons. For each lesson, create 2-4 concepts. For each concept, create 3-5 skills.
 5. Ensure every major module appears in some week.
 
 HANDLING MISSING INFO
@@ -186,7 +186,7 @@ MISSION
 Build a complete, specific weekly schedule using this hierarchy:
   Week → Lessons → Concepts → Skills
 
-Each week must have 2-5 lessons. Each lesson must have 1-3 concepts. Each concept must have 1-4 skills.
+Each week must have 2-5 lessons. Each lesson must have 2-4 concepts. Each concept must have 3-5 skills.
 
 OPERATING PRINCIPLES
 1) Description-driven: The course description IS the curriculum. Extract topics, units, and progression from it.
@@ -211,14 +211,14 @@ For each concept, provide:
 - prerequisites: list of other concept names that must come first (empty list if none)
 - common_misconceptions: list of strings
 - key_takeaways: list of strings
-- skills: 1-4 SkillSchema objects
+- skills: 3-5 SkillSchema objects
 
 PROCESS
 1. Read the course description to identify the subject, major topics, and any stated goals or units.
 2. Divide the topics into a logical instructional sequence across {num_weeks} weeks.
 3. For each week, create 2-5 lessons with specific titles a teacher would actually use.
-4. For each lesson, create 1-3 concepts with full metadata.
-5. For each concept, derive 1-4 measurable skills with bloom_level and difficulty."""
+4. For each lesson, create 2-4 concepts with full metadata.
+5. For each concept, derive 3-5 measurable skills with bloom_level and difficulty."""
 
     # ── Mode C: description + Perplexity research context ───────────────────────
 
@@ -231,7 +231,7 @@ MISSION
 Build a complete, specific, research-informed weekly schedule using this hierarchy:
   Week → Lessons → Concepts → Skills
 
-Each week must have 2-5 lessons. Each lesson must have 1-3 concepts. Each concept must have 1-4 skills.
+Each week must have 2-5 lessons. Each lesson must have 2-4 concepts. Each concept must have 3-5 skills.
 
 OPERATING PRINCIPLES
 1) Description-first: The teacher's course description defines the overall curriculum intent.
@@ -256,15 +256,15 @@ For each concept, provide:
 - prerequisites: list of other concept names that must come first (empty list if none)
 - common_misconceptions: list of strings (draw from the research context where relevant)
 - key_takeaways: list of strings
-- skills: 1-4 SkillSchema objects
+- skills: 3-5 SkillSchema objects
 
 PROCESS
 1. Read the course description to identify the subject, major topics, and goals.
 2. Consult the RESEARCH CONTEXT to enrich concepts with accurate terminology, common misconceptions, and learning progressions.
 3. Divide the topics into a logical instructional sequence across {num_weeks} weeks.
 4. For each week, create 2-5 lessons with specific titles a teacher would actually use.
-5. For each lesson, create 1-3 concepts with full metadata informed by the research.
-6. For each concept, derive 1-4 measurable skills with bloom_level and difficulty."""
+5. For each lesson, create 2-4 concepts with full metadata informed by the research.
+6. For each concept, derive 3-5 measurable skills with bloom_level and difficulty."""
 
     async def _run_async(self) -> PeriodScheduleSchema:
         """Run the agent asynchronously."""
