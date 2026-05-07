@@ -188,17 +188,14 @@ class CurriculumService:
             ))
 
         for c in payload.get("concepts", []):
-            prereqs = c.get("prerequisites") or []
-            takeaways = c.get("key_takeaways") or []
-            misconceptions = c.get("common_misconceptions") or []
             self.concept_dao.insert_concept(Concept(
                 period_id=period_id,
                 concept_name=c["concept_name"],
                 lesson_name=c["lesson_name"],
                 description=c.get("description"),
-                prerequisites=[{"text": p} if isinstance(p, str) else p for p in prereqs],
-                key_takeaways=[{"text": t} if isinstance(t, str) else t for t in takeaways],
-                common_misconceptions=[{"text": m} if isinstance(m, str) else m for m in misconceptions],
+                prerequisites=c.get("prerequisites") or [],
+                key_takeaways=c.get("key_takeaways") or [],
+                common_misconceptions=c.get("common_misconceptions") or [],
                 metadata=c.get("metadata"),
             ))
 
