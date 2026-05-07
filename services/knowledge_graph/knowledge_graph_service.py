@@ -14,11 +14,11 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from data_access.period_schedule_dao import PeriodScheduleDAO
 from data_access.student_skill_mastery_dao import StudentSkillMasteryDAO
 from exceptions.validation_error import ValidationError
-from models.period_schedule import ConceptNode
 from models.student_skill_mastery import StudentSkillMastery
+
+ConceptNode = dict
 from services.knowledge_graph import curriculum_parser
 from services.tracking.events import Events
 from services.tracking.track import track_event
@@ -29,15 +29,17 @@ logger = logging.getLogger(__name__)
 class KnowledgeGraphService:
     def __init__(
         self,
-        period_schedule_dao: Optional[PeriodScheduleDAO] = None,
+        period_schedule_dao: Optional[Any] = None,
         student_skill_mastery_dao: Optional[StudentSkillMasteryDAO] = None,
     ) -> None:
-        self.period_schedule_dao = period_schedule_dao or PeriodScheduleDAO()
+        self.period_schedule_dao = period_schedule_dao
         self.student_skill_mastery_dao = student_skill_mastery_dao or StudentSkillMasteryDAO()
 
     # -- internal helpers -----------------------------------------------------
 
     def _schedule_json(self, period_id: str) -> dict:
+        if self.period_schedule_dao is None:
+            return {}
         schedule = self.period_schedule_dao.get_by_period_id(period_id)
         if schedule is None or not schedule.schedule_json:
             return {}

@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from api.deps import AuthPayload, get_auth, require_student_viewer
+from routers.deps import AuthPayload, get_auth, require_student_viewer
 from data_access.parent_dao import ParentDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO

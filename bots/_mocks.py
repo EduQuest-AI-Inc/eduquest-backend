@@ -5,7 +5,9 @@ Activated when MOCK_AI=true via bots/provider.py. All classes return
 realistic-shaped data (real Pydantic types) so downstream service logic
 runs unchanged.
 """
-from typing import Any, Optional
+import math
+from datetime import date
+from typing import Any
 
 
 class MockRunResult:
@@ -151,56 +153,147 @@ class MockGradingOrchestrator:
         )
 
 
+_RESEARCH_TOPICS = [
+    "Research-based Topic A",
+    "Research-based Topic B",
+    "Research-based Topic C",
+]
+
+_MIN_KEYWORD_LENGTH = 4
+_MAX_KEYWORDS = 5
+
+_BLOOM_LEVELS = ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"]
+_DIFFICULTIES = ["beginner", "intermediate", "advanced"]
+
+
+def _extract_topics(course_description: str) -> list[str]:
+    """Derive up to 5 keywords from course_description, falling back to research placeholders."""
+    words = [w for w in course_description.split() if len(w) >= _MIN_KEYWORD_LENGTH]
+    return words[:_MAX_KEYWORDS] if words else _RESEARCH_TOPICS
+
+
+class MockCurriculumAgent:
+    """
+    Deterministic replacement for CurriculumAgent. Returns a fully structured
+    CurriculumResult with no randomness, no network calls, and no DB writes.
+    The service layer is responsible for persisting the result.
+
+    Determinism rules:
+      - Week count  = ceil((end_date - start_date).days / 7)
+      - Lessons     = 1 if week_number is odd, 2 if even
+      - Concepts    = 1 if lesson_index is odd (1-based), 2 if even
+      - Skills      = 1 if concept_index is odd (1-based), 2 if even
+      - Topics      = keywords cycled from course_description (or research placeholders)
+    """
+
+    def __init__(
+        self,
+        vector_store_ids: list,
+        course_name: str = None,
+        start_date: str = None,
+        end_date: str = None,
+        course_description: str = None,
+        research_context: str = None,
+    ):
+        self._start_date = date.fromisoformat(start_date) if start_date else date.today()
+        self._end_date = date.fromisoformat(end_date) if end_date else date.today()
+        self._course_description = course_description or course_name or ""
+
+    def run(self):
+        from bots.schemas.curriculum import (
+            CurriculumConcept,
+            CurriculumLesson,
+            CurriculumResult,
+            CurriculumSkill,
+            CurriculumWeek,
+        )
+
+        total_weeks = math.ceil((self._end_date - self._start_date).days / 7) or 3
+        topics = _extract_topics(self._course_description)
+        weeks = []
+
+        for w in range(1, total_weeks + 1):
+            topic = topics[(w - 1) % len(topics)]
+            lesson_count = 1 if w % 2 != 0 else 2
+            lessons = []
+
+            for lesson_num in range(1, lesson_count + 1):
+                concept_count = 1 if lesson_num % 2 != 0 else 2
+                concepts = []
+
+                for c in range(1, concept_count + 1):
+                    skill_count = 1 if c % 2 != 0 else 2
+                    skills = []
+                    for s in range(1, skill_count + 1):
+                        idx = w + lesson_num + c + s
+                        skills.append(CurriculumSkill(
+                            skill_id=f"{w}.{lesson_num}.{c}.{s}",
+                            title=f"Skill {w}.{lesson_num}.{c}.{s}",
+                            description=f"Students can demonstrate {_BLOOM_LEVELS[(idx) % len(_BLOOM_LEVELS)].lower()}-level mastery of skill {w}.{lesson_num}.{c}.{s}.",
+                            bloom_level=_BLOOM_LEVELS[idx % len(_BLOOM_LEVELS)],
+                            difficulty=_DIFFICULTIES[(w + s) % len(_DIFFICULTIES)],
+                            mastery_threshold=0.8 if s % 2 != 0 else 0.7,
+                        ))
+
+                    cidx = w + lesson_num + c
+                    prereqs = [f"Familiarity with Week {w - 1} material"] if w > 1 else []
+                    if c > 1:
+                        prereqs.append(f"Concept {w}.{lesson_num}.{c - 1}")
+                    concepts.append(
+                        CurriculumConcept(
+                            concept_id=f"{w}.{lesson_num}.{c}",
+                            title=f"Concept {w}.{lesson_num}.{c}",
+                            description=f"An exploration of concept {w}.{lesson_num}.{c} within {topic}, focusing on core principles and real-world application.",
+                            prerequisites=prereqs,
+                            key_takeaways=[
+                                f"Understand the foundational principles of concept {w}.{lesson_num}.{c}.",
+                                f"Apply concept {w}.{lesson_num}.{c} to solve problems in {topic}.",
+                            ] + ([f"Evaluate trade-offs when using concept {w}.{lesson_num}.{c}."] if cidx % 2 == 0 else []),
+                            common_misconceptions=(
+                                [f"Students often confuse concept {w}.{lesson_num}.{c} with adjacent ideas from earlier weeks."]
+                                if cidx % 3 != 0 else []
+                            ),
+                            skills=skills,
+                        )
+                    )
+
+                lessons.append(
+                    CurriculumLesson(
+                        lesson_id=f"{w}.{lesson_num}",
+                        title=f"Lesson {w}.{lesson_num}",
+                        concepts=concepts,
+                    )
+                )
+
+            weeks.append(
+                CurriculumWeek(
+                    week_number=w,
+                    week_id=str(w),
+                    title=f"Week {w}: {topic}",
+                    lessons=lessons,
+                )
+            )
+
+        return CurriculumResult(
+            grade_level="unspecified",
+            course=self._course_description,
+            total_weeks=total_weeks,
+            weeks=weeks,
+        )
+
+    async def run_async(self):
+        return self.run()
+
+    def run_and_get_json(self) -> dict:
+        return self.run().model_dump()
+
+    async def run_and_get_json_async(self) -> dict:
+        return self.run().model_dump()
+
+
 class MockConversationsSession:
     """Duck-typed stand-in for agents.OpenAIConversationsSession."""
 
     def __init__(self, conversation_id=None):
         self._session_id = conversation_id or "mock-conversation-id-001"
 
-
-class MockPeriodScheduleAgent:
-    """Fast replacement for PeriodScheduleAgent."""
-
-    def __init__(
-        self,
-        vector_store_ids: Optional[list] = None,
-        course_name: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        course_description: Optional[str] = None,
-    ):
-        self.course_name = course_name or "Course"
-        self.start_date = start_date
-        self.end_date = end_date
-
-    def run_and_get_json(self) -> dict:
-        return {
-            "weeks": [
-                {
-                    "week_number": 1,
-                    "start_date": "Not specified",
-                    "end_date": "Not specified",
-                    "lessons": [
-                        f"[MOCK] Introduction to {self.course_name} concepts",
-                        "Overview of key themes and objectives",
-                    ],
-                    "skills": [
-                        "Identify core vocabulary",
-                        "Understand course structure and expectations",
-                    ],
-                },
-                {
-                    "week_number": 2,
-                    "start_date": "Not specified",
-                    "end_date": "Not specified",
-                    "lessons": [
-                        "[MOCK] Deep dive into primary topics",
-                        "Guided practice and discussion exercises",
-                    ],
-                    "skills": [
-                        "Apply concepts to worked examples",
-                        "Demonstrate foundational understanding",
-                    ],
-                },
-            ]
-        }

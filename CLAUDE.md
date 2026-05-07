@@ -7,29 +7,26 @@ See also: [data_access/CLAUDE.md](data_access/CLAUDE.md) for DAO and database pa
 ```
 eduquest-backend/
 ├── main.py                         # FastAPI app factory and entry point (sole server — Flask migration complete)
-├── api/                            # FastAPI layer
+├── routers/                        # FastAPI layer
 │   ├── deps.py                     # get_auth() dependency → AuthPayload (JWT from header or cookie)
-│   └── routers/
-│       ├── auth.py                 # /auth — login, register, password reset
-│       ├── conversation.py         # /conversation — profile assistant, update assistant
-│       ├── enrollment.py           # /enrollment — enroll/unenroll students
-│       ├── ltg.py                  # /period — LTG conversation routes (mounted under /period)
-│       ├── parent.py               # /parent — parent invite, child lookup
-│       ├── period.py               # /period — period CRUD, homework agent
-│       ├── quest.py                # /quest — quest retrieval, submission
-│       ├── schedule.py             # /period — period schedule routes (mounted under /period)
-│       ├── teacher.py              # /teacher — Canvas courses (teacher-only)
-│       ├── user.py                 # /user — user profile
-│       └── waitlist.py             # /pilot-waitlist — status, join
-├── services/                         # Service/business logic layer (imported by api/routers/)
+│   ├── auth.py                     # /auth — login, register, password reset
+│   ├── conversation.py             # /conversation — profile assistant, update assistant
+│   ├── enrollment.py               # /enrollment — enroll/unenroll students
+│   ├── ltg.py                      # /period — LTG conversation routes (mounted under /period)
+│   ├── parent.py                   # /parent — parent invite, child lookup
+│   ├── period.py                   # /period — period CRUD, homework agent
+│   ├── quest.py                    # /quest — quest retrieval, submission
+│   ├── teacher.py                  # /teacher — Canvas courses (teacher-only)
+│   ├── user.py                     # /user — user profile
+│   └── waitlist.py                 # /pilot-waitlist — status, join
+├── services/                         # Service/business logic layer (imported by routers/)
 │   ├── auth/                       # auth_service.py, password_reset_service.py, password_policy.py
 │   ├── conversation/               # conversation_service.py, grading_service.py,
 │   │                               #   ltg_service.py, profile_service.py, teacher_feedback_service.py
 │   ├── enrollment/                 # enrollment_service.py (CRUD, verify_and_enroll, unenroll,
 │   │                               #   get_my_periods, assert_enrolled)
-│   ├── period/                     # period_service.py, period_quest_service.py,
-│   │                               #   period_schedule_service.py,
-│   │                               #   period_management_service.py, period_file_helpers.py
+│   ├── period/                     # period_quest_service.py,
+│   │                               #   period_management_service.py, period_file_service.py
 │   ├── quest/                      # quest_service.py, quest_creation_service.py,
 │   │                               #   quest_retrieval_service.py, quest_grading_service.py
 │   ├── user/                       # user_service.py
@@ -44,7 +41,6 @@ eduquest-backend/
 │   ├── quest.py                    # Quest — assignment with rubric, grade, status
 │   ├── enrollment.py               # Enrollment — student ↔ period membership
 │   ├── period.py                   # Period — class with vector store and Canvas metadata
-│   ├── period_schedule.py          # PeriodSchedule — AI-generated weekly schedule
 │   ├── conversation.py             # Conversation — chat session record
 │   ├── session.py                  # Session — JWT session record
 │   ├── parent_invite.py            # ParentInvite — invite token for parent signup
@@ -56,13 +52,13 @@ eduquest-backend/
 │   ├── guardrails.py               # Content safety guardrails
 │   ├── profile_agent.py            # Student profile agent
 │   ├── provider.py                 # Bot provider — factory for real and mock bot instances
-│   ├── schedule_agent.py           # Schedule generation agent
 │   ├── teacher_feedback_agent.py   # Teacher feedback agent
 │   ├── _mocks.py                   # Mock bot instances for testing
 │   └── schemas/rubric.py           # Rubric Pydantic schema
 ├── integrations/                   # External service adapters (shared across features)
 │   ├── s3_service.py               # AWS S3 upload helpers
 │   ├── canvas_service.py           # Canvas LMS integration (canvasapi library)
+│   ├── perplexity_service.py       # Perplexity Agent API (deep-research preset) for curriculum research
 │   └── email_service.py            # SES email sending
 ├── utils/
 │   ├── token_utils.py              # extract_auth_token(), get_user_id_from_token(), set_auth_cookie()
@@ -84,7 +80,7 @@ eduquest-backend/
 - `/conversation` — profile assistant, update assistant
 - `/enrollment` — student enrollment
 - `/parent` — parent invite and child lookup
-- `/period` — period CRUD, homework agent; also the prefix for `schedule.py` (period schedule CRUD) and `ltg.py` (LTG conversation), which are separate router files mounted under `/period`
+- `/period` — period CRUD, homework agent; also the prefix for `ltg.py` (LTG conversation), which is a separate router file mounted under `/period`
 - `/quest` — quest retrieval, submission
 - `/teacher` — Canvas courses (teacher-only)
 - `/user` — user profile
@@ -92,10 +88,10 @@ eduquest-backend/
 
 ## Route Pattern
 
-FastAPI routers live in `api/routers/[feature].py`. Each imports service classes from `services/[feature]/`:
+FastAPI routers live in `routers/[feature].py`. Each imports service classes from `services/[feature]/`:
 
 ```
-api/routers/[feature].py       # FastAPI router — HTTP boundary only
+routers/[feature].py       # FastAPI router — HTTP boundary only
 services/[feature]/
   ├── [feature]_service.py     # Business logic (thin orchestrator)
   ├── [feature]_*_service.py   # Sub-services for specific concerns
@@ -134,6 +130,9 @@ Route handlers raise these exceptions — do **not** add `except` clauses for th
 All agent code in `bots/` (not `EQ_agents/` — that directory no longer exists). Agents use OpenAI's Agents SDK (`from agents import Agent, Runner`).
 
 - `bots/grading_agent.py` (`GradingOrchestrator`) — produces per-skill float scores (0.0–1.0). Results are written to `aggregated_metrics` via `AggregatedMetricsDAO`.
+- `bots/schedule_agent.py` (`PeriodScheduleAgent`) — generates Week→Lesson→Concept→Skill schedule hierarchy. Accepts `research_context` (from Perplexity) to fill curriculum gaps when no files are uploaded.
+- `bots/coverage_evaluator.py` (`CoverageEvaluator`) — single `gpt-4o-mini` structured call; returns `sufficient`, `gaps`, and `research_queries`. Used before schedule generation to decide whether to call Perplexity.
+- `integrations/perplexity_service.py` (`PerplexityService`) — calls `POST https://api.perplexity.ai/v1/agent` with `{"preset": "deep-research", "input": ...}` via `httpx`. Response text is in `output[-1]["content"][0]["text"]` (last item of type "message" in the `output` array). NOT the OpenAI-compatible `/chat/completions` endpoint.
 
 ## Development
 
@@ -150,6 +149,7 @@ pip install -r requirements.txt
 - `JWT_SECRET_KEY`
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 - `OPENAI_API_KEY`
+- `PERPLEXITY_API_KEY` — required for `PerplexityService` (Perplexity Agent API)
 - `API_GATEWAY_URL` (optional)
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 
@@ -163,6 +163,13 @@ uvicorn main:app --reload
 **Testing**:
 
 ```bash
+# Load .env before running one-off Python tests (venv doesn't auto-load it):
+set -a && source .env && set +a && python -c "..."
+
+# All pytest runs fail with ModuleNotFoundError: No module named 'supabase' in local dev
+# — supabase is not installed in the venv. Tests requiring DAO access cannot be run locally.
+# Use standalone python -c scripts for agent/integration layer testing.
+
 pytest
 pytest -m unit
 pytest -m integration

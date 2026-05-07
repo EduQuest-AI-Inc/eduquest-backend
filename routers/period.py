@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import math
 import os
@@ -11,7 +10,7 @@ from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from api.deps import AuthPayload, Role, get_auth, require_roles
+from routers.deps import AuthPayload, Role, get_auth, require_roles
 from data_access.teacher_dao import TeacherDAO
 from integrations import openai_vector_store
 from integrations.s3_service import (
@@ -36,7 +35,7 @@ waitlist_service = WaitlistService()
 
 # ─── Private helpers ──────────────────────────────────────────────────────────
 
-async def _process_period_files(
+def _process_period_files(
     period_id: str,
     course_name: str,
     file_paths: list,
@@ -78,15 +77,6 @@ async def _process_period_files(
             logger.error("ingest_to_openai failed for period %s: %s", period_id, e, exc_info=True)
             raise
         period_management_service.update_file_vector_store_ids(period_id, file_vs_ids)
-
-        loop = asyncio.get_event_loop()
-        try:
-            await asyncio.wait_for(
-                loop.run_in_executor(None, period_file_service.run_pipeline, period_id, user_id),
-                timeout=300.0,
-            )
-        except asyncio.TimeoutError:
-            logger.warning("Schedule generation timed out for period %s — marking ready anyway", period_id)
 
         period_management_service.update_processing_status(period_id, "ready")
     except Exception as e:

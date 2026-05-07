@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from api.deps import AuthPayload, Role, get_auth
+from routers.deps import AuthPayload, Role, get_auth
 from data_access.enrollment_dao import EnrollmentDAO
 from data_access.parent_dao import ParentDAO
 from data_access.period_dao import PeriodDAO
