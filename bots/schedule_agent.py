@@ -22,12 +22,17 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ── Output schema (normalized hierarchy) ────────────────────────────────────
 
+class MasteryCriteriaSchema(BaseModel):
+    descriptor: str = Field(description='Measurable mastery statement, e.g. "Student can ..."')
+    passing_score: float = Field(description="Score threshold from 0.0 to 1.0")
+
+
 class SkillSchema(BaseModel):
     skill_name: str = Field(description="Short, unique skill name")
     description: str = Field(description="What this skill means in practice")
     bloom_level: str = Field(description="One of: Remember, Understand, Apply, Analyze, Evaluate, Create")
     difficulty: str = Field(description="One of: beginner, intermediate, advanced")
-    mastery_criteria: dict = Field(description='e.g. {"descriptor": "Student can ...", "passing_score": 0.8}')
+    mastery_criteria: MasteryCriteriaSchema
 
 
 class ConceptSchema(BaseModel):
@@ -149,7 +154,7 @@ For each skill, provide:
 - description: what this skill means in practice
 - bloom_level: exactly one of: Remember, Understand, Apply, Analyze, Evaluate, Create
 - difficulty: exactly one of: beginner, intermediate, advanced
-- mastery_criteria: dict with "descriptor" (string: "Student can ...") and "passing_score" (float 0.0-1.0)
+- mastery_criteria: MasteryCriteriaSchema with descriptor (string: "Student can ...") and passing_score (float 0.0-1.0)
 
 For each concept, provide:
 - concept_name, description
@@ -197,7 +202,7 @@ For each skill, provide:
 - description: what this skill means in practice
 - bloom_level: exactly one of: Remember, Understand, Apply, Analyze, Evaluate, Create
 - difficulty: exactly one of: beginner, intermediate, advanced
-- mastery_criteria: dict with "descriptor" (string: "Student can ...") and "passing_score" (float 0.0-1.0)
+- mastery_criteria: MasteryCriteriaSchema with descriptor (string: "Student can ...") and passing_score (float 0.0-1.0)
 
 For each concept, provide:
 - concept_name, description
@@ -242,7 +247,7 @@ For each skill, provide:
 - description: what this skill means in practice
 - bloom_level: exactly one of: Remember, Understand, Apply, Analyze, Evaluate, Create
 - difficulty: exactly one of: beginner, intermediate, advanced
-- mastery_criteria: dict with "descriptor" (string: "Student can ...") and "passing_score" (float 0.0-1.0)
+- mastery_criteria: MasteryCriteriaSchema with descriptor (string: "Student can ...") and passing_score (float 0.0-1.0)
 
 For each concept, provide:
 - concept_name, description
@@ -298,9 +303,18 @@ RESEARCH CONTEXT (gathered from Perplexity Sonar — use this to fill curriculum
         """Run the agent synchronously and return the schedule."""
         return asyncio.run(self._run_async())
 
+    async def run_async(self) -> PeriodScheduleSchema:
+        """Run the agent asynchronously and return the schedule."""
+        return await self._run_async()
+
     def run_and_get_json(self) -> dict:
         """Run the agent and return the schedule as a JSON-serializable dict."""
         schedule = self.run()
+        return schedule.model_dump()
+
+    async def run_and_get_json_async(self) -> dict:
+        """Run the agent asynchronously and return the schedule as a JSON-serializable dict."""
+        schedule = await self.run_async()
         return schedule.model_dump()
 
 

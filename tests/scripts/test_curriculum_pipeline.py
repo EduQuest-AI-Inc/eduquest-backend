@@ -165,7 +165,10 @@ async def main() -> None:
             research_context=research_context,
         )
 
-    schedule_dict = schedule_agent.run_and_get_json()
+    if hasattr(schedule_agent, "run_and_get_json_async"):
+        schedule_dict = await schedule_agent.run_and_get_json_async()
+    else:
+        schedule_dict = schedule_agent.run_and_get_json()
     parsed = PeriodScheduleSchema.model_validate(schedule_dict)
 
     print(f"  Weeks: {len(parsed.weeks)}")
