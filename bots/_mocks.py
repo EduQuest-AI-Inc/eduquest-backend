@@ -172,9 +172,9 @@ def _extract_topics(course_description: str) -> list[str]:
     return words[:_MAX_KEYWORDS] if words else _RESEARCH_TOPICS
 
 
-class MockCurriculumBot:
+class MockCurriculumAgent:
     """
-    Deterministic replacement for CurriculumBot. Returns a fully structured
+    Deterministic replacement for CurriculumAgent. Returns a fully structured
     CurriculumResult with no randomness, no network calls, and no DB writes.
     The service layer is responsible for persisting the result.
 
@@ -188,17 +188,16 @@ class MockCurriculumBot:
 
     def __init__(
         self,
-        start_date: str,
-        end_date: str,
-        grade_level: str,
-        course_description: str,
-        course_metadata: dict,
+        vector_store_ids: list,
+        course_name: str = None,
+        start_date: str = None,
+        end_date: str = None,
+        course_description: str = None,
+        research_context: str = None,
     ):
-        self.start_date = date.fromisoformat(start_date)
-        self.end_date = date.fromisoformat(end_date)
-        self.grade_level = grade_level
-        self.course_description = course_description
-        self.course_metadata = course_metadata
+        self._start_date = date.fromisoformat(start_date) if start_date else date.today()
+        self._end_date = date.fromisoformat(end_date) if end_date else date.today()
+        self._course_description = course_description or course_name or ""
 
     def run(self):
         from bots.schemas.curriculum import (
@@ -209,8 +208,8 @@ class MockCurriculumBot:
             CurriculumWeek,
         )
 
-        total_weeks = math.ceil((self.end_date - self.start_date).days / 7) or 3
-        topics = _extract_topics(self.course_description)
+        total_weeks = math.ceil((self._end_date - self._start_date).days / 7) or 3
+        topics = _extract_topics(self._course_description)
         weeks = []
 
         for w in range(1, total_weeks + 1):
@@ -276,11 +275,20 @@ class MockCurriculumBot:
             )
 
         return CurriculumResult(
-            grade_level=self.grade_level,
-            course=self.course_description,
+            grade_level="unspecified",
+            course=self._course_description,
             total_weeks=total_weeks,
             weeks=weeks,
         )
+
+    async def run_async(self):
+        return self.run()
+
+    def run_and_get_json(self) -> dict:
+        return self.run().model_dump()
+
+    async def run_and_get_json_async(self) -> dict:
+        return self.run().model_dump()
 
 
 class MockConversationsSession:

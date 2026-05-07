@@ -37,17 +37,18 @@ class BotProvider:
         from bots.grading_agent import GradingOrchestrator
         return GradingOrchestrator()
 
-    def create_curriculum_bot(
+    def create_curriculum_agent(
         self,
-        start_date: str,
-        end_date: str,
-        grade_level: str,
-        course_description: str,
-        course_metadata: dict,
+        vector_store_ids: list,
+        course_name: str = None,
+        start_date: str = None,
+        end_date: str = None,
+        course_description: str = None,
+        research_context: str = None,
     ):
-        # Real CurriculumBot not yet implemented — always use mock
-        from bots._mocks import MockCurriculumBot
-        return MockCurriculumBot(start_date, end_date, grade_level, course_description, course_metadata)
+        from bots.curriculum_agent import CurriculumAgent
+        return CurriculumAgent(vector_store_ids, course_name, start_date, end_date,
+                               course_description, research_context)
 
     def create_profile_agent(self):
         from bots.profile_agent import create_profile_agent
@@ -144,16 +145,18 @@ class MockBotProvider(BotProvider):
         from bots._mocks import MockGradingOrchestrator
         return MockGradingOrchestrator()
 
-    def create_curriculum_bot(
+    def create_curriculum_agent(
         self,
-        start_date: str,
-        end_date: str,
-        grade_level: str,
-        course_description: str,
-        course_metadata: dict,
+        vector_store_ids: list,
+        course_name: str = None,
+        start_date: str = None,
+        end_date: str = None,
+        course_description: str = None,
+        research_context: str = None,
     ):
-        from bots._mocks import MockCurriculumBot
-        return MockCurriculumBot(start_date, end_date, grade_level, course_description, course_metadata)
+        from bots._mocks import MockCurriculumAgent
+        return MockCurriculumAgent(vector_store_ids, course_name, start_date, end_date,
+                                   course_description, research_context)
 
     def create_profile_agent(self):
         from bots.profile_agent import create_profile_agent

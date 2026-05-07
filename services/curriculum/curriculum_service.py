@@ -92,16 +92,16 @@ class CurriculumService:
 
             start_date = period.get("start_date") or date.today().isoformat()
             end_date = period.get("end_date") or date.today().isoformat()
-            grade_level = period.get("grade_level") or "unspecified"
             course_description = period.get("course_description") or period["name"]
-            course_metadata = period.get("course_metadata") or {}
+            vector_store_ids = [period["vector_store_id"]] if period.get("vector_store_id") else []
 
-            bot = get_bot_provider().create_curriculum_bot(
+            bot = get_bot_provider().create_curriculum_agent(
+                vector_store_ids=vector_store_ids,
+                course_name=period.get("name"),
                 start_date=str(start_date),
                 end_date=str(end_date),
-                grade_level=grade_level,
                 course_description=course_description,
-                course_metadata=course_metadata,
+                research_context=None,
             )
             result = bot.run()
 
@@ -128,8 +128,8 @@ class CurriculumService:
         for week in result.weeks:
             weeks.append({
                 "week_number": week.week_number,
-                "week_start": None,
-                "week_end": None,
+                "week_start": getattr(week, 'start_date', None),
+                "week_end": getattr(week, 'end_date', None),
             })
             for lesson in week.lessons:
                 lessons.append({
