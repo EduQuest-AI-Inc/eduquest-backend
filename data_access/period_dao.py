@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 from data_access.base_dao import SupabaseBaseDAO
 
@@ -26,7 +26,7 @@ class PeriodDAO(SupabaseBaseDAO):
             'processing_status': getattr(period, 'processing_status', 'pending'),
         })
 
-    def get_period_by_id(self, period_id: str) -> Optional[Dict[str, Any]]:
+    def get_period_by_id(self, period_id: str) -> Optional[dict]:
         return self._select_by_id('period_id', period_id)
 
     def update_period(self, period_id: str, updates: Dict[str, Any]) -> None:

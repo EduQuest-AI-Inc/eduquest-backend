@@ -46,7 +46,7 @@ class CurriculumService:
     def get_curriculum(self, period_id: str) -> dict[str, Any]:
         period = self._get_period_or_raise(period_id)
         return {
-            "period_status": period.get("status", "pending"),
+            "period_status": period["status"],
             "weeks": self.week_dao.get_weeks_by_period(period_id),
             "lessons": self.lesson_dao.get_lessons_by_period(period_id),
             "concepts": self.concept_dao.get_concepts_by_period(period_id),
@@ -71,7 +71,7 @@ class CurriculumService:
 
     def approve_period(self, period_id: str) -> None:
         period = self._get_period_or_raise(period_id)
-        if period.get("status") == "pending":
+        if period["status"] == "pending":
             raise ValidationError("Cannot approve a period with no generated curriculum")
         self.period_dao.update_status(period_id, "approved")
 
@@ -93,7 +93,7 @@ class CurriculumService:
             start_date = period.get("start_date") or date.today().isoformat()
             end_date = period.get("end_date") or date.today().isoformat()
             grade_level = period.get("grade_level") or "unspecified"
-            course_description = period.get("course_description") or period.get("name", "")
+            course_description = period.get("course_description") or period["name"]
             course_metadata = period.get("course_metadata") or {}
 
             bot = get_bot_provider().create_curriculum_bot(

@@ -2,10 +2,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import logging
+import time
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
+
+_req_log = logging.getLogger("eduquest.request")
 
 from routers import conversation, period, schedule, ltg, teacher, waitlist
 from routers import auth, user, enrollment, quest, parent
@@ -39,6 +44,21 @@ app.add_middleware(
     allow_headers=["*"],
     allow_methods=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.monotonic()
+    response = await call_next(request)
+    ms = (time.monotonic() - start) * 1000
+    _req_log.info(
+        "%s %s %s %.0fms",
+        request.method,
+        request.url.path,
+        response.status_code,
+        ms,
+    )
+    return response
 
 
 @app.exception_handler(ValidationError)

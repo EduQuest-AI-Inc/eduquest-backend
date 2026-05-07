@@ -85,8 +85,13 @@ class _SkillEditPayload(BaseModel):
 def _assert_period_owner(period_id: str, user_id: str) -> None:
     period = _period_dao.get_period_by_id(period_id)
     if not period:
+        logger.warning("period not found: period_id=%s", period_id)
         raise HTTPException(status_code=404, detail=f"Period '{period_id}' not found")
-    if period.get("owner_id") != user_id:
+    if period["owner_id"] != user_id:
+        logger.warning(
+            "ownership check failed: period_id=%s owner_id=%s caller_id=%s",
+            period_id, period["owner_id"], user_id,
+        )
         raise HTTPException(status_code=403, detail="Unauthorized")
 
 
@@ -96,7 +101,7 @@ def _assert_period_owner(period_id: str, user_id: str) -> None:
 def trigger_generation(
     period_id: str,
     background_tasks: BackgroundTasks,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
 ):
     _assert_period_owner(period_id, auth.sub)
     try:
@@ -114,7 +119,7 @@ def trigger_generation(
 @router.get("/{period_id}")
 def get_curriculum(
     period_id: str,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
 ):
     _assert_period_owner(period_id, auth.sub)
     try:
@@ -130,7 +135,7 @@ def get_curriculum(
 def save_curriculum(
     period_id: str,
     payload: _SavePayload,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
 ):
     _assert_period_owner(period_id, auth.sub)
     try:
@@ -150,7 +155,7 @@ def update_concept(
     period_id: str,
     concept_name: str,
     payload: _ConceptEditPayload,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
 ):
     _assert_period_owner(period_id, auth.sub)
     fields = {k: v for k, v in payload.model_dump().items() if v is not None}
@@ -169,7 +174,7 @@ def update_skill(
     period_id: str,
     skill_name: str,
     payload: _SkillEditPayload,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
 ):
     _assert_period_owner(period_id, auth.sub)
     fields = {k: v for k, v in payload.model_dump().items() if v is not None}
@@ -186,7 +191,7 @@ def update_skill(
 @router.post("/{period_id}/approve")
 def approve_period(
     period_id: str,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
 ):
     _assert_period_owner(period_id, auth.sub)
     try:
