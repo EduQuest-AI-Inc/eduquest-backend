@@ -9,6 +9,7 @@ import os
 
 from routers import conversation, period, schedule, ltg, teacher, waitlist
 from routers import auth, user, enrollment, quest, parent
+from routers import curriculum
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from exceptions.auth_error import AuthError
@@ -78,6 +79,7 @@ app.include_router(quest.router, prefix="/quest")
 app.include_router(teacher.router, prefix="/teacher")
 app.include_router(user.router, prefix="/user")
 app.include_router(waitlist.router, prefix="/pilot-waitlist")
+app.include_router(curriculum.router, prefix="/curriculum")
 
 
 @app.get("/helloworld")

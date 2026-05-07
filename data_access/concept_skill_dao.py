@@ -11,6 +11,12 @@ class ConceptSkillDAO(SupabaseBaseDAO):
     def insert_concept_skill(self, cs: ConceptSkill) -> None:
         self._insert(cs.to_item())
 
+    def get_all_for_period(self, period_id: str) -> list[dict[str, Any]]:
+        return self._select_eq('period_id', period_id)
+
+    def delete_all_for_period(self, period_id: str) -> None:
+        self._delete({'period_id': period_id})
+
     def get_skills_for_concept(self, period_id: str, concept_name: str) -> list[dict[str, Any]]:
         response = self._execute(
             self._table().select('*').eq('period_id', period_id).eq('concept_name', concept_name)
