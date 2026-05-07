@@ -4,9 +4,10 @@ import os
 from typing import Optional
 import math
 from datetime import date, timedelta
+from openai.types.shared import Reasoning
 from pydantic import BaseModel, Field
 from typing import List
-from agents import Agent, Runner, FileSearchTool, trace
+from agents import Agent, Runner, FileSearchTool, trace, ModelSettings
 from openai import OpenAI
 import asyncio
 import json
@@ -119,6 +120,7 @@ class PeriodScheduleAgent:
             name="Period Schedule Agent",
             instructions=instructions,
             model="gpt-5.5",
+            model_settings=ModelSettings(reasoning=Reasoning(effort="high")),
             tools=tools,  # type: ignore[arg-type]
             output_type=PeriodScheduleSchema
         )
