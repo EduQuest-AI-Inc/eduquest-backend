@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import math
 import os
@@ -11,7 +10,7 @@ from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from api.deps import AuthPayload, Role, get_auth, require_roles
+from routers.deps import AuthPayload, Role, get_auth, require_roles
 from data_access.teacher_dao import TeacherDAO
 from integrations import openai_vector_store
 from integrations.s3_service import (
@@ -23,6 +22,7 @@ from integrations.s3_service import (
 )
 from services.period.period_file_service import PeriodFileService
 from models.period import CourseMetadata
+from services.curriculum.curriculum_service import CurriculumService
 from services.period.period_management_service import PeriodManagementService
 from services.waitlist.waitlist_service import WaitlistService
 
@@ -30,13 +30,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 period_management_service = PeriodManagementService()
 period_file_service = PeriodFileService()
+curriculum_service = CurriculumService()
 teacher_dao = TeacherDAO()
 waitlist_service = WaitlistService()
 
 
 # ─── Private helpers ──────────────────────────────────────────────────────────
 
-async def _process_period_files(
+def _process_period_files(
     period_id: str,
     course_name: str,
     file_paths: list,
@@ -79,16 +80,12 @@ async def _process_period_files(
             raise
         period_management_service.update_file_vector_store_ids(period_id, file_vs_ids)
 
-        loop = asyncio.get_event_loop()
-        try:
-            await asyncio.wait_for(
-                loop.run_in_executor(None, period_file_service.run_pipeline, period_id, user_id),
-                timeout=300.0,
-            )
-        except asyncio.TimeoutError:
-            logger.warning("Schedule generation timed out for period %s — marking ready anyway", period_id)
-
         period_management_service.update_processing_status(period_id, "ready")
+
+        try:
+            curriculum_service._run_generation(period_id)
+        except Exception as e:
+            logger.error("Auto curriculum generation failed for period %s: %s", period_id, e, exc_info=True)
     except Exception as e:
         logger.error("Background processing failed for period %s: %s", period_id, e, exc_info=True)
         period_management_service.update_processing_status(period_id, "failed")
@@ -188,8 +185,11 @@ def create_period(
     primary_standard: Optional[str] = Form(default=None),
     additional_standards: List[str] = Form(default=[]),
     specific_standard_codes: Optional[str] = Form(default=None),
+    status: Optional[str] = Form(default="pending"),
     auth: AuthPayload = Depends(get_auth),
 ):
+    if status not in ("pending", "setup_draft"):
+        raise HTTPException(status_code=400, detail="Invalid status value")
     if auth.role == Role.TEACHER:
         _validate_pilot_access(auth.sub)
 
@@ -210,11 +210,12 @@ def create_period(
                 shutil.copyfileobj(upload.file, dest)
             file_paths.append(file_path)
 
+        is_draft = status == "setup_draft"
         period = period_management_service.create_period(
             course=name,
             user_id=auth.sub,
             vector_store_id="",
-            file_urls=[],
+            file_urls=file_keys if is_draft else [],
             canvas_course_id=int(canvas_course_id) if canvas_course_id else None,
             canvas_course_name=canvas_course_name,
             start_date=start_date or None,
@@ -223,7 +224,8 @@ def create_period(
             mastery_threshold=mastery_threshold,
             course_description=course_description or None,
             course_metadata=course_metadata,
-            processing_status="pending",
+            processing_status="ready" if is_draft else "pending",
+            status=status,
         )
         period_id = period["period_id"]
 
@@ -233,20 +235,23 @@ def create_period(
             except Exception as e:
                 logger.warning("Failed to persist Canvas credentials for teacher %s: %s", auth.sub, e)
 
-        background_tasks.add_task(
-            _process_period_files,
-            period_id=period_id,
-            course_name=name,
-            file_paths=file_paths,
-            temp_dir=temp_dir,
-            user_id=auth.sub,
-            file_keys=file_keys,
-            canvas_api_url=canvas_api_url if auth.role == Role.TEACHER else None,
-            canvas_api_key=canvas_api_key if auth.role == Role.TEACHER else None,
-            canvas_course_id=canvas_course_id if auth.role == Role.TEACHER else None,
-        )
+        if is_draft:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        else:
+            background_tasks.add_task(
+                _process_period_files,
+                period_id=period_id,
+                course_name=name,
+                file_paths=file_paths,
+                temp_dir=temp_dir,
+                user_id=auth.sub,
+                file_keys=file_keys,
+                canvas_api_url=canvas_api_url if auth.role == Role.TEACHER else None,
+                canvas_api_key=canvas_api_key if auth.role == Role.TEACHER else None,
+                canvas_course_id=canvas_course_id if auth.role == Role.TEACHER else None,
+            )
 
-        return {"message": "Period created", "period": period, "status": "pending"}
+        return {"message": "Period created", "period": period, "status": status}
 
     except HTTPException:
         raise
@@ -255,6 +260,119 @@ def create_period(
     except Exception as e:
         shutil.rmtree(temp_dir, ignore_errors=True)
         logger.error("Error in create-period: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.patch("/period/{period_id}/setup")
+def update_period_setup(
+    period_id: str,
+    background_tasks: BackgroundTasks,
+    name: Optional[str] = Form(default=None),
+    files: List[UploadFile] = File(default=[]),
+    file_keys: List[str] = Form(default=[]),
+    canvas_api_url: Optional[str] = Form(default=None),
+    canvas_api_key: Optional[str] = Form(default=None),
+    canvas_course_id: Optional[str] = Form(default=None),
+    canvas_course_name: Optional[str] = Form(default=None),
+    start_date: Optional[str] = Form(default=None),
+    end_date: Optional[str] = Form(default=None),
+    course_description: Optional[str] = Form(default=None),
+    grade_level: Optional[str] = Form(default=None),
+    mastery_threshold: Optional[float] = Form(default=None),
+    learning_objectives: Optional[str] = Form(default=None),
+    primary_standard: Optional[str] = Form(default=None),
+    additional_standards: List[str] = Form(default=[]),
+    specific_standard_codes: Optional[str] = Form(default=None),
+    status: Optional[str] = Form(default="setup_draft"),
+    auth: AuthPayload = Depends(get_auth),
+):
+    if status not in ("pending", "setup_draft"):
+        raise HTTPException(status_code=400, detail="Invalid status value")
+
+    period = period_management_service.get_period_by_id(period_id)
+    if not period:
+        raise HTTPException(status_code=404, detail="Period not found")
+    if period.get("owner_id") != auth.sub:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    if period.get("status") != "setup_draft":
+        raise HTTPException(status_code=400, detail="Period is not a setup draft")
+
+    raw_metadata = CourseMetadata(
+        learning_objectives=learning_objectives,
+        primary_standard=primary_standard,
+        additional_standards=additional_standards or [],
+        specific_standard_codes=specific_standard_codes,
+    )
+    course_metadata = raw_metadata if raw_metadata.model_dump(exclude_none=True) else None
+
+    existing_file_keys = period.get("file_urls") or []
+    all_file_keys = existing_file_keys + file_keys
+    is_finalizing = status == "pending"
+
+    updates: dict = {
+        "status": status,
+        "file_urls": [] if is_finalizing else all_file_keys,
+        "processing_status": "pending" if is_finalizing else "ready",
+    }
+    if name is not None:
+        updates["name"] = name
+    if course_description is not None:
+        updates["course_description"] = course_description or None
+    if start_date is not None:
+        updates["start_date"] = start_date or None
+    if end_date is not None:
+        updates["end_date"] = end_date or None
+    if grade_level is not None:
+        updates["grade_level"] = grade_level or None
+    if mastery_threshold is not None:
+        updates["mastery_threshold"] = mastery_threshold
+    if canvas_course_id is not None:
+        updates["canvas_course_id"] = int(canvas_course_id) if canvas_course_id else None
+    if canvas_course_name is not None:
+        updates["canvas_course_name"] = canvas_course_name or None
+    if course_metadata:
+        updates["course_metadata"] = course_metadata.model_dump()
+
+    temp_dir = tempfile.mkdtemp()
+    try:
+        file_paths: List[str] = []
+        for upload in files:
+            file_path = os.path.join(temp_dir, upload.filename or "")
+            with open(file_path, "wb") as dest:
+                shutil.copyfileobj(upload.file, dest)
+            file_paths.append(file_path)
+
+        updated = period_management_service.update_setup(period_id, updates)
+
+        if auth.role == Role.TEACHER and canvas_api_url and canvas_api_key:
+            try:
+                teacher_dao.update_canvas_credentials(auth.sub, canvas_api_url, canvas_api_key)
+            except Exception as e:
+                logger.warning("Failed to persist Canvas credentials for teacher %s: %s", auth.sub, e)
+
+        if is_finalizing:
+            background_tasks.add_task(
+                _process_period_files,
+                period_id=period_id,
+                course_name=name or period.get("name", ""),
+                file_paths=file_paths,
+                temp_dir=temp_dir,
+                user_id=auth.sub,
+                file_keys=all_file_keys,
+                canvas_api_url=canvas_api_url if auth.role == Role.TEACHER else None,
+                canvas_api_key=canvas_api_key if auth.role == Role.TEACHER else None,
+                canvas_course_id=canvas_course_id if auth.role == Role.TEACHER else None,
+            )
+        else:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+        return {"message": "Period updated", "period": updated, "status": status}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        logger.error("Error in update-period-setup %s: %s", period_id, e, exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -277,6 +395,19 @@ def add_files_to_period(
     existing = period.get("file_urls") or []
     period_management_service.update_file_urls(payload.period_id, existing + payload.file_keys)
     return {"message": f"Successfully added {len(payload.file_keys)} files to period", "added_files": payload.file_keys}
+
+
+@router.get("/period/{period_id}")
+def get_period(
+    period_id: str,
+    auth: AuthPayload = Depends(get_auth),
+):
+    period = period_management_service.get_period_by_id(period_id)
+    if not period:
+        raise HTTPException(status_code=404, detail="Period not found")
+    if period.get("owner_id") != auth.sub:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    return {"period": period}
 
 
 @router.delete("/period/{period_id}", status_code=204)

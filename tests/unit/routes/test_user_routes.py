@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from main import app
-from api.deps import get_auth, AuthPayload
+from routers.deps import get_auth, AuthPayload
 
 
 def _student_auth():

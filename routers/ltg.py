@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from api.deps import AuthPayload, get_auth
+from routers.deps import AuthPayload, get_auth
 from services.period.period_service import PeriodService
 
 logger = logging.getLogger(__name__)

@@ -5,7 +5,7 @@ Fails loudly when a new route is added without auth.
 import pytest
 from fastapi.routing import APIRoute
 from main import app
-from api.deps import get_auth
+from routers.deps import get_auth
 
 # Routes that are intentionally public — no auth required.
 # Add to this set when a new public endpoint is introduced; document the reason.

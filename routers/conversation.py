@@ -10,7 +10,7 @@ from fastapi import UploadFile
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from api.deps import AuthPayload, Role, get_auth, require_roles
+from routers.deps import AuthPayload, Role, get_auth, require_roles
 from data_access.quest_dao import QuestDAO
 from services.conversation.conversation_service import ConversationService
 logger = logging.getLogger(__name__)

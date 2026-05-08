@@ -28,6 +28,7 @@ class Period(BaseModel):
     course_metadata: Optional[CourseMetadata] = None
     file_vector_store_ids: List[str] = []
     processing_status: str = "pending"
+    status: str = "pending"
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_item(self):

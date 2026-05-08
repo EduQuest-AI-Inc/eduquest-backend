@@ -17,8 +17,9 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Iterator, Optional
 
-from models.period_schedule import ConceptNode
 from models.student_skill_mastery import MASTERY_CUTOFF
+
+ConceptNode = dict
 
 
 def _safe_list(value: Any) -> list:

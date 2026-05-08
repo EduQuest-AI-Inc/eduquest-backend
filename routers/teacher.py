@@ -4,7 +4,7 @@ from canvasapi import Canvas
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from api.deps import AuthPayload, Role, require_roles
+from routers.deps import AuthPayload, Role, require_roles
 from data_access.aggregated_metrics_dao import AggregatedMetricsDAO
 from data_access.period_dao import PeriodDAO
 from data_access.teacher_dao import TeacherDAO
