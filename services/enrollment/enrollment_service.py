@@ -116,7 +116,7 @@ class EnrollmentService:
             for p in self.period_dao.get_periods_by_owner_id(parent['user_id']):
                 if p['period_id'] in enrolled:
                     continue
-                if p.get('status') in ('draft', 'approved'):
+                if p.get('status') == 'approved':
                     periods.append(p)
         return periods
 
