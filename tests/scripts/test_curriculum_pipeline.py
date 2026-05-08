@@ -79,11 +79,11 @@ def _build_quest_entries(schedule: dict, enabled_weeks: list) -> list:
         if week_num not in enabled_weeks:
             continue
         lessons = week.get("lessons", [])
-        lesson_names = [l["lesson_name"] for l in lessons]
+        lesson_names = [lesson["lesson_name"] for lesson in lessons]
         skills = [
             s["skill_name"]
-            for l in lessons
-            for c in l.get("concepts", [])
+            for lesson in lessons
+            for c in lesson.get("concepts", [])
             for s in c.get("skills", [])
         ]
         entries.append({
@@ -184,21 +184,21 @@ async def main() -> None:
     _check(len(parsed.weeks) > 0, "schedule has weeks")
     _check(all(len(w.lessons) > 0 for w in parsed.weeks), "every week has lessons")
     _check(
-        all(len(c.skills) > 0 for w in parsed.weeks for l in w.lessons for c in l.concepts),
+        all(len(c.skills) > 0 for w in parsed.weeks for lesson in w.lessons for c in lesson.concepts),
         "every concept has skills",
     )
     valid_bloom = {"Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"}
     _check(
         all(
             s.bloom_level in valid_bloom
-            for w in parsed.weeks for l in w.lessons for c in l.concepts for s in c.skills
+            for w in parsed.weeks for lesson in w.lessons for c in lesson.concepts for s in c.skills
         ),
         "all bloom_levels are valid",
     )
     _check(
         all(
             s.difficulty in ("beginner", "intermediate", "advanced")
-            for w in parsed.weeks for l in w.lessons for c in l.concepts for s in c.skills
+            for w in parsed.weeks for lesson in w.lessons for c in lesson.concepts for s in c.skills
         ),
         "all difficulties are valid",
     )

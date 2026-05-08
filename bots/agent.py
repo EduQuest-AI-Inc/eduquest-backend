@@ -1,9 +1,8 @@
 """
 Homework (HW) Agent for generating quest instructions and rubrics.
 
-Note: SchedulesAgent has been removed - quest weeks now come from the centralized
-period_schedule table (teacher-selected quest weeks). The HWAgent is called directly
-with the list of enabled quest weeks.
+Quest weeks are derived from the curriculum (all weeks in an approved curriculum
+generate quests). The HWAgent receives the assembled quest list from PeriodQuestService.
 """
 import logging
 import sys

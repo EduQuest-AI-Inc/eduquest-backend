@@ -129,20 +129,20 @@ async def main() -> None:
     _check(len(parsed.weeks) > 0, "schedule has weeks")
     _check(all(len(w.lessons) > 0 for w in parsed.weeks), "every week has lessons")
     _check(
-        all(len(c.skills) > 0 for w in parsed.weeks for l in w.lessons for c in l.concepts),
+        all(len(c.skills) > 0 for w in parsed.weeks for lesson in w.lessons for c in lesson.concepts),
         "every concept has skills",
     )
     _check(
         all(
             s.bloom_level in ("Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create")
-            for w in parsed.weeks for l in w.lessons for c in l.concepts for s in c.skills
+            for w in parsed.weeks for lesson in w.lessons for c in lesson.concepts for s in c.skills
         ),
         "all bloom_levels are valid",
     )
     _check(
         all(
             s.difficulty in ("beginner", "intermediate", "advanced")
-            for w in parsed.weeks for l in w.lessons for c in l.concepts for s in c.skills
+            for w in parsed.weeks for lesson in w.lessons for c in lesson.concepts for s in c.skills
         ),
         "all difficulties are valid",
     )

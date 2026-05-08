@@ -27,7 +27,6 @@ def _build_period(period_id: str = "MATH-101") -> Dict[str, str]:
 def _make_service() -> EnrollmentService:
     svc = EnrollmentService.__new__(EnrollmentService)
     svc.period_dao = MagicMock()
-    svc.period_schedule_dao = MagicMock()
     svc.student_dao = MagicMock()
     svc.user_dao = MagicMock()
     svc.conversation_dao = MagicMock()
@@ -162,16 +161,13 @@ def test_get_my_periods_skips_missing_periods():
 
 
 def _setup_verify(svc: EnrollmentService, *, owner_role: str = "teacher") -> None:
-    schedule_mock = MagicMock()
-    schedule_mock.quest_enabled_weeks = True
-    svc.period_schedule_dao.get_by_period_id.return_value = schedule_mock
     svc.user_dao.get_by_id.return_value = {"role": owner_role}
 
 
 @pytest.mark.unit
 def test_verify_period_id_not_enrolled_enrolls_student():
     svc = _make_service()
-    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "name": "Math", "owner_id": "t1"}
+    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "name": "Math", "owner_id": "t1", "status": "approved"}
     _setup_verify(svc)
     svc.student_dao.get_student_by_id.return_value = {"user_id": "u1"}
     svc.enrollment_dao.get_enrollments_by_student.return_value = []
@@ -185,7 +181,7 @@ def test_verify_period_id_not_enrolled_enrolls_student():
 @pytest.mark.unit
 def test_verify_period_id_already_enrolled_raises():
     svc = _make_service()
-    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "t1"}
+    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "t1", "status": "approved"}
     _setup_verify(svc)
     svc.student_dao.get_student_by_id.return_value = {"user_id": "u1"}
     svc.enrollment_dao.get_enrollments_by_student.return_value = [{"period_id": "p1"}]
@@ -207,7 +203,7 @@ def test_verify_rejects_parent_period_via_id():
 @pytest.mark.unit
 def test_verify_allows_parent_period_via_dropdown():
     svc = _make_service()
-    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "name": "Math", "owner_id": "par1"}
+    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "name": "Math", "owner_id": "par1", "status": "approved"}
     _setup_verify(svc, owner_role="parent")
     svc.student_dao.get_student_by_id.return_value = {"user_id": "u1"}
     svc.enrollment_dao.get_enrollments_by_student.return_value = []

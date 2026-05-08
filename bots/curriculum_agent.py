@@ -1,6 +1,7 @@
 import logging
 import sys
 import os
+import time
 from typing import Optional
 import math
 from datetime import date, timedelta
@@ -8,36 +9,26 @@ from openai.types.shared import Reasoning
 from pydantic import BaseModel, Field
 from typing import List
 from agents import Agent, Runner, FileSearchTool, trace, ModelSettings
-from openai import OpenAI
 import asyncio
-import json
-import tempfile
 
 logger = logging.getLogger(__name__)
 
 # Add the parent directory to Python path so we can import from eduquest-backend
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 
 # ── Output schema (normalized hierarchy) ────────────────────────────────────
 
-class MasteryCriteriaSchema(BaseModel):
-    descriptor: str = Field(description='Measurable mastery statement, e.g. "Student can ..."')
-    passing_score: float = Field(description="Score threshold from 0.0 to 1.0")
-
-
 class SkillSchema(BaseModel):
-    skill_name: str = Field(description="Short, unique skill name")
+    title: str = Field(description="Short, unique skill name")
     description: str = Field(description="What this skill means in practice")
     bloom_level: str = Field(description="One of: Remember, Understand, Apply, Analyze, Evaluate, Create")
     difficulty: str = Field(description="One of: beginner, intermediate, advanced")
-    mastery_criteria: MasteryCriteriaSchema
+    mastery_threshold: float = Field(description="Score threshold from 0.0 to 1.0")
 
 
 class ConceptSchema(BaseModel):
-    concept_name: str
+    title: str
     description: str
     prerequisites: List[str] = Field(description="Names of other concepts that must be learned first")
     common_misconceptions: List[str]
@@ -46,7 +37,7 @@ class ConceptSchema(BaseModel):
 
 
 class LessonSchema(BaseModel):
-    lesson_name: str
+    title: str
     concepts: List[ConceptSchema] = Field(description="2-4 concepts covered in this lesson")
 
 
@@ -57,12 +48,12 @@ class WeekSchema(BaseModel):
     lessons: List[LessonSchema] = Field(description="2-5 lessons per week")
 
 
-class PeriodScheduleSchema(BaseModel):
-    """Schema for the full period schedule output."""
+class CurriculumScheduleSchema(BaseModel):
+    """Schema for the full curriculum schedule output."""
     weeks: List[WeekSchema]
 
 
-class PeriodScheduleAgent:
+class CurriculumAgent:
     """
     Agent that generates a period-level semester schedule.
     This is teacher/period scoped (not student-specific).
@@ -124,7 +115,7 @@ class PeriodScheduleAgent:
             model="gpt-5.5",
             model_settings=ModelSettings(reasoning=Reasoning(effort="high")),
             tools=tools,  # type: ignore[arg-type]
-            output_type=PeriodScheduleSchema
+            output_type=CurriculumScheduleSchema
         )
         self._num_weeks = num_weeks
 
@@ -159,14 +150,14 @@ TERM CALENDAR
 
 SCHEMA REQUIREMENTS
 For each skill, provide:
-- skill_name: short, unique identifier
+- title: short, unique skill name
 - description: what this skill means in practice
 - bloom_level: exactly one of: Remember, Understand, Apply, Analyze, Evaluate, Create
 - difficulty: exactly one of: beginner, intermediate, advanced
-- mastery_criteria: MasteryCriteriaSchema with descriptor (string: "Student can ...") and passing_score (float 0.0-1.0)
+- mastery_threshold: float from 0.0 to 1.0
 
 For each concept, provide:
-- concept_name, description
+- title, description
 - prerequisites: list of other concept names that must come first (empty list if none)
 - common_misconceptions: list of strings
 - key_takeaways: list of strings
@@ -209,14 +200,14 @@ TERM CALENDAR
 
 SCHEMA REQUIREMENTS
 For each skill, provide:
-- skill_name: short, unique identifier
+- title: short, unique skill name
 - description: what this skill means in practice
 - bloom_level: exactly one of: Remember, Understand, Apply, Analyze, Evaluate, Create
 - difficulty: exactly one of: beginner, intermediate, advanced
-- mastery_criteria: MasteryCriteriaSchema with descriptor (string: "Student can ...") and passing_score (float 0.0-1.0)
+- mastery_threshold: float from 0.0 to 1.0
 
 For each concept, provide:
-- concept_name, description
+- title, description
 - prerequisites: list of other concept names that must come first (empty list if none)
 - common_misconceptions: list of strings
 - key_takeaways: list of strings
@@ -259,14 +250,14 @@ TERM CALENDAR
 
 SCHEMA REQUIREMENTS
 For each skill, provide:
-- skill_name: short, unique identifier
+- title: short, unique skill name
 - description: what this skill means in practice
 - bloom_level: exactly one of: Remember, Understand, Apply, Analyze, Evaluate, Create
 - difficulty: exactly one of: beginner, intermediate, advanced
-- mastery_criteria: MasteryCriteriaSchema with descriptor (string: "Student can ...") and passing_score (float 0.0-1.0)
+- mastery_threshold: float from 0.0 to 1.0
 
 For each concept, provide:
-- concept_name, description
+- title, description
 - prerequisites: list of other concept names that must come first (empty list if none)
 - common_misconceptions: list of strings (draw from the research context where relevant)
 - key_takeaways: list of strings
@@ -280,9 +271,15 @@ PROCESS
 5. For each lesson, create 2-4 concepts with full metadata informed by the research.
 6. For each concept, derive 3-5 measurable skills with bloom_level and difficulty."""
 
-    async def _run_async(self) -> PeriodScheduleSchema:
-        """Run the agent asynchronously."""
+    async def _run_async(self) -> CurriculumScheduleSchema:
+        mode = "files" if self.vector_store_ids else ("research" if self.research_context else "description")
+        logger.info(
+            "CurriculumAgent starting: course=%r mode=%s weeks=%d model=gpt-5.5",
+            self.course_name, mode, self._num_weeks,
+        )
+        t0 = time.monotonic()
         grade_line = f"Grade level: {self.grade_level or 'Not specified'}"
+
         if self.vector_store_ids:
             base_prompt = f"""Please create a weekly semester schedule for {self.course_name} based on the course materials in the vector store.
 
@@ -313,18 +310,21 @@ RESEARCH CONTEXT (gathered from Perplexity Sonar — use this to fill curriculum
         else:
             prompt = base_prompt
 
-        with trace("period_schedule_generation"):
+        with trace("curriculum_generation"):
             result = await Runner.run(
                 self.agent,
                 prompt
             )
+
+        elapsed = time.monotonic() - t0
+        logger.info("CurriculumAgent complete: elapsed=%.1fs", elapsed)
         return result.final_output
 
-    def run(self) -> PeriodScheduleSchema:
+    def run(self) -> CurriculumScheduleSchema:
         """Run the agent synchronously and return the schedule."""
         return asyncio.run(self._run_async())
 
-    async def run_async(self) -> PeriodScheduleSchema:
+    async def run_async(self) -> CurriculumScheduleSchema:
         """Run the agent asynchronously and return the schedule."""
         return await self._run_async()
 
@@ -337,90 +337,3 @@ RESEARCH CONTEXT (gathered from Perplexity Sonar — use this to fill curriculum
         """Run the agent asynchronously and return the schedule as a JSON-serializable dict."""
         schedule = await self.run_async()
         return schedule.model_dump()
-
-
-class PeriodScheduleService:
-    """
-    Service for managing period schedules including S3 and vector store operations.
-    """
-
-    def __init__(self, period_id: str, vector_store_id: str) -> None:
-        self.period_id = period_id
-        self.vector_store_id = vector_store_id
-        self.schedule_openai_file_id: Optional[str] = None
-
-    def generate_schedule(self, course_name: Optional[str] = None) -> dict:
-        """
-        Generate a new schedule using the agent.
-
-        Args:
-            course_name: Optional course name for context.
-
-        Returns:
-            dict: The generated schedule as a dictionary.
-        """
-        agent = PeriodScheduleAgent(
-            vector_store_id=self.vector_store_id,
-            course_name=course_name
-        )
-        return agent.run_and_get_json()
-
-    def upload_schedule_to_vector_store(self, schedule_dict: dict) -> str:
-        """
-        Upload schedule JSON to the vector store.
-
-        Args:
-            schedule_dict: The schedule as a dictionary.
-
-        Returns:
-            str: The OpenAI file ID of the uploaded schedule.
-        """
-        # Create a temp file with the schedule JSON
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(schedule_dict, f, indent=2)
-            temp_path = f.name
-
-        try:
-            # Upload file to OpenAI
-            with open(temp_path, 'rb') as f:
-                file_response = client.files.create(
-                    file=f,
-                    purpose="assistants"
-                )
-
-            # Attach to vector store
-            client.vector_stores.files.create(
-                vector_store_id=self.vector_store_id,
-                file_id=file_response.id
-            )
-
-            self.schedule_openai_file_id = file_response.id
-            return file_response.id
-
-        finally:
-            # Cleanup temp file
-            os.unlink(temp_path)
-
-    def replace_schedule_in_vector_store(self, schedule_dict: dict, old_file_id: Optional[str] = None) -> str:
-        """
-        Replace the schedule in the vector store.
-
-        Args:
-            schedule_dict: The new schedule as a dictionary.
-            old_file_id: The old file ID to delete (optional).
-
-        Returns:
-            str: The new OpenAI file ID.
-        """
-        # Delete old file if provided
-        if old_file_id:
-            try:
-                client.vector_stores.files.delete(
-                    vector_store_id=self.vector_store_id,
-                    file_id=old_file_id
-                )
-            except Exception as e:
-                logger.warning("Failed to delete old schedule file %s: %s", old_file_id, e)
-
-        # Upload new schedule
-        return self.upload_schedule_to_vector_store(schedule_dict)

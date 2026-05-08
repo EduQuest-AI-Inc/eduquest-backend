@@ -4,7 +4,6 @@ from datetime import date
 from typing import Optional
 
 from data_access.period_dao import PeriodDAO
-from data_access.period_schedule_dao import PeriodScheduleDAO
 from integrations import openai_vector_store
 from integrations.s3_service import delete_files_from_s3
 from models.period import CourseMetadata, Period
@@ -15,7 +14,6 @@ class PeriodManagementService:
 
     def __init__(self) -> None:
         self.period_dao = PeriodDAO()
-        self.period_schedule_dao = PeriodScheduleDAO()
 
     def generate_period_id(self, course_name: str) -> str:
         clean_course = re.sub(r'[^a-zA-Z0-9]', '', course_name).upper()[:8]
@@ -38,6 +36,7 @@ class PeriodManagementService:
         course_description: Optional[str] = None,
         course_metadata: Optional[CourseMetadata] = None,
         processing_status: str = "pending",
+        status: str = "pending",
     ) -> dict:
         period_id = self.generate_period_id(course)
         existing = self.period_dao.get_period_by_id(period_id)
@@ -64,9 +63,17 @@ class PeriodManagementService:
             course_description=course_description,
             course_metadata=course_metadata,
             processing_status=processing_status,
+            status=status,
         )
         self.period_dao.add_period(new_period)
         return new_period.to_item()
+
+    def update_status(self, period_id: str, status: str) -> None:
+        self.period_dao.update_status(period_id, status)
+
+    def update_setup(self, period_id: str, fields: dict) -> Optional[dict]:
+        self.period_dao.update_period(period_id, fields)
+        return self.period_dao.get_period_by_id(period_id)
 
     def update_file_urls(self, period_id: str, file_urls: list) -> None:
         self.period_dao.update_file_urls(period_id, file_urls)
@@ -83,8 +90,7 @@ class PeriodManagementService:
     def get_periods_by_owner(self, user_id: str) -> list:
         periods = self.period_dao.get_periods_by_owner_id(user_id)
         for period in periods:
-            schedule = self.period_schedule_dao.get_by_period_id(period['period_id'])
-            period['has_schedule'] = schedule is not None and len(schedule.quest_enabled_weeks) > 0
+            period['has_curriculum'] = period.get('status') in ('draft', 'approved')
         return periods
 
     def get_period_by_id(self, period_id: str) -> Optional[dict]:

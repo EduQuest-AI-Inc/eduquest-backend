@@ -2,13 +2,25 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import logging
+import time
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)-8s  %(name)s - %(message)s",
+    force=True,
+)
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
 
-from api.routers import conversation, period, schedule, ltg, teacher, waitlist
-from api.routers import auth, user, enrollment, quest, parent
+_req_log = logging.getLogger("eduquest.request")
+
+from routers import conversation, period, ltg, teacher, waitlist
+from routers import auth, user, enrollment, quest, parent
+from routers import curriculum
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from exceptions.auth_error import AuthError
@@ -38,6 +50,21 @@ app.add_middleware(
     allow_headers=["*"],
     allow_methods=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.monotonic()
+    response = await call_next(request)
+    ms = (time.monotonic() - start) * 1000
+    _req_log.info(
+        "%s %s %s %.0fms",
+        request.method,
+        request.url.path,
+        response.status_code,
+        ms,
+    )
+    return response
 
 
 @app.exception_handler(ValidationError)
@@ -72,12 +99,12 @@ app.include_router(conversation.router, prefix="/conversation")
 app.include_router(enrollment.router, prefix="/enrollment")
 app.include_router(parent.router, prefix="/parent")
 app.include_router(period.router, prefix="/period")
-app.include_router(schedule.router, prefix="/period")
 app.include_router(ltg.router, prefix="/period")
 app.include_router(quest.router, prefix="/quest")
 app.include_router(teacher.router, prefix="/teacher")
 app.include_router(user.router, prefix="/user")
 app.include_router(waitlist.router, prefix="/pilot-waitlist")
+app.include_router(curriculum.router, prefix="/curriculum")
 
 
 @app.get("/helloworld")
