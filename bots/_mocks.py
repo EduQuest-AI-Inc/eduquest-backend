@@ -193,6 +193,7 @@ class MockCurriculumAgent:
         start_date: str = None,
         end_date: str = None,
         course_description: str = None,
+        grade_level: str = None,
         research_context: str = None,
     ):
         self._start_date = date.fromisoformat(start_date) if start_date else date.today()
@@ -296,4 +297,3 @@ class MockConversationsSession:
 
     def __init__(self, conversation_id=None):
         self._session_id = conversation_id or "mock-conversation-id-001"
-

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from datetime import date
@@ -5,6 +6,7 @@ from typing import Any
 
 from fastapi import BackgroundTasks
 
+from bots.coverage_evaluator import CoverageEvaluator
 from bots.provider import get_bot_provider
 from data_access.concept_dao import ConceptDAO
 from data_access.concept_skill_dao import ConceptSkillDAO
@@ -14,6 +16,7 @@ from data_access.skill_dao import SkillDAO
 from data_access.week_dao import WeekDAO
 from exceptions.not_found_error import NotFoundError
 from exceptions.validation_error import ValidationError
+from integrations.perplexity_service import PerplexityService
 from models.concept import Concept
 from models.concept_skill import ConceptSkill
 from models.lesson import Lesson
@@ -96,9 +99,35 @@ class CurriculumService:
             start_date = period.get("start_date") or date.today().isoformat()
             end_date = period.get("end_date") or date.today().isoformat()
             course_description = period.get("course_description") or period["name"]
-            vector_store_ids = [period["vector_store_id"]] if period.get("vector_store_id") else []
+            grade_level = period.get("grade_level")
+            has_course_materials = bool(period.get("file_urls")) or bool(period.get("canvas_course_id"))
+            vector_store_ids = (
+                [period["vector_store_id"]]
+                if period.get("vector_store_id") and has_course_materials
+                else []
+            )
+            research_context = None
 
-            mode = "files" if vector_store_ids else "description"
+            if not vector_store_ids:
+                try:
+                    coverage = CoverageEvaluator().evaluate(
+                        course_name=period.get("name") or "",
+                        course_description=course_description,
+                        has_files=False,
+                        grade_level=grade_level,
+                    )
+                    if not coverage.sufficient and coverage.research_queries:
+                        queries = coverage.research_queries[:3]
+                        research_context = asyncio.run(
+                            PerplexityService().research(queries, max_steps=5)
+                        )
+                except Exception as e:
+                    logger.warning(
+                        "Curriculum research enrichment failed; falling back to description-only: %s",
+                        e,
+                    )
+
+            mode = "files" if vector_store_ids else ("research" if research_context else "description")
             logger.info(
                 "curriculum generation starting: period_id=%s mode=%s start=%s end=%s",
                 period_id, mode, start_date, end_date,
@@ -110,7 +139,8 @@ class CurriculumService:
                 start_date=str(start_date),
                 end_date=str(end_date),
                 course_description=course_description,
-                research_context=None,
+                grade_level=grade_level,
+                research_context=research_context,
             )
             result = bot.run()
 

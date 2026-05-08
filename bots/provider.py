@@ -44,11 +44,19 @@ class BotProvider:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         course_description: Optional[str] = None,
+        grade_level: Optional[str] = None,
         research_context: Optional[str] = None,
     ):
         from bots.curriculum_agent import CurriculumAgent
-        return CurriculumAgent(vector_store_ids, course_name, start_date, end_date,
-                               course_description, research_context)
+        return CurriculumAgent(
+            vector_store_ids=vector_store_ids,
+            course_name=course_name,
+            start_date=start_date,
+            end_date=end_date,
+            course_description=course_description,
+            grade_level=grade_level,
+            research_context=research_context,
+        )
 
     def create_profile_agent(self):
         from bots.profile_agent import create_profile_agent
@@ -152,11 +160,19 @@ class MockBotProvider(BotProvider):
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         course_description: Optional[str] = None,
+        grade_level: Optional[str] = None,
         research_context: Optional[str] = None,
     ):
         from bots._mocks import MockCurriculumAgent
-        return MockCurriculumAgent(vector_store_ids, course_name, start_date, end_date,
-                                   course_description, research_context)
+        return MockCurriculumAgent(
+            vector_store_ids=vector_store_ids,
+            course_name=course_name,
+            start_date=start_date,
+            end_date=end_date,
+            course_description=course_description,
+            grade_level=grade_level,
+            research_context=research_context,
+        )
 
     def create_profile_agent(self):
         from bots.profile_agent import create_profile_agent
