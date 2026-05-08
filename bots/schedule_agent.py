@@ -75,11 +75,13 @@ class PeriodScheduleAgent:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         course_description: Optional[str] = None,
+        grade_level: Optional[str] = None,
         research_context: Optional[str] = None,
     ) -> None:
         self.vector_store_ids = vector_store_ids or []
         self.course_description = course_description
         self.course_name = course_name or "the course"
+        self.grade_level = grade_level
         self.research_context = research_context
 
         # Compute week count and calendar from dates when provided
@@ -105,11 +107,11 @@ class PeriodScheduleAgent:
 
         # Mode selection
         if self.vector_store_ids:
-            instructions = self._files_instructions(num_weeks, calendar_section)
+            instructions = self._files_instructions(num_weeks, calendar_section, grade_level)
         elif self.research_context:
-            instructions = self._research_instructions(num_weeks, calendar_section)
+            instructions = self._research_instructions(num_weeks, calendar_section, grade_level)
         else:
-            instructions = self._description_instructions(num_weeks, calendar_section)
+            instructions = self._description_instructions(num_weeks, calendar_section, grade_level)
 
         tools = (
             [FileSearchTool(vector_store_ids=self.vector_store_ids)]
@@ -129,7 +131,7 @@ class PeriodScheduleAgent:
     # ── Mode A: uploaded files → search the vector store ────────────────────────
 
     @staticmethod
-    def _files_instructions(num_weeks: int, calendar_section: str) -> str:
+    def _files_instructions(num_weeks: int, calendar_section: str, grade_level: Optional[str]) -> str:
         return f"""\
 You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from uploaded course materials.
 
@@ -141,11 +143,16 @@ Each week must have 2-5 lessons. Each lesson must have 2-5 concepts. Each concep
 
 Your output must be accurate to the provided materials and must not invent content not present in the inputs.
 
+COURSE CONTEXT
+- Grade level: {grade_level or "Not specified"}
+Tailor lesson depth, vocabulary, and skill complexity to this grade level.
+
 OPERATING PRINCIPLES
 1) Evidence-first: Prefer explicit evidence from the uploaded course materials.
 2) Weekly clarity: Each week must have a coherent theme, manageable lessons, and skills stated as observable outcomes.
-3) Non-hallucination: Do not create content that isn't referenced in the materials.
+3) Prefer materials, but fill gaps: Ground content in the materials whenever possible. If the materials are sparse for a given week, supplement with standard subject-area content appropriate for the grade level — never produce placeholder text like "Review/Catch-up," "Awaiting curriculum," or "TBD."
 4) The schedule must have EXACTLY {num_weeks} weeks — no more, no fewer.
+5) Never request more information from the user. Always produce a complete schedule from whatever is provided. Do not refuse, ask clarifying questions, or note that more input is needed — produce your best schedule using only the available context.
 
 TERM CALENDAR
 {calendar_section}
@@ -170,15 +177,12 @@ PROCESS
 2. Identify modules, units, assignments, and their sequence.
 3. Allocate content across exactly {num_weeks} weeks based on module order.
 4. For each week, create 2-5 lessons. For each lesson, create 2-4 concepts. For each concept, create 3-5 skills.
-5. Ensure every major module appears in some week.
-
-HANDLING MISSING INFO
-- Missing content for a week → describe as "Review/Catch-up week" or similar"""
+5. Ensure every major module appears in some week. Fill any sparse weeks with grade-appropriate review or extension lessons that fit the course's logical progression."""
 
     # ── Mode B: no files → build from course description alone ──────────────────
 
     @staticmethod
-    def _description_instructions(num_weeks: int, calendar_section: str) -> str:
+    def _description_instructions(num_weeks: int, calendar_section: str, grade_level: Optional[str]) -> str:
         return f"""\
 You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from a teacher-provided course description.
 
@@ -188,12 +192,17 @@ Build a complete, specific weekly schedule using this hierarchy:
 
 Each week must have 2-5 lessons. Each lesson must have 2-4 concepts. Each concept must have 3-5 skills.
 
+COURSE CONTEXT
+- Grade level: {grade_level or "Not specified"}
+Tailor lesson depth, vocabulary, and skill complexity to this grade level.
+
 OPERATING PRINCIPLES
 1) Description-driven: The course description IS the curriculum. Extract topics, units, and progression from it.
-2) Infer a logical sequence: if the description names broad topics, expand them into a coherent weekly arc with specific lesson titles.
+2) Infer a logical sequence: if the description names broad topics, expand them into a coherent weekly arc with specific lesson titles. If the description is thin, supplement with standard subject-area content appropriate for the grade level.
 3) Every week must have real, specific lesson content — never write placeholder text like "Awaiting curriculum," "Review/Catch-up," or "Hold for materials."
 4) Skills must be concrete and measurable (e.g. "Analyze causes of WWI" not "Understand history").
 5) The schedule must have EXACTLY {num_weeks} weeks — no more, no fewer.
+6) Never request more information from the user. Always produce a complete schedule from whatever is provided. Do not refuse, ask clarifying questions, or note that more input is needed — produce your best schedule using only the available context.
 
 TERM CALENDAR
 {calendar_section}
@@ -223,7 +232,7 @@ PROCESS
     # ── Mode C: description + Perplexity research context ───────────────────────
 
     @staticmethod
-    def _research_instructions(num_weeks: int, calendar_section: str) -> str:
+    def _research_instructions(num_weeks: int, calendar_section: str, grade_level: Optional[str]) -> str:
         return f"""\
 You are "Weekly Course Schedule Architect," an AI agent that builds a week-by-week instructional schedule from a teacher-provided course description supplemented by web research.
 
@@ -233,12 +242,17 @@ Build a complete, specific, research-informed weekly schedule using this hierarc
 
 Each week must have 2-5 lessons. Each lesson must have 2-4 concepts. Each concept must have 3-5 skills.
 
+COURSE CONTEXT
+- Grade level: {grade_level or "Not specified"}
+Tailor lesson depth, vocabulary, and skill complexity to this grade level.
+
 OPERATING PRINCIPLES
 1) Description-first: The teacher's course description defines the overall curriculum intent.
 2) Research-informed: The RESEARCH CONTEXT (provided in the user prompt) fills in curriculum gaps with authoritative, web-sourced content. Use it to produce rich, accurate concept definitions, misconceptions, and skills.
 3) Every week must have real, specific lesson content — never write placeholder text.
 4) Skills must be concrete and measurable (e.g. "Solve linear equations using substitution" not "Understand algebra").
 5) The schedule must have EXACTLY {num_weeks} weeks — no more, no fewer.
+6) Never request more information from the user. Always produce a complete schedule from whatever is provided. Do not refuse, ask clarifying questions, or note that more input is needed — produce your best schedule using only the available context.
 
 TERM CALENDAR
 {calendar_section}
@@ -268,8 +282,11 @@ PROCESS
 
     async def _run_async(self) -> PeriodScheduleSchema:
         """Run the agent asynchronously."""
+        grade_line = f"Grade level: {self.grade_level or 'Not specified'}"
         if self.vector_store_ids:
             base_prompt = f"""Please create a weekly semester schedule for {self.course_name} based on the course materials in the vector store.
+
+{grade_line}
 
 Search the course materials to understand:
 - What modules/units exist
@@ -280,6 +297,8 @@ Search the course materials to understand:
 Then produce a complete weekly schedule covering the entire semester."""
         else:
             base_prompt = f"""Please create a weekly semester schedule for {self.course_name}.
+
+{grade_line}
 
 No course files were uploaded. Use the following teacher-provided description as your primary curriculum source:
 

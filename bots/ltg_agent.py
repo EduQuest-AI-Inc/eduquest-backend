@@ -54,7 +54,7 @@ If the student indicates they want to choose a goal (e.g., "I choose goal 1", "I
     return Agent(
         name="Long-Term Goal Assistant",
         instructions=instructions,
-        model="gpt-5",
+        model="gpt-5.4",
         output_type=LTGResponse,
         tools=[
             FileSearchTool(

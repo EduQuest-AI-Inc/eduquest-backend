@@ -44,6 +44,7 @@ class BotProvider:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         course_description: Optional[str] = None,
+        grade_level: Optional[str] = None,
         research_context: Optional[str] = None,
     ):
         from bots.schedule_agent import PeriodScheduleAgent
@@ -53,6 +54,7 @@ class BotProvider:
             start_date=start_date,
             end_date=end_date,
             course_description=course_description,
+            grade_level=grade_level,
             research_context=research_context,
         )
 
@@ -158,6 +160,7 @@ class MockBotProvider(BotProvider):
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         course_description: Optional[str] = None,
+        grade_level: Optional[str] = None,
         research_context: Optional[str] = None,
     ):
         from bots._mocks import MockPeriodScheduleAgent
@@ -167,6 +170,7 @@ class MockBotProvider(BotProvider):
             start_date=start_date,
             end_date=end_date,
             course_description=course_description,
+            grade_level=grade_level,
             research_context=research_context,
         )
 

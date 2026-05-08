@@ -168,6 +168,7 @@ class MockPeriodScheduleAgent:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         course_description: Optional[str] = None,
+        grade_level: Optional[str] = None,
         research_context: Optional[str] = None,
     ):
         self.course_name = course_name or "Course"

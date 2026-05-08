@@ -259,6 +259,15 @@ class TestAcceptParentInvite:
         assert resp.status_code == 500
 
 
+VALID_CREATE_PERIOD_PAYLOAD = {
+    "name": "Math 101",
+    "course_description": "Intro algebra and geometry",
+    "grade_level": "9th grade",
+    "start_date": "2025-09-01",
+    "end_date": "2026-01-15",
+}
+
+
 class TestCreatePeriod:
 
     @pytest.mark.api
@@ -274,7 +283,7 @@ class TestCreatePeriod:
             mock_td.get_teacher_by_id.return_value = APPROVED_TEACHER
             mock_cvs.return_value = (mock_vs, [])
             mock_pms.create_period.return_value = {"period_id": "P1-ABCD-1234", "name": "Math 101"}
-            resp = client.post("/period/create-period", data={"name": "Math 101"}, files=[])
+            resp = client.post("/period/create-period", data=VALID_CREATE_PERIOD_PAYLOAD, files=[])
         assert resp.status_code == 201
         assert "message" in resp.json()
         assert "period" in resp.json()
@@ -286,12 +295,19 @@ class TestCreatePeriod:
              patch("api.routers.period.waitlist_service_p") as mock_wl:
             mock_td.get_teacher_by_id.return_value = UNAPPROVED_TEACHER
             mock_wl.get_status.return_value = {"on_waitlist": False}
-            resp = client.post("/period/create-period", data={"name": "Math 101"}, files=[])
+            resp = client.post("/period/create-period", data=VALID_CREATE_PERIOD_PAYLOAD, files=[])
         assert resp.status_code == 403
 
     @pytest.mark.api
     def test_create_period_missing_name_returns_422(self, client):
         resp = client.post("/period/create-period", data={}, files=[])
+        assert resp.status_code == 422
+
+    @pytest.mark.api
+    @pytest.mark.parametrize("missing_field", ["course_description", "grade_level", "start_date", "end_date"])
+    def test_create_period_missing_required_field_returns_422(self, client, missing_field):
+        payload = {k: v for k, v in VALID_CREATE_PERIOD_PAYLOAD.items() if k != missing_field}
+        resp = client.post("/period/create-period", data=payload, files=[])
         assert resp.status_code == 422
 
     @pytest.mark.api
@@ -303,7 +319,7 @@ class TestCreatePeriod:
              patch("api.routers.period.create_vector_store") as mock_cvs:
             mock_td.get_teacher_by_id.return_value = APPROVED_TEACHER
             mock_cvs.side_effect = RuntimeError("vector store failed")
-            resp = client.post("/period/create-period", data={"name": "Math 101"}, files=[])
+            resp = client.post("/period/create-period", data=VALID_CREATE_PERIOD_PAYLOAD, files=[])
         assert resp.status_code == 500
 
 

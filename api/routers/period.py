@@ -83,7 +83,7 @@ async def _process_period_files(
         try:
             await asyncio.wait_for(
                 loop.run_in_executor(None, period_file_service.run_pipeline, period_id, user_id),
-                timeout=300.0,
+                timeout=600.0,
             )
         except asyncio.TimeoutError:
             logger.warning("Schedule generation timed out for period %s — marking ready anyway", period_id)
@@ -179,10 +179,10 @@ def create_period(
     canvas_api_key: Optional[str] = Form(default=None),
     canvas_course_id: Optional[str] = Form(default=None),
     canvas_course_name: Optional[str] = Form(default=None),
-    start_date: Optional[str] = Form(default=None),
-    end_date: Optional[str] = Form(default=None),
-    course_description: Optional[str] = Form(default=None),
-    grade_level: Optional[str] = Form(default=None),
+    start_date: str = Form(...),
+    end_date: str = Form(...),
+    course_description: str = Form(...),
+    grade_level: str = Form(...),
     mastery_threshold: Optional[float] = Form(default=None),
     learning_objectives: Optional[str] = Form(default=None),
     primary_standard: Optional[str] = Form(default=None),
@@ -217,11 +217,11 @@ def create_period(
             file_urls=[],
             canvas_course_id=int(canvas_course_id) if canvas_course_id else None,
             canvas_course_name=canvas_course_name,
-            start_date=start_date or None,
-            end_date=end_date or None,
-            grade_level=grade_level or None,
+            start_date=start_date,
+            end_date=end_date,
+            grade_level=grade_level,
             mastery_threshold=mastery_threshold,
-            course_description=course_description or None,
+            course_description=course_description,
             course_metadata=course_metadata,
             processing_status="pending",
         )

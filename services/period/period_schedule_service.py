@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Optional
 
@@ -6,6 +7,8 @@ from data_access.period_dao import PeriodDAO
 from integrations import openai_vector_store
 from models.period_schedule import PeriodSchedule
 from bots.provider import get_bot_provider
+from bots.coverage_evaluator import CoverageEvaluator
+from integrations.perplexity_service import PerplexityService
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,34 @@ class PeriodScheduleService:
             all_vs_ids.append(vector_store_id)
         all_vs_ids.extend(file_vector_store_ids)
 
+        grade_level = period.get("grade_level")
+        research_context = None
+
+        # Only run coverage + Perplexity when no files are uploaded — Mode A is
+        # already grounded in real curriculum content and doesn't need research.
+        if not file_urls:
+            try:
+                cov = CoverageEvaluator().evaluate(
+                    course_name=course_name,
+                    course_description=course_description,
+                    has_files=False,
+                    grade_level=grade_level,
+                )
+                if not cov.sufficient and cov.research_queries:
+                    try:
+                        queries = cov.research_queries[:3]
+                        research_context = asyncio.run(
+                            PerplexityService().research(queries, max_steps=5)
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "Perplexity research failed; falling back to description-only: %s", e
+                        )
+            except Exception as e:
+                logger.warning(
+                    "Coverage evaluation failed; falling back to description-only: %s", e
+                )
+
         # Generate schedule using the agent
         agent = get_bot_provider().create_schedule_agent(
             vector_store_ids=all_vs_ids or None,
@@ -58,6 +89,8 @@ class PeriodScheduleService:
             start_date=period.get("start_date"),
             end_date=period.get("end_date"),
             course_description=course_description,
+            grade_level=grade_level,
+            research_context=research_context,
         )
         schedule_dict = agent.run_and_get_json()
 
