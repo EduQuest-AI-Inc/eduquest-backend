@@ -36,6 +36,7 @@ class PeriodManagementService:
         course_description: Optional[str] = None,
         course_metadata: Optional[CourseMetadata] = None,
         processing_status: str = "pending",
+        status: str = "pending",
     ) -> dict:
         period_id = self.generate_period_id(course)
         existing = self.period_dao.get_period_by_id(period_id)
@@ -62,9 +63,17 @@ class PeriodManagementService:
             course_description=course_description,
             course_metadata=course_metadata,
             processing_status=processing_status,
+            status=status,
         )
         self.period_dao.add_period(new_period)
         return new_period.to_item()
+
+    def update_status(self, period_id: str, status: str) -> None:
+        self.period_dao.update_status(period_id, status)
+
+    def update_setup(self, period_id: str, fields: dict) -> Optional[dict]:
+        self.period_dao.update_period(period_id, fields)
+        return self.period_dao.get_period_by_id(period_id)
 
     def update_file_urls(self, period_id: str, file_urls: list) -> None:
         self.period_dao.update_file_urls(period_id, file_urls)

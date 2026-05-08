@@ -24,6 +24,7 @@ class PeriodDAO(SupabaseBaseDAO):
             'course_metadata': period.course_metadata.model_dump() if period.course_metadata else None,
             'file_vector_store_ids': getattr(period, 'file_vector_store_ids', []),
             'processing_status': getattr(period, 'processing_status', 'pending'),
+            'status': getattr(period, 'status', 'pending'),
         })
 
     def get_period_by_id(self, period_id: str) -> Optional[dict]:

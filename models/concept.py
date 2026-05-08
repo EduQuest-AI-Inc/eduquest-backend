@@ -7,9 +7,9 @@ class Concept(BaseModel):
     concept_name: str
     lesson_name: str
     description: Optional[str] = None
-    prerequisites: Optional[list[dict]] = None
-    common_misconceptions: Optional[list[dict]] = None
-    key_takeaways: Optional[list[dict]] = None
+    prerequisites: Optional[list[str]] = None
+    common_misconceptions: Optional[list[str]] = None
+    key_takeaways: Optional[list[str]] = None
     metadata: Optional[dict] = None
     created_at: Optional[str] = None
     last_updated_at: Optional[str] = None

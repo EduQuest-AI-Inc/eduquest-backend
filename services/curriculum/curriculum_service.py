@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import date
 from typing import Any
 
@@ -84,6 +85,8 @@ class CurriculumService:
         return period
 
     def _run_generation(self, period_id: str) -> None:
+        t0 = time.monotonic()
+        mode = "unknown"
         try:
             period = self.period_dao.get_period_by_id(period_id)
             if not period:
@@ -95,6 +98,12 @@ class CurriculumService:
             course_description = period.get("course_description") or period["name"]
             vector_store_ids = [period["vector_store_id"]] if period.get("vector_store_id") else []
 
+            mode = "files" if vector_store_ids else "description"
+            logger.info(
+                "curriculum generation starting: period_id=%s mode=%s start=%s end=%s",
+                period_id, mode, start_date, end_date,
+            )
+
             bot = get_bot_provider().create_curriculum_agent(
                 vector_store_ids=vector_store_ids,
                 course_name=period.get("name") or "",
@@ -105,16 +114,26 @@ class CurriculumService:
             )
             result = bot.run()
 
+            elapsed = time.monotonic() - t0
+            logger.info(
+                "curriculum generation complete: period_id=%s mode=%s elapsed=%.1fs weeks=%d",
+                period_id, mode, elapsed, len(result.weeks),
+            )
+
             payload = self._curriculum_result_to_payload(period_id, result)
             self._bulk_replace(period_id, payload)
             self.period_dao.update_status(period_id, "draft")
 
         except Exception:
-            logger.exception("Curriculum generation failed for period %s", period_id)
+            elapsed = time.monotonic() - t0
+            logger.exception(
+                "curriculum generation failed: period_id=%s mode=%s elapsed=%.1fs",
+                period_id, mode, elapsed,
+            )
             try:
                 self.period_dao.update_status(period_id, "failed")
             except Exception:
-                logger.exception("Could not set status=failed for period %s", period_id)
+                logger.exception("could not set status=failed for period %s", period_id)
 
     def _curriculum_result_to_payload(self, period_id: str, result) -> dict[str, Any]:
         """Convert CurriculumResult (bot output) into the save_curriculum payload shape."""
@@ -188,17 +207,14 @@ class CurriculumService:
             ))
 
         for c in payload.get("concepts", []):
-            prereqs = c.get("prerequisites") or []
-            takeaways = c.get("key_takeaways") or []
-            misconceptions = c.get("common_misconceptions") or []
             self.concept_dao.insert_concept(Concept(
                 period_id=period_id,
                 concept_name=c["concept_name"],
                 lesson_name=c["lesson_name"],
                 description=c.get("description"),
-                prerequisites=[{"text": p} if isinstance(p, str) else p for p in prereqs],
-                key_takeaways=[{"text": t} if isinstance(t, str) else t for t in takeaways],
-                common_misconceptions=[{"text": m} if isinstance(m, str) else m for m in misconceptions],
+                prerequisites=c.get("prerequisites") or [],
+                key_takeaways=c.get("key_takeaways") or [],
+                common_misconceptions=c.get("common_misconceptions") or [],
                 metadata=c.get("metadata"),
             ))
 

@@ -1,6 +1,7 @@
 import logging
 import sys
 import os
+import time
 from typing import Optional
 import math
 from datetime import date, timedelta
@@ -257,7 +258,13 @@ PROCESS
 6. For each concept, derive 3-5 measurable skills with bloom_level and difficulty."""
 
     async def _run_async(self) -> CurriculumScheduleSchema:
-        """Run the agent asynchronously."""
+        mode = "files" if self.vector_store_ids else ("research" if self.research_context else "description")
+        logger.info(
+            "CurriculumAgent starting: course=%r mode=%s weeks=%d model=gpt-5.5",
+            self.course_name, mode, self._num_weeks,
+        )
+        t0 = time.monotonic()
+
         if self.vector_store_ids:
             base_prompt = f"""Please create a weekly semester schedule for {self.course_name} based on the course materials in the vector store.
 
@@ -289,6 +296,9 @@ RESEARCH CONTEXT (gathered from Perplexity Sonar — use this to fill curriculum
                 self.agent,
                 prompt
             )
+
+        elapsed = time.monotonic() - t0
+        logger.info("CurriculumAgent complete: elapsed=%.1fs", elapsed)
         return result.final_output
 
     def run(self) -> CurriculumScheduleSchema:
