@@ -22,6 +22,7 @@ from integrations.s3_service import (
 )
 from services.period.period_file_service import PeriodFileService
 from models.period import CourseMetadata
+from services.curriculum.curriculum_service import CurriculumService
 from services.period.period_management_service import PeriodManagementService
 from services.waitlist.waitlist_service import WaitlistService
 
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 period_management_service = PeriodManagementService()
 period_file_service = PeriodFileService()
+curriculum_service = CurriculumService()
 teacher_dao = TeacherDAO()
 waitlist_service = WaitlistService()
 
@@ -79,6 +81,11 @@ def _process_period_files(
         period_management_service.update_file_vector_store_ids(period_id, file_vs_ids)
 
         period_management_service.update_processing_status(period_id, "ready")
+
+        try:
+            curriculum_service._run_generation(period_id)
+        except Exception as e:
+            logger.error("Auto curriculum generation failed for period %s: %s", period_id, e, exc_info=True)
     except Exception as e:
         logger.error("Background processing failed for period %s: %s", period_id, e, exc_info=True)
         period_management_service.update_processing_status(period_id, "failed")

@@ -5,6 +5,12 @@ load_dotenv()
 import logging
 import time
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)-8s  %(name)s - %(message)s",
+    force=True,
+)
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
