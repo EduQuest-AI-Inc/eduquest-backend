@@ -109,7 +109,7 @@ def continue_ltg_conversation(
     previous_response_id: Optional[str],
     user_message: str,
 ) -> Dict[str, Any]:
-    service = LTGConversationService(vector_store_id, previous_response_id)
+    service = LTGConversationService(vector_store_id, {}, previous_response_id)
     return asyncio.run(service.continue_conversation(user_message))
 
 
