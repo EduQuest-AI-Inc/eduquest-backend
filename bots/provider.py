@@ -66,6 +66,16 @@ class BotProvider:
         from bots.ltg_agent import create_ltg_agent
         return create_ltg_agent(vector_store_id, curriculum)
 
+    def create_schedule_agent(self, student, period, schedule, goal_text, previous_response_id=None):
+        from bots.ltg_schedule_agent import LTGScheduleAgent
+        return LTGScheduleAgent(
+            student=student,
+            period=period,
+            schedule=schedule,
+            goal_text=goal_text,
+            previous_response_id=previous_response_id,
+        )
+
     def create_teacher_feedback_agent(self):
         from bots.teacher_feedback_agent import create_teacher_feedback_agent
         return create_teacher_feedback_agent()
@@ -181,6 +191,10 @@ class MockBotProvider(BotProvider):
     def create_ltg_agent(self, vector_store_id: str, curriculum: dict):
         from bots.ltg_agent import create_ltg_agent
         return create_ltg_agent(vector_store_id, curriculum)
+
+    def create_schedule_agent(self, student, period, schedule, goal_text, previous_response_id=None):
+        from bots._mocks import MockLTGScheduleAgent
+        return MockLTGScheduleAgent(student=student, schedule=schedule, goal_text=goal_text)
 
     def create_teacher_feedback_agent(self):
         from bots.teacher_feedback_agent import create_teacher_feedback_agent

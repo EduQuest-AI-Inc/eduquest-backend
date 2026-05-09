@@ -134,6 +134,30 @@ class MockHWAgent:
         return results
 
 
+class MockLTGScheduleAgent:
+    """Fast replacement for LTGScheduleAgent — returns one goal-aligned name per schedule item."""
+
+    def __init__(self, student=None, schedule=None, goal_text=None, **kwargs):
+        self._schedule = schedule or []
+        self._goal_text = goal_text or "complete the course"
+
+    def run(self):
+        from bots.ltg_schedule_agent import ScheduleOutput, WeekQuest
+
+        verbs = ["Build", "Design", "Analyze", "Create", "Apply",
+                 "Investigate", "Prototype", "Compare", "Draft", "Evaluate"]
+        goal_fragment = self._goal_text[:40].rstrip()
+        quests = []
+        for i, entry in enumerate(self._schedule):
+            week = entry.get("Week", i + 1) if isinstance(entry, dict) else i + 1
+            skills_raw = entry.get("Skills", "") if isinstance(entry, dict) else ""
+            first_skill = skills_raw.split(";")[0].strip() if skills_raw else "core skills"
+            verb = verbs[i % len(verbs)]
+            quest_name = f"[MOCK] {verb} a {first_skill} artifact toward: {goal_fragment}"
+            quests.append(WeekQuest(week=week, quest_name=quest_name))
+        return ScheduleOutput(quests=quests)
+
+
 class MockGradingOrchestrator:
     """Fast replacement for GradingOrchestrator."""
 

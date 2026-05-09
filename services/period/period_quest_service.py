@@ -1,13 +1,17 @@
+import logging
 from datetime import date, timedelta
 from typing import Dict, Any, Optional
 from data_access.period_dao import PeriodDAO
 from data_access.student_dao import StudentDAO
 from data_access.enrollment_dao import EnrollmentDAO
 from data_access.ltg_conversation_dao import LtgConversationDAO
+from data_access.student_long_term_goal_dao import StudentLongTermGoalDAO
 
 from bots.provider import get_bot_provider
 from services.curriculum.curriculum_service import CurriculumService
 from services.quest.quest_service import QuestService
+
+logger = logging.getLogger(__name__)
 
 
 def _friday_of_week(start: date, week_num: int) -> date:
@@ -25,6 +29,7 @@ class PeriodQuestService:
         self.enrollment_dao = EnrollmentDAO()
         self.curriculum_service = CurriculumService()
         self.ltg_conversation_dao = LtgConversationDAO()
+        self.ltg_goal_dao = StudentLongTermGoalDAO()
         self.quest_service = QuestService()
 
     def _assert_enrolled(self, caller_id: str, period_id: str) -> None:
@@ -93,6 +98,36 @@ class PeriodQuestService:
             )
 
         ltg_response_id = self.ltg_conversation_dao.get_last_response_id(caller_id, period_id)
+
+        goal_text = self.ltg_goal_dao.get_by_student_and_period(caller_id, period_id)
+        if goal_text:
+            try:
+                schedule_agent = get_bot_provider().create_schedule_agent(
+                    student=student,
+                    period=period,
+                    schedule=schedule_quests,
+                    goal_text=goal_text,
+                    previous_response_id=ltg_response_id,
+                )
+                schedule_output = schedule_agent.run()
+                name_by_week = {wq.week: wq.quest_name for wq in schedule_output.quests}
+                for quest in schedule_quests:
+                    if quest["Week"] in name_by_week:
+                        quest["Name"] = name_by_week[quest["Week"]]
+                logger.info(
+                    "LTGScheduleAgent enriched %d/%d quest names for student %s",
+                    len(schedule_output.quests), len(schedule_quests), caller_id,
+                )
+            except Exception as exc:
+                logger.error(
+                    "LTGScheduleAgent failed for student %s — falling back to generic names: %s",
+                    caller_id, exc,
+                )
+        else:
+            logger.info(
+                "No LTG goal found for student %s in period %s — using generic quest names.",
+                caller_id, period_id,
+            )
 
         homework_agent = get_bot_provider().create_hw_agent(student, period, schedule_quests, previous_response_id=ltg_response_id)
         homework = homework_agent.run()
