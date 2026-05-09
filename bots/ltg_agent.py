@@ -19,10 +19,10 @@ class LTGResponse(BaseModel):
 
 
 def create_ltg_agent(vector_store_id: str, curriculum: dict) -> Agent:
-    weeks = ", ".join(w.get("title", w.get("week_number", "")) for w in curriculum.get("weeks", []))
-    lessons = ", ".join(lesson.get("title", lesson.get("lesson_name", "")) for lesson in curriculum.get("lessons", []))
-    concepts = ", ".join(c.get("name", c.get("concept_name", "")) for c in curriculum.get("concepts", []))
-    skills = ", ".join(s.get("name", s.get("skill_name", "")) for s in curriculum.get("skills", []))
+    weeks = ", ".join(str(w.get("week_number", "")) for w in curriculum.get("weeks", []))
+    lessons = ", ".join(str(lesson.get("title", lesson.get("lesson_name", ""))) for lesson in curriculum.get("lessons", []))
+    concepts = ", ".join(str(c.get("name", c.get("concept_name", ""))) for c in curriculum.get("concepts", []))
+    skills = ", ".join(str(s.get("name", s.get("skill_name", ""))) for s in curriculum.get("skills", []))
 
     curriculum_block = f"""Class Curriculum:
 - Weeks: {weeks or "not specified"}
