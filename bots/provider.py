@@ -104,6 +104,10 @@ class BotProvider:
         else:
             skills = []
         instructions = quest_data.get("instructions", quest_data.get("description", ""))
+        if isinstance(instructions, list):
+            instructions = "\n".join(
+                f"Step {s['step']}: {s['text']}" for s in instructions if isinstance(s, dict)
+            )
         return GradingInput(
             submission=submission_text,
             rubric=rubric,
