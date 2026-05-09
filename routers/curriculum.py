@@ -4,9 +4,10 @@ from typing import Any, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, require_roles
+from routers.deps import AuthPayload, Role, require_active_membership
 from data_access.period_dao import PeriodDAO
 from services.curriculum.curriculum_service import CurriculumService
+from services.enrollment.enrollment_service import EnrollmentService
 from exceptions.not_found_error import NotFoundError
 from exceptions.validation_error import ValidationError
 
@@ -15,6 +16,7 @@ router = APIRouter()
 
 _curriculum_service = CurriculumService()
 _period_dao = PeriodDAO()
+_enrollment_service = EnrollmentService()
 
 
 # ── Request models ─────────────────────────────────────────────────────────────
@@ -95,13 +97,20 @@ def _assert_period_owner(period_id: str, user_id: str) -> None:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
 
+def _assert_student_enrolled(period_id: str, user_id: str) -> None:
+    try:
+        _enrollment_service.assert_enrolled(user_id, period_id)
+    except ValidationError:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 @router.post("/{period_id}/generate", status_code=202)
 def trigger_generation(
     period_id: str,
     background_tasks: BackgroundTasks,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
+    auth: AuthPayload = Depends(require_active_membership),
 ):
     _assert_period_owner(period_id, auth.sub)
     try:
@@ -119,9 +128,12 @@ def trigger_generation(
 @router.get("/{period_id}")
 def get_curriculum(
     period_id: str,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
+    auth: AuthPayload = Depends(require_active_membership),
 ):
-    _assert_period_owner(period_id, auth.sub)
+    if auth.role == Role.STUDENT:
+        _assert_student_enrolled(period_id, auth.sub)
+    else:
+        _assert_period_owner(period_id, auth.sub)
     try:
         return _curriculum_service.get_curriculum(period_id)
     except NotFoundError as e:
@@ -135,7 +147,7 @@ def get_curriculum(
 def save_curriculum(
     period_id: str,
     payload: _SavePayload,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
+    auth: AuthPayload = Depends(require_active_membership),
 ):
     _assert_period_owner(period_id, auth.sub)
     try:
@@ -155,7 +167,7 @@ def update_concept(
     period_id: str,
     concept_name: str,
     payload: _ConceptEditPayload,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
+    auth: AuthPayload = Depends(require_active_membership),
 ):
     _assert_period_owner(period_id, auth.sub)
     fields = {k: v for k, v in payload.model_dump().items() if v is not None}
@@ -174,7 +186,7 @@ def update_skill(
     period_id: str,
     skill_name: str,
     payload: _SkillEditPayload,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
+    auth: AuthPayload = Depends(require_active_membership),
 ):
     _assert_period_owner(period_id, auth.sub)
     fields = {k: v for k, v in payload.model_dump().items() if v is not None}
@@ -191,7 +203,7 @@ def update_skill(
 @router.post("/{period_id}/approve")
 def approve_period(
     period_id: str,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
+    auth: AuthPayload = Depends(require_active_membership),
 ):
     _assert_period_owner(period_id, auth.sub)
     try:

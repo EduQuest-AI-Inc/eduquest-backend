@@ -239,7 +239,7 @@ async def main() -> None:
             schedule=quest_entries,
         )
     else:
-        from bots.agent import HWAgent
+        from bots.quest_agent import HWAgent
         hw_agent = HWAgent(
             student=MOCK_STUDENT,
             period=MOCK_PERIOD,

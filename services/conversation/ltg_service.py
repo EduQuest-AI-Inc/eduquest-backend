@@ -13,6 +13,7 @@ from data_access.period_dao import PeriodDAO
 from data_access.student_dao import StudentDAO
 from data_access.ltg_conversation_dao import LtgConversationDAO
 from data_access.student_long_term_goal_dao import StudentLongTermGoalDAO
+from services.curriculum.curriculum_service import CurriculumService
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from services.enrollment.enrollment_service import EnrollmentService
@@ -26,10 +27,10 @@ class LTGConversationService:
     in the ltg_conversation table.
     """
 
-    def __init__(self, vector_store_id: str, previous_response_id: Optional[str] = None) -> None:
+    def __init__(self, vector_store_id: str, curriculum: dict, previous_response_id: Optional[str] = None) -> None:
         self.vector_store_id = vector_store_id
         self.previous_response_id = previous_response_id
-        self.agent = get_bot_provider().create_ltg_agent(vector_store_id)
+        self.agent = get_bot_provider().create_ltg_agent(vector_store_id, curriculum)
 
     async def initiate(self, student: Dict[str, Any]) -> Dict[str, Any]:
         """Start a new LTG conversation for a student."""
@@ -97,9 +98,10 @@ class LTGConversationService:
 def initiate_ltg_conversation(
     vector_store_id: str,
     student: Dict[str, Any],
+    curriculum: Dict[str, Any],
     previous_response_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    service = LTGConversationService(vector_store_id, previous_response_id)
+    service = LTGConversationService(vector_store_id, curriculum, previous_response_id)
     return asyncio.run(service.initiate(student))
 
 
@@ -108,7 +110,7 @@ def continue_ltg_conversation(
     previous_response_id: Optional[str],
     user_message: str,
 ) -> Dict[str, Any]:
-    service = LTGConversationService(vector_store_id, previous_response_id)
+    service = LTGConversationService(vector_store_id, {}, previous_response_id)
     return asyncio.run(service.continue_conversation(user_message))
 
 
@@ -136,6 +138,8 @@ def run_initiate_ltg(user_id: str, period_id: str) -> Dict[str, Any]:
     if not vector_store_id:
         raise Exception("Period does not have a vector store configured")
 
+    curriculum = CurriculumService().get_curriculum(period_id)
+
     existing_conversation_id = ltg_conversation_dao.get_conversation_id(user_id, period_id)
     if existing_conversation_id:
         return {
@@ -154,7 +158,7 @@ def run_initiate_ltg(user_id: str, period_id: str) -> Dict[str, Any]:
         "learning_style": student.get("learning_style", []),
     }
 
-    result = initiate_ltg_conversation(vector_store_id=vector_store_id, student=student_data)
+    result = initiate_ltg_conversation(vector_store_id=vector_store_id, student=student_data, curriculum=curriculum)
 
     response_id = result.get("response_id")
     if not response_id:
