@@ -386,7 +386,7 @@ Quick reference for all 24 tables in the EduQuest Supabase database, grouped by 
 | ------------------- | --------- | ----------- | --------------------------------------------------- |
 | `conversation_id`   | text      | PK          |                                                     |
 | `user_id`           | text      | NOT NULL    | FK → `user.user_id`                                 |
-| `conversation_type` | text      | NOT NULL    | e.g. `"profile"`, `"update"`, `"quest_grading"`     |
+| `conversation_type` | text      | NOT NULL    | e.g. `"profile"`, `"update"`                        |
 | `period_id`         | text      | nullable    |                                                     |
 | `created_at`        | timestamptz | NOT NULL    |                                                     |
 | `last_response_id`  | text        | nullable    | Last OpenAI response ID — used for message chaining |
