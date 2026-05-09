@@ -24,31 +24,14 @@ unset PILOT_WAITLIST_ENABLED
 
 ## 🔐 Password Reset Feature Setup
 
-### DynamoDB Tables (Manual Creation Required)
+### Supabase Tables
 
-Before using the password reset feature, create the following DynamoDB tables in AWS Console:
+Storage is on Supabase Postgres (no DynamoDB). The `password_reset_token` and `password_reset_rate_limit` tables should already exist in your Supabase project; the Pydantic models and DAOs live at:
 
-#### 1. `password_reset_token` Table
+- `models/password_reset_token.py` + `data_access/password_reset_token_dao.py`
+- `data_access/password_reset_rate_limit_dao.py`
 
-| Setting | Value |
-| --- | --- |
-| **Table name** | `password_reset_token` |
-| **Partition key** | `token_hash` (String) |
-| **Sort key** | None |
-
-**Enable TTL:**
-- Attribute name: `expires_at_epoch`
-
-#### 2. `password_reset_rate_limit` Table
-
-| Setting | Value |
-| --- | --- |
-| **Table name** | `password_reset_rate_limit` |
-| **Partition key** | `key` (String) |
-| **Sort key** | None |
-
-**Enable TTL:**
-- Attribute name: `expires_at_epoch`
+If you're bootstrapping a fresh Supabase project, create them with the columns referenced by those DAOs, plus `created_at` and `expires_at` timestamps. Run cleanup of expired tokens via a scheduled SQL job or the trial reminder service pattern (`services/billing/trial_reminder_service.py`).
 
 ### Environment Variables
 
@@ -57,7 +40,7 @@ Add these to your `.env` file:
 ```bash
 # SES Configuration (required for password reset emails)
 SES_FROM_EMAIL=noreply@eduquestai.org  # Must be verified in SES
-FRONTEND_BASE_URL=https://eduquestai.org  # Or http://localhost:5173 for dev
+FRONTEND_BASE_URL=https://eduquestai.org  # Or http://localhost:3000 for dev (Next.js dev server)
 ```
 
 ### SES Setup
@@ -66,23 +49,14 @@ FRONTEND_BASE_URL=https://eduquestai.org  # Or http://localhost:5173 for dev
 2. **Move out of sandbox** (for production) or verify recipient emails (for testing)
 3. Ensure the IAM user/role has `ses:SendEmail` permission
 
-### Backfill `email_lc` for Existing Users
-
-Run the backfill script to populate `email_lc` for existing users:
-
-```bash
-cd eduquest-backend
-python scripts/backfill_email_lc.py
-```
-
-This is a one-time operation required before the password reset feature can find existing users.
-
 ### Password Reset Endpoints
 
 | Endpoint | Method | Description |
 | --- | --- | --- |
 | `/auth/password-reset/request` | POST | Request a password reset email |
 | `/auth/password-reset/confirm` | POST | Confirm reset with token and new password |
+
+Password policy: ≥10 characters, must contain at least one letter and one number, must not be in the common-password blocklist. See `services/auth/password_policy.py`.
 
 ---
 

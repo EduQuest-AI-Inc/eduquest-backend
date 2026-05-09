@@ -14,6 +14,7 @@ openai-agents
 pydantic
 supabase>=2.0.0
 posthog>=4.0.0
+stripe>=11.0.0
 pytest
 pytest-cov
 ruff

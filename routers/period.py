@@ -10,7 +10,7 @@ from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, get_auth, require_roles
+from routers.deps import AuthPayload, Role, get_auth, require_active_membership, require_roles
 from data_access.teacher_dao import TeacherDAO
 from integrations import openai_vector_store
 from integrations.s3_service import (
@@ -20,11 +20,15 @@ from integrations.s3_service import (
     generate_presigned_part_url,
     get_file_presigned_url,
 )
+from services.billing.membership_service import (
+    MembershipRequiredError,
+    MembershipService,
+    PlanLimitExceededError,
+)
 from services.period.period_file_service import PeriodFileService
 from models.period import CourseMetadata
 from services.curriculum.curriculum_service import CurriculumService
 from services.period.period_management_service import PeriodManagementService
-from services.waitlist.waitlist_service import WaitlistService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -32,7 +36,7 @@ period_management_service = PeriodManagementService()
 period_file_service = PeriodFileService()
 curriculum_service = CurriculumService()
 teacher_dao = TeacherDAO()
-waitlist_service = WaitlistService()
+membership_service = MembershipService()
 
 
 # ─── Private helpers ──────────────────────────────────────────────────────────
@@ -93,22 +97,16 @@ def _process_period_files(
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def _validate_pilot_access(user_id: str):
-    """Raise HTTPException 403 if teacher lacks pilot access."""
-    pilot_enabled = os.getenv("PILOT_WAITLIST_ENABLED", "true").lower() == "true"
-    if not pilot_enabled:
-        return
-    teacher = teacher_dao.get_teacher_by_id(user_id)
-    if not teacher or not teacher.get("pilot_approved", False):
-        waitlist_status = waitlist_service.get_status(user_id)
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "error": "Pilot access required to create a class. Please join the pilot waitlist.",
-                "code": "PILOT_WAITLIST_REQUIRED",
-                "waitlist": waitlist_status,
-            },
-        )
+def _membership_required_response(err: MembershipRequiredError) -> HTTPException:
+    return HTTPException(
+        status_code=403,
+        detail={
+            "error": "Active membership required",
+            "code": "MEMBERSHIP_REQUIRED",
+            "status": err.access.status.value,
+            "trial_ends_at": err.access.trial_ends_at,
+        },
+    )
 
 
 # ─── Period management ────────────────────────────────────────────────────────
@@ -158,6 +156,8 @@ def multipart_complete(payload: _MultipartCompleteRequest, auth: AuthPayload = D
 
 @router.get("/periods")
 def list_periods(auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT))):
+    # Listing is allowed regardless of membership so paying users can see their
+    # classes and lapsed users still see what they have but cannot manage them.
     try:
         result = period_management_service.get_periods_by_owner(auth.sub)
         return {"periods": result}
@@ -190,8 +190,18 @@ def create_period(
 ):
     if status not in ("pending", "setup_draft"):
         raise HTTPException(status_code=400, detail="Invalid status value")
-    if auth.role == Role.TEACHER:
-        _validate_pilot_access(auth.sub)
+
+    # Membership gate: parent/teacher need an active trial or paid subscription
+    # to create classes, and the plan's class limit is enforced server-side.
+    try:
+        membership_service.assert_can_create_class(auth.sub, auth.role.value)
+    except MembershipRequiredError as e:
+        raise _membership_required_response(e)
+    except PlanLimitExceededError as e:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": str(e), "code": "PLAN_LIMIT_EXCEEDED"},
+        )
 
     raw_metadata = CourseMetadata(
         learning_objectives=learning_objectives,
@@ -284,7 +294,7 @@ def update_period_setup(
     additional_standards: List[str] = Form(default=[]),
     specific_standard_codes: Optional[str] = Form(default=None),
     status: Optional[str] = Form(default="setup_draft"),
-    auth: AuthPayload = Depends(get_auth),
+    auth: AuthPayload = Depends(require_active_membership),
 ):
     if status not in ("pending", "setup_draft"):
         raise HTTPException(status_code=400, detail="Invalid status value")
@@ -384,7 +394,7 @@ class _AddFilesRequest(BaseModel):
 @router.post("/add-files-to-period")
 def add_files_to_period(
     payload: _AddFilesRequest,
-    auth: AuthPayload = Depends(get_auth),
+    auth: AuthPayload = Depends(require_active_membership),
 ):
     period = period_management_service.get_period_by_id(payload.period_id)
     if not period:
@@ -400,7 +410,7 @@ def add_files_to_period(
 @router.get("/period/{period_id}")
 def get_period(
     period_id: str,
-    auth: AuthPayload = Depends(get_auth),
+    auth: AuthPayload = Depends(require_active_membership),
 ):
     period = period_management_service.get_period_by_id(period_id)
     if not period:
@@ -413,7 +423,7 @@ def get_period(
 @router.delete("/period/{period_id}", status_code=204)
 def delete_period(
     period_id: str,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
+    auth: AuthPayload = Depends(require_active_membership),
 ):
     try:
         period_management_service.delete_period(period_id, auth.sub)
