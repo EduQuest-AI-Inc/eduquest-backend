@@ -155,9 +155,13 @@ class HWAgent:
                 output_type=Instructions,
             )
 
+            run_kwargs = {}
+            if self.previous_response_id:
+                run_kwargs["previous_response_id"] = self.previous_response_id
             result = await Runner.run(
                 instruction_agent,
                 f"Create detailed instructions for this quest: {quest_name} - Skills: {quest_skills}",
+                **run_kwargs  # type: ignore[arg-type]
             )
 
             steps = result.final_output.steps
@@ -198,9 +202,13 @@ class HWAgent:
                 output_type=Rubric
             )
             
+            run_kwargs = {}
+            if self.previous_response_id:
+                run_kwargs["previous_response_id"] = self.previous_response_id
             result = await Runner.run(
                 rubric_agent,
                 f"Create a rubric for: {quest_name}",
+                **run_kwargs  # type: ignore[arg-type]
             )
 
             return result.final_output
