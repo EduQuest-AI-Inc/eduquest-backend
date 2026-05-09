@@ -221,7 +221,7 @@ class MembershipService:
     def attach_stripe_customer(self, user_id: str, customer_id: str) -> None:
         self.dao.update(user_id, {"stripe_customer_id": customer_id})
 
-    def apply_stripe_subscription(self, subscription: Dict[str, Any]) -> Optional[str]:
+    def apply_stripe_subscription(self, subscription: Any) -> Optional[str]:
         """Mirror a Stripe Subscription object into the local membership row.
 
         Returns the user_id whose membership was synced, or None if we couldn't

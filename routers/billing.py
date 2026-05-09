@@ -150,9 +150,9 @@ async def stripe_webhook(request: Request):
         logger.warning("Stripe webhook signature verification failed: %s", e)
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    event_type = event.get("type", "")
-    data = (event.get("data") or {}).get("object") or {}
-    logger.info("stripe.webhook event_type=%s id=%s", event_type, event.get("id"))
+    event_type: str = getattr(event, "type", "") or ""
+    data = getattr(getattr(event, "data", None), "object", None) or {}
+    logger.info("stripe.webhook event_type=%s id=%s", event_type, getattr(event, "id", None))
 
     try:
         if event_type in (
