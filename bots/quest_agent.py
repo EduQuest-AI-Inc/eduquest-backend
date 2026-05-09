@@ -53,7 +53,7 @@ class HWAgent:
     Homework agent that generates quest instructions and rubrics.
 
     Accepts an optional previous_response_id (the last response ID from the
-    student's LTG conversation) so the title-generation call gets LTG context.
+    student's LTG conversation) so instruction and rubric generation get LTG context.
     """
 
     def __init__(self, student, period, schedule, conversation_id: Optional[str] = None, previous_response_id: Optional[str] = None) -> None:
@@ -66,7 +66,7 @@ class HWAgent:
             schedule: List of quest dicts with Name, Skills, Week.
             conversation_id: Ignored (kept for backwards-compat call sites).
             previous_response_id: Optional last_response_id from the LTG conversation
-                                   for passing context to the title-generation call.
+                                   for passing context to instruction and rubric generation.
         """
         self.student = student
         self.period = period
@@ -80,46 +80,6 @@ class HWAgent:
         else:
             logger.debug("HWAgent running without LTG conversation context (stateless)")
         
-    async def generate_title(self, quest) -> str:
-        """Generate a short, student-personalized quest title (max 12 words)."""
-        with trace("generate_title"):
-            teacher_plan = quest.get("Name") if isinstance(quest, dict) else getattr(quest, "name", "")
-            quest_skills = quest.get("Skills") if isinstance(quest, dict) else getattr(quest, "skills", "")
-
-            title_agent = Agent(
-                name="Quest Title Generator",
-                instructions=f"""
-                You write short, personalized quest titles for students.
-
-                Student Information:
-                - Name: {self.student["first_name"]}
-                - Interests: {self.student["interest"]}
-                - Learning Style: {self.student["learning_style"]}
-
-                This week the teacher has planned: {teacher_plan}
-                Skills to practice: {quest_skills}
-
-                Write ONE quest title (maximum 12 words) that:
-                - Sounds like a personal challenge for this student, not a lesson plan
-                - Connects the student's interests/goal to this week's learning objectives
-                - Uses active, engaging language (e.g. "Craft...", "Explore...", "Build...")
-                - Does NOT repeat "Week X" or reference the teacher's plan literally
-
-                Return ONLY the title text. No quotes, no punctuation at the end.
-                """,
-                model="gpt-4o"
-            )
-
-            run_kwargs = {}
-            if self.previous_response_id:
-                run_kwargs["previous_response_id"] = self.previous_response_id
-            result = await Runner.run(
-                title_agent,
-                f"Generate a quest title for week covering: {quest_skills}",
-                **run_kwargs  # type: ignore[arg-type]
-            )
-            return result.final_output.strip()
-
     async def generate_instructions(self, quest) -> list[dict]:
         """Generate detailed step-by-step instructions for a quest as structured data."""
         with trace("generate_instructions"):
@@ -155,9 +115,13 @@ class HWAgent:
                 output_type=Instructions,
             )
 
+            run_kwargs = {}
+            if self.previous_response_id:
+                run_kwargs["previous_response_id"] = self.previous_response_id
             result = await Runner.run(
                 instruction_agent,
                 f"Create detailed instructions for this quest: {quest_name} - Skills: {quest_skills}",
+                **run_kwargs  # type: ignore[arg-type]
             )
 
             steps = result.final_output.steps
@@ -198,42 +162,38 @@ class HWAgent:
                 output_type=Rubric
             )
             
+            run_kwargs = {}
+            if self.previous_response_id:
+                run_kwargs["previous_response_id"] = self.previous_response_id
             result = await Runner.run(
                 rubric_agent,
                 f"Create a rubric for: {quest_name}",
+                **run_kwargs  # type: ignore[arg-type]
             )
 
             return result.final_output
     
     async def process_quest(self, quest) -> IndividualQuest:
-        """Process a single quest to generate title, instructions and rubric"""
+        """Process a single quest to generate instructions and rubric."""
         with trace("process_quest"):
-            # Handle both dict and object formats
             teacher_plan = quest.get("Name") if isinstance(quest, dict) else getattr(quest, "name", "")
             quest_skills = quest.get("Skills") if isinstance(quest, dict) else getattr(quest, "skills", "")
             quest_week = quest.get("Week") if isinstance(quest, dict) else getattr(quest, "week", 1)
 
             logger.debug("Processing quest: %s", teacher_plan)
 
-            quest_description, instructions, rubric = await asyncio.gather(
-                self.generate_title(quest),
+            instructions, rubric = await asyncio.gather(
                 self.generate_instructions(quest),
                 self.generate_rubric(quest),
             )
 
-            # Convert rubric to dict format
-            rubric_dict = rubric.to_dict_format()
-
-            # Create the IndividualQuest object
-            individual_quest = IndividualQuest(
-                Name=quest_description,   # AI-generated title → stored as individual_quest.description in DB
+            return IndividualQuest(
+                Name=teacher_plan,
                 Skills=quest_skills,  # type: ignore[arg-type]
                 Week=quest_week,  # type: ignore[arg-type]
                 instructions=instructions,
-                rubric=rubric_dict
+                rubric=rubric.to_dict_format(),
             )
-            
-            return individual_quest
     
     async def _run_async(self) -> list[IndividualQuest]:
         """Process all quests in the schedule asynchronously"""
