@@ -15,6 +15,7 @@ from data_access.ltg_conversation_dao import LtgConversationDAO
 from data_access.student_long_term_goal_dao import StudentLongTermGoalDAO
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
+from services.enrollment.enrollment_service import EnrollmentService
 
 
 class LTGConversationService:
@@ -120,6 +121,8 @@ def run_initiate_ltg(user_id: str, period_id: str) -> Dict[str, Any]:
     period_dao = PeriodDAO()
     student_dao = StudentDAO()
     ltg_conversation_dao = LtgConversationDAO()
+
+    EnrollmentService().assert_enrolled(user_id, period_id)
 
     student = student_dao.get_student_by_id(user_id)
     if not student:
