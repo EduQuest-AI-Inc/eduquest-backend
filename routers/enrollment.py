@@ -4,8 +4,14 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, get_auth, require_roles, require_student_viewer
+from routers.deps import AuthPayload, Role, get_auth, require_active_membership, require_roles, require_student_viewer
 from data_access.period_dao import PeriodDAO
+from data_access.user_dao import UserDAO
+from services.billing.membership_service import (
+    MembershipRequiredError,
+    MembershipService,
+    PlanLimitExceededError,
+)
 from services.enrollment.enrollment_service import EnrollmentService
 from services.parent.parent_service import ParentService
 from services.period.period_service import PeriodService
@@ -15,7 +21,9 @@ router = APIRouter()
 service = EnrollmentService()
 period_service = PeriodService()
 parent_service = ParentService()
+membership_service = MembershipService()
 _period_dao = PeriodDAO()
+_user_dao = UserDAO()
 
 
 # ─── Request models ───────────────────────────────────────────────────────────
@@ -52,7 +60,7 @@ def enroll(body: EnrollRequest, auth: AuthPayload = Depends(get_auth)):
 
 
 @router.get("/enrollments/{period_id}")
-def get_enrollments(period_id: str, auth: AuthPayload = Depends(get_auth)):
+def get_enrollments(period_id: str, auth: AuthPayload = Depends(require_active_membership)):
     period = _period_dao.get_period_by_id(period_id)
     if not period:
         raise HTTPException(status_code=404, detail="Period not found")
@@ -67,7 +75,7 @@ def get_enrollments(period_id: str, auth: AuthPayload = Depends(get_auth)):
 
 
 @router.get("/student-profile/{period_id}/{user_id}")
-def get_student_profile(period_id: str, user_id: str, auth: AuthPayload = Depends(get_auth)):
+def get_student_profile(period_id: str, user_id: str, auth: AuthPayload = Depends(require_active_membership)):
     period = _period_dao.get_period_by_id(period_id)
     if not period:
         raise HTTPException(status_code=404, detail="Period not found")
@@ -97,6 +105,34 @@ def my_periods(
 
 @router.post("/verify-period")
 def verify_period(body: VerifyPeriodRequest, auth: AuthPayload = Depends(get_auth)):
+    # Enforce the OWNER's plan student-per-class limit at enrollment time.
+    # This protects the owner from over-quota even though students aren't
+    # paying — without it a parent on Starter could end up with > 20 students.
+    period = _period_dao.get_period_by_id(body.period_id)
+    if period:
+        owner_id = period.get("owner_id")
+        owner = _user_dao.get_by_id(owner_id) if owner_id else None
+        owner_role = owner.get("role") if owner else None
+        if owner_id and owner_role in ("teacher", "parent"):
+            try:
+                membership_service.assert_can_add_student_to_period(
+                    owner_id, owner_role, body.period_id
+                )
+            except MembershipRequiredError:
+                # Owner's membership lapsed: do not accept new enrollments.
+                # Existing students keep their assigned class access.
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error": "This class is not currently accepting new students.",
+                        "code": "OWNER_MEMBERSHIP_INACTIVE",
+                    },
+                )
+            except PlanLimitExceededError as e:
+                raise HTTPException(
+                    status_code=403,
+                    detail={"error": str(e), "code": "PLAN_LIMIT_EXCEEDED"},
+                )
     period = period_service.verify_period_id(auth.sub, body.period_id, body.allow_parent_period)
     return {"message": "Period verified and added to enrollments", "period": period}
 

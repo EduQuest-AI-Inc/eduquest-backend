@@ -43,6 +43,29 @@ def _fetch_user_profile(user_id: str) -> Optional[dict]:
     if role == "teacher":
         profile.setdefault("pilot_approved", False)
         profile.pop("canvas_api_key", None)
+    if role in ("teacher", "parent"):
+        # Inline a compact membership snapshot so the dashboard can decide
+        # whether to gate management UI without a second round trip.
+        try:
+            from services.billing.membership_service import MembershipService
+            access = MembershipService().evaluate_access(user_id, role)
+            profile["membership"] = {
+                "status": access.status.value,
+                "plan": access.plan.value if access.plan else None,
+                "has_active_membership": access.has_active_membership,
+                "trial_ends_at": access.trial_ends_at,
+                "class_limit": access.class_limit,
+                "students_per_class_limit": access.students_per_class_limit,
+            }
+        except Exception:
+            profile["membership"] = {
+                "status": "none",
+                "plan": None,
+                "has_active_membership": False,
+                "trial_ends_at": None,
+                "class_limit": None,
+                "students_per_class_limit": None,
+            }
     return profile
 
 

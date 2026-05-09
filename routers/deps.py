@@ -3,7 +3,7 @@ from enum import Enum
 from typing import FrozenSet, Optional
 
 import jwt
-from fastapi import Cookie, Header, HTTPException
+from fastapi import Cookie, Depends, Header, HTTPException
 
 JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret")
 JWT_ALGORITHM = "HS256"
@@ -58,7 +58,6 @@ def require_roles(*roles: Role):
         auth: AuthPayload = Depends(require_roles(Role.TEACHER))
         auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT))
     """
-    from fastapi import Depends
     allowed: FrozenSet[Role] = frozenset(roles)
 
     def _check(auth: AuthPayload = Depends(get_auth)) -> AuthPayload:
@@ -72,6 +71,40 @@ def require_roles(*roles: Role):
     return _check
 
 
+def require_active_membership(auth: AuthPayload = Depends(get_auth)) -> AuthPayload:
+    """
+    FastAPI dependency. Restricts a route to parent/teacher callers whose
+    membership is currently active (trialing or paid). Students are never
+    affected by this gate; they reach it only via mis-routing, in which case
+    we fail closed with code `OWNER_ROLE_REQUIRED`.
+
+    Returns a structured 403 with code `MEMBERSHIP_REQUIRED` so the frontend
+    can render the paywall UI.
+
+    Usage:
+        auth: AuthPayload = Depends(require_active_membership)
+    """
+    if auth.role not in (Role.TEACHER, Role.PARENT):
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "Forbidden", "code": "OWNER_ROLE_REQUIRED"},
+        )
+    # Lazy import to avoid circulars between routers and services.
+    from services.billing.membership_service import MembershipService
+    access = MembershipService().evaluate_access(auth.sub, auth.role.value)
+    if not access.has_active_membership:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Active membership required",
+                "code": "MEMBERSHIP_REQUIRED",
+                "status": access.status.value,
+                "trial_ends_at": access.trial_ends_at,
+            },
+        )
+    return auth
+
+
 def require_student_viewer(student_id_param: str = "user_id"):
     """
     Dependency factory for routes where a teacher or parent may optionally provide
@@ -81,7 +114,7 @@ def require_student_viewer(student_id_param: str = "user_id"):
     Usage:
         auth: AuthPayload = Depends(require_student_viewer("user_id"))
     """
-    from fastapi import Depends, Request
+    from fastapi import Request
     from data_access.parent_dao import ParentDAO
     from services.period.period_service import PeriodService
 

@@ -53,6 +53,10 @@ class SignupRequest(BaseModel):
     email: str
     grade: Optional[str] = None
     invite_code: Optional[str] = None
+    # Required confirmation for parent/teacher accounts: explicit acknowledgement
+    # that they are starting the 14-day no-card trial. The frontend renders the
+    # trial-terms screen and only sets this to True after the user confirms.
+    trial_confirmed: Optional[bool] = None
 
 
 @router.post("/signup", status_code=201)
@@ -62,6 +66,11 @@ def signup(body: SignupRequest):
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}")
     if body.role == "student" and not body.grade:
         raise HTTPException(status_code=400, detail="grade is required for students")
+    if body.role in ("teacher", "parent") and not body.trial_confirmed:
+        raise HTTPException(
+            status_code=400,
+            detail="trial_confirmed is required for parent/teacher signups",
+        )
 
     normalized_email = body.email.strip().lower()
     if user_dao.get_by_email(normalized_email):
@@ -78,6 +87,15 @@ def signup(body: SignupRequest):
         raise HTTPException(status_code=status, detail=error_message)
 
     response_body: dict = {"message": "User registered successfully"}
+
+    # Start the 14-day no-card trial for parents/teachers immediately on signup.
+    if body.role in ("teacher", "parent"):
+        try:
+            from services.billing.membership_service import MembershipService
+            MembershipService().start_trial_if_eligible(body.username, body.role)
+            response_body["trial_started"] = True
+        except Exception as e:  # pragma: no cover — billing is not auth-critical
+            logger.warning("Trial creation failed for %s: %s", body.username, e)
 
     if body.role == "student" and body.invite_code:
         invite_code = body.invite_code.strip().upper()
@@ -122,6 +140,16 @@ def login(body: LoginRequest, response: Response):
             or not student.get("learning_style")
         ):
             response_data["needs_profile"] = True
+
+    # Backfill: legacy parent/teacher accounts created before the membership
+    # system exist without a row. Auto-start their 14-day trial on first login
+    # so they aren't suddenly blocked from creating/managing classes.
+    if body.role in ("teacher", "parent"):
+        try:
+            from services.billing.membership_service import MembershipService
+            MembershipService().start_trial_if_eligible(body.username, body.role)
+        except Exception as e:  # pragma: no cover — login must not depend on billing
+            logger.warning("Trial backfill failed for %s on login: %s", body.username, e)
 
     set_auth_cookie(response, token)
     return response_data
