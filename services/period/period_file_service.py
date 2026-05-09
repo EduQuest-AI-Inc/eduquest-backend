@@ -5,14 +5,13 @@ from integrations.canvas_service import Course as CanvasCourse, course_to_json
 from integrations.s3_service import upload_file_to_s3
 from integrations import openai_vector_store
 from integrations.pdf_processor import preprocess_pdf
-from services.period.period_schedule_service import PeriodScheduleService
 
 logger = logging.getLogger(__name__)
 
 
 class PeriodFileService:
     def __init__(self) -> None:
-        self._schedule_service = PeriodScheduleService()
+        pass
 
     def append_canvas_data(
         self,
@@ -84,12 +83,3 @@ class PeriodFileService:
 
         return file_vs_ids
 
-    def run_pipeline(self, period_id: str, user_id: str):
-        """Generate and save schedule; log and return None on failure."""
-        try:
-            result = self._schedule_service.generate_and_save_schedule(period_id, user_id)
-            logger.info("Schedule generated for period %s", period_id)
-            return result
-        except Exception as e:
-            logger.warning("Schedule generation failed for %s: %s", period_id, e)
-            return None

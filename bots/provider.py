@@ -26,7 +26,7 @@ class BotProvider:
     OpenAI SDK at module import time when it isn't needed."""
 
     def create_hw_agent(self, student, period, schedule, conversation_id=None, previous_response_id=None):
-        from bots.agent import HWAgent
+        from bots.quest_agent import HWAgent
         return HWAgent(
             student, period, schedule,
             conversation_id=conversation_id,
@@ -37,30 +37,44 @@ class BotProvider:
         from bots.grading_agent import GradingOrchestrator
         return GradingOrchestrator()
 
-    def create_schedule_agent(
+    def create_curriculum_agent(
         self,
-        vector_store_ids: Optional[list] = None,
+        vector_store_ids: list,
         course_name: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         course_description: Optional[str] = None,
+        grade_level: Optional[str] = None,
+        research_context: Optional[str] = None,
     ):
-        from bots.schedule_agent import PeriodScheduleAgent
-        return PeriodScheduleAgent(
+        from bots.curriculum_agent import CurriculumAgent
+        return CurriculumAgent(
             vector_store_ids=vector_store_ids,
             course_name=course_name,
             start_date=start_date,
             end_date=end_date,
             course_description=course_description,
+            grade_level=grade_level,
+            research_context=research_context,
         )
 
     def create_profile_agent(self):
         from bots.profile_agent import create_profile_agent
         return create_profile_agent()
 
-    def create_ltg_agent(self, vector_store_id: str):
+    def create_ltg_agent(self, vector_store_id: str, curriculum: dict):
         from bots.ltg_agent import create_ltg_agent
-        return create_ltg_agent(vector_store_id)
+        return create_ltg_agent(vector_store_id, curriculum)
+
+    def create_schedule_agent(self, student, period, schedule, goal_text, previous_response_id=None):
+        from bots.ltg_schedule_agent import LTGScheduleAgent
+        return LTGScheduleAgent(
+            student=student,
+            period=period,
+            schedule=schedule,
+            goal_text=goal_text,
+            previous_response_id=previous_response_id,
+        )
 
     def create_teacher_feedback_agent(self):
         from bots.teacher_feedback_agent import create_teacher_feedback_agent
@@ -90,6 +104,10 @@ class BotProvider:
         else:
             skills = []
         instructions = quest_data.get("instructions", quest_data.get("description", ""))
+        if isinstance(instructions, list):
+            instructions = "\n".join(
+                f"Step {s['step']}: {s['text']}" for s in instructions if isinstance(s, dict)
+            )
         return GradingInput(
             submission=submission_text,
             rubric=rubric,
@@ -149,30 +167,38 @@ class MockBotProvider(BotProvider):
         from bots._mocks import MockGradingOrchestrator
         return MockGradingOrchestrator()
 
-    def create_schedule_agent(
+    def create_curriculum_agent(
         self,
-        vector_store_ids: Optional[list] = None,
+        vector_store_ids: list,
         course_name: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         course_description: Optional[str] = None,
+        grade_level: Optional[str] = None,
+        research_context: Optional[str] = None,
     ):
-        from bots._mocks import MockPeriodScheduleAgent
-        return MockPeriodScheduleAgent(
+        from bots._mocks import MockCurriculumAgent
+        return MockCurriculumAgent(
             vector_store_ids=vector_store_ids,
             course_name=course_name,
             start_date=start_date,
             end_date=end_date,
             course_description=course_description,
+            grade_level=grade_level,
+            research_context=research_context,
         )
 
     def create_profile_agent(self):
         from bots.profile_agent import create_profile_agent
         return create_profile_agent()
 
-    def create_ltg_agent(self, vector_store_id: str):
+    def create_ltg_agent(self, vector_store_id: str, curriculum: dict):
         from bots.ltg_agent import create_ltg_agent
-        return create_ltg_agent(vector_store_id)
+        return create_ltg_agent(vector_store_id, curriculum)
+
+    def create_schedule_agent(self, student, period, schedule, goal_text, previous_response_id=None):
+        from bots._mocks import MockLTGScheduleAgent
+        return MockLTGScheduleAgent(student=student, schedule=schedule, goal_text=goal_text)
 
     def create_teacher_feedback_agent(self):
         from bots.teacher_feedback_agent import create_teacher_feedback_agent

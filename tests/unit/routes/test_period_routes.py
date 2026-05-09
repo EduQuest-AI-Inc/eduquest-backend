@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from main import app
-from api.deps import get_auth, AuthPayload
+from routers.deps import get_auth, AuthPayload
 
 OWNED_PERIOD = {"period_id": "p1", "owner_id": "user-1", "file_urls": []}
 OTHER_PERIOD = {"period_id": "p1", "owner_id": "other-user", "file_urls": []}
@@ -259,6 +259,15 @@ class TestAcceptParentInvite:
         assert resp.status_code == 500
 
 
+VALID_CREATE_PERIOD_PAYLOAD = {
+    "name": "Math 101",
+    "course_description": "Intro algebra and geometry",
+    "grade_level": "9th grade",
+    "start_date": "2025-09-01",
+    "end_date": "2026-01-15",
+}
+
+
 class TestCreatePeriod:
 
     @pytest.mark.api
@@ -274,7 +283,7 @@ class TestCreatePeriod:
             mock_td.get_teacher_by_id.return_value = APPROVED_TEACHER
             mock_cvs.return_value = (mock_vs, [])
             mock_pms.create_period.return_value = {"period_id": "P1-ABCD-1234", "name": "Math 101"}
-            resp = client.post("/period/create-period", data={"name": "Math 101"}, files=[])
+            resp = client.post("/period/create-period", data=VALID_CREATE_PERIOD_PAYLOAD, files=[])
         assert resp.status_code == 201
         assert "message" in resp.json()
         assert "period" in resp.json()
@@ -286,12 +295,19 @@ class TestCreatePeriod:
              patch("api.routers.period.waitlist_service_p") as mock_wl:
             mock_td.get_teacher_by_id.return_value = UNAPPROVED_TEACHER
             mock_wl.get_status.return_value = {"on_waitlist": False}
-            resp = client.post("/period/create-period", data={"name": "Math 101"}, files=[])
+            resp = client.post("/period/create-period", data=VALID_CREATE_PERIOD_PAYLOAD, files=[])
         assert resp.status_code == 403
 
     @pytest.mark.api
     def test_create_period_missing_name_returns_422(self, client):
         resp = client.post("/period/create-period", data={}, files=[])
+        assert resp.status_code == 422
+
+    @pytest.mark.api
+    @pytest.mark.parametrize("missing_field", ["course_description", "grade_level", "start_date", "end_date"])
+    def test_create_period_missing_required_field_returns_422(self, client, missing_field):
+        payload = {k: v for k, v in VALID_CREATE_PERIOD_PAYLOAD.items() if k != missing_field}
+        resp = client.post("/period/create-period", data=payload, files=[])
         assert resp.status_code == 422
 
     @pytest.mark.api
@@ -303,7 +319,7 @@ class TestCreatePeriod:
              patch("api.routers.period.create_vector_store") as mock_cvs:
             mock_td.get_teacher_by_id.return_value = APPROVED_TEACHER
             mock_cvs.side_effect = RuntimeError("vector store failed")
-            resp = client.post("/period/create-period", data={"name": "Math 101"}, files=[])
+            resp = client.post("/period/create-period", data=VALID_CREATE_PERIOD_PAYLOAD, files=[])
         assert resp.status_code == 500
 
 
@@ -376,111 +392,6 @@ class TestAddFilesToPeriod:
                 files=[("files", ("f.txt", b"x", "text/plain"))],
             )
         assert resp.status_code == 500
-
-
-class TestGeneratePeriodSchedule:
-
-    @pytest.mark.api
-    @patch("api.routers.period.period_schedule_service")
-    def test_generate_schedule_success(self, mock_svc, client):
-        mock_svc.generate_and_save_schedule.return_value = {
-            "period_id": "p1", "weeks": [{"week": 1, "topic": "Intro"}]
-        }
-        resp = client.post("/period/period-schedule/generate", json={"period_id": "p1"})
-        assert resp.status_code == 200
-        assert resp.json()["message"] == "Schedule generated successfully"
-        assert resp.json()["period_id"] == "p1"
-
-    @pytest.mark.api
-    @patch("api.routers.period.period_schedule_service")
-    def test_generate_schedule_permission_denied(self, mock_svc, client):
-        mock_svc.generate_and_save_schedule.side_effect = PermissionError("Not your period")
-        resp = client.post("/period/period-schedule/generate", json={"period_id": "other"})
-        assert resp.status_code == 403
-
-    @pytest.mark.api
-    @patch("api.routers.period.period_schedule_service")
-    def test_generate_schedule_value_error_returns_400(self, mock_svc, client):
-        mock_svc.generate_and_save_schedule.side_effect = ValueError("bad period")
-        resp = client.post("/period/period-schedule/generate", json={"period_id": "bad"})
-        assert resp.status_code == 400
-
-    @pytest.mark.api
-    def test_generate_schedule_missing_period_id_returns_422(self, client):
-        resp = client.post("/period/period-schedule/generate", json={})
-        assert resp.status_code == 422
-
-
-class TestGetPeriodSchedule:
-
-    @pytest.mark.api
-    @patch("api.routers.period.period_schedule_service")
-    def test_get_schedule_success(self, mock_svc, client):
-        mock_svc.get_schedule.return_value = {
-            "period_id": "p1",
-            "weeks": [{"week": 1, "topic": "Intro"}],
-        }
-        resp = client.get("/period/period-schedule", params={"period_id": "p1"})
-        assert resp.status_code == 200
-        assert resp.json()["period_id"] == "p1"
-
-    @pytest.mark.api
-    @patch("api.routers.period.period_schedule_service")
-    def test_get_schedule_not_found(self, mock_svc, client):
-        mock_svc.get_schedule.return_value = None
-        resp = client.get("/period/period-schedule", params={"period_id": "MISSING"})
-        assert resp.status_code == 404
-
-    @pytest.mark.api
-    def test_get_schedule_missing_period_id_returns_422(self, client):
-        resp = client.get("/period/period-schedule")
-        assert resp.status_code == 422
-
-
-class TestUpdatePeriodSchedule:
-
-    @pytest.mark.api
-    @patch("api.routers.period.period_schedule_service")
-    def test_update_schedule_success(self, mock_svc, client):
-        mock_svc.update_schedule.return_value = {"period_id": "p1", "updated": True}
-        resp = client.put("/period/period-schedule", json={
-            "period_id": "p1",
-            "schedule": {"weeks": [{"week": 1, "topic": "Updated"}]},
-        })
-        assert resp.status_code == 200
-        assert resp.json()["period_id"] == "p1"
-
-    @pytest.mark.api
-    @patch("api.routers.period.period_schedule_service")
-    def test_update_schedule_permission_denied(self, mock_svc, client):
-        mock_svc.update_schedule.side_effect = PermissionError("Not your period")
-        resp = client.put("/period/period-schedule", json={
-            "period_id": "OTHER", "schedule": {}
-        })
-        assert resp.status_code == 403
-
-
-class TestSetQuestWeeks:
-
-    @pytest.mark.api
-    @patch("api.routers.period.period_schedule_service")
-    def test_set_quest_weeks_success(self, mock_svc, client):
-        mock_svc.set_quest_weeks.return_value = {"period_id": "p1", "quest_enabled_weeks": [1, 3, 5]}
-        resp = client.put("/period/period-schedule/quest-weeks", json={
-            "period_id": "p1",
-            "quest_enabled_weeks": [1, 3, 5],
-        })
-        assert resp.status_code == 200
-        assert resp.json()["quest_enabled_weeks"] == [1, 3, 5]
-
-    @pytest.mark.api
-    @patch("api.routers.period.period_schedule_service")
-    def test_set_quest_weeks_invalid_period(self, mock_svc, client):
-        mock_svc.set_quest_weeks.side_effect = ValueError("Period not found")
-        resp = client.put("/period/period-schedule/quest-weeks", json={
-            "period_id": "BAD", "quest_enabled_weeks": [1]
-        })
-        assert resp.status_code == 400
 
 
 class TestUnenrollRoute:

@@ -1,13 +1,17 @@
+import logging
 from datetime import date, timedelta
 from typing import Dict, Any, Optional
 from data_access.period_dao import PeriodDAO
 from data_access.student_dao import StudentDAO
 from data_access.enrollment_dao import EnrollmentDAO
-from data_access.period_schedule_dao import PeriodScheduleDAO
 from data_access.ltg_conversation_dao import LtgConversationDAO
+from data_access.student_long_term_goal_dao import StudentLongTermGoalDAO
 
 from bots.provider import get_bot_provider
+from services.curriculum.curriculum_service import CurriculumService
 from services.quest.quest_service import QuestService
+
+logger = logging.getLogger(__name__)
 
 
 def _friday_of_week(start: date, week_num: int) -> date:
@@ -23,8 +27,9 @@ class PeriodQuestService:
         self.period_dao = PeriodDAO()
         self.student_dao = StudentDAO()
         self.enrollment_dao = EnrollmentDAO()
-        self.period_schedule_dao = PeriodScheduleDAO()
+        self.curriculum_service = CurriculumService()
         self.ltg_conversation_dao = LtgConversationDAO()
+        self.ltg_goal_dao = StudentLongTermGoalDAO()
         self.quest_service = QuestService()
 
     def _assert_enrolled(self, caller_id: str, period_id: str) -> None:
@@ -43,18 +48,24 @@ class PeriodQuestService:
         if not period:
             raise Exception("Period not found")
 
-        period_schedule = self.period_schedule_dao.get_by_period_id(period_id)
-        if not period_schedule:
-            raise Exception("No period schedule found. Teacher must generate a schedule first.")
+        curriculum = self.curriculum_service.get_curriculum(period_id)
+        weeks = curriculum.get('weeks', [])
+        if not weeks:
+            raise Exception("No curriculum found. Teacher must generate and approve a curriculum first.")
 
-        quest_enabled_weeks = period_schedule.quest_enabled_weeks or []
-        if not quest_enabled_weeks:
-            raise Exception("No quest weeks enabled by teacher. Teacher must select which weeks have quests.")
+        all_lessons = curriculum.get('lessons', [])
+        lessons_by_week: Dict[int, list] = {}
+        for lesson in all_lessons:
+            wn = lesson.get('week_number')
+            lessons_by_week.setdefault(wn, []).append(lesson.get('lesson_name', ''))
 
-        schedule_json = period_schedule.schedule_json or {}
-        schedule_weeks = schedule_json.get("weeks", [])
-        if not schedule_weeks:
-            raise Exception("Period schedule has no weeks data. Teacher must generate a schedule.")
+        all_concepts = curriculum.get('concepts', [])
+        lesson_to_week = {lesson.get('lesson_name'): lesson.get('week_number') for lesson in all_lessons}
+        concepts_by_week: Dict[int, list] = {}
+        for concept in all_concepts:
+            wn = lesson_to_week.get(concept.get('lesson_name'))
+            if wn is not None:
+                concepts_by_week.setdefault(wn, []).append(concept.get('concept_name', ''))
 
         period_start_date: Optional[date] = None
         raw_start = period.get("start_date")
@@ -65,20 +76,19 @@ class PeriodQuestService:
                 pass
 
         schedule_quests = []
-        for week_data in schedule_weeks:
-            week_num = week_data.get("week_number")
-            if week_num in quest_enabled_weeks:
-                lessons = week_data.get("lessons", [])
-                skills = week_data.get("skills", [])
-                quest_name = f"Week {week_num}: " + "; ".join(lessons[:3]) if lessons else f"Week {week_num} Quest"
-                quest_skills = "; ".join(skills) if skills else "Practice skills from this week"
-                quest_entry: Dict[str, Any] = {"Name": quest_name, "Skills": quest_skills, "Week": week_num}
-                if period_start_date is not None:
-                    quest_entry["DueDate"] = _friday_of_week(period_start_date, week_num).isoformat()
-                schedule_quests.append(quest_entry)
+        for week in weeks:
+            week_num = week.get('week_number')
+            lessons = lessons_by_week.get(week_num, [])
+            concepts = concepts_by_week.get(week_num, [])
+            quest_name = f"Week {week_num}: " + "; ".join(lessons[:3]) if lessons else f"Week {week_num} Quest"
+            quest_skills = "; ".join(concepts) if concepts else "Practice skills from this week"
+            quest_entry: Dict[str, Any] = {"Name": quest_name, "Skills": quest_skills, "Week": week_num}
+            if period_start_date is not None:
+                quest_entry["DueDate"] = _friday_of_week(period_start_date, week_num).isoformat()
+            schedule_quests.append(quest_entry)
 
         if not schedule_quests:
-            raise Exception("No quests could be built from enabled weeks. Check period schedule data.")
+            raise Exception("No quests could be built from curriculum weeks.")
 
         ltg_conv_id = self.ltg_conversation_dao.get_conversation_id(caller_id, period_id)
         if not ltg_conv_id:
@@ -88,6 +98,36 @@ class PeriodQuestService:
             )
 
         ltg_response_id = self.ltg_conversation_dao.get_last_response_id(caller_id, period_id)
+
+        goal_text = self.ltg_goal_dao.get_by_student_and_period(caller_id, period_id)
+        if goal_text:
+            try:
+                schedule_agent = get_bot_provider().create_schedule_agent(
+                    student=student,
+                    period=period,
+                    schedule=schedule_quests,
+                    goal_text=goal_text,
+                    previous_response_id=ltg_response_id,
+                )
+                schedule_output = schedule_agent.run()
+                name_by_week = {wq.week: wq.quest_name for wq in schedule_output.quests}
+                for quest in schedule_quests:
+                    if quest["Week"] in name_by_week:
+                        quest["Name"] = name_by_week[quest["Week"]]
+                logger.info(
+                    "LTGScheduleAgent enriched %d/%d quest names for student %s",
+                    len(schedule_output.quests), len(schedule_quests), caller_id,
+                )
+            except Exception as exc:
+                logger.error(
+                    "LTGScheduleAgent failed for student %s — falling back to generic names: %s",
+                    caller_id, exc,
+                )
+        else:
+            logger.info(
+                "No LTG goal found for student %s in period %s — using generic quest names.",
+                caller_id, period_id,
+            )
 
         homework_agent = get_bot_provider().create_hw_agent(student, period, schedule_quests, previous_response_id=ltg_response_id)
         homework = homework_agent.run()
@@ -99,11 +139,12 @@ class PeriodQuestService:
             schedule_dict, homework_dict, caller_id, period_id
         )
 
+        quest_week_nums = [w.get('week_number') for w in weeks]
         return {
             "homework": homework_dict,
             "message": f"Homework generated successfully for {len(schedule_quests)} quest weeks",
             "saved_quests": save_result,
-            "quest_weeks": quest_enabled_weeks,
+            "quest_weeks": quest_week_nums,
         }
 
     def update_quests_with_recommended_change(

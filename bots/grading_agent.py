@@ -13,7 +13,7 @@ import json
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
 
-from agents import Agent, Runner
+from agents import Agent, Runner, AgentOutputSchema
 
 from bots.guardrails import check_student_output_safety
 
@@ -74,7 +74,7 @@ class GradingOrchestrator:
 
             Calculate the total score and maximum possible points.""",
             model="gpt-5",
-            output_type=NumericalGrade,
+            output_type=AgentOutputSchema(NumericalGrade, strict_json_schema=False),
         )
 
         self.feedback_agent = Agent(
@@ -89,7 +89,7 @@ class GradingOrchestrator:
 
             Your feedback should help the student understand their performance and how to improve.""",
             model="gpt-5",
-            output_type=StudentFeedback,
+            output_type=AgentOutputSchema(StudentFeedback, strict_json_schema=False),
             output_guardrails=[check_student_output_safety],
         )
 
@@ -104,7 +104,7 @@ class GradingOrchestrator:
 
             Focus on what the student has actually demonstrated, not potential or effort.""",
             model="gpt-5",
-            output_type=SkillMastery,
+            output_type=AgentOutputSchema(SkillMastery, strict_json_schema=False),
         )
 
         self.adaptation_agent = Agent(
@@ -120,7 +120,7 @@ class GradingOrchestrator:
 
             Only recommend changes when there's clear evidence of need.""",
             model="gpt-5",
-            output_type=HomeworkRecommendation,
+            output_type=AgentOutputSchema(HomeworkRecommendation, strict_json_schema=False),
         )
 
     async def grade_submission(self, grading_input: GradingInput) -> GradingResult:

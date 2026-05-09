@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 from data_access.base_dao import SupabaseBaseDAO
 
@@ -16,14 +16,18 @@ class PeriodDAO(SupabaseBaseDAO):
             'file_urls': getattr(period, 'file_urls', []),
             'canvas_course_id': getattr(period, 'canvas_course_id', None),
             'canvas_course_name': getattr(period, 'canvas_course_name', None),
-            'start_date': getattr(period, 'start_date', None),
-            'end_date': getattr(period, 'end_date', None),
+            'start_date': period.start_date.isoformat() if period.start_date else None,
+            'end_date': period.end_date.isoformat() if period.end_date else None,
+            'grade_level': getattr(period, 'grade_level', None),
+            'mastery_threshold': getattr(period, 'mastery_threshold', None),
             'course_description': getattr(period, 'course_description', None),
+            'course_metadata': period.course_metadata.model_dump() if period.course_metadata else None,
             'file_vector_store_ids': getattr(period, 'file_vector_store_ids', []),
             'processing_status': getattr(period, 'processing_status', 'pending'),
+            'status': getattr(period, 'status', 'pending'),
         })
 
-    def get_period_by_id(self, period_id: str) -> Optional[Dict[str, Any]]:
+    def get_period_by_id(self, period_id: str) -> Optional[dict]:
         return self._select_by_id('period_id', period_id)
 
     def update_period(self, period_id: str, updates: Dict[str, Any]) -> None:
@@ -37,3 +41,6 @@ class PeriodDAO(SupabaseBaseDAO):
 
     def get_periods_by_owner_id(self, owner_id: str) -> List:
         return self._select_eq('owner_id', owner_id)
+
+    def update_status(self, period_id: str, status: str) -> None:
+        self._update({'period_id': period_id}, {'status': status})
