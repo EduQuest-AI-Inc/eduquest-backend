@@ -26,7 +26,7 @@ class BotProvider:
     OpenAI SDK at module import time when it isn't needed."""
 
     def create_hw_agent(self, student, period, schedule, conversation_id=None, previous_response_id=None):
-        from bots.agent import HWAgent
+        from bots.quest_agent import HWAgent
         return HWAgent(
             student, period, schedule,
             conversation_id=conversation_id,

@@ -102,7 +102,7 @@ class MockHWAgent:
         self.schedule = schedule
 
     def run(self) -> list:
-        from bots.agent import IndividualQuest
+        from bots.quest_agent import IndividualQuest
 
         results = []
         for quest in self.schedule:
