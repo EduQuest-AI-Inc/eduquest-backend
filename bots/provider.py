@@ -62,9 +62,9 @@ class BotProvider:
         from bots.profile_agent import create_profile_agent
         return create_profile_agent()
 
-    def create_ltg_agent(self, vector_store_id: str):
+    def create_ltg_agent(self, vector_store_id: str, curriculum: dict):
         from bots.ltg_agent import create_ltg_agent
-        return create_ltg_agent(vector_store_id)
+        return create_ltg_agent(vector_store_id, curriculum)
 
     def create_teacher_feedback_agent(self):
         from bots.teacher_feedback_agent import create_teacher_feedback_agent
@@ -178,9 +178,9 @@ class MockBotProvider(BotProvider):
         from bots.profile_agent import create_profile_agent
         return create_profile_agent()
 
-    def create_ltg_agent(self, vector_store_id: str):
+    def create_ltg_agent(self, vector_store_id: str, curriculum: dict):
         from bots.ltg_agent import create_ltg_agent
-        return create_ltg_agent(vector_store_id)
+        return create_ltg_agent(vector_store_id, curriculum)
 
     def create_teacher_feedback_agent(self):
         from bots.teacher_feedback_agent import create_teacher_feedback_agent
