@@ -10,7 +10,7 @@ def client():
     app.dependency_overrides[get_auth] = lambda: AuthPayload(
         sub="teacher-1", role="teacher", token="fake-token"
     )
-    with TestClient(app) as c:
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
 
@@ -32,7 +32,7 @@ class TestGetWaitlistStatus:
             mock_svc.get_status.side_effect = RuntimeError("db down")
             resp = client.get("/pilot-waitlist/status")
         assert resp.status_code == 500
-        assert "Failed to get waitlist status" in resp.json()["detail"]
+        assert resp.json()["error"] == "Internal server error"
 
 
 class TestJoinWaitlist:
@@ -86,7 +86,7 @@ class TestJoinWaitlist:
             mock_svc.join.side_effect = RuntimeError("crash")
             resp = client.post("/pilot-waitlist/join", json={})
         assert resp.status_code == 500
-        assert "Failed to join waitlist" in resp.json()["detail"]
+        assert resp.json()["error"] == "Internal server error"
 
 
 class TestApproveTeacher:
@@ -122,7 +122,7 @@ class TestApproveTeacher:
             mock_svc.approve.side_effect = RuntimeError("crash")
             resp = client.post("/pilot-waitlist/approve/target-teacher")
         assert resp.status_code == 500
-        assert "Failed to approve teacher" in resp.json()["detail"]
+        assert resp.json()["error"] == "Internal server error"
 
     @pytest.mark.api
     def test_approve_uses_path_param_user_id(self, client):
