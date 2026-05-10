@@ -25,8 +25,8 @@ def client():
 class TestGetProfile:
 
     @pytest.mark.api
-    @patch("api.routers.user.user_dao")
-    @patch("api.routers.user.student_dao")
+    @patch("routers.user.user_dao")
+    @patch("routers.user.student_dao")
     def test_get_profile_success(self, mock_student_dao, mock_user_dao, client):
         mock_user_dao.get_by_id.return_value = {"user_id": "stu-1", "role": "student"}
         mock_student_dao.get_student_by_id.return_value = {
@@ -42,15 +42,15 @@ class TestGetProfile:
         assert data["role"] == "student"
 
     @pytest.mark.api
-    @patch("api.routers.user.user_dao")
+    @patch("routers.user.user_dao")
     def test_get_profile_user_not_found(self, mock_user_dao, client):
         mock_user_dao.get_by_id.return_value = None
         resp = client.get("/user/profile")
         assert resp.status_code == 404
 
     @pytest.mark.api
-    @patch("api.routers.user.user_dao")
-    @patch("api.routers.user.teacher_dao")
+    @patch("routers.user.user_dao")
+    @patch("routers.user.teacher_dao")
     def test_get_profile_strips_teacher_canvas_key(self, mock_teacher_dao, mock_user_dao, client):
         app.dependency_overrides[get_auth] = lambda: AuthPayload(sub="tch-1", role="teacher", token="fake-token")
         mock_user_dao.get_by_id.return_value = {"user_id": "tch-1", "role": "teacher"}
@@ -71,7 +71,7 @@ class TestGetProfile:
 class TestUpdateTutorial:
 
     @pytest.mark.api
-    @patch("api.routers.user.user_service")
+    @patch("routers.user.user_service")
     def test_update_tutorial_success(self, mock_svc, client):
         mock_svc.update_tutorial_status.return_value = None
         resp = client.post("/user/update-tutorial", json={"completed_tutorial": True})
@@ -79,7 +79,7 @@ class TestUpdateTutorial:
         assert "updated" in resp.json()["message"]
 
     @pytest.mark.api
-    @patch("api.routers.user.user_service")
+    @patch("routers.user.user_service")
     def test_update_tutorial_defaults_false(self, mock_svc, client):
         mock_svc.update_tutorial_status.return_value = None
         resp = client.post("/user/update-tutorial", json={})
@@ -94,7 +94,7 @@ class TestUpdateTutorial:
 class TestGetTutorialStatus:
 
     @pytest.mark.api
-    @patch("api.routers.user.user_service")
+    @patch("routers.user.user_service")
     def test_tutorial_status_complete(self, mock_svc, client):
         mock_svc.get_tutorial_status.return_value = True
         resp = client.get("/user/tutorial-status")
@@ -102,7 +102,7 @@ class TestGetTutorialStatus:
         assert resp.json()["completed_tutorial"] is True
 
     @pytest.mark.api
-    @patch("api.routers.user.user_service")
+    @patch("routers.user.user_service")
     def test_tutorial_status_incomplete(self, mock_svc, client):
         mock_svc.get_tutorial_status.return_value = False
         resp = client.get("/user/tutorial-status")

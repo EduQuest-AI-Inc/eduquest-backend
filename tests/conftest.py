@@ -1,7 +1,8 @@
 # HOW TO RUN TESTS (from eduquest-backend/ with venv active):
 #   pytest                                    # all tests
 #   pytest -m unit                            # unit tests only (no network)
-#   pytest -m integration                       # integration tests (hits real Supabase)
+#   pytest -m integration                     # integration tests (hits real Supabase)
+#   pytest -m api                             # API tests (hits real Supabase and makes HTTP calls to test app)
 #   pytest tests/test_teacher_dao.py          # single file
 #   pytest --cov=. --cov-report=html          # coverage report
 
@@ -68,4 +69,10 @@ sys.modules['botocore.exceptions'] = MagicMock()
 # will raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set").
 os.environ.setdefault('SUPABASE_URL', 'http://localhost:54321')
 os.environ.setdefault('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
+
+# Eagerly import main so all routers/services are cached in sys.modules while
+# mocks are active. Without this, tests/unit/bots/conftest.py removes bots mocks
+# at collection time (before route test files are imported), causing 'from main
+# import app' in those files to see un-mocked bots and produce broken app state.
+import main  # noqa: F401
 

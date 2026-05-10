@@ -5,8 +5,6 @@ import pytest
 #   1. Always delete-before-insert for any fixture using a fixed ID — leftover rows
 #      from crashed runs cause duplicate-key ERRORs across all dependent tests.
 #   2. Print at the start of setup so fixture failures are locatable in pytest output.
-#   3. Prefer _select_eq over _select_by_id when "not found" must be distinguishable
-#      from a silent PostgREST quirk — maybe_single() returns None for both cases.
 
 
 @pytest.fixture(scope="session")
