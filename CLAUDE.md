@@ -132,8 +132,15 @@ Custom exceptions in `exceptions/` are caught by global handlers in `main.py`:
 - `ValidationError` → 400
 - `NotFoundError` → 404
 - `AuthError` → 401
+- bare `Exception` → 500 (catch-all; logs full traceback)
 
-Route handlers raise these exceptions — do **not** add `except` clauses for them in route code.
+**Rule: route handlers must never catch bare `Exception` to convert it to a 500.** All unhandled exceptions bubble up to the global handler, which owns the 500 mapping. This keeps logging, error shape, and observability consistent across every route.
+
+The only `except` clauses that belong in route handlers are intentional HTTP-branch mappings (e.g. `except MembershipRequiredError → 403`, `except ValueError → 400`) or intentional swallows where a sub-operation must not block the primary flow (e.g. billing trial-start during login — marked with a `# must not block <action>` comment).
+
+Handlers that must perform cleanup before propagating (e.g. `shutil.rmtree` on a temp dir) should do so and then `raise` the original exception — never convert it to `HTTPException(500)`.
+
+**Service guard methods must not use an `assert_` prefix.** Python's `unittest.mock` treats any attribute starting with `assert_` as a potential misspelled assertion helper and raises `AttributeError` at test time. Use `check_*` or `verify_*` instead (e.g. `check_enrolled`, `check_can_create_class`).
 
 ## Auth Token Utilities
 

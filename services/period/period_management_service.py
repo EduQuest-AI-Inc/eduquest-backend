@@ -4,6 +4,9 @@ from datetime import date
 from typing import Optional
 
 from data_access.period_dao import PeriodDAO
+from exceptions.auth_error import AuthError
+from exceptions.not_found_error import NotFoundError
+from exceptions.validation_error import ValidationError
 from integrations import openai_vector_store
 from integrations.s3_service import delete_files_from_s3
 from models.period import CourseMetadata, Period
@@ -46,7 +49,7 @@ class PeriodManagementService:
             existing = self.period_dao.get_period_by_id(period_id)
             attempts += 1
         if existing:
-            raise ValueError("Unable to generate unique period ID")
+            raise ValidationError("Unable to generate unique period ID")
 
         new_period = Period(
             period_id=period_id,
@@ -99,15 +102,15 @@ class PeriodManagementService:
     def get_vector_store_id(self, period_id: str) -> str:
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
-            raise ValueError("Period not found")
+            raise NotFoundError("Period not found")
         return period['vector_store_id']
 
     def delete_period(self, period_id: str, user_id: str) -> None:
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
-            raise ValueError("Period not found")
+            raise NotFoundError("Period not found")
         if period.get("owner_id") != user_id:
-            raise PermissionError("Not authorized to delete this period")
+            raise AuthError("Not authorized to delete this period")
         vector_store_id = period.get("vector_store_id")
         if vector_store_id:
             openai_vector_store.delete_store(vector_store_id)

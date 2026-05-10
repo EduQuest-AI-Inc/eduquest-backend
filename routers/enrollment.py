@@ -51,12 +51,7 @@ class AcceptInviteRequest(BaseModel):
 
 @router.post("/enroll")
 def enroll(body: EnrollRequest, auth: AuthPayload = Depends(get_auth)):
-    try:
-        result = service.enroll_student(auth.sub, body.period_id, body.semester)
-        return result
-    except Exception as e:
-        logger.error("Enrollment error: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Server error")
+    return service.enroll_student(auth.sub, body.period_id, body.semester)
 
 
 @router.get("/enrollments/{period_id}")
@@ -66,12 +61,7 @@ def get_enrollments(period_id: str, auth: AuthPayload = Depends(require_active_m
         raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
         raise HTTPException(status_code=403, detail="Not authorized")
-    try:
-        enrollments = service.get_enrollments_for_period(period_id)
-        return enrollments
-    except Exception as e:
-        logger.error("Error fetching enrollments: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to fetch enrollments")
+    return service.get_enrollments_for_period(period_id)
 
 
 @router.get("/student-profile/{period_id}/{user_id}")
@@ -81,16 +71,10 @@ def get_student_profile(period_id: str, user_id: str, auth: AuthPayload = Depend
         raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
         raise HTTPException(status_code=403, detail="Not authorized")
-    try:
-        profile = service.get_student_profile(period_id, user_id)
-        if profile:
-            return profile
-        raise HTTPException(status_code=404, detail="Profile not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Error fetching student profile: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Server error")
+    profile = service.get_student_profile(period_id, user_id)
+    if profile:
+        return profile
+    raise HTTPException(status_code=404, detail="Profile not found")
 
 
 # ─── Student enrollment ───────────────────────────────────────────────────────
@@ -115,7 +99,7 @@ def verify_period(body: VerifyPeriodRequest, auth: AuthPayload = Depends(get_aut
         owner_role = owner.get("role") if owner else None
         if owner_id and owner_role in ("teacher", "parent"):
             try:
-                membership_service.assert_can_add_student_to_period(
+                membership_service.check_can_add_student_to_period(
                     owner_id, owner_role, body.period_id
                 )
             except MembershipRequiredError:
@@ -164,6 +148,3 @@ def accept_parent_invite(body: AcceptInviteRequest, auth: AuthPayload = Depends(
         if "not found" in msg.lower() or "invalid" in msg.lower():
             raise HTTPException(status_code=404, detail=msg)
         raise HTTPException(status_code=400, detail=msg)
-    except Exception as e:
-        logger.error("Error in accept-parent-invite: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")

@@ -99,7 +99,7 @@ def _assert_period_owner(period_id: str, user_id: str) -> None:
 
 def _assert_student_enrolled(period_id: str, user_id: str) -> None:
     try:
-        _enrollment_service.assert_enrolled(user_id, period_id)
+        _enrollment_service.check_enrolled(user_id, period_id)
     except ValidationError:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
@@ -119,9 +119,6 @@ def trigger_generation(
         raise HTTPException(status_code=400, detail=str(e))
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error("trigger_generation error for period %s: %s", period_id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
     return {"message": "Curriculum generation started"}
 
 
@@ -138,9 +135,6 @@ def get_curriculum(
         return _curriculum_service.get_curriculum(period_id)
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error("get_curriculum error for period %s: %s", period_id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.patch("/{period_id}")
@@ -156,9 +150,6 @@ def save_curriculum(
         raise HTTPException(status_code=404, detail=str(e))
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error("save_curriculum error for period %s: %s", period_id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
     return {"message": "Curriculum saved"}
 
 
@@ -175,9 +166,6 @@ def update_concept(
         _curriculum_service.update_concept(period_id, concept_name, fields)
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error("update_concept error: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
     return {"message": "Concept updated"}
 
 
@@ -194,9 +182,6 @@ def update_skill(
         _curriculum_service.update_skill(period_id, skill_name, fields)
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error("update_skill error: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
     return {"message": "Skill updated"}
 
 
@@ -212,7 +197,4 @@ def approve_period(
         raise HTTPException(status_code=400, detail=str(e))
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error("approve_period error for period %s: %s", period_id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
     return {"message": "Period approved"}

@@ -41,6 +41,23 @@ and RLS policy in one place and prevents clients from bypassing server-side vali
 
 Services must never import agent classes directly. All bot creation must go through `get_bot_provider()`. This is what makes `MOCK_AI=true` (env flag) and `set_bot_provider(MockBotProvider())` (test setup) work — swapping the provider swaps every agent at once without touching service code. A direct import bypasses the provider and silently breaks the mock system, causing tests to make real OpenAI calls or fail without a clear cause.
 
+### Services receive their dependencies — they never instantiate DAOs or other services inline
+
+Service classes must declare their DAOs and sub-services as constructor parameters with defaults, not create them inside methods. This is what makes unit tests possible without `@patch` — tests pass mock DAOs directly to the constructor.
+
+```python
+# Correct
+class MyService:
+    def __init__(self, my_dao=None):
+        self.my_dao = my_dao or MyDAO()
+
+# Wrong — hides a Supabase dependency, forces class-level patching in tests
+def run_something(user_id):
+    dao = MyDAO()   # untestable without @patch
+```
+
+Module-level orchestration functions (`run_*`) are also banned for the same reason. If logic needs its own DAOs, it belongs in a service class, not a free function.
+
 ---
 
 ## Testing Decisions
