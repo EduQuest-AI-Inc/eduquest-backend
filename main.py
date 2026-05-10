@@ -82,6 +82,15 @@ async def auth_error_handler(request: Request, exc: AuthError):
     return JSONResponse(status_code=401, content={"error": str(exc)})
 
 
+_logger = logging.getLogger(__name__)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    _logger.error("Unhandled exception: %s %s — %s", request.method, request.url.path, exc, exc_info=True)
+    return JSONResponse(status_code=500, content={"error": "Internal server error"})
+
+
 @app.on_event("startup")
 async def check_s3_connectivity():
     from integrations.s3_service import s3, BUCKET_NAME

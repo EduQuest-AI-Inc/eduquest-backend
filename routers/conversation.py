@@ -24,10 +24,7 @@ conversation_service = ConversationService()
 
 @router.post("/initiate-profile-assistant")
 def initiate_profile_assistant(auth: AuthPayload = Depends(require_roles(Role.STUDENT))):
-    try:
-        return conversation_service.start_profile_assistant(auth.sub)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return conversation_service.start_profile_assistant(auth.sub)
 
 
 class ContinueProfileRequest(BaseModel):
@@ -52,8 +49,6 @@ def continue_profile_assistant(
         raise HTTPException(status_code=400, detail=str(e))
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -106,8 +101,8 @@ async def initiate_update_assistant(
                 quests_file = json.dumps([quest_data])
             except HTTPException:
                 raise
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Failed to fetch quest: {e}")
+            except Exception:
+                raise
 
             user_id = quest_data["user_id"]
             period_id = quest_data.get("period_id")
@@ -187,9 +182,6 @@ async def initiate_update_assistant(
         raise HTTPException(status_code=400, detail=str(e))
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error("initiate-update-assistant failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 class ContinueUpdateRequest(BaseModel):
@@ -214,5 +206,3 @@ def continue_update_assistant(
         raise HTTPException(status_code=400, detail=str(e))
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))

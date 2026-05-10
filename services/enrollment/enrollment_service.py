@@ -204,7 +204,7 @@ class EnrollmentService:
             "remaining_enrollments": updated_enrollments,
         }
 
-    def assert_enrolled(self, user_id: str, period_id: str) -> None:
+    def check_enrolled(self, user_id: str, period_id: str) -> None:
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
         if not any(e['user_id'] == user_id for e in enrollments):
             raise ValidationError(f"Student {user_id} is not enrolled in period {period_id}")

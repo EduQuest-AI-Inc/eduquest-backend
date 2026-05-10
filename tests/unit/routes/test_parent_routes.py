@@ -2,14 +2,15 @@ import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from main import app
-from routers.deps import get_auth, AuthPayload
+from routers.deps import get_auth, require_active_membership, AuthPayload, Role
+
+_PARENT_AUTH = AuthPayload(sub="parent-1", role=Role.PARENT, token="fake-token")
 
 
 @pytest.fixture(scope="module")
 def client():
-    app.dependency_overrides[get_auth] = lambda: AuthPayload(
-        sub="parent-1", role="parent", token="fake-token"
-    )
+    app.dependency_overrides[get_auth] = lambda: _PARENT_AUTH
+    app.dependency_overrides[require_active_membership] = lambda: _PARENT_AUTH
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

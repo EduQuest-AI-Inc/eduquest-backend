@@ -2,139 +2,125 @@ import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from main import app
-from routers.deps import get_auth, AuthPayload
-
-OWNED_PERIOD = {"period_id": "p1", "owner_id": "teacher-1", "file_urls": []}
-OTHER_PERIOD = {"period_id": "p1", "owner_id": "other-teacher", "file_urls": []}
+from routers.deps import get_auth, AuthPayload, Role
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def client():
     app.dependency_overrides[get_auth] = lambda: AuthPayload(
-        sub="teacher-1", role="teacher", token="fake-token"
+        sub="user-1", role=Role.STUDENT, token="fake-token"
     )
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
 
 
-class TestEnroll:
+class TestMyPeriods:
 
     @pytest.mark.api
-    def test_enroll_success(self, client):
-        with patch("routers.enrollment.service") as mock_svc:
-            mock_svc.enroll_student.return_value = {"message": "Student teacher-1 enrolled in p1 successfully"}
-            resp = client.post("/enrollment/enroll", json={"period_id": "p1", "semester": "Fall 2025"})
+    def test_my_periods_returns_list(self, client):
+        with patch("routers.enrollment.period_service") as mock_ps:
+            mock_ps.get_my_periods.return_value = [{"period_id": "p1"}]
+            resp = client.get("/enrollment/my-periods")
         assert resp.status_code == 200
+        mock_ps.get_my_periods.assert_called_once_with("user-1")
+
+    @pytest.mark.api
+    def test_my_periods_empty_returns_empty_list(self, client):
+        with patch("routers.enrollment.period_service") as mock_ps:
+            mock_ps.get_my_periods.return_value = []
+            resp = client.get("/enrollment/my-periods")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+
+class TestVerifyPeriod:
+
+    @pytest.mark.api
+    def test_verify_period_success(self, client):
+        with patch("routers.enrollment._period_dao") as mock_pd, \
+             patch("routers.enrollment.period_service") as mock_ps:
+            mock_pd.get_period_by_id.return_value = None  # skip owner membership check
+            mock_ps.verify_period_id.return_value = {"period_id": "p1", "name": "Math"}
+            resp = client.post("/enrollment/verify-period", json={"period_id": "p1"})
+        assert resp.status_code == 200
+        assert resp.json()["period"]["period_id"] == "p1"
         assert "message" in resp.json()
-        mock_svc.enroll_student.assert_called_once_with("teacher-1", "p1", "Fall 2025")
+
+
+class TestUnenroll:
 
     @pytest.mark.api
-    def test_enroll_uses_default_semester(self, client):
-        with patch("routers.enrollment.service") as mock_svc:
-            mock_svc.enroll_student.return_value = {"message": "ok"}
-            resp = client.post("/enrollment/enroll", json={"period_id": "p1"})
+    def test_unenroll_success(self, client):
+        with patch("routers.enrollment.period_service") as mock_ps:
+            mock_ps.unenroll_from_period.return_value = {"message": "Unenrolled", "period_id": "p1"}
+            resp = client.post("/enrollment/unenroll", json={"period_id": "p1"})
         assert resp.status_code == 200
-        mock_svc.enroll_student.assert_called_once_with("teacher-1", "p1", "Fall 2025")
+        assert resp.json()["period_id"] == "p1"
 
     @pytest.mark.api
-    def test_enroll_missing_period_id_returns_422(self, client):
-        resp = client.post("/enrollment/enroll", json={})
+    def test_unenroll_missing_period_id_returns_422(self, client):
+        resp = client.post("/enrollment/unenroll", json={})
         assert resp.status_code == 422
 
     @pytest.mark.api
-    def test_enroll_service_error_returns_500(self, client):
-        with patch("routers.enrollment.service") as mock_svc:
-            mock_svc.enroll_student.side_effect = RuntimeError("db error")
-            resp = client.post("/enrollment/enroll", json={"period_id": "p1"})
-        assert resp.status_code == 500
+    def test_unenroll_not_enrolled_returns_400(self, client):
+        with patch("routers.enrollment.period_service") as mock_ps:
+            from exceptions.validation_error import ValidationError
+            mock_ps.unenroll_from_period.side_effect = ValidationError("You are not enrolled in period X")
+            resp = client.post("/enrollment/unenroll", json={"period_id": "X"})
+        assert resp.status_code == 400
 
 
-class TestGetEnrollments:
+class TestAcceptParentInvite:
 
     @pytest.mark.api
-    def test_get_enrollments_success(self, client):
-        with patch("routers.enrollment._period_dao") as mock_pd, \
-             patch("routers.enrollment.service") as mock_svc:
-            mock_pd.get_period_by_id.return_value = OWNED_PERIOD
-            mock_svc.get_enrollments_for_period.return_value = {
-                "students": [{"user_id": "s1"}], "file_urls": []
+    def test_accept_invite_success(self, client):
+        with patch("routers.enrollment.parent_service") as mock_parent:
+            mock_parent.accept_invite.return_value = {
+                "message": "Successfully linked", "student_id": "user-1", "parent_id": "parent-1"
             }
-            resp = client.get("/enrollment/enrollments/p1")
+            resp = client.post("/enrollment/accept-parent-invite", json={"code": "ABCD1234"})
         assert resp.status_code == 200
-        assert "students" in resp.json()
-        assert len(resp.json()["students"]) == 1
+        mock_parent.accept_invite.assert_called_once_with("user-1", "ABCD1234")
 
     @pytest.mark.api
-    def test_get_enrollments_period_not_found_returns_404(self, client):
-        with patch("routers.enrollment._period_dao") as mock_pd:
-            mock_pd.get_period_by_id.return_value = None
-            resp = client.get("/enrollment/enrollments/missing")
-        assert resp.status_code == 404
-        assert "Period not found" in resp.json()["detail"]
+    def test_accept_invite_empty_code_returns_400(self, client):
+        resp = client.post("/enrollment/accept-parent-invite", json={"code": "   "})
+        assert resp.status_code == 400
+        assert "detail" in resp.json()
 
     @pytest.mark.api
-    def test_get_enrollments_not_owner_returns_403(self, client):
-        with patch("routers.enrollment._period_dao") as mock_pd:
-            mock_pd.get_period_by_id.return_value = OTHER_PERIOD
-            resp = client.get("/enrollment/enrollments/p1")
-        assert resp.status_code == 403
-        assert "Not authorized" in resp.json()["detail"]
+    def test_accept_invite_expired_returns_410(self, client):
+        with patch("routers.enrollment.parent_service") as mock_parent:
+            mock_parent.accept_invite.side_effect = ValueError("Invite code has expired")
+            resp = client.post("/enrollment/accept-parent-invite", json={"code": "ABCD1234"})
+        assert resp.status_code == 410
 
     @pytest.mark.api
-    def test_get_enrollments_service_error_returns_500(self, client):
-        with patch("routers.enrollment._period_dao") as mock_pd, \
-             patch("routers.enrollment.service") as mock_svc:
-            mock_pd.get_period_by_id.return_value = OWNED_PERIOD
-            mock_svc.get_enrollments_for_period.side_effect = RuntimeError("crash")
-            resp = client.get("/enrollment/enrollments/p1")
-        assert resp.status_code == 500
-
-
-class TestGetStudentProfile:
+    def test_accept_invite_already_used_returns_410(self, client):
+        with patch("routers.enrollment.parent_service") as mock_parent:
+            mock_parent.accept_invite.side_effect = ValueError("Invite code has already been used")
+            resp = client.post("/enrollment/accept-parent-invite", json={"code": "ABCD1234"})
+        assert resp.status_code == 410
 
     @pytest.mark.api
-    def test_get_student_profile_success(self, client):
-        with patch("routers.enrollment._period_dao") as mock_pd, \
-             patch("routers.enrollment.service") as mock_svc:
-            mock_pd.get_period_by_id.return_value = OWNED_PERIOD
-            mock_svc.get_student_profile.return_value = {
-                "interest": "math", "strength": "algebra",
-                "weakness": "writing", "learning_style": "visual",
-            }
-            resp = client.get("/enrollment/student-profile/p1/s1")
-        assert resp.status_code == 200
-        assert resp.json()["interest"] == "math"
-
-    @pytest.mark.api
-    def test_get_student_profile_period_not_found_returns_404(self, client):
-        with patch("routers.enrollment._period_dao") as mock_pd:
-            mock_pd.get_period_by_id.return_value = None
-            resp = client.get("/enrollment/student-profile/missing/s1")
+    def test_accept_invite_invalid_code_returns_404(self, client):
+        with patch("routers.enrollment.parent_service") as mock_parent:
+            mock_parent.accept_invite.side_effect = ValueError("Invalid invite code")
+            resp = client.post("/enrollment/accept-parent-invite", json={"code": "ABCD1234"})
         assert resp.status_code == 404
 
     @pytest.mark.api
-    def test_get_student_profile_not_owner_returns_403(self, client):
-        with patch("routers.enrollment._period_dao") as mock_pd:
-            mock_pd.get_period_by_id.return_value = OTHER_PERIOD
-            resp = client.get("/enrollment/student-profile/p1/s1")
-        assert resp.status_code == 403
+    def test_accept_invite_other_value_error_returns_400(self, client):
+        with patch("routers.enrollment.parent_service") as mock_parent:
+            mock_parent.accept_invite.side_effect = ValueError("Something else went wrong")
+            resp = client.post("/enrollment/accept-parent-invite", json={"code": "ABCD1234"})
+        assert resp.status_code == 400
 
     @pytest.mark.api
-    def test_get_student_profile_not_found_returns_404(self, client):
-        with patch("routers.enrollment._period_dao") as mock_pd, \
-             patch("routers.enrollment.service") as mock_svc:
-            mock_pd.get_period_by_id.return_value = OWNED_PERIOD
-            mock_svc.get_student_profile.return_value = None
-            resp = client.get("/enrollment/student-profile/p1/s1")
-        assert resp.status_code == 404
-        assert "Profile not found" in resp.json()["detail"]
-
-    @pytest.mark.api
-    def test_get_student_profile_service_error_returns_500(self, client):
-        with patch("routers.enrollment._period_dao") as mock_pd, \
-             patch("routers.enrollment.service") as mock_svc:
-            mock_pd.get_period_by_id.return_value = OWNED_PERIOD
-            mock_svc.get_student_profile.side_effect = RuntimeError("crash")
-            resp = client.get("/enrollment/student-profile/p1/s1")
+    def test_accept_invite_exception_returns_500(self, client):
+        with patch("routers.enrollment.parent_service") as mock_parent:
+            mock_parent.accept_invite.side_effect = RuntimeError("crash")
+            resp = client.post("/enrollment/accept-parent-invite", json={"code": "ABCD1234"})
         assert resp.status_code == 500
