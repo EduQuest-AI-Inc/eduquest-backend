@@ -6,6 +6,8 @@ from data_access.student_dao import StudentDAO
 from data_access.enrollment_dao import EnrollmentDAO
 from data_access.ltg_conversation_dao import LtgConversationDAO
 from data_access.student_long_term_goal_dao import StudentLongTermGoalDAO
+from exceptions.not_found_error import NotFoundError
+from exceptions.validation_error import ValidationError
 
 from bots.provider import get_bot_provider
 from services.curriculum.curriculum_service import CurriculumService
@@ -35,23 +37,23 @@ class PeriodQuestService:
     def _assert_enrolled(self, caller_id: str, period_id: str) -> None:
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
         if not any(e['user_id'] == caller_id for e in enrollments):
-            raise Exception(f"Student {caller_id} is not enrolled in period {period_id}")
+            raise ValidationError(f"Student {caller_id} is not enrolled in period {period_id}")
 
     def start_homework_agent(self, caller_id: str, period_id: str) -> Dict[str, Any]:
         self._assert_enrolled(caller_id, period_id)
 
         student = self.student_dao.get_student_by_id(caller_id)
         if not student:
-            raise Exception("Student not found")
+            raise NotFoundError("Student not found")
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
-            raise Exception("Period not found")
+            raise NotFoundError("Period not found")
 
         curriculum = self.curriculum_service.get_curriculum(period_id)
         weeks = curriculum.get('weeks', [])
         if not weeks:
-            raise Exception("No curriculum found. Teacher must generate and approve a curriculum first.")
+            raise NotFoundError("No curriculum found. Teacher must generate and approve a curriculum first.")
 
         all_lessons = curriculum.get('lessons', [])
         lessons_by_week: Dict[int, list] = {}
@@ -88,11 +90,11 @@ class PeriodQuestService:
             schedule_quests.append(quest_entry)
 
         if not schedule_quests:
-            raise Exception("No quests could be built from curriculum weeks.")
+            raise ValidationError("No quests could be built from curriculum weeks.")
 
         ltg_conv_id = self.ltg_conversation_dao.get_conversation_id(caller_id, period_id)
         if not ltg_conv_id:
-            raise Exception(
+            raise NotFoundError(
                 "No LTG conversation found for this period. "
                 "Student must complete the Long-Term Goal conversation before generating quests."
             )
@@ -154,15 +156,15 @@ class PeriodQuestService:
 
         student = self.student_dao.get_student_by_id(caller_id)
         if not student:
-            raise Exception(f"Student not found: {caller_id}")
+            raise NotFoundError(f"Student not found: {caller_id}")
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
-            raise Exception("Period not found")
+            raise NotFoundError("Period not found")
 
         existing_quests = self.quest_service.get_quests_for_student_and_period(caller_id, period_id)
         if not existing_quests:
-            raise Exception("No existing quests found. Cannot update without existing quest structure.")
+            raise NotFoundError("No existing quests found. Cannot update without existing quest structure.")
 
         incomplete_quests = [
             {"Name": q.get('description', ''), "Skills": q.get('skills', ''), "Week": q.get('week', 1)}

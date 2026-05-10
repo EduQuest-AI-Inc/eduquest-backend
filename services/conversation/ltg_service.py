@@ -137,7 +137,7 @@ class LTGOrchestrationService:
 
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
-            raise Exception("Student not found")
+            raise NotFoundError("Student not found")
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
@@ -145,7 +145,7 @@ class LTGOrchestrationService:
 
         vector_store_id = period.get("vector_store_id")
         if not vector_store_id:
-            raise Exception("Period does not have a vector store configured")
+            raise ValidationError("Period does not have a vector store configured")
 
         existing_conversation_id = self.ltg_conversation_dao.get_conversation_id(user_id, period_id)
         if existing_conversation_id:
@@ -171,7 +171,7 @@ class LTGOrchestrationService:
 
         response_id = result.get("response_id")
         if not response_id:
-            raise Exception("Failed to create LTG conversation - no response_id returned")
+            raise Exception("Failed to create LTG conversation - no response_id returned")  # unexpected agent failure → 500
 
         conversation_id = str(uuid.uuid4())
         self.ltg_conversation_dao.upsert_conversation(
@@ -200,15 +200,15 @@ class LTGOrchestrationService:
         if not period_id:
             period_id = self.ltg_conversation_dao.find_period_for_conversation(user_id, conversation_id)
         if not period_id:
-            raise Exception("Could not determine period for conversation")
+            raise NotFoundError("Could not determine period for conversation")
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
-            raise Exception("Period not found")
+            raise NotFoundError("Period not found")
 
         vector_store_id = period.get("vector_store_id")
         if not vector_store_id:
-            raise Exception("Period does not have a vector store configured")
+            raise ValidationError("Period does not have a vector store configured")
 
         last_response_id = self.ltg_conversation_dao.get_last_response_id(user_id, period_id)
 
