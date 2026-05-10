@@ -9,13 +9,13 @@ import uuid
 from typing import Optional, Dict, Any
 
 from bots.provider import get_bot_provider
+from data_access.ltg_conversation_dao import LtgConversationDAO
 from data_access.period_dao import PeriodDAO
 from data_access.student_dao import StudentDAO
-from data_access.ltg_conversation_dao import LtgConversationDAO
 from data_access.student_long_term_goal_dao import StudentLongTermGoalDAO
-from services.curriculum.curriculum_service import CurriculumService
-from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
+from exceptions.validation_error import ValidationError
+from services.curriculum.curriculum_service import CurriculumService
 
 
 class LTGConversationService:
@@ -115,110 +115,122 @@ def continue_ltg_conversation(
 
 # ---- Full orchestration (validation + DAO + AI) ----
 
-def run_initiate_ltg(user_id: str, period_id: str) -> Dict[str, Any]:
-    if not period_id:
-        raise ValidationError("Missing period ID")
+class LTGOrchestrationService:
 
-    period_dao = PeriodDAO()
-    student_dao = StudentDAO()
-    ltg_conversation_dao = LtgConversationDAO()
+    def __init__(
+        self,
+        period_dao=None,
+        student_dao=None,
+        ltg_conversation_dao=None,
+        student_long_term_goal_dao=None,
+        curriculum_service=None,
+    ) -> None:
+        self.period_dao = period_dao or PeriodDAO()
+        self.student_dao = student_dao or StudentDAO()
+        self.ltg_conversation_dao = ltg_conversation_dao or LtgConversationDAO()
+        self.student_long_term_goal_dao = student_long_term_goal_dao or StudentLongTermGoalDAO()
+        self.curriculum_service = curriculum_service or CurriculumService()
 
-    student = student_dao.get_student_by_id(user_id)
-    if not student:
-        raise Exception("Student not found")
+    def initiate(self, user_id: str, period_id: str) -> Dict[str, Any]:
+        if not period_id:
+            raise ValidationError("Missing period ID")
 
-    period = period_dao.get_period_by_id(period_id)
-    if not period:
-        raise NotFoundError("Invalid period ID")
+        student = self.student_dao.get_student_by_id(user_id)
+        if not student:
+            raise Exception("Student not found")
 
-    vector_store_id = period.get("vector_store_id")
-    if not vector_store_id:
-        raise Exception("Period does not have a vector store configured")
+        period = self.period_dao.get_period_by_id(period_id)
+        if not period:
+            raise NotFoundError("Invalid period ID")
 
-    existing_conversation_id = ltg_conversation_dao.get_conversation_id(user_id, period_id)
-    if existing_conversation_id:
-        return {
-            "conversation_id": existing_conversation_id,
-            "response": {"message": "Welcome back! Let's continue working on your long-term goal."},
-            "resumed": True,
+        vector_store_id = period.get("vector_store_id")
+        if not vector_store_id:
+            raise Exception("Period does not have a vector store configured")
+
+        existing_conversation_id = self.ltg_conversation_dao.get_conversation_id(user_id, period_id)
+        if existing_conversation_id:
+            return {
+                "conversation_id": existing_conversation_id,
+                "response": {"message": "Welcome back! Let's continue working on your long-term goal."},
+                "resumed": True,
+            }
+
+        curriculum = self.curriculum_service.get_curriculum(period_id)
+
+        student_data = {
+            "first_name": student.get("first_name", ""),
+            "last_name": student.get("last_name", ""),
+            "grade": student.get("grade", ""),
+            "strength": student.get("strength", []),
+            "weakness": student.get("weakness", []),
+            "interest": student.get("interest", []),
+            "learning_style": student.get("learning_style", []),
         }
 
-    curriculum = CurriculumService().get_curriculum(period_id)
+        result = initiate_ltg_conversation(vector_store_id=vector_store_id, student=student_data, curriculum=curriculum)
 
-    student_data = {
-        "first_name": student.get("first_name", ""),
-        "last_name": student.get("last_name", ""),
-        "grade": student.get("grade", ""),
-        "strength": student.get("strength", []),
-        "weakness": student.get("weakness", []),
-        "interest": student.get("interest", []),
-        "learning_style": student.get("learning_style", []),
-    }
+        response_id = result.get("response_id")
+        if not response_id:
+            raise Exception("Failed to create LTG conversation - no response_id returned")
 
-    result = initiate_ltg_conversation(vector_store_id=vector_store_id, student=student_data, curriculum=curriculum)
-
-    response_id = result.get("response_id")
-    if not response_id:
-        raise Exception("Failed to create LTG conversation - no response_id returned")
-
-    conversation_id = str(uuid.uuid4())
-    ltg_conversation_dao.upsert_conversation(
-        user_id, period_id, conversation_id, last_response_id=response_id
-    )
-
-    return {
-        "conversation_id": conversation_id,
-        "response": {
-            "message": result.get("message", ""),
-            "goal_1": result.get("goal_1"),
-            "goal_2": result.get("goal_2"),
-            "goal_3": result.get("goal_3"),
-        },
-        "resumed": False,
-    }
-
-
-def run_continue_ltg(
-    user_id: str, conversation_type: str, conversation_id: str,
-    message: str, period_id: Optional[str] = None,
-) -> Dict[str, Any]:
-    period_dao = PeriodDAO()
-    ltg_conversation_dao = LtgConversationDAO()
-
-    if not period_id:
-        period_id = ltg_conversation_dao.find_period_for_conversation(user_id, conversation_id)
-    if not period_id:
-        raise Exception("Could not determine period for conversation")
-
-    period = period_dao.get_period_by_id(period_id)
-    if not period:
-        raise Exception("Period not found")
-
-    vector_store_id = period.get("vector_store_id")
-    if not vector_store_id:
-        raise Exception("Period does not have a vector store configured")
-
-    last_response_id = ltg_conversation_dao.get_last_response_id(user_id, period_id)
-
-    try:
-        result = continue_ltg_conversation(
-            vector_store_id=vector_store_id,
-            previous_response_id=last_response_id,
-            user_message=message,
+        conversation_id = str(uuid.uuid4())
+        self.ltg_conversation_dao.upsert_conversation(
+            user_id, period_id, conversation_id, last_response_id=response_id
         )
 
-        new_response_id = result.get("response_id")
-        if new_response_id:
-            ltg_conversation_dao.update_last_response_id(user_id, period_id, new_response_id)
+        return {
+            "conversation_id": conversation_id,
+            "response": {
+                "message": result.get("message", ""),
+                "goal_1": result.get("goal_1"),
+                "goal_2": result.get("goal_2"),
+                "goal_3": result.get("goal_3"),
+            },
+            "resumed": False,
+        }
 
-        reply = result.get("message", "")
-        goal_chosen = result.get("goal_chosen", False)
-        chosen_goal = result.get("chosen_goal")
+    def continue_conversation(
+        self,
+        user_id: str,
+        conversation_type: str,
+        conversation_id: str,
+        message: str,
+        period_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        if not period_id:
+            period_id = self.ltg_conversation_dao.find_period_for_conversation(user_id, conversation_id)
+        if not period_id:
+            raise Exception("Could not determine period for conversation")
 
-        if goal_chosen and chosen_goal:
-            StudentLongTermGoalDAO().upsert(user_id, period_id, chosen_goal)
+        period = self.period_dao.get_period_by_id(period_id)
+        if not period:
+            raise Exception("Period not found")
 
-        return {"response": reply, "goal_chosen": goal_chosen}
+        vector_store_id = period.get("vector_store_id")
+        if not vector_store_id:
+            raise Exception("Period does not have a vector store configured")
 
-    except Exception as e:
-        return {"error": str(e)}
+        last_response_id = self.ltg_conversation_dao.get_last_response_id(user_id, period_id)
+
+        try:
+            result = continue_ltg_conversation(
+                vector_store_id=vector_store_id,
+                previous_response_id=last_response_id,
+                user_message=message,
+            )
+
+            new_response_id = result.get("response_id")
+            if new_response_id:
+                self.ltg_conversation_dao.update_last_response_id(user_id, period_id, new_response_id)
+
+            reply = result.get("message", "")
+            goal_chosen = result.get("goal_chosen", False)
+            chosen_goal = result.get("chosen_goal")
+
+            if goal_chosen and chosen_goal:
+                self.student_long_term_goal_dao.upsert(user_id, period_id, chosen_goal)
+
+            return {"response": reply, "goal_chosen": goal_chosen}
+
+        except Exception as e:
+            return {"error": str(e)}
