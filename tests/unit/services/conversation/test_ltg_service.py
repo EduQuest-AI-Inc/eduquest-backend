@@ -220,12 +220,13 @@ def test_run_initiate_ltg_existing_conversation_returns_resumed(
 
 
 @pytest.mark.unit
+@patch("services.conversation.ltg_service.CurriculumService")
 @patch("services.conversation.ltg_service.initiate_ltg_conversation",
        return_value={"response_id": "resp-new", "message": "Goals!", "goal_1": "G1", "goal_2": "G2", "goal_3": "G3"})
 @patch("services.conversation.ltg_service.LtgConversationDAO")
 @patch("services.conversation.ltg_service.StudentDAO")
 @patch("services.conversation.ltg_service.PeriodDAO")
-def test_run_initiate_ltg_new_conversation(mock_period_cls, mock_student_cls, mock_ltg_cls, mock_initiate):
+def test_run_initiate_ltg_new_conversation(mock_period_cls, mock_student_cls, mock_ltg_cls, mock_initiate, mock_curriculum_cls):
     mock_student_cls.return_value.get_student_by_id.return_value = {
         "user_id": "u1", "first_name": "A", "last_name": "B", "grade": "",
         "strength": [], "weakness": [], "interest": [], "learning_style": [],

@@ -16,7 +16,6 @@ from data_access.student_long_term_goal_dao import StudentLongTermGoalDAO
 from services.curriculum.curriculum_service import CurriculumService
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
-from services.enrollment.enrollment_service import EnrollmentService
 
 
 class LTGConversationService:
@@ -124,8 +123,6 @@ def run_initiate_ltg(user_id: str, period_id: str) -> Dict[str, Any]:
     student_dao = StudentDAO()
     ltg_conversation_dao = LtgConversationDAO()
 
-    EnrollmentService().assert_enrolled(user_id, period_id)
-
     student = student_dao.get_student_by_id(user_id)
     if not student:
         raise Exception("Student not found")
@@ -138,8 +135,6 @@ def run_initiate_ltg(user_id: str, period_id: str) -> Dict[str, Any]:
     if not vector_store_id:
         raise Exception("Period does not have a vector store configured")
 
-    curriculum = CurriculumService().get_curriculum(period_id)
-
     existing_conversation_id = ltg_conversation_dao.get_conversation_id(user_id, period_id)
     if existing_conversation_id:
         return {
@@ -147,6 +142,8 @@ def run_initiate_ltg(user_id: str, period_id: str) -> Dict[str, Any]:
             "response": {"message": "Welcome back! Let's continue working on your long-term goal."},
             "resumed": True,
         }
+
+    curriculum = CurriculumService().get_curriculum(period_id)
 
     student_data = {
         "first_name": student.get("first_name", ""),

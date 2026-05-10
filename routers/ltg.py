@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from routers.deps import AuthPayload, get_auth
+from services.enrollment.enrollment_service import EnrollmentService
 from services.period.period_service import PeriodService
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ def initiate_ltg_conversation(
     auth: AuthPayload = Depends(get_auth),
 ):
     try:
+        EnrollmentService().assert_enrolled(auth.sub, body.period_id)
         return period_service.initiate_ltg_conversation(auth.sub, body.period_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
