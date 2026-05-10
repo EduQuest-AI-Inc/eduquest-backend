@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 
 from services.period.period_management_service import PeriodManagementService
+from exceptions.not_found_error import NotFoundError
 
 
 def _svc():
@@ -115,5 +116,5 @@ def test_get_vector_store_id_not_found():
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = None
 
-    with pytest.raises(ValueError):
+    with pytest.raises(NotFoundError):
         svc.get_vector_store_id("missing")

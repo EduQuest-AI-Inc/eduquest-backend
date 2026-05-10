@@ -11,6 +11,7 @@ logging.basicConfig(
     force=True,
 )
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -25,7 +26,20 @@ from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from exceptions.auth_error import AuthError
 
-app = FastAPI(title="EduQuest Agent Service")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from integrations.s3_service import s3, BUCKET_NAME
+    _log = logging.getLogger(__name__)
+    try:
+        s3.head_bucket(Bucket=BUCKET_NAME)
+        _log.info("S3 OK — bucket=%s endpoint=%s", BUCKET_NAME, s3.meta.endpoint_url)
+    except Exception as e:
+        _log.error("S3 connectivity FAILED — bucket=%s error=%s", BUCKET_NAME, e)
+    yield
+
+
+app = FastAPI(title="EduQuest Agent Service", lifespan=lifespan)
 
 allowed_origins = [
     "https://eduquestai.org",
@@ -90,17 +104,6 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     _logger.error("Unhandled exception: %s %s — %s", request.method, request.url.path, exc, exc_info=True)
     return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
-
-@app.on_event("startup")
-async def check_s3_connectivity():
-    from integrations.s3_service import s3, BUCKET_NAME
-    import logging
-    _log = logging.getLogger(__name__)
-    try:
-        s3.head_bucket(Bucket=BUCKET_NAME)
-        _log.info("S3 OK — bucket=%s endpoint=%s", BUCKET_NAME, s3.meta.endpoint_url)
-    except Exception as e:
-        _log.error("S3 connectivity FAILED — bucket=%s error=%s", BUCKET_NAME, e)
 
 
 app.include_router(auth.router, prefix="/auth")

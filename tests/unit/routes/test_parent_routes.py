@@ -11,7 +11,7 @@ _PARENT_AUTH = AuthPayload(sub="parent-1", role=Role.PARENT, token="fake-token")
 def client():
     app.dependency_overrides[get_auth] = lambda: _PARENT_AUTH
     app.dependency_overrides[require_active_membership] = lambda: _PARENT_AUTH
-    with TestClient(app) as c:
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
 

@@ -10,7 +10,7 @@ def client():
     app.dependency_overrides[get_auth] = lambda: AuthPayload(
         sub="user-1", role="student", token="fake-token"
     )
-    with TestClient(app) as c:
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
 
@@ -20,7 +20,7 @@ def teacher_client():
     app.dependency_overrides[get_auth] = lambda: AuthPayload(
         sub="teacher-1", role="teacher", token="t"
     )
-    with TestClient(app) as c:
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
 
@@ -30,7 +30,7 @@ def other_teacher_client():
     app.dependency_overrides[get_auth] = lambda: AuthPayload(
         sub="teacher-2", role="teacher", token="t"
     )
-    with TestClient(app) as c:
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
 

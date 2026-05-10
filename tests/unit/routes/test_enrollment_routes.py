@@ -10,7 +10,7 @@ def client():
     app.dependency_overrides[get_auth] = lambda: AuthPayload(
         sub="user-1", role=Role.STUDENT, token="fake-token"
     )
-    with TestClient(app) as c:
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
 

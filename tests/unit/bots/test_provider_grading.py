@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import MagicMock
-from bots.provider import BotProvider
 
 _QUEST_DICT_RUBRIC = {
     "rubric": {"criteria": "content"},
@@ -15,6 +14,7 @@ _QUEST_DICT_RUBRIC = {
 
 @pytest.mark.unit
 def test_build_grading_input_dict_rubric_and_semicolon_skills():
+    from bots.provider import BotProvider
     result = BotProvider._build_grading_input(_QUEST_DICT_RUBRIC, "my submission")
     assert result.rubric == {"criteria": "content"}
     assert result.skills == ["Reading", "Writing"]
@@ -24,6 +24,7 @@ def test_build_grading_input_dict_rubric_and_semicolon_skills():
 
 @pytest.mark.unit
 def test_build_grading_input_json_string_rubric():
+    from bots.provider import BotProvider
     quest = {**_QUEST_DICT_RUBRIC, "rubric": '{"criteria": "content"}'}
     result = BotProvider._build_grading_input(quest, "text")
     assert result.rubric == {"criteria": "content"}
@@ -31,6 +32,7 @@ def test_build_grading_input_json_string_rubric():
 
 @pytest.mark.unit
 def test_build_grading_input_invalid_json_rubric():
+    from bots.provider import BotProvider
     quest = {**_QUEST_DICT_RUBRIC, "rubric": "not json{{"}
     result = BotProvider._build_grading_input(quest, "text")
     assert result.rubric == {"raw": "not json{{"}
@@ -38,6 +40,7 @@ def test_build_grading_input_invalid_json_rubric():
 
 @pytest.mark.unit
 def test_build_grading_input_skills_as_list():
+    from bots.provider import BotProvider
     quest = {**_QUEST_DICT_RUBRIC, "skills": ["Math", "Science"]}
     result = BotProvider._build_grading_input(quest, "text")
     assert result.skills == ["Math", "Science"]
@@ -45,6 +48,7 @@ def test_build_grading_input_skills_as_list():
 
 @pytest.mark.unit
 def test_build_grading_input_empty_skills_string():
+    from bots.provider import BotProvider
     quest = {**_QUEST_DICT_RUBRIC, "skills": ""}
     result = BotProvider._build_grading_input(quest, "text")
     assert result.skills == []
@@ -52,6 +56,7 @@ def test_build_grading_input_empty_skills_string():
 
 @pytest.mark.unit
 def test_build_grading_input_instructions_fallback_to_description():
+    from bots.provider import BotProvider
     quest = {"rubric": {}, "skills": [], "description": "From description."}
     result = BotProvider._build_grading_input(quest, "text")
     assert result.instructions == "From description."
@@ -63,6 +68,7 @@ def test_build_grading_input_instructions_fallback_to_description():
 
 @pytest.mark.unit
 def test_format_grading_result_no_changes():
+    from bots.provider import BotProvider
     r = MagicMock()
     r.skill_mastery = {"Reading": 0.9}
     r.numerical_grade = 85
@@ -81,6 +87,7 @@ def test_format_grading_result_no_changes():
 
 @pytest.mark.unit
 def test_format_grading_result_joins_changes():
+    from bots.provider import BotProvider
     r = MagicMock()
     r.skill_mastery = {}
     r.numerical_grade = 70

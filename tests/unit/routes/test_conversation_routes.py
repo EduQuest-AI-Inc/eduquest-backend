@@ -12,7 +12,7 @@ def _auth():
 @pytest.fixture(scope="module")
 def client():
     app.dependency_overrides[get_auth] = lambda: _auth()
-    with TestClient(app) as c:
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
 
