@@ -26,32 +26,22 @@ def get_quests(
     period_id: Optional[str] = Query(default=None),
     auth: AuthPayload = Depends(get_auth),
 ):
-    try:
-        if period_id:
-            quests = quest_service.get_quests_for_student_and_period(auth.sub, period_id)
-        else:
-            quests = quest_service.get_quests_for_student(auth.sub)
-        for quest in quests:
-            QuestRetrievalService.attach_grade_display(quest)
-        return quests
-    except Exception as e:
-        logger.error("Error getting quests: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to get quests")
+    if period_id:
+        quests = quest_service.get_quests_for_student_and_period(auth.sub, period_id)
+    else:
+        quests = quest_service.get_quests_for_student(auth.sub)
+    for quest in quests:
+        QuestRetrievalService.attach_grade_display(quest)
+    return quests
 
 
 @router.get("/quests/{quest_id}")
 def get_quest(quest_id: str, auth: AuthPayload = Depends(get_auth)):
-    try:
-        quest = quest_dao.get_quest_by_id(quest_id)
-        if quest:
-            QuestRetrievalService.attach_grade_display(quest)
-            return quest
-        raise HTTPException(status_code=404, detail="Quest not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Error getting quest: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to get quest")
+    quest = quest_dao.get_quest_by_id(quest_id)
+    if quest:
+        QuestRetrievalService.attach_grade_display(quest)
+        return quest
+    raise HTTPException(status_code=404, detail="Quest not found")
 
 
 @router.get("/quests/student/{user_id}")
@@ -73,17 +63,13 @@ def get_student_quests(
             caller_period_ids = {p["period_id"] for p in caller_periods}
             if not any(pid in caller_period_ids for pid in period_ids):
                 raise HTTPException(status_code=403, detail="Not authorized")
-    try:
-        if period_id:
-            quests = quest_service.get_quests_for_student_and_period(user_id, period_id)
-        else:
-            quests = quest_service.get_quests_for_student(user_id)
-        for quest in quests:
-            QuestRetrievalService.attach_grade_display(quest)
-        return quests
-    except Exception as e:
-        logger.error("Error getting student quests: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to get student quests")
+    if period_id:
+        quests = quest_service.get_quests_for_student_and_period(user_id, period_id)
+    else:
+        quests = quest_service.get_quests_for_student(user_id)
+    for quest in quests:
+        QuestRetrievalService.attach_grade_display(quest)
+    return quests
 
 
 class UpdateStepsRequest(BaseModel):
@@ -96,12 +82,8 @@ def update_quest_steps(
     body: UpdateStepsRequest,
     auth: AuthPayload = Depends(get_auth),
 ):
-    try:
-        quest_dao.update_completed_steps(quest_id, body.completed_steps)
-        return {"message": "Steps updated", "quest_id": quest_id, "completed_steps": body.completed_steps}
-    except Exception as e:
-        logger.error("Error updating quest steps: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to update quest steps")
+    quest_dao.update_completed_steps(quest_id, body.completed_steps)
+    return {"message": "Steps updated", "quest_id": quest_id, "completed_steps": body.completed_steps}
 
 
 class UpdateQuestStatusRequest(BaseModel):
@@ -116,12 +98,7 @@ def update_quest_status(
 ):
     if body.status not in ("not_started", "in_progress", "completed"):
         raise HTTPException(status_code=400, detail="status must be one of: not_started, in_progress, completed")
-    try:
-        result = quest_service.update_quest_status(quest_id, body.status)
-        return result
-    except Exception as e:
-        logger.error("Error updating quest status: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to update quest status")
+    return quest_service.update_quest_status(quest_id, body.status)
 
 
 class GradeQuestRequest(BaseModel):
@@ -135,19 +112,10 @@ def grade_quest(
     body: GradeQuestRequest,
     auth: AuthPayload = Depends(get_auth),
 ):
-    try:
-        quest_dao.update_quest_grade_and_feedback(quest_id, body.grade, body.feedback)
-        return {"message": "Grade and feedback submitted successfully", "quest_id": quest_id}
-    except Exception as e:
-        logger.error("Error grading quest: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to grade quest")
+    quest_dao.update_quest_grade_and_feedback(quest_id, body.grade, body.feedback)
+    return {"message": "Grade and feedback submitted successfully", "quest_id": quest_id}
 
 
 @router.get("/verify-quest-structure/{period_id}")
 def verify_quest_structure(period_id: str, auth: AuthPayload = Depends(get_auth)):
-    try:
-        verification = quest_service.verify_quest_structure(auth.sub, period_id)
-        return verification
-    except Exception as e:
-        logger.error("Error verifying quest structure: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to verify quest structure")
+    return quest_service.verify_quest_structure(auth.sub, period_id)

@@ -25,12 +25,8 @@ teacher_dao = TeacherDAO()
 
 @router.get("/periods")
 def get_teacher_periods(auth: AuthPayload = Depends(require_roles(Role.TEACHER))):
-    try:
-        result = period_management_service.get_periods_by_owner(auth.sub)
-        return {"periods": result}
-    except Exception as e:
-        logger.error("Error in get_teacher_periods: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+    result = period_management_service.get_periods_by_owner(auth.sub)
+    return {"periods": result}
 
 
 # ---------------------------------------------------------------------------

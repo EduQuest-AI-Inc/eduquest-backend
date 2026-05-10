@@ -4,7 +4,7 @@ Kept for backwards compatibility so routes.py imports remain unchanged.
 """
 from services.enrollment.enrollment_service import EnrollmentService
 from services.period.period_quest_service import PeriodQuestService
-from services.conversation.ltg_service import run_initiate_ltg, run_continue_ltg
+from services.conversation.ltg_service import LTGOrchestrationService
 
 
 class PeriodService:
@@ -24,10 +24,10 @@ class PeriodService:
         return self._enrollment.unenroll_from_period(user_id, period_id)
 
     def initiate_ltg_conversation(self, user_id, period_id):
-        return run_initiate_ltg(user_id, period_id)
+        return LTGOrchestrationService().initiate(user_id, period_id)
 
     def continue_ltg_conversation(self, user_id, conversation_type, conversation_id, message, period_id=None):
-        return run_continue_ltg(user_id, conversation_type, conversation_id, message, period_id)
+        return LTGOrchestrationService().continue_conversation(user_id, conversation_type, conversation_id, message, period_id)
 
     def start_homework_agent(self, user_id, period_id):
         return self._quest.start_homework_agent(user_id, period_id)

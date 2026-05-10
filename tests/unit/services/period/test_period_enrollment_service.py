@@ -215,19 +215,19 @@ def test_verify_allows_parent_period_via_dropdown():
 
 
 @pytest.mark.unit
-def test_assert_enrolled_success():
+def test_check_enrolled_success():
     svc = _make_service()
     svc.enrollment_dao.get_enrollments_by_period.return_value = [
         {"user_id": "u1"}, {"user_id": "u2"}
     ]
 
-    svc.assert_enrolled("u1", "p1")  # should not raise
+    svc.check_enrolled("u1", "p1")  # should not raise
 
 
 @pytest.mark.unit
-def test_assert_enrolled_fails():
+def test_check_enrolled_fails():
     svc = _make_service()
     svc.enrollment_dao.get_enrollments_by_period.return_value = [{"user_id": "u2"}]
 
     with pytest.raises(ValidationError, match="not enrolled"):
-        svc.assert_enrolled("u1", "p1")
+        svc.check_enrolled("u1", "p1")

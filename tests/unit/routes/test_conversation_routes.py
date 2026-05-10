@@ -12,7 +12,7 @@ def _auth():
 @pytest.fixture(scope="module")
 def client():
     app.dependency_overrides[get_auth] = lambda: _auth()
-    with TestClient(app) as c:
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
 
@@ -21,7 +21,7 @@ class TestInitiateProfileAssistant:
 
     @pytest.mark.api
     def test_initiate_profile_assistant_success(self, client):
-        with patch("api.routers.conversation.conversation_service") as mock_svc:
+        with patch("routers.conversation.conversation_service") as mock_svc:
             mock_svc.start_profile_assistant.return_value = {
                 "conversation_id": "cid-1", "response": "Hello!"
             }
@@ -32,7 +32,7 @@ class TestInitiateProfileAssistant:
 
     @pytest.mark.api
     def test_initiate_profile_assistant_service_error_returns_500(self, client):
-        with patch("api.routers.conversation.conversation_service") as mock_svc:
+        with patch("routers.conversation.conversation_service") as mock_svc:
             mock_svc.start_profile_assistant.side_effect = RuntimeError("db fail")
             resp = client.post("/conversation/initiate-profile-assistant")
         assert resp.status_code == 500
@@ -42,7 +42,7 @@ class TestContinueProfileAssistant:
 
     @pytest.mark.api
     def test_continue_profile_assistant_success(self, client):
-        with patch("api.routers.conversation.conversation_service") as mock_svc:
+        with patch("routers.conversation.conversation_service") as mock_svc:
             mock_svc.continue_profile_assistant.return_value = {
                 "response": "Tell me more", "profile_complete": False
             }
@@ -64,7 +64,7 @@ class TestContinueProfileAssistant:
 
     @pytest.mark.api
     def test_continue_profile_assistant_value_error_returns_400(self, client):
-        with patch("api.routers.conversation.conversation_service") as mock_svc:
+        with patch("routers.conversation.conversation_service") as mock_svc:
             mock_svc.continue_profile_assistant.side_effect = ValueError("bad input")
             resp = client.post(
                 "/conversation/continue-profile-assistant",
@@ -75,7 +75,7 @@ class TestContinueProfileAssistant:
 
     @pytest.mark.api
     def test_continue_profile_assistant_lookup_error_returns_404(self, client):
-        with patch("api.routers.conversation.conversation_service") as mock_svc:
+        with patch("routers.conversation.conversation_service") as mock_svc:
             mock_svc.continue_profile_assistant.side_effect = LookupError("not found")
             resp = client.post(
                 "/conversation/continue-profile-assistant",
@@ -85,7 +85,7 @@ class TestContinueProfileAssistant:
 
     @pytest.mark.api
     def test_continue_profile_assistant_generic_exception_returns_500(self, client):
-        with patch("api.routers.conversation.conversation_service") as mock_svc:
+        with patch("routers.conversation.conversation_service") as mock_svc:
             mock_svc.continue_profile_assistant.side_effect = RuntimeError("crash")
             resp = client.post(
                 "/conversation/continue-profile-assistant",
@@ -125,7 +125,7 @@ class TestInitiateUpdateAssistant:
 
     @pytest.mark.api
     def test_initiate_update_assistant_instructor_json_success(self, client):
-        with patch("api.routers.conversation.conversation_service") as mock_svc:
+        with patch("routers.conversation.conversation_service") as mock_svc:
             mock_svc.start_update_assistant.return_value = {"conversation_id": "cid-2", "response": "ok"}
             resp = client.post(
                 "/conversation/initiate-update-assistant",
@@ -136,7 +136,7 @@ class TestInitiateUpdateAssistant:
 
     @pytest.mark.api
     def test_initiate_update_assistant_service_exception_returns_500(self, client):
-        with patch("api.routers.conversation.conversation_service") as mock_svc:
+        with patch("routers.conversation.conversation_service") as mock_svc:
             mock_svc.start_update_assistant.side_effect = RuntimeError("fail")
             resp = client.post(
                 "/conversation/initiate-update-assistant",
@@ -149,7 +149,7 @@ class TestContinueUpdateAssistant:
 
     @pytest.mark.api
     def test_continue_update_assistant_success(self, client):
-        with patch("api.routers.conversation.conversation_service") as mock_svc:
+        with patch("routers.conversation.conversation_service") as mock_svc:
             mock_svc.continue_update_assistant.return_value = {"response": "Updated plan"}
             resp = client.post(
                 "/conversation/continue-update-assistant",
@@ -168,7 +168,7 @@ class TestContinueUpdateAssistant:
 
     @pytest.mark.api
     def test_continue_update_assistant_value_error_returns_400(self, client):
-        with patch("api.routers.conversation.conversation_service") as mock_svc:
+        with patch("routers.conversation.conversation_service") as mock_svc:
             mock_svc.continue_update_assistant.side_effect = ValueError("bad")
             resp = client.post(
                 "/conversation/continue-update-assistant",
@@ -178,7 +178,7 @@ class TestContinueUpdateAssistant:
 
     @pytest.mark.api
     def test_continue_update_assistant_lookup_error_returns_404(self, client):
-        with patch("api.routers.conversation.conversation_service") as mock_svc:
+        with patch("routers.conversation.conversation_service") as mock_svc:
             mock_svc.continue_update_assistant.side_effect = LookupError("missing")
             resp = client.post(
                 "/conversation/continue-update-assistant",
@@ -188,7 +188,7 @@ class TestContinueUpdateAssistant:
 
     @pytest.mark.api
     def test_continue_update_assistant_exception_returns_500(self, client):
-        with patch("api.routers.conversation.conversation_service") as mock_svc:
+        with patch("routers.conversation.conversation_service") as mock_svc:
             mock_svc.continue_update_assistant.side_effect = RuntimeError("crash")
             resp = client.post(
                 "/conversation/continue-update-assistant",

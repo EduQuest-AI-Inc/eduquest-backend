@@ -18,8 +18,8 @@ One file per Supabase table.
 
 `SupabaseBaseDAO` exposes thin wrappers around the PostgREST query builder:
 
-- `_select_by_id(id_column, id_value)` — single-row lookup; returns `None` when missing
-- `_select_eq(column, value)` — multi-row lookup as a list
+- `_select_by_id(id_column, id_value)` — single-row lookup via `.maybe_single()`; only use on true primary key columns
+- `_select_eq(column, value)` — multi-row lookup as a list; use this for any UNIQUE non-PK column (email, code, hash, etc.) — `maybe_single()` returns `None` for both "0 rows" and silent PostgREST failures, making bugs invisible
 - `_insert(data)` — strict insert; raises on conflict
 - `_upsert(data)` — insert-or-update on primary key
 - `_update(filters, updates)` — partial update; returns the updated rows

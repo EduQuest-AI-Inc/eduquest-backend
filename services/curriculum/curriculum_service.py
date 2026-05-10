@@ -164,6 +164,7 @@ class CurriculumService:
                 self.period_dao.update_status(period_id, "failed")
             except Exception:
                 logger.exception("could not set status=failed for period %s", period_id)
+            raise
 
     def _curriculum_result_to_payload(self, period_id: str, result) -> dict[str, Any]:
         """Convert CurriculumResult (bot output) into the save_curriculum payload shape."""

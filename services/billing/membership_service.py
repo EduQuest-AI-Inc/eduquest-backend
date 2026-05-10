@@ -304,7 +304,7 @@ class MembershipService:
 
     # ── Plan limit enforcement ─────────────────────────────────────────────
 
-    def assert_can_create_class(self, user_id: str, role: str) -> None:
+    def check_can_create_class(self, user_id: str, role: str) -> None:
         access = self.evaluate_access(user_id, role)
         if not access.has_active_membership:
             raise MembershipRequiredError(access)
@@ -319,7 +319,7 @@ class MembershipService:
                 f"Upgrade to add more.",
             )
 
-    def assert_can_add_student_to_period(self, owner_id: str, role: str, period_id: str) -> None:
+    def check_can_add_student_to_period(self, owner_id: str, role: str, period_id: str) -> None:
         access = self.evaluate_access(owner_id, role)
         if not access.has_active_membership:
             raise MembershipRequiredError(access)

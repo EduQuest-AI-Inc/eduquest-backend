@@ -86,21 +86,13 @@ class UpdateTutorialRequest(BaseModel):
 
 @router.post("/update-tutorial")
 def update_tutorial(body: UpdateTutorialRequest, auth: AuthPayload = Depends(get_auth)):
-    try:
-        user_service.update_tutorial_status(auth.sub, body.completed_tutorial)
-        return {"message": "Tutorial status updated successfully"}
-    except Exception as e:
-        logger.error("Error updating tutorial status: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to update tutorial status")
+    user_service.update_tutorial_status(auth.sub, body.completed_tutorial)
+    return {"message": "Tutorial status updated successfully"}
 
 
 @router.get("/tutorial-status")
 def get_tutorial_status(auth: AuthPayload = Depends(get_auth)):
-    try:
-        status = user_service.get_tutorial_status(auth.sub)
-        return {"completed_tutorial": status}
-    except Exception as e:
-        logger.error("Error getting tutorial status: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to get tutorial status")
+    status = user_service.get_tutorial_status(auth.sub)
+    return {"completed_tutorial": status}
 
 

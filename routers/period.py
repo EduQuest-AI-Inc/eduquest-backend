@@ -158,12 +158,8 @@ def multipart_complete(payload: _MultipartCompleteRequest, auth: AuthPayload = D
 def list_periods(auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT))):
     # Listing is allowed regardless of membership so paying users can see their
     # classes and lapsed users still see what they have but cannot manage them.
-    try:
-        result = period_management_service.get_periods_by_owner(auth.sub)
-        return {"periods": result}
-    except Exception as e:
-        logger.error("Unexpected error in list-periods: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+    result = period_management_service.get_periods_by_owner(auth.sub)
+    return {"periods": result}
 
 
 @router.post("/create-period", status_code=201)
@@ -194,7 +190,7 @@ def create_period(
     # Membership gate: parent/teacher need an active trial or paid subscription
     # to create classes, and the plan's class limit is enforced server-side.
     try:
-        membership_service.assert_can_create_class(auth.sub, auth.role.value)
+        membership_service.check_can_create_class(auth.sub, auth.role.value)
     except MembershipRequiredError as e:
         raise _membership_required_response(e)
     except PlanLimitExceededError as e:
@@ -267,10 +263,9 @@ def create_period(
         raise
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
+    except Exception:
         shutil.rmtree(temp_dir, ignore_errors=True)
-        logger.error("Error in create-period: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise
 
 
 @router.patch("/period/{period_id}/setup")
@@ -380,10 +375,9 @@ def update_period_setup(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         shutil.rmtree(temp_dir, ignore_errors=True)
-        logger.error("Error in update-period-setup %s: %s", period_id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise
 
 
 class _AddFilesRequest(BaseModel):
@@ -431,18 +425,11 @@ def delete_period(
         raise HTTPException(status_code=404, detail=str(ve))
     except PermissionError:
         raise HTTPException(status_code=403, detail="Unauthorized")
-    except Exception as e:
-        logger.error("Error deleting period %s: %s", period_id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ─── Files ────────────────────────────────────────────────────────────────────
 
 @router.get("/get-file/{key:path}")
 def get_file_presigned(key: str, auth: AuthPayload = Depends(get_auth)):
-    try:
-        url = get_file_presigned_url(key)
-        return {"url": url}
-    except Exception as e:
-        logger.error("Error generating presigned URL for %s: %s", key, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to retrieve file")
+    url = get_file_presigned_url(key)
+    return {"url": url}

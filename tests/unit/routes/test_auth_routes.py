@@ -19,8 +19,8 @@ def client():
 class TestSignupRoute:
 
     @pytest.mark.api
-    @patch("api.routers.auth.register_user", return_value={"success": True})
-    @patch("api.routers.auth.user_dao")
+    @patch("routers.auth.register_user", return_value={"success": True})
+    @patch("routers.auth.user_dao")
     def test_signup_success(self, mock_user_dao, mock_register, client):
         mock_user_dao.get_by_email.return_value = None
         resp = client.post("/auth/signup", json={
@@ -36,7 +36,7 @@ class TestSignupRoute:
         assert "message" in resp.json()
 
     @pytest.mark.api
-    @patch("api.routers.auth.user_dao")
+    @patch("routers.auth.user_dao")
     def test_signup_duplicate_email(self, mock_user_dao, client):
         mock_user_dao.get_by_email.return_value = {"user_id": "existing"}
         resp = client.post("/auth/signup", json={
@@ -51,7 +51,7 @@ class TestSignupRoute:
         assert resp.status_code == 409
 
     @pytest.mark.api
-    @patch("api.routers.auth.user_dao")
+    @patch("routers.auth.user_dao")
     def test_signup_invalid_role(self, mock_user_dao, client):
         mock_user_dao.get_by_email.return_value = None
         resp = client.post("/auth/signup", json={
@@ -65,7 +65,7 @@ class TestSignupRoute:
         assert resp.status_code == 400
 
     @pytest.mark.api
-    @patch("api.routers.auth.user_dao")
+    @patch("routers.auth.user_dao")
     def test_signup_student_missing_grade(self, mock_user_dao, client):
         mock_user_dao.get_by_email.return_value = None
         resp = client.post("/auth/signup", json={
@@ -79,8 +79,8 @@ class TestSignupRoute:
         assert resp.status_code == 400
 
     @pytest.mark.api
-    @patch("api.routers.auth.register_user", return_value={"success": False, "error": "Username already exists"})
-    @patch("api.routers.auth.user_dao")
+    @patch("routers.auth.register_user", return_value={"success": False, "error": "Username already exists"})
+    @patch("routers.auth.user_dao")
     def test_signup_username_conflict(self, mock_user_dao, mock_register, client):
         mock_user_dao.get_by_email.return_value = None
         resp = client.post("/auth/signup", json={
@@ -102,9 +102,9 @@ class TestSignupRoute:
 class TestLoginRoute:
 
     @pytest.mark.api
-    @patch("api.routers.auth.student_dao")
-    @patch("api.routers.auth.session_dao")
-    @patch("api.routers.auth.authenticate_user", return_value=True)
+    @patch("routers.auth.student_dao")
+    @patch("routers.auth.session_dao")
+    @patch("routers.auth.authenticate_user", return_value=True)
     def test_login_success_returns_token(self, mock_auth, mock_session, mock_student, client):
         mock_student.get_student_by_id.return_value = {
             "strength": "math", "weakness": "reading",
@@ -117,7 +117,7 @@ class TestLoginRoute:
         assert "token" in resp.json()
 
     @pytest.mark.api
-    @patch("api.routers.auth.authenticate_user", return_value=False)
+    @patch("routers.auth.authenticate_user", return_value=False)
     def test_login_bad_credentials(self, mock_auth, client):
         resp = client.post("/auth/login", json={
             "username": "stu1", "password": "wrong", "role": "student"
@@ -125,9 +125,9 @@ class TestLoginRoute:
         assert resp.status_code == 401
 
     @pytest.mark.api
-    @patch("api.routers.auth.student_dao")
-    @patch("api.routers.auth.session_dao")
-    @patch("api.routers.auth.authenticate_user", return_value=True)
+    @patch("routers.auth.student_dao")
+    @patch("routers.auth.session_dao")
+    @patch("routers.auth.authenticate_user", return_value=True)
     def test_login_incomplete_profile_sets_flag(self, mock_auth, mock_session, mock_student, client):
         mock_student.get_student_by_id.return_value = {
             "strength": None, "weakness": None, "interest": None, "learning_style": None,
@@ -146,7 +146,7 @@ class TestLoginRoute:
 class TestPasswordResetRequest:
 
     @pytest.mark.api
-    @patch("api.routers.auth.password_reset_service")
+    @patch("routers.auth.password_reset_service")
     def test_reset_request_always_200(self, mock_svc, client):
         mock_svc.request_password_reset.return_value = {
             "success": True,
@@ -169,7 +169,7 @@ class TestPasswordResetRequest:
 class TestPasswordResetConfirm:
 
     @pytest.mark.api
-    @patch("api.routers.auth.password_reset_service")
+    @patch("routers.auth.password_reset_service")
     def test_reset_confirm_success(self, mock_svc, client):
         mock_svc.confirm_password_reset.return_value = (
             True, "Your password has been updated successfully."
@@ -181,7 +181,7 @@ class TestPasswordResetConfirm:
         assert "message" in resp.json()
 
     @pytest.mark.api
-    @patch("api.routers.auth.password_reset_service")
+    @patch("routers.auth.password_reset_service")
     def test_reset_confirm_invalid_token(self, mock_svc, client):
         mock_svc.confirm_password_reset.return_value = (
             False, "This link is invalid or expired."
