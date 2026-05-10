@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from routers.deps import AuthPayload, get_auth
@@ -38,13 +38,8 @@ def initiate_ltg_conversation(
     body: InitiateLTGRequest,
     auth: AuthPayload = Depends(get_auth),
 ):
-    try:
-        EnrollmentService().check_enrolled(auth.sub, body.period_id)
-        return period_service.initiate_ltg_conversation(auth.sub, body.period_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    EnrollmentService().check_enrolled(auth.sub, body.period_id)
+    return period_service.initiate_ltg_conversation(auth.sub, body.period_id)
 
 
 @router.post("/continue-ltg-conversation")
@@ -52,18 +47,13 @@ def continue_ltg_conversation(
     body: ContinueLTGRequest,
     auth: AuthPayload = Depends(get_auth),
 ):
-    try:
-        return period_service.continue_ltg_conversation(
-            auth.sub,
-            body.conversation_type,
-            body.conversation_id,
-            body.message,
-            body.period_id,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    return period_service.continue_ltg_conversation(
+        auth.sub,
+        body.conversation_type,
+        body.conversation_id,
+        body.message,
+        body.period_id,
+    )
 
 
 @router.post("/initiate-homework-agent")
@@ -71,10 +61,5 @@ def initiate_homework_agent(
     body: InitiateHomeworkRequest,
     auth: AuthPayload = Depends(get_auth),
 ):
-    try:
-        user_id = body.user_id or auth.sub
-        return period_service.start_homework_agent(user_id, body.period_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    user_id = body.user_id or auth.sub
+    return period_service.start_homework_agent(user_id, body.period_id)
