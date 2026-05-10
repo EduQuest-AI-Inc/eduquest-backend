@@ -8,7 +8,8 @@ class MaterialFilesDAO(SupabaseBaseDAO):
         super().__init__('material_files')
 
     def get_by_hash(self, file_hash: str) -> Optional[dict]:
-        return self._select_by_id('file_hash', file_hash)
+        rows = self._select_eq('file_hash', file_hash)
+        return rows[0] if rows else None
 
     def insert(self, file_hash: str, openai_file_id: str, vector_store_id: str) -> None:
         self._insert({

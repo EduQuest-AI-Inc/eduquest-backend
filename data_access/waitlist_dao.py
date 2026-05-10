@@ -10,10 +10,12 @@ class WaitlistDAO(SupabaseBaseDAO):
         super().__init__('waitlist')
 
     def get_by_user_id(self, user_id: str) -> Optional[Dict[str, Any]]:
-        return self._select_by_id('user_id', user_id)
+        rows = self._select_eq('user_id', user_id)
+        return rows[0] if rows else None
 
     def get_by_referral_code(self, referral_code: str) -> Optional[Dict[str, Any]]:
-        return self._select_by_id('referral_code', referral_code.upper())
+        rows = self._select_eq('referral_code', referral_code.upper())
+        return rows[0] if rows else None
 
     def get_waitlist_count(self) -> int:
         response = self._execute(self._table().select('*', count='exact'))  # type: ignore[arg-type]

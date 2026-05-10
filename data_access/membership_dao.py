@@ -10,7 +10,8 @@ class MembershipDAO(SupabaseBaseDAO):
         super().__init__("membership")
 
     def get_by_user_id(self, user_id: str) -> Optional[Dict[str, Any]]:
-        return self._select_by_id("user_id", user_id)
+        rows = self._select_eq("user_id", user_id)
+        return rows[0] if rows else None
 
     def get_by_stripe_customer_id(self, customer_id: str) -> Optional[Dict[str, Any]]:
         rows = self._select_eq("stripe_customer_id", customer_id)
