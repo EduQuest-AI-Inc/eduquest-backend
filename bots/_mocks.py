@@ -321,3 +321,43 @@ class MockConversationsSession:
 
     def __init__(self, conversation_id=None):
         self._session_id = conversation_id or "mock-conversation-id-001"
+
+
+class MockPptxAgent:
+    """
+    Deterministic replacement for PptxAgent. Returns a minimal but real
+    .pptx file (title slide + one content slide per concept) so the file
+    can be opened after downloading. Uses python-pptx.
+    """
+
+    async def run(
+        self,
+        lesson: dict,
+        concepts: list[dict],
+        skills: list[dict],
+    ) -> bytes:
+        import io
+        from pptx import Presentation
+
+        prs = Presentation()
+        lesson_name = lesson.get("lesson_name", "Lesson")
+
+        title_slide = prs.slides.add_slide(prs.slide_layouts[0])
+        title_slide.shapes.title.text = f"[MOCK] {lesson_name}"
+        title_slide.placeholders[1].text = "EduQuest — Mock PowerPoint"
+
+        for concept in concepts:
+            concept_name = concept.get("concept_name", "Concept")
+            concept_skills = [s for s in skills if s.get("concept_name") == concept_name]
+            slide = prs.slides.add_slide(prs.slide_layouts[1])
+            slide.shapes.title.text = concept_name
+            tf = slide.placeholders[1].text_frame
+            tf.text = "Skills:"
+            for skill in concept_skills:
+                p = tf.add_paragraph()
+                p.text = f"• {skill.get('skill_name', '')}"
+                p.level = 1
+
+        buf = io.BytesIO()
+        prs.save(buf)
+        return buf.getvalue()

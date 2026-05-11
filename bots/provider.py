@@ -80,6 +80,10 @@ class BotProvider:
         from bots.teacher_feedback_agent import create_teacher_feedback_agent
         return create_teacher_feedback_agent()
 
+    def create_pptx_agent(self):
+        from bots.pptx_agent import PptxAgent
+        return PptxAgent()
+
     async def grade_submission(self, quest_data: dict, submission_text: str) -> dict:
         grading_input = self._build_grading_input(quest_data, submission_text)
         orchestrator = self.create_grading_orchestrator()
@@ -203,6 +207,10 @@ class MockBotProvider(BotProvider):
     def create_teacher_feedback_agent(self):
         from bots.teacher_feedback_agent import create_teacher_feedback_agent
         return create_teacher_feedback_agent()
+
+    def create_pptx_agent(self):
+        from bots._mocks import MockPptxAgent
+        return MockPptxAgent()
 
     async def run_conversation(self, agent, message: str, **kwargs):
         from bots._mocks import MockRunner

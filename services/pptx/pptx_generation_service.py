@@ -61,8 +61,8 @@ class PptxGenerationService:
 
             self.lesson_pptx_dao.update_status(pptx_id, {"status": "generating"})
             try:
-                from bots.pptx_agent import PptxAgent
-                pptx_bytes = await PptxAgent().run(lesson, concepts, skills)
+                from bots.provider import get_bot_provider
+                pptx_bytes = await get_bot_provider().create_pptx_agent().run(lesson, concepts, skills)
                 s3_key = s3_service.upload_pptx(pptx_bytes, row["period_id"], lesson_id)
                 self.lesson_pptx_dao.update_status(pptx_id, {"status": "done", "s3_key": s3_key})
             except Exception as e:
