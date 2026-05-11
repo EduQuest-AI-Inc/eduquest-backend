@@ -230,18 +230,21 @@ class CurriculumService:
                 week_end=w.get("week_end") or None,
             ))
 
+        lesson_id_by_name: dict[str, str] = {}
         for ls in payload.get("lessons", []):
-            self.lesson_dao.insert_lesson(Lesson(
+            lesson_id = self.lesson_dao.insert_lesson(Lesson(
                 period_id=period_id,
                 lesson_name=ls["lesson_name"],
                 week_number=ls["week_number"],
             ))
+            lesson_id_by_name[ls["lesson_name"]] = lesson_id
 
         for c in payload.get("concepts", []):
             self.concept_dao.insert_concept(Concept(
                 period_id=period_id,
                 concept_name=c["concept_name"],
                 lesson_name=c["lesson_name"],
+                lesson_id=lesson_id_by_name.get(c["lesson_name"]),
                 description=c.get("description"),
                 prerequisites=c.get("prerequisites") or [],
                 key_takeaways=c.get("key_takeaways") or [],
