@@ -1,0 +1,13 @@
+openai-agents
+openai
+google-genai
+pydantic
+python-pptx
+matplotlib
+numpy
+python-dotenv
+jinja2
+playwright
+httpx
+pytest
+pytest-asyncio

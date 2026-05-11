@@ -1,0 +1,32 @@
+<section class="slide layout--title" data-index="{{ slide.index }}">
+  <div class="header-bar">
+    <h1>{{ slide.title }}</h1>
+  </div>
+  <div class="body" style="padding-top: 0.4in;">
+    {% set sub_parts = [] %}
+    {% if meta.period_name %}{% set _ = sub_parts.append(meta.period_name) %}{% endif %}
+    {% if meta.grade_level %}{% set _ = sub_parts.append(meta.grade_level) %}{% endif %}
+    {% if meta.week_start %}
+      {% if meta.week_end %}
+        {% set _ = sub_parts.append('Week of ' ~ meta.week_start ~ ' – ' ~ meta.week_end) %}
+      {% else %}
+        {% set _ = sub_parts.append('Week of ' ~ meta.week_start) %}
+      {% endif %}
+    {% endif %}
+    {% if sub_parts %}
+      <p style="font-size: 16pt; color: var(--muted); margin-top: 0;">
+        {{ sub_parts | join('  ·  ') }}
+      </p>
+    {% endif %}
+
+    {% if slide.bullets %}
+      <h2 style="font-size: 20pt; color: var(--blue); margin-top: 0.6in; margin-bottom: 0.2in;">
+        What we'll cover
+      </h2>
+      <ul class="bullets" style="font-size: 19pt;">
+        {% for b in slide.bullets %}<li>{{ b }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+  <div class="footer-bar"></div>
+</section>
