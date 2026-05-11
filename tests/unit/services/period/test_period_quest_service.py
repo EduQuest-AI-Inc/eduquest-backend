@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from services.period.period_quest_service import PeriodQuestService
 from exceptions.not_found_error import NotFoundError
@@ -10,8 +10,9 @@ STUDENT_ID = "student-1"
 PERIOD_ID = "period-1"
 
 
-def _svc():
+def _svc(provider=None):
     svc = PeriodQuestService.__new__(PeriodQuestService)
+    svc._bot_provider = provider or MagicMock()
     svc.period_dao = MagicMock()
     svc.student_dao = MagicMock()
     svc.enrollment_dao = MagicMock()
@@ -90,7 +91,12 @@ def test_start_homework_agent_no_ltg_conversation():
 
 @pytest.mark.unit
 def test_start_homework_agent_happy_path_with_goal():
-    svc = _svc()
+    provider = _mock_provider_with_hw()
+    schedule_agent = MagicMock()
+    schedule_agent.run.return_value = MagicMock(quests=[])
+    provider.create_schedule_agent.return_value = schedule_agent
+
+    svc = _svc(provider=provider)
     svc.student_dao.get_student_by_id.return_value = {"user_id": STUDENT_ID}
     svc.period_dao.get_period_by_id.return_value = {"period_id": PERIOD_ID, "start_date": "2024-01-08"}
     svc.curriculum_service.get_curriculum.return_value = _minimal_curriculum()
@@ -98,14 +104,7 @@ def test_start_homework_agent_happy_path_with_goal():
     svc.ltg_conversation_dao.get_last_response_id.return_value = "resp-1"
     svc.ltg_goal_dao.get_by_student_and_period.return_value = "Build a capstone project"
     svc.quest_service.update_quests_preserving_completed_data.return_value = {"saved": True}
-
-    provider = _mock_provider_with_hw()
-    schedule_agent = MagicMock()
-    schedule_agent.run.return_value = MagicMock(quests=[])
-    provider.create_schedule_agent.return_value = schedule_agent
-
-    with patch("services.period.period_quest_service.get_bot_provider", return_value=provider):
-        result = svc.start_homework_agent(STUDENT_ID, PERIOD_ID)
+    result = svc.start_homework_agent(STUDENT_ID, PERIOD_ID)
 
     assert "homework" in result
     assert "saved_quests" in result
@@ -117,7 +116,8 @@ def test_start_homework_agent_happy_path_with_goal():
 @pytest.mark.unit
 def test_start_homework_agent_happy_path_no_goal():
     """When no LTG goal exists, schedule enrichment is skipped but homework is still generated."""
-    svc = _svc()
+    provider = _mock_provider_with_hw()
+    svc = _svc(provider=provider)
     svc.student_dao.get_student_by_id.return_value = {"user_id": STUDENT_ID}
     svc.period_dao.get_period_by_id.return_value = {"period_id": PERIOD_ID}
     svc.curriculum_service.get_curriculum.return_value = _minimal_curriculum()
@@ -126,10 +126,7 @@ def test_start_homework_agent_happy_path_no_goal():
     svc.ltg_goal_dao.get_by_student_and_period.return_value = None
     svc.quest_service.update_quests_preserving_completed_data.return_value = {}
 
-    provider = _mock_provider_with_hw()
-
-    with patch("services.period.period_quest_service.get_bot_provider", return_value=provider):
-        result = svc.start_homework_agent(STUDENT_ID, PERIOD_ID)
+    result = svc.start_homework_agent(STUDENT_ID, PERIOD_ID)
 
     assert "homework" in result
     provider.create_schedule_agent.assert_not_called()
@@ -139,7 +136,12 @@ def test_start_homework_agent_happy_path_no_goal():
 @pytest.mark.unit
 def test_start_homework_agent_schedule_agent_failure_falls_back():
     """If the schedule agent raises, service falls back to generic names and still completes."""
-    svc = _svc()
+    provider = _mock_provider_with_hw()
+    schedule_agent = MagicMock()
+    schedule_agent.run.side_effect = RuntimeError("OpenAI timeout")
+    provider.create_schedule_agent.return_value = schedule_agent
+
+    svc = _svc(provider=provider)
     svc.student_dao.get_student_by_id.return_value = {"user_id": STUDENT_ID}
     svc.period_dao.get_period_by_id.return_value = {"period_id": PERIOD_ID}
     svc.curriculum_service.get_curriculum.return_value = _minimal_curriculum()
@@ -147,14 +149,7 @@ def test_start_homework_agent_schedule_agent_failure_falls_back():
     svc.ltg_conversation_dao.get_last_response_id.return_value = "resp-1"
     svc.ltg_goal_dao.get_by_student_and_period.return_value = "Build something"
     svc.quest_service.update_quests_preserving_completed_data.return_value = {}
-
-    provider = _mock_provider_with_hw()
-    schedule_agent = MagicMock()
-    schedule_agent.run.side_effect = RuntimeError("OpenAI timeout")
-    provider.create_schedule_agent.return_value = schedule_agent
-
-    with patch("services.period.period_quest_service.get_bot_provider", return_value=provider):
-        result = svc.start_homework_agent(STUDENT_ID, PERIOD_ID)
+    result = svc.start_homework_agent(STUDENT_ID, PERIOD_ID)
 
     assert "homework" in result
     provider.create_hw_agent.assert_called_once()
@@ -220,7 +215,9 @@ def test_update_quests_all_completed_is_noop():
 
 @pytest.mark.unit
 def test_update_quests_happy_path():
-    svc = _enrolled_svc()
+    provider = _mock_provider_with_hw()
+    svc = _svc(provider=provider)
+    svc.enrollment_dao.get_enrollments_by_period.return_value = [{"user_id": STUDENT_ID}]
     svc.student_dao.get_student_by_id.return_value = {"user_id": STUDENT_ID}
     svc.period_dao.get_period_by_id.return_value = {"period_id": PERIOD_ID}
     svc.quest_service.get_quests_for_student_and_period.return_value = [
@@ -230,10 +227,7 @@ def test_update_quests_happy_path():
     svc.ltg_conversation_dao.get_last_response_id.return_value = "resp-1"
     svc.quest_service.update_quests_preserving_completed_data.return_value = {"updated": True}
 
-    provider = _mock_provider_with_hw()
-
-    with patch("services.period.period_quest_service.get_bot_provider", return_value=provider):
-        result = svc.update_quests_with_recommended_change(STUDENT_ID, "student", PERIOD_ID, "add more math")
+    result = svc.update_quests_with_recommended_change(STUDENT_ID, "student", PERIOD_ID, "add more math")
 
     assert result["affected_quests"] == 1
     assert result["preserved_quests"] == 1

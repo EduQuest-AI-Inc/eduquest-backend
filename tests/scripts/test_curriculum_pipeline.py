@@ -145,10 +145,8 @@ async def main() -> None:
     print("="*60)
 
     if MOCK_MODE:
-        from bots.provider import get_bot_provider, set_bot_provider
-        set_bot_provider(None)
-        os.environ["MOCK_AI"] = "true"
-        schedule_agent = get_bot_provider().create_schedule_agent(
+        from bots.provider import MockBotProvider
+        schedule_agent = MockBotProvider().create_schedule_agent(
             course_name=COURSE_NAME,
             course_description=COURSE_DESCRIPTION,
             start_date=START_DATE,
@@ -232,8 +230,8 @@ async def main() -> None:
     print("="*60)
 
     if MOCK_MODE:
-        from bots.provider import get_bot_provider
-        hw_agent = get_bot_provider().create_hw_agent(
+        from bots.provider import MockBotProvider
+        hw_agent = MockBotProvider().create_hw_agent(
             student=MOCK_STUDENT,
             period=MOCK_PERIOD,
             schedule=quest_entries,

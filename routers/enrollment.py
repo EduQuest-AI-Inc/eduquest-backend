@@ -14,12 +14,10 @@ from services.billing.membership_service import (
 )
 from services.enrollment.enrollment_service import EnrollmentService
 from services.parent.parent_service import ParentService
-from services.period.period_service import PeriodService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 service = EnrollmentService()
-period_service = PeriodService()
 parent_service = ParentService()
 membership_service = MembershipService()
 _period_dao = PeriodDAO()
@@ -84,7 +82,7 @@ def my_periods(
     user_id: Optional[str] = Query(None),
     auth: AuthPayload = Depends(require_student_viewer("user_id")),
 ):
-    return period_service.get_my_periods(user_id or auth.sub)
+    return service.get_my_periods(user_id or auth.sub)
 
 
 @router.post("/verify-period")
@@ -117,18 +115,18 @@ def verify_period(body: VerifyPeriodRequest, auth: AuthPayload = Depends(get_aut
                     status_code=403,
                     detail={"error": str(e), "code": "PLAN_LIMIT_EXCEEDED"},
                 )
-    period = period_service.verify_period_id(auth.sub, body.period_id, body.allow_parent_period)
+    period = service.verify_period_id(auth.sub, body.period_id, body.allow_parent_period)
     return {"message": "Period verified and added to enrollments", "period": period}
 
 
 @router.post("/unenroll")
 def unenroll(body: UnenrollRequest, auth: AuthPayload = Depends(get_auth)):
-    return period_service.unenroll_from_period(auth.sub, body.period_id)
+    return service.unenroll_from_period(auth.sub, body.period_id)
 
 
 @router.get("/student/parent-periods")
 def get_parent_periods(auth: AuthPayload = Depends(require_roles(Role.STUDENT))):
-    return period_service.get_parent_periods_for_student(auth.sub)
+    return service.get_parent_periods_for_student(auth.sub)
 
 
 # ─── Parent ───────────────────────────────────────────────────────────────────

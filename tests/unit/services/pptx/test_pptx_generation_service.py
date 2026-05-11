@@ -1,6 +1,5 @@
 import asyncio
 import io
-import sys
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 
@@ -27,15 +26,12 @@ def _mock_agent(pptx_bytes=None, raises=None):
     return agent
 
 
-def _wire_agent(agent):
-    """Configure the stubbed bots.provider so create_pptx_agent() returns agent."""
+def _svc(agent=None):
     provider = MagicMock()
-    provider.create_pptx_agent.return_value = agent
-    sys.modules["bots.provider"].get_bot_provider.return_value = provider
-
-
-def _svc():
+    if agent is not None:
+        provider.create_pptx_agent.return_value = agent
     svc = PptxGenerationService.__new__(PptxGenerationService)
+    svc._bot_provider = provider
     svc.lesson_pptx_dao = MagicMock()
     return svc
 
@@ -58,8 +54,7 @@ def _row(pptx_id="px1", lesson_id="l1", period_id="p1"):
 @pytest.mark.unit
 def test_generate_one_happy_path():
     pptx_bytes = _make_pptx_bytes()
-    _wire_agent(_mock_agent(pptx_bytes=pptx_bytes))
-    svc = _svc()
+    svc = _svc(agent=_mock_agent(pptx_bytes=pptx_bytes))
 
     with patch("services.pptx.pptx_generation_service.s3_service") as mock_s3:
         mock_s3.upload_pptx.return_value = "pptx/p1/l1.pptx"
@@ -78,8 +73,7 @@ def test_generate_one_happy_path():
 
 @pytest.mark.unit
 def test_generate_one_lesson_not_found():
-    _wire_agent(_mock_agent())
-    svc = _svc()
+    svc = _svc(agent=_mock_agent())
     row = _row(lesson_id="missing")
 
     with patch("services.pptx.pptx_generation_service.s3_service") as mock_s3:
@@ -93,8 +87,7 @@ def test_generate_one_lesson_not_found():
 
 @pytest.mark.unit
 def test_generate_one_agent_raises():
-    _wire_agent(_mock_agent(raises=RuntimeError("agent exploded")))
-    svc = _svc()
+    svc = _svc(agent=_mock_agent(raises=RuntimeError("agent exploded")))
 
     with patch("services.pptx.pptx_generation_service.s3_service") as mock_s3:
         asyncio.run(svc._generate_one(_row(), _curriculum(), asyncio.Semaphore(1)))
@@ -109,8 +102,7 @@ def test_generate_one_agent_raises():
 
 @pytest.mark.unit
 def test_run_batch_async_partial_failure():
-    _wire_agent(_mock_agent())
-    svc = _svc()
+    svc = _svc(agent=_mock_agent())
     rows = [
         _row(pptx_id="px1", lesson_id="l1"),
         _row(pptx_id="px2", lesson_id="missing"),  # not in curriculum → fails

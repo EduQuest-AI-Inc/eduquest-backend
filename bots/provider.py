@@ -1,26 +1,24 @@
 """
 Bot provider — factory for real and mock bot instances.
 
-Usage:
-    from bots.provider import get_bot_provider
+Usage (Phase 3+, preferred):
+    Receive BotProviderProtocol via constructor injection.
 
+Usage (legacy shim — services still call this until Phase 3):
+    from bots.provider import get_bot_provider
     agent = get_bot_provider().create_hw_agent(student, period, schedule)
 
-Set MOCK_AI=true in your environment to use fast mock implementations
-that return instant hardcoded responses without hitting the OpenAI API.
-
-For programmatic override (e.g. pytest):
-    from bots.provider import set_bot_provider, MockBotProvider
-    set_bot_provider(MockBotProvider())
-    ...
-    set_bot_provider(None)  # reset to env-var-driven default
+The canonical provider is selected once at startup in main.py lifespan and
+stored in app.state.bot_provider. get_bot_provider() is a non-caching shim
+that creates a fresh instance from MOCK_AI on each call; it exists only for
+backward compatibility with service files that have not yet been migrated to
+constructor injection. Do not add new callers — use routers.deps.get_bot_provider
+(a FastAPI dependency) or constructor injection instead.
 """
 import os
 from typing import Optional
 
 from bots.protocol import BotProviderProtocol  # noqa: F401 — re-exported for callers
-
-_provider_instance: Optional["BotProvider"] = None
 
 
 class BotProvider:
@@ -229,21 +227,11 @@ class MockBotProvider(BotProvider):
 
 
 def get_bot_provider() -> BotProvider:
-    global _provider_instance
-    if _provider_instance is None:
-        if os.getenv("MOCK_AI", "").lower() in ("true", "1", "yes"):
-            _provider_instance = MockBotProvider()
-        else:
-            _provider_instance = BotProvider()
-    return _provider_instance
+    """Non-caching shim — creates a fresh instance on each call from MOCK_AI env var.
 
-
-def set_bot_provider(provider: Optional[BotProvider]) -> None:
-    """Override the global provider. Pass None to reset to env-var-driven default.
-
-    NOTE: this only works when bots.provider is NOT replaced via sys.modules stubbing.
-    After Phase 2 this function will be removed entirely in favour of composition-root
-    selection in main.py lifespan.
+    Deprecated: migrate callers to constructor injection (Phase 3). Do not add new
+    callers. The canonical provider lives in app.state.bot_provider (see main.py).
     """
-    global _provider_instance
-    _provider_instance = provider
+    if os.getenv("MOCK_AI", "").lower() in ("true", "1", "yes"):
+        return MockBotProvider()
+    return BotProvider()

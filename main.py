@@ -30,8 +30,21 @@ from exceptions.permission_error import PermissionError
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from integrations.s3_service import s3, BUCKET_NAME
     _log = logging.getLogger(__name__)
+
+    if os.getenv("MOCK_AI", "").lower() in ("true", "1", "yes"):
+        from bots.provider import MockBotProvider
+        from bots.protocol import BotProviderProtocol
+        provider: BotProviderProtocol = MockBotProvider()
+        _log.info("Bot provider: MockBotProvider (MOCK_AI=true)")
+    else:
+        from bots.provider import BotProvider
+        from bots.protocol import BotProviderProtocol
+        provider: BotProviderProtocol = BotProvider()
+        _log.info("Bot provider: BotProvider (live OpenAI)")
+    app.state.bot_provider = provider
+
+    from integrations.s3_service import s3, BUCKET_NAME
     try:
         s3.head_bucket(Bucket=BUCKET_NAME)
         _log.info("S3 OK — bucket=%s endpoint=%s", BUCKET_NAME, s3.meta.endpoint_url)

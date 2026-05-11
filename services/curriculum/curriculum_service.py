@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import BackgroundTasks
 
 from bots.coverage_evaluator import CoverageEvaluator
-from bots.provider import get_bot_provider
+from bots.protocol import BotProviderProtocol
 from data_access.concept_dao import ConceptDAO
 from data_access.concept_skill_dao import ConceptSkillDAO
 from data_access.lesson_dao import LessonDAO
@@ -29,7 +29,8 @@ _VALID_STATUSES = {"pending", "draft", "approved"}
 
 
 class CurriculumService:
-    def __init__(self) -> None:
+    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+        self._bot_provider = bot_provider
         self.period_dao = PeriodDAO()
         self.week_dao = WeekDAO()
         self.lesson_dao = LessonDAO()
@@ -97,7 +98,7 @@ class CurriculumService:
             ))
 
         self.period_dao.update_status(period_id, "approved")
-        background_tasks.add_task(PptxGenerationService().run_batch, period_id)
+        background_tasks.add_task(PptxGenerationService(bot_provider=self._bot_provider).run_batch, period_id)
         return {"total_lessons": len(lessons)}
 
     # ── private helpers ───────────────────────────────────────────────────────
@@ -154,7 +155,7 @@ class CurriculumService:
                 period_id, mode, start_date, end_date,
             )
 
-            bot = get_bot_provider().create_curriculum_agent(
+            bot = self._bot_provider.create_curriculum_agent(
                 vector_store_ids=vector_store_ids,
                 course_name=period.get("name") or "",
                 start_date=str(start_date),
