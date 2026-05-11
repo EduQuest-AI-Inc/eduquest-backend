@@ -1,4 +1,14 @@
-from typing import Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
+
+
+@runtime_checkable
+class PptxAgentProtocol(Protocol):
+    async def run(
+        self,
+        lesson: dict[str, Any],
+        concepts: list[dict[str, Any]],
+        skills: list[dict[str, Any]],
+    ) -> bytes: ...
 
 
 @runtime_checkable
@@ -40,7 +50,7 @@ class BotProviderProtocol(Protocol):
 
     def create_teacher_feedback_agent(self): ...
 
-    def create_pptx_agent(self): ...
+    def create_pptx_agent(self) -> "PptxAgentProtocol": ...
 
     def make_conversations_session(self, conversation_id=None): ...
 

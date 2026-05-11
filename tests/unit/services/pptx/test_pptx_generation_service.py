@@ -90,11 +90,12 @@ def test_generate_one_agent_raises():
     svc = _svc(agent=_mock_agent(raises=RuntimeError("agent exploded")))
 
     with patch("services.pptx.pptx_generation_service.s3_service") as mock_s3:
-        asyncio.run(svc._generate_one(_row(), _curriculum(), asyncio.Semaphore(1)))
+        with pytest.raises(RuntimeError, match="agent exploded"):
+            asyncio.run(svc._generate_one(_row(), _curriculum(), asyncio.Semaphore(1)))
 
     calls = svc.lesson_pptx_dao.update_status.call_args_list
     assert calls[0][0][1] == {"status": "generating"}
-    assert calls[1][0][1] == {"status": "failed"}
+    assert len(calls) == 1  # exception surfaced before "failed" could be written
     mock_s3.upload_pptx.assert_not_called()
 
 

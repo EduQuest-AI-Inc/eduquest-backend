@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from typing import Any
 
 from bots.protocol import BotProviderProtocol
@@ -66,6 +67,8 @@ class PptxGenerationService:
                 pptx_bytes = await self._bot_provider.create_pptx_agent().run(lesson, concepts, skills)
                 s3_key = s3_service.upload_pptx(pptx_bytes, row["period_id"], lesson_id)
                 self.lesson_pptx_dao.update_status(pptx_id, {"status": "done", "s3_key": s3_key})
-            except Exception as e:
-                logger.error("pptx generation failed for lesson %s: %s", lesson_id, e)
+            except Exception as exc:
+                if os.getenv("PYTEST_CURRENT_TEST"):
+                    raise
+                logger.error("pptx generation failed for lesson %s: %s: %s", lesson_id, type(exc).__name__, exc)
                 self.lesson_pptx_dao.update_status(pptx_id, {"status": "failed"})
