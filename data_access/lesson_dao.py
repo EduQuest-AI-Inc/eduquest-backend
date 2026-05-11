@@ -15,5 +15,8 @@ class LessonDAO(SupabaseBaseDAO):
     def get_lessons_by_period(self, period_id: str) -> list[dict[str, Any]]:
         return self._select_eq('period_id', period_id)
 
+    def get_by_lesson_id(self, lesson_id: str) -> dict[str, Any] | None:
+        return self._select_by_id('lesson_id', lesson_id)
+
     def update_lesson(self, lesson_id: str, fields: dict[str, Any]) -> None:
         self._update({'lesson_id': lesson_id}, fields)

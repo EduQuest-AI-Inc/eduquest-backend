@@ -263,11 +263,12 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 
 > A named lesson belonging to a specific week in a period.
 
-| Field         | Type    | Constraints                              | Notes |
-| ------------- | ------- | ---------------------------------------- | ----- |
-| `period_id`   | text    | PK (composite) → `period`                |       |
-| `lesson_name` | text    | PK (composite)                           |       |
-| `week_number` | integer | NOT NULL → FK `week(period_id, week_number)` |       |
+| Field         | Type    | Constraints                                  | Notes                      |
+| ------------- | ------- | -------------------------------------------- | -------------------------- |
+| `lesson_id`   | uuid    | PK DEFAULT gen_random_uuid()                 | Stable surrogate reference |
+| `period_id`   | text    | NOT NULL → `period`                          |                            |
+| `lesson_name` | text    | NOT NULL                                     |                            |
+| `week_number` | integer | NOT NULL → FK `week(period_id, week_number)` |                            |
 
 **RLS:** Enabled
 
@@ -276,6 +277,31 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
 | SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
 | INSERT/UPDATE/DELETE | FastAPI only |
+
+---
+
+### `lesson_pptx`
+
+> Per-lesson PowerPoint generation job state and S3 reference. One row per lesson, written when a curriculum is approved.
+
+| Field        | Type        | Constraints                      | Notes                                           |
+| ------------ | ----------- | -------------------------------- | ----------------------------------------------- |
+| `pptx_id`    | uuid        | PK DEFAULT gen_random_uuid()     |                                                 |
+| `lesson_id`  | uuid        | NOT NULL FK → `lesson.lesson_id` |                                                 |
+| `period_id`  | text        | NOT NULL FK → `period`           | Denormalized for RLS                            |
+| `status`     | text        | NOT NULL DEFAULT 'pending'       | `pending` \| `generating` \| `done` \| `failed` |
+| `s3_key`     | text        | nullable                         | Null until generation succeeds                  |
+| `created_at` | timestamptz | NOT NULL DEFAULT now()           |                                                 |
+| `updated_at` | timestamptz | NOT NULL DEFAULT now()           | Updated on every status change                  |
+
+**RLS:** Enabled
+
+| Operation     | Who                                                        |
+| ------------- | ---------------------------------------------------------- |
+| SELECT        | Period owner (EXISTS period where `owner_id = sub`)        |
+| SELECT        | Enrolled student (EXISTS enrollment where `user_id = sub`) |
+| SELECT        | Parent of enrolled student (EXISTS parent → enrollment)    |
+| INSERT/UPDATE | FastAPI only                                               |
 
 ---
 
@@ -617,7 +643,8 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | `waitlist`                  | `waitlist_id`                         | Teacher pilot study waitlist              |
 | `parent_invite`             | `code`                                | Invite codes for parents to link to a student and view their progress |
 | `week`                      | `(period_id, week_number)`            | Week rows within a period (start/end dates)       |
-| `lesson`                    | `(period_id, lesson_name)`            | Lesson belonging to a week within a period        |
+| `lesson`                    | `lesson_id`                           | Lesson belonging to a week within a period        |
+| `lesson_pptx`               | `pptx_id`                             | Per-lesson PowerPoint generation state + S3 ref   |
 | `concept`                   | `(period_id, concept_name)`           | Concept taught in a lesson with rich metadata     |
 | `skill`                     | `(period_id, skill_name)`             | Measurable skill with mastery config              |
 | `concept_skill`             | `(period_id, concept_name, skill_name)` | Junction: concepts → skills they develop        |

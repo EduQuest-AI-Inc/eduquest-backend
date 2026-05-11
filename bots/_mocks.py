@@ -213,12 +213,12 @@ class MockCurriculumAgent:
     def __init__(
         self,
         vector_store_ids: list,
-        course_name: str = None,
-        start_date: str = None,
-        end_date: str = None,
-        course_description: str = None,
-        grade_level: str = None,
-        research_context: str = None,
+        course_name: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        course_description: str | None = None,
+        grade_level: str | None = None,
+        research_context: str | None = None,
     ):
         self._start_date = date.fromisoformat(start_date) if start_date else date.today()
         self._end_date = date.fromisoformat(end_date) if end_date else date.today()
