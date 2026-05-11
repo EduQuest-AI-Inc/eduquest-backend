@@ -18,6 +18,8 @@ For programmatic override (e.g. pytest):
 import os
 from typing import Optional
 
+from bots.protocol import BotProviderProtocol  # noqa: F401 — re-exported for callers
+
 _provider_instance: Optional["BotProvider"] = None
 
 
@@ -237,6 +239,11 @@ def get_bot_provider() -> BotProvider:
 
 
 def set_bot_provider(provider: Optional[BotProvider]) -> None:
-    """Override the global provider. Pass None to reset to env-var-driven default."""
+    """Override the global provider. Pass None to reset to env-var-driven default.
+
+    NOTE: this only works when bots.provider is NOT replaced via sys.modules stubbing.
+    After Phase 2 this function will be removed entirely in favour of composition-root
+    selection in main.py lifespan.
+    """
     global _provider_instance
     _provider_instance = provider

@@ -25,7 +25,10 @@ sys.modules['agents'] = MagicMock()
 sys.modules['agents._config'] = MagicMock()
 sys.modules['agents.models'] = MagicMock()
 sys.modules['agents.model_settings'] = MagicMock()
-sys.modules['bots'] = MagicMock()
+# bots.provider is NOT stubbed — real module must be importable so BotProviderProtocol
+# and MockBotProvider are real classes (Rule 5, ARCH_DECISIONS.md).
+# Individual agent modules are still stubbed because they import from the OpenAI SDK
+# at module level; they are only loaded lazily inside provider factory methods.
 sys.modules['bots.quest_agent'] = MagicMock()
 sys.modules['bots.profile_agent'] = MagicMock()
 sys.modules['bots.ltg_agent'] = MagicMock()
@@ -35,7 +38,6 @@ sys.modules['bots.coverage_evaluator'] = MagicMock()
 sys.modules['bots.guardrails'] = MagicMock()
 sys.modules['bots.schemas'] = MagicMock()
 sys.modules['bots.schemas.rubric'] = MagicMock()
-sys.modules['bots.provider'] = MagicMock()
 
 mock_openai_module = MagicMock()
 mock_openai_client = MagicMock()
