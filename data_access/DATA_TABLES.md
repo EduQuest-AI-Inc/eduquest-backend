@@ -1,6 +1,6 @@
 # Supabase Table Reference
 
-Quick reference for all 24 tables in the EduQuest Supabase database, grouped by domain.
+Quick reference for all 23 tables in the EduQuest Supabase database, grouped by domain.
 
 **RLS identity expression:** All policies use `(auth.jwt() ->> 'sub')` — reads the JWT `sub` claim as text, directly matching `user_id` values. Do **not** use `auth.uid()` — it casts to UUID and silently returns null for username-format IDs.
 
@@ -18,9 +18,8 @@ Quick reference for all 24 tables in the EduQuest Supabase database, grouped by 
 **Courses & Enrollment**
 
 5. [period](#period) — a class period owned by a teacher or parent
-6. [period_schedule](#period_schedule) — AI-generated weekly schedule for a period
-7. [enrollment](#enrollment) — student ↔ period membership
-8. [parent_invite](#parent_invite) — invite codes for parents to link to a student and view their progress
+6. [enrollment](#enrollment) — student ↔ period membership
+7. [parent_invite](#parent_invite) — invite codes for parents to link to a student and view their progress
 
 **Curriculum**
 
@@ -191,30 +190,6 @@ Quick reference for all 24 tables in the EduQuest Supabase database, grouped by 
 | SELECT        | Enrolled student (EXISTS enrollment where `user_id = sub`) |
 | UPDATE        | Owner (`owner_id = sub`) |
 | INSERT/DELETE | FastAPI only |
-
----
-
-### `period_schedule`
-
-> AI-generated weekly schedule for a period. Tracks which weeks have quests enabled and the associated OpenAI file.
-
-| Field                     | Type      | Constraints   | Notes                                           |
-| ------------------------- | --------- | ------------- | ----------------------------------------------- |
-| `period_id`               | text      | PK → `period` |                                                 |
-| `schedule_json`           | json      | NOT NULL      | Full AI-generated schedule payload              |
-| `schedule_openai_file_id` | text      | nullable      | OpenAI Files API ID used to create the schedule |
-| `quest_enabled_weeks`     | integer[] | nullable      | List of week numbers that have quests enabled   |
-| `created_at`              | timestamptz | NOT NULL      |                                                 |
-| `last_updated_at`         | timestamptz | NOT NULL      | Auto-updated on every write                     |
-
-**RLS:** Enabled
-
-| Operation | Who  |
-| --------- | ---- |
-| SELECT    | Period owner (EXISTS period where `owner_id = sub`) |
-| INSERT    | Period owner (WITH CHECK) |
-| UPDATE    | Period owner |
-| DELETE    | FastAPI only |
 
 ---
 
@@ -629,7 +604,6 @@ Quick reference for all 24 tables in the EduQuest Supabase database, grouped by 
 | `teacher`                   | `user_id`                             | Teacher profile fields                    |
 | `parent`                    | `user_id`                             | Parent profile + linked student IDs       |
 | `period`                    | `period_id`                           | Class period owned by a teacher or parent (`status`: pending→draft→approved) |
-| `period_schedule`           | `period_id`                           | AI-generated weekly schedule for a period |
 | `enrollment`                | `(user_id, period_id)`                | Student ↔ period membership               |
 | `session`                   | `auth_token`                          | Active JWT sessions                       |
 | `quest`                     | `quest_id`                            | Per-student weekly quest assignment       |
