@@ -21,7 +21,7 @@ class PptxGenerationService:
         """Sync entry point for BackgroundTasks. Fetches state then drives the async batch."""
         from services.curriculum.curriculum_service import CurriculumService
         pptx_rows = self.lesson_pptx_dao.get_by_period(period_id)
-        curriculum = CurriculumService().get_curriculum(period_id)
+        curriculum = CurriculumService(bot_provider=self._bot_provider).get_curriculum(period_id)
         asyncio.run(self._run_batch_async(pptx_rows, curriculum))
 
     async def _run_batch_async(
