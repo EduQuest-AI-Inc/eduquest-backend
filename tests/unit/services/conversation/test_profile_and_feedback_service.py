@@ -56,63 +56,81 @@ def _feedback_svc():
 # ── ProfileConversationService ────────────────────────────────────────────────
 
 @pytest.mark.unit
-def test_check_profile_all_fields_present():
-    profile = _make_full_profile()
-    response = _make_profile_response(profile=profile)
-    result = ProfileConversationService._check_profile(response)
-    assert result[0] is True
-    assert set(result[1].keys()) == {"strength", "weakness", "interest", "learning_style"}
-    assert result[1]["strength"] == ["math"]
+def test_profile_initiate_complete_profile_sets_flag_and_profile_key():
+    """initiate() with all profile fields populated → profile_complete=True and profile key present."""
+    svc = _profile_svc()
+    response = _make_profile_response("Welcome!", profile=_make_full_profile())
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_make_runner_result(response))
+    with patch("services.conversation.profile_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.initiate({"first_name": "Alice", "last_name": "Smith"}))
+    assert result["profile_complete"] is True
+    assert "profile" in result
+    assert set(result["profile"].keys()) == {"strength", "weakness", "interest", "learning_style"}
+    assert result["profile"]["strength"] == ["math"]
 
 
 @pytest.mark.unit
-def test_check_profile_missing_strengths():
+def test_profile_initiate_missing_one_field_incomplete():
+    """initiate() when any profile field is empty → profile_complete=False, no profile key."""
+    svc = _profile_svc()
     p = MagicMock()
-    p.strengths = []
+    p.strengths = []          # missing strengths
     p.weaknesses = ["writing"]
     p.interests = ["science"]
     p.learning_styles = ["visual"]
-    response = _make_profile_response(profile=p)
-    assert ProfileConversationService._check_profile(response) == (False, None)
+    response = _make_profile_response("Tell me more", profile=p)
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_make_runner_result(response))
+    with patch("services.conversation.profile_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.initiate({"first_name": "Alice", "last_name": "Smith"}))
+    assert result["profile_complete"] is False
+    assert "profile" not in result
 
 
 @pytest.mark.unit
-def test_check_profile_missing_weaknesses():
-    p = MagicMock()
-    p.strengths = ["math"]
-    p.weaknesses = []
-    p.interests = ["science"]
-    p.learning_styles = ["visual"]
-    response = _make_profile_response(profile=p)
-    assert ProfileConversationService._check_profile(response) == (False, None)
+def test_profile_initiate_no_profile_incomplete():
+    """initiate() when profile is None → profile_complete=False, no profile key."""
+    svc = _profile_svc()
+    response = _make_profile_response("Hello", profile=None)
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_make_runner_result(response))
+    with patch("services.conversation.profile_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.initiate({"first_name": "Bob", "last_name": ""}))
+    assert result["profile_complete"] is False
+    assert "profile" not in result
 
 
 @pytest.mark.unit
-def test_check_profile_missing_interests():
+def test_profile_continue_complete_profile_sets_flag_and_profile_key():
+    """continue_conversation() with all profile fields populated → profile_complete=True and profile key present."""
+    svc = _profile_svc(previous_response_id="rid-prev")
+    response = _make_profile_response("Done!", profile=_make_full_profile())
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_make_runner_result(response, "rid2"))
+    with patch("services.conversation.profile_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.continue_conversation("I like reading"))
+    assert result["profile_complete"] is True
+    assert "profile" in result
+    assert result["profile"]["weakness"] == ["writing"]
+
+
+@pytest.mark.unit
+def test_profile_continue_missing_profile_field_incomplete():
+    """continue_conversation() when a profile field is missing → profile_complete=False, no profile key."""
+    svc = _profile_svc(previous_response_id="rid-prev")
     p = MagicMock()
     p.strengths = ["math"]
     p.weaknesses = ["writing"]
-    p.interests = []
-    p.learning_styles = ["visual"]
-    response = _make_profile_response(profile=p)
-    assert ProfileConversationService._check_profile(response) == (False, None)
-
-
-@pytest.mark.unit
-def test_check_profile_missing_learning_styles():
-    p = MagicMock()
-    p.strengths = ["math"]
-    p.weaknesses = ["writing"]
     p.interests = ["science"]
-    p.learning_styles = []
-    response = _make_profile_response(profile=p)
-    assert ProfileConversationService._check_profile(response) == (False, None)
-
-
-@pytest.mark.unit
-def test_check_profile_no_profile_attr():
-    response = _make_profile_response(profile=None)
-    assert ProfileConversationService._check_profile(response) == (False, None)
+    p.learning_styles = []    # missing learning styles
+    response = _make_profile_response("Keep going", profile=p)
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=_make_runner_result(response, "rid3"))
+    with patch("services.conversation.profile_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.continue_conversation("I prefer visual learning"))
+    assert result["profile_complete"] is False
+    assert "profile" not in result
 
 
 @pytest.mark.unit
@@ -205,36 +223,64 @@ def test_continue_profile_conversation_sync_wrapper():
 # ── TeacherFeedbackConversationService ────────────────────────────────────────
 
 @pytest.mark.unit
-def test_extract_conversation_id_from_getter_method():
+def test_feedback_initiate_conversation_id_from_sync_getter():
+    """initiate() resolves conversation_id via session._get_session_id() (sync callable)."""
     svc = _feedback_svc()
-    svc.session._get_session_id = MagicMock(return_value="cid-abc")
-    result = asyncio.run(svc._extract_conversation_id())
-    assert result == "cid-abc"
+    svc.session._get_session_id = MagicMock(return_value="cid-sync")
+    tf_resp = MagicMock()
+    tf_resp.response = "feedback"
+    tf_resp.suggested_change = None
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=MagicMock(final_output=tf_resp))
+    with patch("services.conversation.teacher_feedback_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.initiate({"first_name": "Alice", "last_name": "Smith"}, "quest json"))
+    assert result["conversation_id"] == "cid-sync"
 
 
 @pytest.mark.unit
-def test_extract_conversation_id_from_async_getter():
+def test_feedback_initiate_conversation_id_from_async_getter():
+    """initiate() resolves conversation_id via an async session._get_session_id() coroutine."""
     svc = _feedback_svc()
     svc.session._get_session_id = AsyncMock(return_value="cid-async")
-    result = asyncio.run(svc._extract_conversation_id())
-    assert result == "cid-async"
+    tf_resp = MagicMock()
+    tf_resp.response = "feedback"
+    tf_resp.suggested_change = None
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=MagicMock(final_output=tf_resp))
+    with patch("services.conversation.teacher_feedback_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.initiate({"first_name": "Alice", "last_name": "Smith"}, "quest json"))
+    assert result["conversation_id"] == "cid-async"
 
 
 @pytest.mark.unit
-def test_extract_conversation_id_fallback_to_session_id_attr():
+def test_feedback_initiate_conversation_id_from_session_id_attr():
+    """initiate() falls back to session._session_id attribute when _get_session_id is absent."""
     svc = _feedback_svc()
     svc.session = MagicMock(spec=[])
     svc.session._session_id = "cid-attr"
-    result = asyncio.run(svc._extract_conversation_id())
-    assert result == "cid-attr"
+    tf_resp = MagicMock()
+    tf_resp.response = "feedback"
+    tf_resp.suggested_change = None
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=MagicMock(final_output=tf_resp))
+    with patch("services.conversation.teacher_feedback_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.initiate({"first_name": "Alice", "last_name": "Smith"}, "quest json"))
+    assert result["conversation_id"] == "cid-attr"
 
 
 @pytest.mark.unit
-def test_extract_conversation_id_returns_none_when_no_id():
+def test_feedback_initiate_conversation_id_none_when_no_session_id():
+    """initiate() returns conversation_id=None when the session exposes no usable ID."""
     svc = _feedback_svc()
     svc.session = MagicMock(spec=[])
-    result = asyncio.run(svc._extract_conversation_id())
-    assert result is None
+    tf_resp = MagicMock()
+    tf_resp.response = "feedback"
+    tf_resp.suggested_change = None
+    mock_provider = MagicMock()
+    mock_provider.run_conversation = AsyncMock(return_value=MagicMock(final_output=tf_resp))
+    with patch("services.conversation.teacher_feedback_service.get_bot_provider", return_value=mock_provider):
+        result = asyncio.run(svc.initiate({"first_name": "Alice", "last_name": "Smith"}, "quest json"))
+    assert result["conversation_id"] is None
 
 
 @pytest.mark.unit
