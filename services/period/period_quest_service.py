@@ -40,8 +40,6 @@ class PeriodQuestService:
             raise ValidationError(f"Student {caller_id} is not enrolled in period {period_id}")
 
     def start_homework_agent(self, caller_id: str, period_id: str) -> Dict[str, Any]:
-        self._assert_enrolled(caller_id, period_id)
-
         student = self.student_dao.get_student_by_id(caller_id)
         if not student:
             raise NotFoundError("Student not found")

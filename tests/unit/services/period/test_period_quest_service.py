@@ -47,17 +47,8 @@ def _mock_provider_with_hw():
 # ---- start_homework_agent ----
 
 @pytest.mark.unit
-def test_start_homework_agent_not_enrolled():
-    svc = _svc()
-    svc.enrollment_dao.get_enrollments_by_period.return_value = [{"user_id": "other"}]
-
-    with pytest.raises(ValidationError):
-        svc.start_homework_agent(STUDENT_ID, PERIOD_ID)
-
-
-@pytest.mark.unit
 def test_start_homework_agent_student_not_found():
-    svc = _enrolled_svc()
+    svc = _svc()
     svc.student_dao.get_student_by_id.return_value = None
 
     with pytest.raises(NotFoundError):
@@ -66,7 +57,7 @@ def test_start_homework_agent_student_not_found():
 
 @pytest.mark.unit
 def test_start_homework_agent_period_not_found():
-    svc = _enrolled_svc()
+    svc = _svc()
     svc.student_dao.get_student_by_id.return_value = {"user_id": STUDENT_ID}
     svc.period_dao.get_period_by_id.return_value = None
 
@@ -76,7 +67,7 @@ def test_start_homework_agent_period_not_found():
 
 @pytest.mark.unit
 def test_start_homework_agent_no_curriculum_weeks():
-    svc = _enrolled_svc()
+    svc = _svc()
     svc.student_dao.get_student_by_id.return_value = {"user_id": STUDENT_ID}
     svc.period_dao.get_period_by_id.return_value = {"period_id": PERIOD_ID}
     svc.curriculum_service.get_curriculum.return_value = {"weeks": [], "lessons": [], "concepts": []}
@@ -87,7 +78,7 @@ def test_start_homework_agent_no_curriculum_weeks():
 
 @pytest.mark.unit
 def test_start_homework_agent_no_ltg_conversation():
-    svc = _enrolled_svc()
+    svc = _svc()
     svc.student_dao.get_student_by_id.return_value = {"user_id": STUDENT_ID}
     svc.period_dao.get_period_by_id.return_value = {"period_id": PERIOD_ID}
     svc.curriculum_service.get_curriculum.return_value = _minimal_curriculum()
@@ -99,7 +90,7 @@ def test_start_homework_agent_no_ltg_conversation():
 
 @pytest.mark.unit
 def test_start_homework_agent_happy_path_with_goal():
-    svc = _enrolled_svc()
+    svc = _svc()
     svc.student_dao.get_student_by_id.return_value = {"user_id": STUDENT_ID}
     svc.period_dao.get_period_by_id.return_value = {"period_id": PERIOD_ID, "start_date": "2024-01-08"}
     svc.curriculum_service.get_curriculum.return_value = _minimal_curriculum()
@@ -126,7 +117,7 @@ def test_start_homework_agent_happy_path_with_goal():
 @pytest.mark.unit
 def test_start_homework_agent_happy_path_no_goal():
     """When no LTG goal exists, schedule enrichment is skipped but homework is still generated."""
-    svc = _enrolled_svc()
+    svc = _svc()
     svc.student_dao.get_student_by_id.return_value = {"user_id": STUDENT_ID}
     svc.period_dao.get_period_by_id.return_value = {"period_id": PERIOD_ID}
     svc.curriculum_service.get_curriculum.return_value = _minimal_curriculum()
@@ -148,7 +139,7 @@ def test_start_homework_agent_happy_path_no_goal():
 @pytest.mark.unit
 def test_start_homework_agent_schedule_agent_failure_falls_back():
     """If the schedule agent raises, service falls back to generic names and still completes."""
-    svc = _enrolled_svc()
+    svc = _svc()
     svc.student_dao.get_student_by_id.return_value = {"user_id": STUDENT_ID}
     svc.period_dao.get_period_by_id.return_value = {"period_id": PERIOD_ID}
     svc.curriculum_service.get_curriculum.return_value = _minimal_curriculum()

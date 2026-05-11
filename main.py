@@ -25,6 +25,7 @@ from routers import curriculum, billing
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from exceptions.auth_error import AuthError
+from exceptions.permission_error import PermissionError
 
 
 @asynccontextmanager
@@ -94,6 +95,11 @@ async def not_found_error_handler(request: Request, exc: NotFoundError):
 @app.exception_handler(AuthError)
 async def auth_error_handler(request: Request, exc: AuthError):
     return JSONResponse(status_code=401, content={"error": str(exc)})
+
+
+@app.exception_handler(PermissionError)
+async def permission_error_handler(request: Request, exc: PermissionError):
+    return JSONResponse(status_code=403, content={"error": str(exc)})
 
 
 _logger = logging.getLogger(__name__)

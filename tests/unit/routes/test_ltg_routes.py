@@ -17,17 +17,22 @@ def client():
 
 class TestInitiateLTGConversation:
 
+    @pytest.fixture(autouse=True)
+    def mock_enrollment(self):
+        with patch("routers.ltg.EnrollmentService") as m:
+            m.return_value.check_enrolled.return_value = None
+            yield m
+
     @pytest.mark.api
-    def test_initiate_ltg_success(self, client):
-        with patch("routers.ltg.EnrollmentService") as mock_es, \
-             patch("routers.ltg.period_service") as mock_ps:
-            mock_es.return_value.check_enrolled.return_value = None
+    def test_initiate_ltg_success(self, client, mock_enrollment):
+        with patch("routers.ltg.period_service") as mock_ps:
             mock_ps.initiate_ltg_conversation.return_value = {
                 "response": "What are your goals?", "conversation_id": "cid-1"
             }
             resp = client.post("/period/initiate-ltg-conversation", json={"period_id": "p1"})
         assert resp.status_code == 200
         mock_ps.initiate_ltg_conversation.assert_called_once_with("user-1", "p1")
+        mock_enrollment.return_value.check_enrolled.assert_called_once_with("user-1", "p1")
 
     @pytest.mark.api
     def test_initiate_ltg_missing_period_id_returns_422(self, client):
@@ -36,27 +41,21 @@ class TestInitiateLTGConversation:
 
     @pytest.mark.api
     def test_initiate_ltg_value_error_returns_400(self, client):
-        with patch("routers.ltg.EnrollmentService") as mock_es, \
-             patch("routers.ltg.period_service") as mock_ps:
-            mock_es.return_value.check_enrolled.return_value = None
+        with patch("routers.ltg.period_service") as mock_ps:
             mock_ps.initiate_ltg_conversation.side_effect = ValueError("invalid period")
             resp = client.post("/period/initiate-ltg-conversation", json={"period_id": "bad"})
         assert resp.status_code == 400
 
     @pytest.mark.api
     def test_initiate_ltg_lookup_error_returns_404(self, client):
-        with patch("routers.ltg.EnrollmentService") as mock_es, \
-             patch("routers.ltg.period_service") as mock_ps:
-            mock_es.return_value.check_enrolled.return_value = None
+        with patch("routers.ltg.period_service") as mock_ps:
             mock_ps.initiate_ltg_conversation.side_effect = LookupError("not found")
             resp = client.post("/period/initiate-ltg-conversation", json={"period_id": "p1"})
         assert resp.status_code == 404
 
     @pytest.mark.api
     def test_initiate_ltg_exception_returns_500(self, client):
-        with patch("routers.ltg.EnrollmentService") as mock_es, \
-             patch("routers.ltg.period_service") as mock_ps:
-            mock_es.return_value.check_enrolled.return_value = None
+        with patch("routers.ltg.period_service") as mock_ps:
             mock_ps.initiate_ltg_conversation.side_effect = RuntimeError("crash")
             resp = client.post("/period/initiate-ltg-conversation", json={"period_id": "p1"})
         assert resp.status_code == 500
@@ -116,6 +115,12 @@ class TestContinueLTGConversation:
 
 
 class TestInitiateHomeworkAgent:
+
+    @pytest.fixture(autouse=True)
+    def mock_enrollment(self):
+        with patch("routers.ltg.EnrollmentService") as m:
+            m.return_value.check_enrolled.return_value = None
+            yield m
 
     @pytest.mark.api
     def test_initiate_homework_agent_with_explicit_user_id(self, client):
