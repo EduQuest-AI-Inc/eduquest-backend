@@ -214,13 +214,13 @@ def test_delete_period_raises_not_found_when_missing():
 
 
 @pytest.mark.unit
-def test_delete_period_raises_auth_error_when_not_owner():
-    from exceptions.auth_error import AuthError
+def test_delete_period_raises_permission_error_when_not_owner():
+    from exceptions.permission_error import PermissionError
 
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "other_user"}
 
-    with pytest.raises(AuthError):
+    with pytest.raises(PermissionError):
         svc.delete_period("p1", "u1")
 
 
