@@ -10,7 +10,8 @@ from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, get_auth, require_active_membership, require_roles
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_active_membership, require_roles
+from bots.protocol import BotProviderProtocol
 from data_access.teacher_dao import TeacherDAO
 from integrations import openai_vector_store
 from integrations.s3_service import (
@@ -34,7 +35,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 period_management_service = PeriodManagementService()
 period_file_service = PeriodFileService()
-curriculum_service = CurriculumService()
 teacher_dao = TeacherDAO()
 membership_service = MembershipService()
 
@@ -47,6 +47,7 @@ def _process_period_files(
     file_paths: list,
     temp_dir: str,
     user_id: str,
+    bot_provider: BotProviderProtocol,
     file_keys: list = [],
     canvas_api_url: str | None = None,
     canvas_api_key: str | None = None,
@@ -87,9 +88,9 @@ def _process_period_files(
         period_management_service.update_processing_status(period_id, "ready")
 
         try:
-            curriculum_service._run_generation(period_id)
-        except Exception as e:
-            logger.error("Auto curriculum generation failed for period %s: %s", period_id, e, exc_info=True)
+            CurriculumService(bot_provider=bot_provider)._run_generation(period_id)
+        except Exception as exc:
+            logger.error("Auto curriculum generation failed for period %s: %s", period_id, exc, exc_info=True)
     except Exception as e:
         logger.error("Background processing failed for period %s: %s", period_id, e, exc_info=True)
         period_management_service.update_processing_status(period_id, "failed")
@@ -183,6 +184,7 @@ def create_period(
     specific_standard_codes: Optional[str] = Form(default=None),
     status: Optional[str] = Form(default="pending"),
     auth: AuthPayload = Depends(get_auth),
+    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
 ):
     if status not in ("pending", "setup_draft"):
         raise HTTPException(status_code=400, detail="Invalid status value")
@@ -251,6 +253,7 @@ def create_period(
                 file_paths=file_paths,
                 temp_dir=temp_dir,
                 user_id=auth.sub,
+                bot_provider=bot_provider,
                 file_keys=file_keys,
                 canvas_api_url=canvas_api_url if auth.role == Role.TEACHER else None,
                 canvas_api_key=canvas_api_key if auth.role == Role.TEACHER else None,
@@ -290,6 +293,7 @@ def update_period_setup(
     specific_standard_codes: Optional[str] = Form(default=None),
     status: Optional[str] = Form(default="setup_draft"),
     auth: AuthPayload = Depends(require_active_membership),
+    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
 ):
     if status not in ("pending", "setup_draft"):
         raise HTTPException(status_code=400, detail="Invalid status value")
@@ -363,6 +367,7 @@ def update_period_setup(
                 file_paths=file_paths,
                 temp_dir=temp_dir,
                 user_id=auth.sub,
+                bot_provider=bot_provider,
                 file_keys=all_file_keys,
                 canvas_api_url=canvas_api_url if auth.role == Role.TEACHER else None,
                 canvas_api_key=canvas_api_key if auth.role == Role.TEACHER else None,

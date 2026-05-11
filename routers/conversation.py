@@ -10,12 +10,18 @@ from fastapi import UploadFile
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, get_auth, require_roles
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_roles
+from bots.protocol import BotProviderProtocol
 from data_access.quest_dao import QuestDAO
 from services.conversation.conversation_service import ConversationService
 logger = logging.getLogger(__name__)
 router = APIRouter()
-conversation_service = ConversationService()
+
+
+def _get_conversation_service(
+    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+) -> ConversationService:
+    return ConversationService(bot_provider=bot_provider)
 
 
 # ---------------------------------------------------------------------------
@@ -23,8 +29,11 @@ conversation_service = ConversationService()
 # ---------------------------------------------------------------------------
 
 @router.post("/initiate-profile-assistant")
-def initiate_profile_assistant(auth: AuthPayload = Depends(require_roles(Role.STUDENT))):
-    return conversation_service.start_profile_assistant(auth.sub)
+def initiate_profile_assistant(
+    auth: AuthPayload = Depends(require_roles(Role.STUDENT)),
+    svc: ConversationService = Depends(_get_conversation_service),
+):
+    return svc.start_profile_assistant(auth.sub)
 
 
 class ContinueProfileRequest(BaseModel):
@@ -37,9 +46,10 @@ class ContinueProfileRequest(BaseModel):
 def continue_profile_assistant(
     body: ContinueProfileRequest,
     auth: AuthPayload = Depends(get_auth),
+    svc: ConversationService = Depends(_get_conversation_service),
 ):
     try:
-        return conversation_service.continue_profile_assistant(
+        return svc.continue_profile_assistant(
             auth.sub,
             body.conversation_type,
             body.conversation_id,
@@ -61,6 +71,7 @@ def continue_profile_assistant(
 async def initiate_update_assistant(
     request: Request,
     auth: AuthPayload = Depends(get_auth),
+    svc: ConversationService = Depends(_get_conversation_service),
 ):
     loop = asyncio.get_running_loop()
     content_type = request.headers.get("content-type", "")
@@ -118,7 +129,7 @@ async def initiate_update_assistant(
             try:
                 result = await loop.run_in_executor(
                     None,
-                    lambda: conversation_service.start_update_assistant(
+                    lambda: svc.start_update_assistant(
                         quests_file=quests_file,
                         is_instructor=False,
                         caller_user_id=auth.sub,
@@ -163,7 +174,7 @@ async def initiate_update_assistant(
 
             result = await loop.run_in_executor(
                 None,
-                lambda: conversation_service.start_update_assistant(
+                lambda: svc.start_update_assistant(
                     quests_file=quests_file,
                     is_instructor=is_instructor,
                     caller_user_id=auth.sub,
@@ -194,9 +205,10 @@ class ContinueUpdateRequest(BaseModel):
 def continue_update_assistant(
     body: ContinueUpdateRequest,
     auth: AuthPayload = Depends(get_auth),
+    svc: ConversationService = Depends(_get_conversation_service),
 ):
     try:
-        return conversation_service.continue_update_assistant(
+        return svc.continue_update_assistant(
             user_id=auth.sub,
             caller_role=auth.role,
             conversation_id=body.conversation_id,

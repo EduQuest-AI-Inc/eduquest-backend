@@ -3,9 +3,8 @@ KnowledgeGraphService — single entry point for reading and writing a
 student's per-period knowledge graph.
 
 Composes:
-  * PeriodScheduleDAO  — the curriculum (concepts, prereqs, skills)
-  * StudentSkillMasteryDAO — the per-student mastery layer
-  * curriculum_parser — tolerant readers over schedule_json
+  * ConceptDAO / SkillDAO / ConceptSkillDAO  — normalized curriculum tables
+  * StudentSkillMasteryDAO                  — per-student mastery layer
 
 Used by REST routers and by agent function tools.
 """
@@ -14,36 +13,87 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
+from data_access.concept_dao import ConceptDAO
+from data_access.concept_skill_dao import ConceptSkillDAO
+from data_access.skill_dao import SkillDAO
 from data_access.student_skill_mastery_dao import StudentSkillMasteryDAO
 from exceptions.validation_error import ValidationError
-from models.student_skill_mastery import StudentSkillMastery
-
-ConceptNode = dict
-from services.knowledge_graph import curriculum_parser
+from models.student_skill_mastery import MASTERY_CUTOFF, StudentSkillMastery
 from services.tracking.events import Events
 from services.tracking.track import track_event
 
+ConceptNode = dict
 logger = logging.getLogger(__name__)
 
 
 class KnowledgeGraphService:
     def __init__(
         self,
-        period_schedule_dao: Optional[Any] = None,
+        concept_dao: Optional[ConceptDAO] = None,
+        skill_dao: Optional[SkillDAO] = None,
+        concept_skill_dao: Optional[ConceptSkillDAO] = None,
         student_skill_mastery_dao: Optional[StudentSkillMasteryDAO] = None,
     ) -> None:
-        self.period_schedule_dao = period_schedule_dao
+        self.concept_dao = concept_dao or ConceptDAO()
+        self.skill_dao = skill_dao or SkillDAO()
+        self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO()
         self.student_skill_mastery_dao = student_skill_mastery_dao or StudentSkillMasteryDAO()
 
     # -- internal helpers -----------------------------------------------------
 
-    def _schedule_json(self, period_id: str) -> dict:
-        if self.period_schedule_dao is None:
-            return {}
-        schedule = self.period_schedule_dao.get_by_period_id(period_id)
-        if schedule is None or not schedule.schedule_json:
-            return {}
-        return schedule.schedule_json
+    def _load_curriculum(self, period_id: str) -> dict:
+        """Fetch normalized curriculum tables and build lookup structures."""
+        concepts = self.concept_dao.get_concepts_by_period(period_id)
+        skills = self.skill_dao.get_skills_by_period(period_id)
+        cs_links = self.concept_skill_dao.get_all_for_period(period_id)
+
+        # concept_name → [skill_name, ...]
+        cs_by_concept: dict[str, list[str]] = {}
+        for link in cs_links:
+            cs_by_concept.setdefault(link["concept_name"], []).append(link["skill_name"])
+
+        concepts_by_name = {c["concept_name"]: c for c in concepts}
+
+        # skill_name → concept dict (first occurrence wins)
+        skill_to_concept: dict[str, dict] = {}
+        for cname, skill_names in cs_by_concept.items():
+            concept = concepts_by_name.get(cname, {})
+            for sname in skill_names:
+                skill_to_concept.setdefault(sname, concept)
+
+        # skill_name → mastery_threshold
+        skill_thresholds = {
+            s["skill_name"]: float(s.get("mastery_threshold") or MASTERY_CUTOFF)
+            for s in skills
+        }
+
+        # prereq edges: cross-product of prereq-concept skills × dependent-concept skills
+        prereq_edges: set[tuple[str, str]] = set()
+        for concept in concepts:
+            prereqs = concept.get("prerequisites") or []
+            dep_skills = cs_by_concept.get(concept["concept_name"], [])
+            for prereq_name in prereqs:
+                for p in cs_by_concept.get(prereq_name, []):
+                    for d in dep_skills:
+                        if p != d:
+                            prereq_edges.add((p, d))
+
+        return {
+            "skill_to_concept": skill_to_concept,
+            "skill_thresholds": skill_thresholds,
+            "prereq_edges": sorted(prereq_edges),
+            "concepts_by_name": concepts_by_name,
+            "cs_by_concept": cs_by_concept,
+        }
+
+    @staticmethod
+    def _is_unlocked(
+        concept: dict, mastered: set[str], cs_by_concept: dict[str, list[str]]
+    ) -> bool:
+        for prereq_name in (concept.get("prerequisites") or []):
+            if any(s not in mastered for s in cs_by_concept.get(prereq_name, [])):
+                return False
+        return True
 
     # -- public API -----------------------------------------------------------
 
@@ -57,7 +107,6 @@ class KnowledgeGraphService:
                   "score": float,
                   "mastered": bool,
                   "threshold": float,
-                  "concept_id": str | None,
                   "concept_name": str | None,
                   "cognitive_load": str | None,
                 },
@@ -68,8 +117,10 @@ class KnowledgeGraphService:
         Skills present in the curriculum but not yet in the mastery table
         appear with score=0 and mastered=False.
         """
-        schedule_json = self._schedule_json(period_id)
-        skill_concept = curriculum_parser.skill_to_concept(schedule_json)
+        curriculum = self._load_curriculum(period_id)
+        skill_to_concept = curriculum["skill_to_concept"]
+        skill_thresholds = curriculum["skill_thresholds"]
+        prereq_edges = curriculum["prereq_edges"]
 
         mastery_rows = self.student_skill_mastery_dao.get_for_student(student_id, period_id)
         mastery_by_skill: dict[str, StudentSkillMastery] = {
@@ -78,24 +129,23 @@ class KnowledgeGraphService:
 
         nodes: list[dict[str, Any]] = []
         seen: set[str] = set()
-        for skill, concept in skill_concept.items():
+        for skill, concept in skill_to_concept.items():
             seen.add(skill)
             row = mastery_by_skill.get(skill)
-            threshold = curriculum_parser.mastery_threshold_for(schedule_json, skill)
+            threshold = skill_thresholds.get(skill, MASTERY_CUTOFF)
+            metadata = concept.get("metadata") or {}
             nodes.append(
                 {
                     "skill": skill,
                     "score": row.score if row else 0.0,
                     "mastered": row.mastered if row else False,
                     "threshold": threshold,
-                    "concept_id": concept.get("concept_id"),
-                    "concept_name": concept.get("name"),
-                    "cognitive_load": concept.get("cognitive_load"),
+                    "concept_name": concept.get("concept_name"),
+                    "cognitive_load": metadata.get("cognitive_load"),
                 }
             )
 
-        # Skills the student has mastery rows for but the curriculum no
-        # longer mentions. Surface them so callers can spot drift.
+        # Skills with mastery rows but no longer in the curriculum.
         for skill, row in mastery_by_skill.items():
             if skill in seen:
                 continue
@@ -104,17 +154,13 @@ class KnowledgeGraphService:
                     "skill": skill,
                     "score": row.score,
                     "mastered": row.mastered,
-                    "threshold": curriculum_parser.mastery_threshold_for(schedule_json, skill),
-                    "concept_id": None,
+                    "threshold": skill_thresholds.get(skill, MASTERY_CUTOFF),
                     "concept_name": None,
                     "cognitive_load": None,
                 }
             )
 
-        edges = [
-            {"from": p, "to": d}
-            for p, d in curriculum_parser.prereq_skill_edges(schedule_json)
-        ]
+        edges = [{"from": p, "to": d} for p, d in prereq_edges]
 
         return {"nodes": nodes, "edges": edges}
 
@@ -152,9 +198,9 @@ class KnowledgeGraphService:
         if not skill_name:
             raise ValidationError("skill_name is required")
 
-        threshold = curriculum_parser.mastery_threshold_for(
-            self._schedule_json(period_id), skill_name
-        )
+        curriculum = self._load_curriculum(period_id)
+        threshold = curriculum["skill_thresholds"].get(skill_name, MASTERY_CUTOFF)
+
         row = self.student_skill_mastery_dao.upsert_score(
             student_id=student_id,
             period_id=period_id,
@@ -175,9 +221,6 @@ class KnowledgeGraphService:
                 },
             )
         except Exception:
-            # track_event already swallows posthog errors; this guards
-            # against any other unexpected import/runtime issue so a
-            # write never fails because of analytics.
             logger.exception("track_event raised unexpectedly for skill_mastery_updated")
 
         return row
@@ -190,14 +233,15 @@ class KnowledgeGraphService:
         by this student. Concepts with no prerequisites are always
         included.
         """
-        schedule_json = self._schedule_json(period_id)
-        concepts_by_id = curriculum_parser.concepts_by_id(schedule_json)
+        curriculum = self._load_curriculum(period_id)
+        concepts_by_name = curriculum["concepts_by_name"]
+        cs_by_concept = curriculum["cs_by_concept"]
 
         mastery_rows = self.student_skill_mastery_dao.get_for_student(student_id, period_id)
         mastered_skills = {r.skill_name for r in mastery_rows if r.mastered}
 
         return [
             concept
-            for concept in concepts_by_id.values()
-            if curriculum_parser.concept_is_unlocked(concept, mastered_skills, concepts_by_id)
+            for concept in concepts_by_name.values()
+            if self._is_unlocked(concept, mastered_skills, cs_by_concept)
         ]

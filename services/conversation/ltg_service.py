@@ -8,7 +8,7 @@ import asyncio
 import uuid
 from typing import Optional, Dict, Any
 
-from bots.provider import get_bot_provider
+from bots.protocol import BotProviderProtocol
 from data_access.ltg_conversation_dao import LtgConversationDAO
 from data_access.period_dao import PeriodDAO
 from data_access.student_dao import StudentDAO
@@ -26,10 +26,11 @@ class LTGConversationService:
     in the ltg_conversation table.
     """
 
-    def __init__(self, vector_store_id: str, curriculum: dict, previous_response_id: Optional[str] = None) -> None:
+    def __init__(self, vector_store_id: str, curriculum: dict, previous_response_id: Optional[str] = None, *, bot_provider: BotProviderProtocol) -> None:
+        self._bot_provider = bot_provider
         self.vector_store_id = vector_store_id
         self.previous_response_id = previous_response_id
-        self.agent = get_bot_provider().create_ltg_agent(vector_store_id, curriculum)
+        self.agent = bot_provider.create_ltg_agent(vector_store_id, curriculum)
 
     async def initiate(self, student: Dict[str, Any]) -> Dict[str, Any]:
         """Start a new LTG conversation for a student."""
@@ -51,7 +52,7 @@ class LTGConversationService:
             f"that incorporate what I'll learn in this class."
         )
 
-        result = await get_bot_provider().run_conversation(self.agent, initial_message)
+        result = await self._bot_provider.run_conversation(self.agent, initial_message)
 
         response = result.final_output
 
@@ -66,7 +67,7 @@ class LTGConversationService:
 
     async def continue_conversation(self, user_message: str) -> Dict[str, Any]:
         """Continue an existing LTG conversation."""
-        result = await get_bot_provider().run_conversation(
+        result = await self._bot_provider.run_conversation(
             self.agent,
             user_message,
             previous_response_id=self.previous_response_id,
@@ -99,8 +100,10 @@ def initiate_ltg_conversation(
     student: Dict[str, Any],
     curriculum: Dict[str, Any],
     previous_response_id: Optional[str] = None,
+    *,
+    bot_provider: BotProviderProtocol,
 ) -> Dict[str, Any]:
-    service = LTGConversationService(vector_store_id, curriculum, previous_response_id)
+    service = LTGConversationService(vector_store_id, curriculum, previous_response_id, bot_provider=bot_provider)
     return asyncio.run(service.initiate(student))
 
 
@@ -108,8 +111,10 @@ def continue_ltg_conversation(
     vector_store_id: str,
     previous_response_id: Optional[str],
     user_message: str,
+    *,
+    bot_provider: BotProviderProtocol,
 ) -> Dict[str, Any]:
-    service = LTGConversationService(vector_store_id, {}, previous_response_id)
+    service = LTGConversationService(vector_store_id, {}, previous_response_id, bot_provider=bot_provider)
     return asyncio.run(service.continue_conversation(user_message))
 
 
@@ -124,12 +129,15 @@ class LTGOrchestrationService:
         ltg_conversation_dao=None,
         student_long_term_goal_dao=None,
         curriculum_service=None,
+        *,
+        bot_provider: BotProviderProtocol,
     ) -> None:
+        self._bot_provider = bot_provider
         self.period_dao = period_dao or PeriodDAO()
         self.student_dao = student_dao or StudentDAO()
         self.ltg_conversation_dao = ltg_conversation_dao or LtgConversationDAO()
         self.student_long_term_goal_dao = student_long_term_goal_dao or StudentLongTermGoalDAO()
-        self.curriculum_service = curriculum_service or CurriculumService()
+        self.curriculum_service = curriculum_service or CurriculumService(bot_provider=bot_provider)
 
     def initiate(self, user_id: str, period_id: str) -> Dict[str, Any]:
         if not period_id:
@@ -167,7 +175,12 @@ class LTGOrchestrationService:
             "learning_style": student.get("learning_style", []),
         }
 
-        result = initiate_ltg_conversation(vector_store_id=vector_store_id, student=student_data, curriculum=curriculum)
+        result = initiate_ltg_conversation(
+            vector_store_id=vector_store_id,
+            student=student_data,
+            curriculum=curriculum,
+            bot_provider=self._bot_provider,
+        )
 
         response_id = result.get("response_id")
         if not response_id:
@@ -217,6 +230,7 @@ class LTGOrchestrationService:
                 vector_store_id=vector_store_id,
                 previous_response_id=last_response_id,
                 user_message=message,
+                bot_provider=self._bot_provider,
             )
 
             new_response_id = result.get("response_id")
@@ -232,5 +246,5 @@ class LTGOrchestrationService:
 
             return {"response": reply, "goal_chosen": goal_chosen}
 
-        except Exception as e:
-            return {"error": str(e)}
+        except Exception as exc:
+            return {"error": str(exc)}

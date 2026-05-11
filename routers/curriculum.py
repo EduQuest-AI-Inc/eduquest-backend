@@ -4,7 +4,10 @@ from typing import Any, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, require_active_membership
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_active_membership
+from bots.protocol import BotProviderProtocol
+from data_access.lesson_dao import LessonDAO
+from data_access.lesson_pptx_dao import LessonPptxDAO
 from data_access.period_dao import PeriodDAO
 from services.curriculum.curriculum_service import CurriculumService
 from services.enrollment.enrollment_service import EnrollmentService
@@ -14,9 +17,16 @@ from exceptions.validation_error import ValidationError
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_curriculum_service = CurriculumService()
 _period_dao = PeriodDAO()
+_lesson_dao = LessonDAO()
+_lesson_pptx_dao = LessonPptxDAO()
 _enrollment_service = EnrollmentService()
+
+
+def _get_curriculum_service(
+    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+) -> CurriculumService:
+    return CurriculumService(bot_provider=bot_provider)
 
 
 # ── Request models ─────────────────────────────────────────────────────────────
@@ -111,14 +121,15 @@ def trigger_generation(
     period_id: str,
     background_tasks: BackgroundTasks,
     auth: AuthPayload = Depends(require_active_membership),
+    svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     _assert_period_owner(period_id, auth.sub)
     try:
-        _curriculum_service.trigger_generation(period_id, background_tasks)
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        svc.trigger_generation(period_id, background_tasks)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
     return {"message": "Curriculum generation started"}
 
 
@@ -126,15 +137,16 @@ def trigger_generation(
 def get_curriculum(
     period_id: str,
     auth: AuthPayload = Depends(require_active_membership),
+    svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     if auth.role == Role.STUDENT:
         _assert_student_enrolled(period_id, auth.sub)
     else:
         _assert_period_owner(period_id, auth.sub)
     try:
-        return _curriculum_service.get_curriculum(period_id)
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        return svc.get_curriculum(period_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.patch("/{period_id}")
@@ -142,14 +154,15 @@ def save_curriculum(
     period_id: str,
     payload: _SavePayload,
     auth: AuthPayload = Depends(require_active_membership),
+    svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     _assert_period_owner(period_id, auth.sub)
     try:
-        _curriculum_service.save_curriculum(period_id, payload.model_dump())
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        svc.save_curriculum(period_id, payload.model_dump())
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return {"message": "Curriculum saved"}
 
 
@@ -159,13 +172,14 @@ def update_concept(
     concept_name: str,
     payload: _ConceptEditPayload,
     auth: AuthPayload = Depends(require_active_membership),
+    svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     _assert_period_owner(period_id, auth.sub)
     fields = {k: v for k, v in payload.model_dump().items() if v is not None}
     try:
-        _curriculum_service.update_concept(period_id, concept_name, fields)
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        svc.update_concept(period_id, concept_name, fields)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
     return {"message": "Concept updated"}
 
 
@@ -175,26 +189,59 @@ def update_skill(
     skill_name: str,
     payload: _SkillEditPayload,
     auth: AuthPayload = Depends(require_active_membership),
+    svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     _assert_period_owner(period_id, auth.sub)
     fields = {k: v for k, v in payload.model_dump().items() if v is not None}
     try:
-        _curriculum_service.update_skill(period_id, skill_name, fields)
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        svc.update_skill(period_id, skill_name, fields)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
     return {"message": "Skill updated"}
 
 
-@router.post("/{period_id}/approve")
+@router.post("/{period_id}/approve", status_code=202)
 def approve_period(
     period_id: str,
+    background_tasks: BackgroundTasks,
     auth: AuthPayload = Depends(require_active_membership),
+    svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     _assert_period_owner(period_id, auth.sub)
     try:
-        _curriculum_service.approve_period(period_id)
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    return {"message": "Period approved"}
+        return svc.approve_period(period_id, background_tasks)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/{period_id}/pptx/status")
+def get_pptx_status(
+    period_id: str,
+    auth: AuthPayload = Depends(get_auth),
+):
+    if auth.role == Role.STUDENT:
+        _assert_student_enrolled(period_id, auth.sub)
+    else:
+        _assert_period_owner(period_id, auth.sub)
+
+    pptx_rows = _lesson_pptx_dao.get_by_period(period_id)
+    if not pptx_rows:
+        raise HTTPException(status_code=404, detail="No PowerPoint generation found for this period")
+
+    lessons = _lesson_dao.get_lessons_by_period(period_id)
+    lesson_map = {lesson["lesson_id"]: lesson for lesson in lessons}
+
+    return {
+        "lessons": [
+            {
+                "lesson_id": row["lesson_id"],
+                "lesson_name": lesson_map.get(row["lesson_id"], {}).get("lesson_name"),
+                "week_number": lesson_map.get(row["lesson_id"], {}).get("week_number"),
+                "pptx_status": row["status"],
+                "pptx_id": row["pptx_id"],
+            }
+            for row in pptx_rows
+        ]
+    }

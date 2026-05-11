@@ -9,7 +9,7 @@ from data_access.student_long_term_goal_dao import StudentLongTermGoalDAO
 from exceptions.not_found_error import NotFoundError
 from exceptions.validation_error import ValidationError
 
-from bots.provider import get_bot_provider
+from bots.protocol import BotProviderProtocol
 from services.curriculum.curriculum_service import CurriculumService
 from services.quest.quest_service import QuestService
 
@@ -25,11 +25,12 @@ def _friday_of_week(start: date, week_num: int) -> date:
 
 class PeriodQuestService:
 
-    def __init__(self) -> None:
+    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+        self._bot_provider = bot_provider
         self.period_dao = PeriodDAO()
         self.student_dao = StudentDAO()
         self.enrollment_dao = EnrollmentDAO()
-        self.curriculum_service = CurriculumService()
+        self.curriculum_service = CurriculumService(bot_provider=bot_provider)
         self.ltg_conversation_dao = LtgConversationDAO()
         self.ltg_goal_dao = StudentLongTermGoalDAO()
         self.quest_service = QuestService()
@@ -40,8 +41,6 @@ class PeriodQuestService:
             raise ValidationError(f"Student {caller_id} is not enrolled in period {period_id}")
 
     def start_homework_agent(self, caller_id: str, period_id: str) -> Dict[str, Any]:
-        self._assert_enrolled(caller_id, period_id)
-
         student = self.student_dao.get_student_by_id(caller_id)
         if not student:
             raise NotFoundError("Student not found")
@@ -104,7 +103,7 @@ class PeriodQuestService:
         goal_text = self.ltg_goal_dao.get_by_student_and_period(caller_id, period_id)
         if goal_text:
             try:
-                schedule_agent = get_bot_provider().create_schedule_agent(
+                schedule_agent = self._bot_provider.create_schedule_agent(
                     student=student,
                     period=period,
                     schedule=schedule_quests,
@@ -131,7 +130,7 @@ class PeriodQuestService:
                 caller_id, period_id,
             )
 
-        homework_agent = get_bot_provider().create_hw_agent(student, period, schedule_quests, previous_response_id=ltg_response_id)
+        homework_agent = self._bot_provider.create_hw_agent(student, period, schedule_quests, previous_response_id=ltg_response_id)
         homework = homework_agent.run()
 
         homework_dict = self._normalize_homework(homework)
@@ -185,7 +184,7 @@ class PeriodQuestService:
         ltg_response_id = self.ltg_conversation_dao.get_last_response_id(caller_id, period_id)
         student_with_context = {**student, 'recommended_change': recommended_change}
 
-        homework_agent = get_bot_provider().create_hw_agent(student_with_context, period, incomplete_quests, previous_response_id=ltg_response_id)
+        homework_agent = self._bot_provider.create_hw_agent(student_with_context, period, incomplete_quests, previous_response_id=ltg_response_id)
         homework = homework_agent.run()
         homework_dict = self._normalize_homework(homework)
 

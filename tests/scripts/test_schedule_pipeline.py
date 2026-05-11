@@ -90,10 +90,8 @@ async def main() -> None:
     print(f"\n=== Step 3: Schedule Agent ({'MOCK' if mock else 'LIVE — calls OpenAI'}) ===")
 
     if mock:
-        from bots.provider import get_bot_provider, set_bot_provider
-        set_bot_provider(None)
-        os.environ["MOCK_AI"] = "true"
-        agent = get_bot_provider().create_schedule_agent(
+        from bots.provider import MockBotProvider
+        agent = MockBotProvider().create_schedule_agent(
             course_name=COURSE_NAME,
             course_description=COURSE_DESCRIPTION,
             start_date=START_DATE,

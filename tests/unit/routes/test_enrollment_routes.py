@@ -19,7 +19,7 @@ class TestMyPeriods:
 
     @pytest.mark.api
     def test_my_periods_returns_list(self, client):
-        with patch("routers.enrollment.period_service") as mock_ps:
+        with patch("routers.enrollment.service") as mock_ps:
             mock_ps.get_my_periods.return_value = [{"period_id": "p1"}]
             resp = client.get("/enrollment/my-periods")
         assert resp.status_code == 200
@@ -27,7 +27,7 @@ class TestMyPeriods:
 
     @pytest.mark.api
     def test_my_periods_empty_returns_empty_list(self, client):
-        with patch("routers.enrollment.period_service") as mock_ps:
+        with patch("routers.enrollment.service") as mock_ps:
             mock_ps.get_my_periods.return_value = []
             resp = client.get("/enrollment/my-periods")
         assert resp.status_code == 200
@@ -39,7 +39,7 @@ class TestVerifyPeriod:
     @pytest.mark.api
     def test_verify_period_success(self, client):
         with patch("routers.enrollment._period_dao") as mock_pd, \
-             patch("routers.enrollment.period_service") as mock_ps:
+             patch("routers.enrollment.service") as mock_ps:
             mock_pd.get_period_by_id.return_value = None  # skip owner membership check
             mock_ps.verify_period_id.return_value = {"period_id": "p1", "name": "Math"}
             resp = client.post("/enrollment/verify-period", json={"period_id": "p1"})
@@ -52,7 +52,7 @@ class TestUnenroll:
 
     @pytest.mark.api
     def test_unenroll_success(self, client):
-        with patch("routers.enrollment.period_service") as mock_ps:
+        with patch("routers.enrollment.service") as mock_ps:
             mock_ps.unenroll_from_period.return_value = {"message": "Unenrolled", "period_id": "p1"}
             resp = client.post("/enrollment/unenroll", json={"period_id": "p1"})
         assert resp.status_code == 200
@@ -65,7 +65,7 @@ class TestUnenroll:
 
     @pytest.mark.api
     def test_unenroll_not_enrolled_returns_400(self, client):
-        with patch("routers.enrollment.period_service") as mock_ps:
+        with patch("routers.enrollment.service") as mock_ps:
             from exceptions.validation_error import ValidationError
             mock_ps.unenroll_from_period.side_effect = ValidationError("You are not enrolled in period X")
             resp = client.post("/enrollment/unenroll", json={"period_id": "X"})

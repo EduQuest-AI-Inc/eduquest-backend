@@ -21,16 +21,30 @@ _req_log = logging.getLogger("eduquest.request")
 
 from routers import conversation, period, ltg, teacher, waitlist
 from routers import auth, user, enrollment, quest, parent
-from routers import curriculum, billing
+from routers import curriculum, billing, lessons
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from exceptions.auth_error import AuthError
+from exceptions.permission_error import PermissionError
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from integrations.s3_service import s3, BUCKET_NAME
     _log = logging.getLogger(__name__)
+
+    if os.getenv("MOCK_AI", "").lower() in ("true", "1", "yes"):
+        from bots.provider import MockBotProvider
+        from bots.protocol import BotProviderProtocol
+        provider: BotProviderProtocol = MockBotProvider()
+        _log.info("Bot provider: MockBotProvider (MOCK_AI=true)")
+    else:
+        from bots.provider import BotProvider
+        from bots.protocol import BotProviderProtocol
+        provider: BotProviderProtocol = BotProvider()
+        _log.info("Bot provider: BotProvider (live OpenAI)")
+    app.state.bot_provider = provider
+
+    from integrations.s3_service import s3, BUCKET_NAME
     try:
         s3.head_bucket(Bucket=BUCKET_NAME)
         _log.info("S3 OK — bucket=%s endpoint=%s", BUCKET_NAME, s3.meta.endpoint_url)
@@ -96,6 +110,11 @@ async def auth_error_handler(request: Request, exc: AuthError):
     return JSONResponse(status_code=401, content={"error": str(exc)})
 
 
+@app.exception_handler(PermissionError)
+async def permission_error_handler(request: Request, exc: PermissionError):
+    return JSONResponse(status_code=403, content={"error": str(exc)})
+
+
 _logger = logging.getLogger(__name__)
 
 
@@ -117,6 +136,7 @@ app.include_router(teacher.router, prefix="/teacher")
 app.include_router(user.router, prefix="/user")
 app.include_router(waitlist.router, prefix="/pilot-waitlist")
 app.include_router(curriculum.router, prefix="/curriculum")
+app.include_router(lessons.router, prefix="/lessons")
 app.include_router(billing.router, prefix="/billing")
 
 

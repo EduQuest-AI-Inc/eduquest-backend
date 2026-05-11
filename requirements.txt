@@ -21,3 +21,4 @@ ruff
 pyright
 pypdf
 pymupdf
+python-pptx

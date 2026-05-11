@@ -9,7 +9,6 @@ from data_access.parent_dao import ParentDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
 from data_access.user_dao import UserDAO
-from services.period.period_service import PeriodService
 from services.user.user_service import UserService
 
 logger = logging.getLogger(__name__)
@@ -19,7 +18,6 @@ student_dao = StudentDAO()
 teacher_dao = TeacherDAO()
 parent_dao = ParentDAO()
 user_dao = UserDAO()
-period_service_u = PeriodService()
 
 _ROLE_FETCHERS = {
     "student": lambda uid: student_dao.get_student_by_id(uid),

@@ -1,24 +1,24 @@
 """
 Bot provider — factory for real and mock bot instances.
 
-Usage:
-    from bots.provider import get_bot_provider
+Usage (Phase 3+, preferred):
+    Receive BotProviderProtocol via constructor injection.
 
+Usage (legacy shim — services still call this until Phase 3):
+    from bots.provider import get_bot_provider
     agent = get_bot_provider().create_hw_agent(student, period, schedule)
 
-Set MOCK_AI=true in your environment to use fast mock implementations
-that return instant hardcoded responses without hitting the OpenAI API.
-
-For programmatic override (e.g. pytest):
-    from bots.provider import set_bot_provider, MockBotProvider
-    set_bot_provider(MockBotProvider())
-    ...
-    set_bot_provider(None)  # reset to env-var-driven default
+The canonical provider is selected once at startup in main.py lifespan and
+stored in app.state.bot_provider. get_bot_provider() is a non-caching shim
+that creates a fresh instance from MOCK_AI on each call; it exists only for
+backward compatibility with service files that have not yet been migrated to
+constructor injection. Do not add new callers — use routers.deps.get_bot_provider
+(a FastAPI dependency) or constructor injection instead.
 """
 import os
 from typing import Optional
 
-_provider_instance: Optional["BotProvider"] = None
+from bots.protocol import BotProviderProtocol  # noqa: F401 — re-exported for callers
 
 
 class BotProvider:
@@ -79,6 +79,10 @@ class BotProvider:
     def create_teacher_feedback_agent(self):
         from bots.teacher_feedback_agent import create_teacher_feedback_agent
         return create_teacher_feedback_agent()
+
+    def create_pptx_agent(self):
+        from bots.pptx_agent import PptxAgent
+        return PptxAgent()
 
     async def grade_submission(self, quest_data: dict, submission_text: str) -> dict:
         grading_input = self._build_grading_input(quest_data, submission_text)
@@ -204,6 +208,10 @@ class MockBotProvider(BotProvider):
         from bots.teacher_feedback_agent import create_teacher_feedback_agent
         return create_teacher_feedback_agent()
 
+    def create_pptx_agent(self):
+        from bots._mocks import MockPptxAgent
+        return MockPptxAgent()
+
     async def run_conversation(self, agent, message: str, **kwargs):
         from bots._mocks import MockRunner
         return await MockRunner.run(agent, message, **kwargs)
@@ -219,16 +227,11 @@ class MockBotProvider(BotProvider):
 
 
 def get_bot_provider() -> BotProvider:
-    global _provider_instance
-    if _provider_instance is None:
-        if os.getenv("MOCK_AI", "").lower() in ("true", "1", "yes"):
-            _provider_instance = MockBotProvider()
-        else:
-            _provider_instance = BotProvider()
-    return _provider_instance
+    """Non-caching shim — creates a fresh instance on each call from MOCK_AI env var.
 
-
-def set_bot_provider(provider: Optional[BotProvider]) -> None:
-    """Override the global provider. Pass None to reset to env-var-driven default."""
-    global _provider_instance
-    _provider_instance = provider
+    Deprecated: migrate callers to constructor injection (Phase 3). Do not add new
+    callers. The canonical provider lives in app.state.bot_provider (see main.py).
+    """
+    if os.getenv("MOCK_AI", "").lower() in ("true", "1", "yes"):
+        return MockBotProvider()
+    return BotProvider()

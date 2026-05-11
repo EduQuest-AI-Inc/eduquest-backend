@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch, mock_open
+from unittest.mock import MagicMock, AsyncMock, patch, mock_open  # patch still used for _read_submission_text
 
 from services.conversation.grading_service import (
     _read_submission_text,
@@ -119,8 +119,7 @@ def test_read_submission_text_pdf_case_insensitive():
 @pytest.mark.unit
 def test_grade_student_submission_with_text():
     provider = _mock_provider()
-    with patch("services.conversation.grading_service.get_bot_provider", return_value=provider):
-        result = grade_student_submission(_QUEST_DICT_RUBRIC, submission_text="my text")
+    result = grade_student_submission(_QUEST_DICT_RUBRIC, submission_text="my text", bot_provider=provider)
     provider.grade_submission.assert_called_once_with(_QUEST_DICT_RUBRIC, "my text")
     assert set(result.keys()) >= {"grade", "overall_score", "feedback", "change", "recommended_change", "response"}
     assert result["overall_score"] == 85
@@ -133,31 +132,29 @@ def test_grade_student_submission_with_text():
 @pytest.mark.unit
 def test_grade_student_submission_with_path():
     provider = _mock_provider()
-    with patch("services.conversation.grading_service.get_bot_provider", return_value=provider):
-        with patch("services.conversation.grading_service._read_submission_text", return_value="file content") as mock_read:
-            grade_student_submission(_QUEST_DICT_RUBRIC, submission_path="/tmp/file.txt")
+    with patch("services.conversation.grading_service._read_submission_text", return_value="file content") as mock_read:
+        grade_student_submission(_QUEST_DICT_RUBRIC, submission_path="/tmp/file.txt", bot_provider=provider)
     mock_read.assert_called_once_with("/tmp/file.txt")
     provider.grade_submission.assert_called_once_with(_QUEST_DICT_RUBRIC, "file content")
 
 
 @pytest.mark.unit
 def test_grade_student_submission_neither_arg_raises():
+    provider = _mock_provider()
     with pytest.raises(ValueError, match="submission_path or submission_text"):
-        grade_student_submission(_QUEST_DICT_RUBRIC)
+        grade_student_submission(_QUEST_DICT_RUBRIC, bot_provider=provider)
 
 
 @pytest.mark.unit
 def test_grade_student_submission_recommended_changes_joined():
     result_with_changes = {**_EXPECTED_RESULT, "recommended_change": "Fix intro; Add citations"}
     provider = _mock_provider(return_value=result_with_changes)
-    with patch("services.conversation.grading_service.get_bot_provider", return_value=provider):
-        result = grade_student_submission(_QUEST_DICT_RUBRIC, submission_text="x")
+    result = grade_student_submission(_QUEST_DICT_RUBRIC, submission_text="x", bot_provider=provider)
     assert result["recommended_change"] == "Fix intro; Add citations"
 
 
 @pytest.mark.unit
 def test_grade_student_submission_empty_recommended_changes_is_none():
     provider = _mock_provider()
-    with patch("services.conversation.grading_service.get_bot_provider", return_value=provider):
-        result = grade_student_submission(_QUEST_DICT_RUBRIC, submission_text="x")
+    result = grade_student_submission(_QUEST_DICT_RUBRIC, submission_text="x", bot_provider=provider)
     assert result["recommended_change"] is None

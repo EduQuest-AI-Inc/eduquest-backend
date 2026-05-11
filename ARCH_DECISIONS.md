@@ -17,7 +17,9 @@ The frontend may hide buttons, redirect routes, or skip rendering components bas
 
 ### Auth & Role-Based Access Control
 
-Role enforcement lives exclusively at the **router layer** via FastAPI `Depends()`. Service methods never raise errors for role checks — they assume the caller is already authorized. Service-layer `PermissionError` is reserved for **ownership checks** only (e.g. a teacher editing another teacher's period).
+Role enforcement lives exclusively at the **router layer** via FastAPI `Depends()`. Service methods never raise errors for role checks — they assume the caller is already authorized. Service-layer `PermissionError` is reserved for **ownership checks** only (e.g. a teacher editing another teacher's period) — ownership stays in the service because verifying it requires fetching the same resource the service needs anyway; moving it to the router would mean two queries for the same row.
+
+Enrollment checks — verifying a user is a member of a specific period — are also an authorization concern, not business logic. They belong at the router layer. Since `period_id` always arrives from the request body, call `EnrollmentService().check_enrolled(user_id, period_id)` at the top of the handler, before any service call. Service methods must not perform enrollment checks.
 
 Three roles: `Role.STUDENT`, `Role.TEACHER`, `Role.PARENT` — defined as a `str, Enum` in `api/deps.py` alongside `AuthPayload` and `get_auth()`.
 
@@ -37,13 +39,17 @@ The frontend uses the Supabase client SDK for auth only (sign-up, sign-in, sessi
 All domain data reads and writes must go through the FastAPI backend. This keeps business logic
 and RLS policy in one place and prevents clients from bypassing server-side validation.
 
-### All agent instantiation goes through `bots/provider.py::get_bot_provider()`
+### The bot provider is selected once at startup — services depend on the protocol, never the implementation
 
-Services must never import agent classes directly. All bot creation must go through `get_bot_provider()`. This is what makes `MOCK_AI=true` (env flag) and `set_bot_provider(MockBotProvider())` (test setup) work — swapping the provider swaps every agent at once without touching service code. A direct import bypasses the provider and silently breaks the mock system, causing tests to make real OpenAI calls or fail without a clear cause.
+`os.getenv("MOCK_AI")` is read exactly once, in `main.py` lifespan, and the result is stored in `app.state.bot_provider`. After startup, no code reads `MOCK_AI` again. `get_bot_provider()` in `api/deps.py` is a thin FastAPI dependency that reads `request.app.state.bot_provider` — it contains no selection logic.
 
-### Services receive their dependencies — they never instantiate DAOs or other services inline
+All type annotations for the bot provider use `BotProviderProtocol` from `bots/protocol.py`, never the concrete `BotProvider` or `MockBotProvider` class. `BotProviderProtocol` is a `@runtime_checkable Protocol`: any object that implements all factory methods satisfies it without inheritance. Depending on a concrete class defeats the abstraction and prevents swapping implementations.
 
-Service classes must declare their DAOs and sub-services as constructor parameters with defaults, not create them inside methods. This is what makes unit tests possible without `@patch` — tests pass mock DAOs directly to the constructor.
+Individual bot classes (`HWAgent`, `GradingOrchestrator`, `CurriculumAgent`, etc.) are never imported or instantiated outside `bots/provider.py`. All bot creation goes through the provider factory methods. A direct import bypasses the abstraction boundary — if the provider is swapped, a directly-instantiated bot silently runs against the wrong configuration.
+
+### Services receive their dependencies — they never instantiate DAOs, services, or the bot provider inline
+
+Service classes must declare their DAOs, sub-services, and bot provider as constructor parameters with defaults, not create them inside methods. This is what makes unit tests possible without `@patch` — tests pass mock objects directly to the constructor.
 
 ```python
 # Correct
@@ -55,6 +61,8 @@ class MyService:
 def run_something(user_id):
     dao = MyDAO()   # untestable without @patch
 ```
+
+The bot provider follows the same rule. Services declare `bot_provider: BotProviderProtocol` as a constructor parameter and store it as `self._bot_provider`. No service imports or calls `get_bot_provider()` directly — that is the router's job via `Depends()`.
 
 Module-level orchestration functions (`run_*`) are also banned for the same reason. If logic needs its own DAOs, it belongs in a service class, not a free function.
 
@@ -69,6 +77,12 @@ Module-level orchestration functions (`run_*`) are also banned for the same reas
 ### `services/tracking/` is intentionally untested
 
 PostHog analytics calls are fire-and-forget by design — failures are swallowed so tracking never breaks product flows. Writing unit tests for these wrappers would only verify that the PostHog SDK was called correctly, which is testing the vendor. If the event schema needs to be verified, do it via a PostHog test environment, not a unit test.
+
+### Bot mocking uses `MockBotProvider()` constructor injection — no `sys.modules` stubbing or `patch()` calls
+
+Tests that need a mock bot provider pass `MockBotProvider()` directly to the service constructor — the same way the router wires it in production via `Depends()`. `conftest.py` must not replace any module under `bots/` with `MagicMock()`, and `patch("services.X.get_bot_provider")` is banned. Module replacement creates invisible fakes: new bot modules added after the stub are silently mocked with no warning, and test failures are indistinguishable from real runtime errors. Patching import paths breaks on file renames and never exercises the real `Depends()` wiring.
+
+`MockBotProvider` must satisfy `BotProviderProtocol` — verified by `tests/unit/bots/test_provider_compliance.py` which asserts `isinstance(MockBotProvider(), BotProviderProtocol)`. Any PR that adds a factory method to `BotProvider` must add the same method to both `BotProviderProtocol` and `MockBotProvider` before it merges. The motivating incident: `MockBotProvider` was missing `create_pptx_agent()` after the method was added to the real provider. The resulting `TypeError` was swallowed by a bare `except Exception`, recorded as `status='failed'`, and looked identical to a real agent crash.
 
 ### Private methods are tested through the public API, not directly
 

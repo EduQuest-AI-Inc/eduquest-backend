@@ -1,6 +1,7 @@
 # CLAUDE.md — Backend
 
 See also: [data_access/CLAUDE.md](data_access/CLAUDE.md) for DAO and database patterns.
+See also: [ARCH_DECISIONS.md](ARCH_DECISIONS.md) for authoritative decisions on router boundaries, auth enforcement, enrollment checks, agent instantiation, service dependencies, and testing conventions.
 
 ## Package Layout
 

@@ -18,6 +18,7 @@ from data_access.teacher_dao import TeacherDAO
 from exceptions.not_found_error import NotFoundError
 from exceptions.validation_error import ValidationError
 from integrations.s3_service import upload_file_to_s3
+from bots.protocol import BotProviderProtocol
 from models.conversation import Conversation
 from services.conversation.grading_service import grade_student_submission
 from services.conversation.profile_service import (
@@ -35,7 +36,8 @@ logger = logging.getLogger(__name__)
 
 
 class ConversationService:
-    def __init__(self) -> None:
+    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+        self._bot_provider = bot_provider
         self.student_dao = StudentDAO()
         self.conversation_dao = ConversationDAO()
         self.teacher_dao = TeacherDAO()
@@ -50,7 +52,7 @@ class ConversationService:
         if not student:
             raise NotFoundError("Student not found")
 
-        result = initiate_profile_conversation(student)
+        result = initiate_profile_conversation(student, bot_provider=self._bot_provider)
 
         response_id = result.get("response_id")
         if not response_id:
@@ -79,7 +81,7 @@ class ConversationService:
         last_response_id = conversation.get("last_response_id")
         if not isinstance(last_response_id, str):
             raise NotFoundError("Conversation has no response ID")
-        result = continue_profile_conversation(last_response_id, message)
+        result = continue_profile_conversation(last_response_id, message, bot_provider=self._bot_provider)
 
         new_response_id = result.get("response_id")
         if new_response_id:
@@ -157,6 +159,7 @@ class ConversationService:
             result = initiate_teacher_feedback(
                 student=target_student,
                 quests_summary=quests_summary,
+                bot_provider=self._bot_provider,
             )
 
             conversation_id = result.get("conversation_id")
@@ -193,6 +196,7 @@ class ConversationService:
         grading_result = grade_student_submission(
             quest_data=quest_data,
             submission_path=submission_file,
+            bot_provider=self._bot_provider,
         )
 
         grade = grading_result.get("grade")
@@ -243,7 +247,7 @@ class ConversationService:
 
         period_id = conversation.get("period_id")
 
-        result = continue_teacher_feedback(conversation_id, message)
+        result = continue_teacher_feedback(conversation_id, message, bot_provider=self._bot_provider)
 
         suggested_change = result.get("suggested_change")
         if suggested_change and period_id:
@@ -301,7 +305,7 @@ class ConversationService:
         """Delegate recommended changes to PeriodService."""
         try:
             from services.period.period_service import PeriodService
-            period_service = PeriodService()
+            period_service = PeriodService(bot_provider=self._bot_provider)
             quest_update_result = period_service.update_quests_with_recommended_change(
                 caller_id, caller_role, period_id, recommended_change,
             )

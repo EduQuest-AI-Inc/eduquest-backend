@@ -3,7 +3,7 @@ from enum import Enum
 from typing import FrozenSet, Optional
 
 import jwt
-from fastapi import Cookie, Depends, Header, HTTPException
+from fastapi import Cookie, Depends, Header, HTTPException, Request
 
 JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret")
 JWT_ALGORITHM = "HS256"
@@ -105,6 +105,12 @@ def require_active_membership(auth: AuthPayload = Depends(get_auth)) -> AuthPayl
     return auth
 
 
+def get_bot_provider(request: Request):
+    """FastAPI dependency — reads the provider initialised in main.py lifespan."""
+    from bots.protocol import BotProviderProtocol  # noqa: F401
+    return request.app.state.bot_provider
+
+
 def require_student_viewer(student_id_param: str = "user_id"):
     """
     Dependency factory for routes where a teacher or parent may optionally provide
@@ -116,10 +122,10 @@ def require_student_viewer(student_id_param: str = "user_id"):
     """
     from fastapi import Request
     from data_access.parent_dao import ParentDAO
-    from services.period.period_service import PeriodService
+    from services.enrollment.enrollment_service import EnrollmentService
 
     _parent_dao = ParentDAO()
-    _period_svc = PeriodService()
+    _enrollment_svc = EnrollmentService()
 
     def _check(request: Request, auth: AuthPayload = Depends(get_auth)) -> AuthPayload:
         student_id = (
@@ -134,7 +140,7 @@ def require_student_viewer(student_id_param: str = "user_id"):
             if student_id not in linked:
                 raise HTTPException(status_code=403, detail="Access denied")
         elif auth.role == Role.TEACHER:
-            if not _period_svc.has_teacher_access_to_student(auth.sub, student_id):
+            if not _enrollment_svc.has_teacher_access_to_student(auth.sub, student_id):
                 raise HTTPException(status_code=403, detail="Access denied")
         else:
             raise HTTPException(status_code=403, detail="Access denied")
