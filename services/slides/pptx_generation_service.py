@@ -1,0 +1,102 @@
+import asyncio
+import logging
+import os
+from typing import Any
+
+from bots.protocol import BotProviderProtocol
+from data_access.lesson_pptx_dao import LessonPptxDAO
+from data_access.period_dao import PeriodDAO
+from integrations import s3_service
+
+logger = logging.getLogger(__name__)
+
+_SEMAPHORE_LIMIT = 8
+
+
+class PptxGenerationService:
+    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+        self._bot_provider = bot_provider
+        self.lesson_pptx_dao = LessonPptxDAO()
+        self.period_dao = PeriodDAO()
+
+    def run_batch(self, period_id: str) -> None:
+        """Sync entry point for BackgroundTasks. Fetches state then drives the async batch."""
+        from services.curriculum.curriculum_service import CurriculumService
+
+        period = self.period_dao.get_period_by_id(period_id)
+        period_context = {
+            "period_name": period.get("name", "") if period else "",
+            "grade_level": period.get("grade_level", "") if period else "",
+            "course_name": period.get("canvas_course_name", "") if period else "",
+            "course_description": period.get("course_description", "") if period else "",
+        }
+
+        pptx_rows = self.lesson_pptx_dao.get_by_period(period_id)
+        curriculum = CurriculumService(bot_provider=self._bot_provider).get_curriculum(period_id)
+        asyncio.run(self._run_batch_async(pptx_rows, curriculum, period_context))
+
+    async def _run_batch_async(
+        self,
+        pptx_rows: list[dict[str, Any]],
+        curriculum: dict[str, Any],
+        period_context: dict[str, Any],
+    ) -> None:
+        sem = asyncio.Semaphore(_SEMAPHORE_LIMIT)
+        await asyncio.gather(
+            *[self._generate_one(row, curriculum, period_context, sem) for row in pptx_rows]
+        )
+
+    async def _generate_one(
+        self,
+        row: dict[str, Any],
+        curriculum: dict[str, Any],
+        period_context: dict[str, Any],
+        sem: asyncio.Semaphore,
+    ) -> None:
+        async with sem:
+            pptx_id = row["pptx_id"]
+            lesson_id = row["lesson_id"]
+
+            lesson = next(
+                (les for les in curriculum["lessons"] if les.get("lesson_id") == lesson_id),
+                None,
+            )
+            if not lesson:
+                logger.error("pptx generation: lesson %s not found in curriculum", lesson_id)
+                self.lesson_pptx_dao.update_status(pptx_id, {"status": "failed"})
+                return
+
+            concepts = [
+                c for c in curriculum["concepts"]
+                if c.get("lesson_name") == lesson["lesson_name"]
+            ]
+            concept_names = {c["concept_name"] for c in concepts}
+            skills = [
+                s for s in curriculum["skills"]
+                if any(
+                    cs["concept_name"] in concept_names and cs["skill_name"] == s["skill_name"]
+                    for cs in curriculum["concept_skills"]
+                )
+            ]
+
+            lesson_with_context = {
+                **lesson,
+                "concepts": concepts,
+                "skills": skills,
+            }
+
+            self.lesson_pptx_dao.update_status(pptx_id, {"status": "generating"})
+            try:
+                pptx_bytes = await self._bot_provider.create_pptx_agent().run(
+                    lesson_with_context, period_context
+                )
+                s3_key = s3_service.upload_pptx(pptx_bytes, row["period_id"], lesson_id)
+                self.lesson_pptx_dao.update_status(pptx_id, {"status": "done", "s3_key": s3_key})
+            except Exception as exc:
+                if os.getenv("PYTEST_CURRENT_TEST"):
+                    raise
+                logger.error(
+                    "pptx generation failed for lesson %s: %s: %s",
+                    lesson_id, type(exc).__name__, exc,
+                )
+                self.lesson_pptx_dao.update_status(pptx_id, {"status": "failed"})
