@@ -7,15 +7,15 @@ from exceptions.validation_error import ValidationError
 
 
 def _svc():
-    svc = CurriculumService.__new__(CurriculumService)
-    svc._bot_provider = MagicMock()
-    svc.period_dao = MagicMock()
-    svc.week_dao = MagicMock()
-    svc.lesson_dao = MagicMock()
-    svc.concept_dao = MagicMock()
-    svc.skill_dao = MagicMock()
-    svc.concept_skill_dao = MagicMock()
-    return svc
+    return CurriculumService(
+        bot_provider=MagicMock(),
+        period_dao=MagicMock(),
+        week_dao=MagicMock(),
+        lesson_dao=MagicMock(),
+        concept_dao=MagicMock(),
+        skill_dao=MagicMock(),
+        concept_skill_dao=MagicMock(),
+    )
 
 
 def _period(status="pending"):

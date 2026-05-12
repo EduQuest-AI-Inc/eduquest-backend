@@ -11,6 +11,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from integrations.nano_banana_client import (
     NanoBananaClient,
     NanoBananaError,

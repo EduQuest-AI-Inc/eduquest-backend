@@ -29,14 +29,24 @@ _VALID_STATUSES = {"pending", "draft", "approved"}
 
 
 class CurriculumService:
-    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+    def __init__(
+        self,
+        *,
+        bot_provider: BotProviderProtocol,
+        period_dao=None,
+        week_dao=None,
+        lesson_dao=None,
+        concept_dao=None,
+        skill_dao=None,
+        concept_skill_dao=None,
+    ) -> None:
         self._bot_provider = bot_provider
-        self.period_dao = PeriodDAO()
-        self.week_dao = WeekDAO()
-        self.lesson_dao = LessonDAO()
-        self.concept_dao = ConceptDAO()
-        self.skill_dao = SkillDAO()
-        self.concept_skill_dao = ConceptSkillDAO()
+        self.period_dao = period_dao or PeriodDAO()
+        self.week_dao = week_dao or WeekDAO()
+        self.lesson_dao = lesson_dao or LessonDAO()
+        self.concept_dao = concept_dao or ConceptDAO()
+        self.skill_dao = skill_dao or SkillDAO()
+        self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO()
 
     # ── public API ────────────────────────────────────────────────────────────
 

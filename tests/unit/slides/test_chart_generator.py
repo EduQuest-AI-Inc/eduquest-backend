@@ -6,8 +6,11 @@ from __future__ import annotations
 
 import os
 
+import pytest
 
 from models.slide_plan import ChartSpec
+
+pytestmark = pytest.mark.unit
 from utils.rendering.chart_generator import generate_chart, generate_chart_to_file
 
 

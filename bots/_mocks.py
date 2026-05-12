@@ -330,7 +330,7 @@ class MockPptxAgent:
     can be opened after downloading. Uses python-pptx.
     """
 
-    async def run(self, lesson: dict, period_context: dict) -> bytes:
+    async def run(self, lesson: dict, period_context: dict) -> dict:
         import io
         from pptx import Presentation
 
@@ -357,4 +357,4 @@ class MockPptxAgent:
 
         buf = io.BytesIO()
         prs.save(buf)
-        return {"pptx_bytes": buf.getvalue(), "html_str": ""}
+        return {"pptx_bytes": buf.getvalue(), "html_str": "<html><body>[MOCK]</body></html>"}

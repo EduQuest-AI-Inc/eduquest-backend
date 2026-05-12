@@ -47,9 +47,9 @@ All type annotations for the bot provider use `BotProviderProtocol` from `bots/p
 
 Individual bot classes (`HWAgent`, `GradingOrchestrator`, `CurriculumAgent`, etc.) are never imported or instantiated outside `bots/provider.py`. All bot creation goes through the provider factory methods. A direct import bypasses the abstraction boundary — if the provider is swapped, a directly-instantiated bot silently runs against the wrong configuration.
 
-### Services receive their dependencies — they never instantiate DAOs, services, or the bot provider inline
+### Services receive their dependencies — they never instantiate DAOs, services, integration modules, or the bot provider inline
 
-Service classes must declare their DAOs, sub-services, and bot provider as constructor parameters with defaults, not create them inside methods. This is what makes unit tests possible without `@patch` — tests pass mock objects directly to the constructor.
+Service classes must declare their DAOs, sub-services, integration modules, and bot provider as constructor parameters with defaults, not create them inside methods. This is what makes unit tests possible without `@patch` — tests pass mock objects directly to the constructor.
 
 ```python
 # Correct

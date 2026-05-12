@@ -22,14 +22,26 @@ _SEMAPHORE_LIMIT = 8
 
 
 class PptxGenerationService:
-    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+    def __init__(
+        self,
+        *,
+        bot_provider: BotProviderProtocol,
+        lesson_pptx_dao=None,
+        period_dao=None,
+        lesson_dao=None,
+        concept_dao=None,
+        skill_dao=None,
+        concept_skill_dao=None,
+        s3=None,
+    ) -> None:
         self._bot_provider = bot_provider
-        self.lesson_pptx_dao = LessonPptxDAO()
-        self.period_dao = PeriodDAO()
-        self.lesson_dao = LessonDAO()
-        self.concept_dao = ConceptDAO()
-        self.skill_dao = SkillDAO()
-        self.concept_skill_dao = ConceptSkillDAO()
+        self.lesson_pptx_dao = lesson_pptx_dao or LessonPptxDAO()
+        self.period_dao = period_dao or PeriodDAO()
+        self.lesson_dao = lesson_dao or LessonDAO()
+        self.concept_dao = concept_dao or ConceptDAO()
+        self.skill_dao = skill_dao or SkillDAO()
+        self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO()
+        self._s3 = s3 or s3_service
 
     def start_batch(
         self,
@@ -132,11 +144,11 @@ class PptxGenerationService:
                 pptx_bytes = result["pptx_bytes"]
                 html_str = result.get("html_str", "")
 
-                pptx_key = s3_service.upload_pptx(pptx_bytes, row["period_id"], lesson_id)
+                pptx_key = self._s3.upload_pptx(pptx_bytes, row["period_id"], lesson_id)
                 fields: dict[str, Any] = {"status": "done", "s3_key": pptx_key}
 
                 if html_str:
-                    html_key = s3_service.upload_html(html_str, row["period_id"], lesson_id)
+                    html_key = self._s3.upload_html(html_str, row["period_id"], lesson_id)
                     fields["html_key"] = html_key
 
                 self.lesson_pptx_dao.update_status(pptx_id, fields)

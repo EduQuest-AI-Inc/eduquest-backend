@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from models.slide_plan import CompletedSlide, CompleteSlideDeck
+
+pytestmark = pytest.mark.unit
 from utils.rendering.html_renderer import render_html
 
 

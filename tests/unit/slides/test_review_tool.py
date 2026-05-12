@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
 
 from models.slide_plan import VisualReviewResult
+
+pytestmark = pytest.mark.unit
 
 
 def _result(decision: str, revised: str | None = None) -> VisualReviewResult:

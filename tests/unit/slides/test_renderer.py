@@ -6,7 +6,10 @@ from __future__ import annotations
 
 import io
 
+import pytest
 from pptx import Presentation
+
+pytestmark = pytest.mark.unit
 
 from models.slide_plan import CompletedSlide
 from utils.rendering.pptx_renderer import render
