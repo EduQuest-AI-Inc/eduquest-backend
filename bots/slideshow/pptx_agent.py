@@ -1,11 +1,67 @@
-from typing import Any
+"""
+PptxAgent — generates a PowerPoint deck for one lesson.
+
+Drives the full multi-agent pipeline (orchestrator → content writer → visual
+review) and renders the result to PPTX bytes. PDF/HTML are produced as
+by-products but only PPTX bytes are returned; S3 upload happens in the
+service layer.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+
+from agents import custom_span, trace
+
+from bots.slideshow.orchestrator_agent import OrchestratorAgent
+from services.slides.renderer import pptx_renderer
+
+logger = logging.getLogger(__name__)
 
 
 class PptxAgent:
-    async def run(
-        self,
-        lesson: dict[str, Any],
-        concepts: list[dict[str, Any]],
-        skills: list[dict[str, Any]],
-    ) -> bytes:
-        raise NotImplementedError("PowerPoint agent not yet implemented")
+    async def run(self, lesson: dict, period_context: dict) -> bytes:
+        """Generate a PPTX for one lesson and return raw bytes.
+
+        Args:
+            lesson: Lesson dict with lesson_name, concepts, skills, etc.
+            period_context: Dict with period_name, grade_level, course_name,
+                            course_description, and optional week_start/week_end.
+
+        Returns:
+            Raw PPTX bytes suitable for S3 upload.
+        """
+        trace_metadata = {
+            "lesson_name": str(lesson.get("lesson_name", "")),
+            "period_name": str(period_context.get("period_name", "")),
+            "grade_level": str(period_context.get("grade_level", "")),
+        }
+        with trace("pptx_agent", metadata=trace_metadata):
+            logger.info("Running orchestrator for lesson: %s", lesson.get("lesson_name"))
+            deck = await OrchestratorAgent().run_async(lesson, period_context)
+            logger.info("Orchestrator complete: %d slides", len(deck.slides))
+
+            meta = {
+                "lesson_name": lesson.get("lesson_name", deck.lesson_name),
+                "period_name": period_context.get("period_name", ""),
+                "grade_level": period_context.get("grade_level", ""),
+                "week_start": period_context.get("week_start", ""),
+                "week_end": period_context.get("week_end", ""),
+            }
+
+            with custom_span("render_pptx", data={"slide_count": len(deck.slides)}):
+                pptx_bytes = pptx_renderer.render(deck.slides, meta=meta)
+
+            _cleanup_temp_files(deck)
+
+        return pptx_bytes
+
+
+def _cleanup_temp_files(deck) -> None:
+    for cs in deck.slides:
+        if cs.visual_path and os.path.exists(cs.visual_path):
+            try:
+                os.unlink(cs.visual_path)
+            except OSError:
+                pass

@@ -186,7 +186,7 @@ def test_approve_period_draft_transitions_to_approved():
     svc.lesson_dao.get_lessons_by_period.return_value = [{"lesson_id": "l1", "lesson_name": "Intro"}]
     bg = MagicMock()
     with patch("data_access.lesson_pptx_dao.LessonPptxDAO") as MockDao, \
-         patch("services.pptx.pptx_generation_service.PptxGenerationService"):
+         patch("services.slides.pptx_generation_service.PptxGenerationService"):
         MockDao.return_value.get_by_period.return_value = []
         svc.approve_period("p1", bg)
     called_status = svc.period_dao.update_status.call_args[0][1]

@@ -11,7 +11,6 @@ Replaces the older `PlannerAgent` (which only emitted a plan with hints).
 
 from __future__ import annotations
 
-import asyncio
 import json
 
 from agents import Agent, ModelSettings, Runner, custom_span
@@ -118,13 +117,10 @@ along with `period_name` and `grade_level` from the period context above.
 Set `html_output` in the returned `CompleteSlideDeck` to the HTML string.
 """
 
-    async def _run_async(
+    async def run_async(
         self, lesson: dict, period_context: dict
     ) -> CompleteSlideDeck:
         prompt = self._build_prompt(lesson, period_context)
         with custom_span("orchestrator"):
             result = await Runner.run(self.agent, prompt, max_turns=80)
         return result.final_output
-
-    def run(self, lesson: dict, period_context: dict) -> CompleteSlideDeck:
-        return asyncio.run(self._run_async(lesson, period_context))

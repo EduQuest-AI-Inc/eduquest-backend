@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from services.slides.visuals.nano_banana_client import (
+from integrations.nano_banana_client import (
     NanoBananaClient,
     NanoBananaError,
     _extract_image_bytes,

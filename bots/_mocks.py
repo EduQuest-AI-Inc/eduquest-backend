@@ -330,12 +330,7 @@ class MockPptxAgent:
     can be opened after downloading. Uses python-pptx.
     """
 
-    async def run(
-        self,
-        lesson: dict,
-        concepts: list[dict],
-        skills: list[dict],
-    ) -> bytes:
+    async def run(self, lesson: dict, period_context: dict) -> bytes:
         import io
         from pptx import Presentation
 
@@ -346,6 +341,8 @@ class MockPptxAgent:
         title_slide.shapes.title.text = f"[MOCK] {lesson_name}"
         title_slide.placeholders[1].text = "EduQuest — Mock PowerPoint"
 
+        concepts = lesson.get("concepts", [])
+        skills = lesson.get("skills", [])
         for concept in concepts:
             concept_name = concept.get("concept_name", "Concept")
             concept_skills = [s for s in skills if s.get("concept_name") == concept_name]

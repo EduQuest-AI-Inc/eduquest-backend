@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from agents import function_tool
 
-from services.slides.visuals.nano_banana_client import (
+from integrations.nano_banana_client import (
     NanoBananaClient,
     NanoBananaError,
 )

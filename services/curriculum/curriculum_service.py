@@ -83,7 +83,7 @@ class CurriculumService:
 
         from data_access.lesson_pptx_dao import LessonPptxDAO
         from models.lesson_pptx import LessonPptx
-        from services.pptx.pptx_generation_service import PptxGenerationService
+        from services.slides.pptx_generation_service import PptxGenerationService
 
         lesson_pptx_dao = LessonPptxDAO()
         if lesson_pptx_dao.get_by_period(period_id):
