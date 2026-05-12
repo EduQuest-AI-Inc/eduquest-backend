@@ -66,6 +66,15 @@ The bot provider follows the same rule. Services declare `bot_provider: BotProvi
 
 Module-level orchestration functions (`run_*`) are also banned for the same reason. If logic needs its own DAOs, it belongs in a service class, not a free function.
 
+### `integrations/` vs `utils/` — network boundary rule
+
+The distinction between these two directories is whether the code needs a network call or a credential to function:
+
+- `integrations/` — external service adapters that make outbound network calls or require API credentials at runtime (S3, Canvas, Stripe, SES, Perplexity). These cannot run offline.
+- `utils/` — local library computation that runs offline: string manipulation, token handling, pure-Python rendering (matplotlib charts, python-pptx layout, Jinja2 HTML). No credentials, no network.
+
+Renderers (PPTX, HTML, chart generation) belong in `utils/rendering/` because they are local library calls using matplotlib, python-pptx, and Jinja2 — no API keys, no network. They must not live under `services/` or `integrations/`.
+
 ---
 
 ## Testing Decisions

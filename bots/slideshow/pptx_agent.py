@@ -15,22 +15,17 @@ import os
 from agents import custom_span, trace
 
 from bots.slideshow.orchestrator_agent import OrchestratorAgent
-from services.slides.renderer import pptx_renderer
+from utils.rendering import html_renderer, pptx_renderer
 
 logger = logging.getLogger(__name__)
 
 
 class PptxAgent:
-    async def run(self, lesson: dict, period_context: dict) -> bytes:
-        """Generate a PPTX for one lesson and return raw bytes.
-
-        Args:
-            lesson: Lesson dict with lesson_name, concepts, skills, etc.
-            period_context: Dict with period_name, grade_level, course_name,
-                            course_description, and optional week_start/week_end.
+    async def run(self, lesson: dict, period_context: dict) -> dict:
+        """Generate a PPTX and HTML for one lesson.
 
         Returns:
-            Raw PPTX bytes suitable for S3 upload.
+            Dict with ``pptx_bytes`` (bytes) and ``html_str`` (str).
         """
         trace_metadata = {
             "lesson_name": str(lesson.get("lesson_name", "")),
@@ -52,10 +47,11 @@ class PptxAgent:
 
             with custom_span("render_pptx", data={"slide_count": len(deck.slides)}):
                 pptx_bytes = pptx_renderer.render(deck.slides, meta=meta)
+                html_str = html_renderer.render_html(deck, meta)
 
             _cleanup_temp_files(deck)
 
-        return pptx_bytes
+        return {"pptx_bytes": pptx_bytes, "html_str": html_str}
 
 
 def _cleanup_temp_files(deck) -> None:

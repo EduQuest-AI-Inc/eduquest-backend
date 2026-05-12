@@ -52,3 +52,20 @@ def get_lesson_pptx(
         "version": 1,
         "lesson_name": lesson.get("lesson_name") if lesson else None,
     }
+
+
+@router.get("/{lesson_id}/html")
+def get_lesson_html(
+    lesson_id: str,
+    auth: AuthPayload = Depends(get_auth),
+):
+    pptx_row = _lesson_pptx_dao.get_latest_done(lesson_id)
+    if not pptx_row:
+        raise HTTPException(status_code=404, detail="No completed presentation for this lesson")
+    if not pptx_row.get("html_key"):
+        raise HTTPException(status_code=404, detail="HTML version not available for this lesson")
+
+    _assert_lesson_access(pptx_row["period_id"], auth)
+
+    url = s3_service.generate_presigned_url(pptx_row["html_key"], expiry=3600)
+    return {"url": url, "expires_in": 3600}

@@ -8,7 +8,7 @@ import os
 
 
 from models.slide_plan import ChartSpec
-from services.slides.visuals.chart_generator import generate_chart, generate_chart_to_file
+from utils.rendering.chart_generator import generate_chart, generate_chart_to_file
 
 
 def _spec(chart_type: str, description: str = "Test chart", data_hints: dict | None = None) -> ChartSpec:

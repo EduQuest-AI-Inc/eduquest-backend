@@ -3,7 +3,7 @@ from typing import Any, Optional, Protocol, runtime_checkable
 
 @runtime_checkable
 class PptxAgentProtocol(Protocol):
-    async def run(self, lesson: dict[str, Any], period_context: dict[str, Any]) -> bytes: ...
+    async def run(self, lesson: dict[str, Any], period_context: dict[str, Any]) -> dict[str, Any]: ...
 
 
 @runtime_checkable

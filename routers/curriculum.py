@@ -4,13 +4,12 @@ from typing import Any, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_active_membership
+from routers.deps import AuthPayload, Role, get_bot_provider, require_active_membership
 from bots.protocol import BotProviderProtocol
-from data_access.lesson_dao import LessonDAO
-from data_access.lesson_pptx_dao import LessonPptxDAO
 from data_access.period_dao import PeriodDAO
 from services.curriculum.curriculum_service import CurriculumService
 from services.enrollment.enrollment_service import EnrollmentService
+from services.slides.pptx_generation_service import PptxGenerationService
 from exceptions.not_found_error import NotFoundError
 from exceptions.validation_error import ValidationError
 
@@ -18,8 +17,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _period_dao = PeriodDAO()
-_lesson_dao = LessonDAO()
-_lesson_pptx_dao = LessonPptxDAO()
 _enrollment_service = EnrollmentService()
 
 
@@ -27,6 +24,12 @@ def _get_curriculum_service(
     bot_provider: BotProviderProtocol = Depends(get_bot_provider),
 ) -> CurriculumService:
     return CurriculumService(bot_provider=bot_provider)
+
+
+def _get_slides_service(
+    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+) -> PptxGenerationService:
+    return PptxGenerationService(bot_provider=bot_provider)
 
 
 # ── Request models ─────────────────────────────────────────────────────────────
@@ -206,42 +209,14 @@ def approve_period(
     background_tasks: BackgroundTasks,
     auth: AuthPayload = Depends(require_active_membership),
     svc: CurriculumService = Depends(_get_curriculum_service),
+    slides_svc: PptxGenerationService = Depends(_get_slides_service),
 ):
     _assert_period_owner(period_id, auth.sub)
     try:
-        return svc.approve_period(period_id, background_tasks)
+        lessons = svc.approve_period(period_id)
+        slides_svc.start_batch(period_id, background_tasks, lessons)
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-
-
-@router.get("/{period_id}/pptx/status")
-def get_pptx_status(
-    period_id: str,
-    auth: AuthPayload = Depends(get_auth),
-):
-    if auth.role == Role.STUDENT:
-        _assert_student_enrolled(period_id, auth.sub)
-    else:
-        _assert_period_owner(period_id, auth.sub)
-
-    pptx_rows = _lesson_pptx_dao.get_by_period(period_id)
-    if not pptx_rows:
-        raise HTTPException(status_code=404, detail="No PowerPoint generation found for this period")
-
-    lessons = _lesson_dao.get_lessons_by_period(period_id)
-    lesson_map = {lesson["lesson_id"]: lesson for lesson in lessons}
-
-    return {
-        "lessons": [
-            {
-                "lesson_id": row["lesson_id"],
-                "lesson_name": lesson_map.get(row["lesson_id"], {}).get("lesson_name"),
-                "week_number": lesson_map.get(row["lesson_id"], {}).get("week_number"),
-                "pptx_status": row["status"],
-                "pptx_id": row["pptx_id"],
-            }
-            for row in pptx_rows
-        ]
-    }
+    return {"total_lessons": len(lessons)}

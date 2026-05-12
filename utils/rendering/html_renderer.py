@@ -1,12 +1,3 @@
-"""
-HTML Renderer
-
-Builds a standalone HTML document for a CompleteSlideDeck using Jinja2.
-The output document has one `<section class="slide">` per slide; CSS in the
-base template uses `@page { size: 16in 9in }` so Playwright will paginate
-each section onto its own PDF page.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,7 +6,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from models.slide_plan import CompleteSlideDeck
 
-_TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
+_TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
 _env = Environment(
     loader=FileSystemLoader(str(_TEMPLATES_DIR)),

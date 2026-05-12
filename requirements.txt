@@ -26,4 +26,3 @@ google-genai
 matplotlib
 numpy
 jinja2
-playwright

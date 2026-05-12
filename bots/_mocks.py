@@ -357,4 +357,4 @@ class MockPptxAgent:
 
         buf = io.BytesIO()
         prs.save(buf)
-        return buf.getvalue()
+        return {"pptx_bytes": buf.getvalue(), "html_str": ""}

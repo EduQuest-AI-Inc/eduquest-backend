@@ -18,7 +18,7 @@ from agents import function_tool
 from bots.slideshow.visual_review_agent import VisualReviewAgent
 from models.slide_plan import ChartSpec
 from integrations import nano_banana_client
-from services.slides.visuals import chart_generator
+from utils.rendering import chart_generator
 
 logger = logging.getLogger(__name__)
 

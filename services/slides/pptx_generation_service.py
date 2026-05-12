@@ -3,10 +3,18 @@ import logging
 import os
 from typing import Any
 
+from fastapi import BackgroundTasks
+
 from bots.protocol import BotProviderProtocol
+from data_access.concept_dao import ConceptDAO
+from data_access.concept_skill_dao import ConceptSkillDAO
+from data_access.lesson_dao import LessonDAO
 from data_access.lesson_pptx_dao import LessonPptxDAO
 from data_access.period_dao import PeriodDAO
+from data_access.skill_dao import SkillDAO
+from exceptions.validation_error import ValidationError
 from integrations import s3_service
+from models.lesson_pptx import LessonPptx
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +26,37 @@ class PptxGenerationService:
         self._bot_provider = bot_provider
         self.lesson_pptx_dao = LessonPptxDAO()
         self.period_dao = PeriodDAO()
+        self.lesson_dao = LessonDAO()
+        self.concept_dao = ConceptDAO()
+        self.skill_dao = SkillDAO()
+        self.concept_skill_dao = ConceptSkillDAO()
+
+    def start_batch(
+        self,
+        period_id: str,
+        background_tasks: BackgroundTasks,
+        lessons: list[dict[str, Any]],
+    ) -> int:
+        """Create LessonPptx records and schedule background generation.
+
+        Raises ValidationError if generation is already running or completed.
+        Returns the number of lessons queued.
+        """
+        if self.lesson_pptx_dao.get_by_period(period_id):
+            raise ValidationError("Generation already running or completed for this period")
+
+        for lesson in lessons:
+            self.lesson_pptx_dao.insert(LessonPptx(
+                lesson_id=lesson["lesson_id"],
+                period_id=period_id,
+                status="pending",
+            ))
+
+        background_tasks.add_task(self.run_batch, period_id)
+        return len(lessons)
 
     def run_batch(self, period_id: str) -> None:
-        """Sync entry point for BackgroundTasks. Fetches state then drives the async batch."""
-        from services.curriculum.curriculum_service import CurriculumService
-
+        """Sync entry point for BackgroundTasks. Reads state then drives the async batch."""
         period = self.period_dao.get_period_by_id(period_id)
         period_context = {
             "period_name": period.get("name", "") if period else "",
@@ -32,7 +66,12 @@ class PptxGenerationService:
         }
 
         pptx_rows = self.lesson_pptx_dao.get_by_period(period_id)
-        curriculum = CurriculumService(bot_provider=self._bot_provider).get_curriculum(period_id)
+        curriculum = {
+            "lessons": self.lesson_dao.get_lessons_by_period(period_id),
+            "concepts": self.concept_dao.get_concepts_by_period(period_id),
+            "skills": self.skill_dao.get_skills_by_period(period_id),
+            "concept_skills": self.concept_skill_dao.get_all_for_period(period_id),
+        }
         asyncio.run(self._run_batch_async(pptx_rows, curriculum, period_context))
 
     async def _run_batch_async(
@@ -72,9 +111,9 @@ class PptxGenerationService:
             ]
             concept_names = {c["concept_name"] for c in concepts}
             skills = [
-                s for s in curriculum["skills"]
+                skill for skill in curriculum["skills"]
                 if any(
-                    cs["concept_name"] in concept_names and cs["skill_name"] == s["skill_name"]
+                    cs["concept_name"] in concept_names and cs["skill_name"] == skill["skill_name"]
                     for cs in curriculum["concept_skills"]
                 )
             ]
@@ -87,11 +126,20 @@ class PptxGenerationService:
 
             self.lesson_pptx_dao.update_status(pptx_id, {"status": "generating"})
             try:
-                pptx_bytes = await self._bot_provider.create_pptx_agent().run(
+                result = await self._bot_provider.create_pptx_agent().run(
                     lesson_with_context, period_context
                 )
-                s3_key = s3_service.upload_pptx(pptx_bytes, row["period_id"], lesson_id)
-                self.lesson_pptx_dao.update_status(pptx_id, {"status": "done", "s3_key": s3_key})
+                pptx_bytes = result["pptx_bytes"]
+                html_str = result.get("html_str", "")
+
+                pptx_key = s3_service.upload_pptx(pptx_bytes, row["period_id"], lesson_id)
+                fields: dict[str, Any] = {"status": "done", "s3_key": pptx_key}
+
+                if html_str:
+                    html_key = s3_service.upload_html(html_str, row["period_id"], lesson_id)
+                    fields["html_key"] = html_key
+
+                self.lesson_pptx_dao.update_status(pptx_id, fields)
             except Exception as exc:
                 if os.getenv("PYTEST_CURRENT_TEST"):
                     raise

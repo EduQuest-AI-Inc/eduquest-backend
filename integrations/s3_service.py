@@ -133,6 +133,22 @@ def upload_pptx(pptx_bytes: bytes, period_id: str, lesson_id: str) -> str:
     return key
 
 
+def upload_html(html_str: str, period_id: str, lesson_id: str) -> str:
+    """Upload an HTML slide deck to S3 and return the key."""
+    key = f"slides/{period_id}/{lesson_id}.html"
+    if not BUCKET_NAME:
+        logger.warning("S3 upload skipped: S3_BUCKET_NAME not set")
+        return key
+    s3.put_object(
+        Bucket=BUCKET_NAME,
+        Key=key,
+        Body=html_str.encode("utf-8"),
+        ContentType="text/html; charset=utf-8",
+        ACL="private",
+    )
+    return key
+
+
 def generate_presigned_url(s3_key: str, expiry: int = 900) -> str:
     """Return a presigned S3 GET URL for a PowerPoint file (default 15-min expiry)."""
     return get_file_presigned_url(s3_key, expires_in=expiry)

@@ -17,12 +17,12 @@ def _make_pptx_bytes() -> bytes:
 
 
 def _mock_agent(pptx_bytes=None, raises=None):
-    """Mock PptxAgent: run() is AsyncMock returning real bytes (or raising)."""
+    """Mock PptxAgent: run() is AsyncMock returning {pptx_bytes, html_str} dict (or raising)."""
     agent = MagicMock()
     if raises:
         agent.run = AsyncMock(side_effect=raises)
     else:
-        agent.run = AsyncMock(return_value=pptx_bytes or _make_pptx_bytes())
+        agent.run = AsyncMock(return_value={"pptx_bytes": pptx_bytes or _make_pptx_bytes(), "html_str": ""})
     return agent
 
 

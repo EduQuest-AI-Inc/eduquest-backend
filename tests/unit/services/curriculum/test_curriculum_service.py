@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from services.curriculum.curriculum_service import CurriculumService
 from exceptions.not_found_error import NotFoundError
@@ -184,13 +184,10 @@ def test_approve_period_draft_transitions_to_approved():
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = _period("draft")
     svc.lesson_dao.get_lessons_by_period.return_value = [{"lesson_id": "l1", "lesson_name": "Intro"}]
-    bg = MagicMock()
-    with patch("data_access.lesson_pptx_dao.LessonPptxDAO") as MockDao, \
-         patch("services.slides.pptx_generation_service.PptxGenerationService"):
-        MockDao.return_value.get_by_period.return_value = []
-        svc.approve_period("p1", bg)
+    lessons = svc.approve_period("p1")
     called_status = svc.period_dao.update_status.call_args[0][1]
     assert called_status == "approved"
+    assert lessons == [{"lesson_id": "l1", "lesson_name": "Intro"}]
 
 
 @pytest.mark.unit
@@ -198,7 +195,7 @@ def test_approve_period_pending_raises():
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = _period("pending")
     with pytest.raises(ValidationError):
-        svc.approve_period("p1", MagicMock())
+        svc.approve_period("p1")
 
 
 @pytest.mark.unit
@@ -206,7 +203,7 @@ def test_approve_period_already_approved_raises():
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = _period("approved")
     with pytest.raises(ValidationError):
-        svc.approve_period("p1", MagicMock())
+        svc.approve_period("p1")
 
 
 @pytest.mark.unit
@@ -214,4 +211,4 @@ def test_approve_period_period_not_found_raises():
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = None
     with pytest.raises(NotFoundError):
-        svc.approve_period("p1", MagicMock())
+        svc.approve_period("p1")

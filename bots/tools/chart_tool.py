@@ -9,7 +9,7 @@ import json
 from agents import function_tool
 
 from models.slide_plan import ChartSpec
-from services.slides.visuals import chart_generator
+from utils.rendering import chart_generator
 
 
 @function_tool

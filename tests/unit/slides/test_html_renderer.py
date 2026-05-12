@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from models.slide_plan import CompletedSlide, CompleteSlideDeck
-from services.slides.renderer.html_renderer import render_html
+from utils.rendering.html_renderer import render_html
 
 
 def _deck() -> CompleteSlideDeck:

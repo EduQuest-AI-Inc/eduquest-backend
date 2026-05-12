@@ -74,32 +74,15 @@ class CurriculumService:
         self._get_period_or_raise(period_id)
         self.skill_dao.update_skill(period_id, skill_name, fields)
 
-    def approve_period(self, period_id: str, background_tasks: BackgroundTasks) -> dict[str, Any]:
+    def approve_period(self, period_id: str) -> list[dict[str, Any]]:
         period = self._get_period_or_raise(period_id)
         if period["status"] != "draft":
             raise ValidationError(
                 f"Cannot approve: period status is '{period['status']}', must be 'draft'"
             )
-
-        from data_access.lesson_pptx_dao import LessonPptxDAO
-        from models.lesson_pptx import LessonPptx
-        from services.slides.pptx_generation_service import PptxGenerationService
-
-        lesson_pptx_dao = LessonPptxDAO()
-        if lesson_pptx_dao.get_by_period(period_id):
-            raise ValidationError("Generation already running or completed for this period")
-
         lessons = self.lesson_dao.get_lessons_by_period(period_id)
-        for lesson in lessons:
-            lesson_pptx_dao.insert(LessonPptx(
-                lesson_id=lesson["lesson_id"],
-                period_id=period_id,
-                status="pending",
-            ))
-
         self.period_dao.update_status(period_id, "approved")
-        background_tasks.add_task(PptxGenerationService(bot_provider=self._bot_provider).run_batch, period_id)
-        return {"total_lessons": len(lessons)}
+        return lessons
 
     # ── private helpers ───────────────────────────────────────────────────────
 

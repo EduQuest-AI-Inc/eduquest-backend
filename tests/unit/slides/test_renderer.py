@@ -9,7 +9,7 @@ import io
 from pptx import Presentation
 
 from models.slide_plan import CompletedSlide
-from services.slides.renderer.pptx_renderer import render
+from utils.rendering.pptx_renderer import render
 
 
 def _slide(

@@ -12,7 +12,7 @@ import json
 from agents import function_tool
 
 from models.slide_plan import CompleteSlideDeck, CompletedSlide
-from services.slides.renderer import html_renderer
+from utils.rendering import html_renderer
 
 
 @function_tool
