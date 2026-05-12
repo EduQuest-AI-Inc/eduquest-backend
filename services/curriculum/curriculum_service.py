@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import BackgroundTasks
 
-from bots.coverage_evaluator import CoverageEvaluator
+from bots.curriculum.coverage_evaluator import CoverageEvaluator
 from bots.protocol import BotProviderProtocol
 from data_access.concept_dao import ConceptDAO
 from data_access.concept_skill_dao import ConceptSkillDAO

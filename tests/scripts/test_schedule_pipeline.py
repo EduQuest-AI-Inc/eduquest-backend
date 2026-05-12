@@ -51,7 +51,7 @@ def _check(condition: bool, label: str) -> None:
 
 
 async def main() -> None:
-    from bots.coverage_evaluator import CoverageEvaluator
+    from bots.curriculum.coverage_evaluator import CoverageEvaluator
     from integrations.perplexity_service import PerplexityService
     from bots.schedule_agent import PeriodScheduleAgent, PeriodScheduleSchema
 

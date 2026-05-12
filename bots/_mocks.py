@@ -102,7 +102,7 @@ class MockHWAgent:
         self.schedule = schedule
 
     def run(self) -> list:
-        from bots.quest_agent import IndividualQuest
+        from bots.quests.quest_agent import IndividualQuest
 
         results = []
         for quest in self.schedule:
@@ -142,7 +142,7 @@ class MockLTGScheduleAgent:
         self._goal_text = goal_text or "complete the course"
 
     def run(self):
-        from bots.ltg_schedule_agent import ScheduleOutput, WeekQuest
+        from bots.quests.ltg_schedule_agent import ScheduleOutput, WeekQuest
 
         verbs = ["Build", "Design", "Analyze", "Create", "Apply",
                  "Investigate", "Prototype", "Compare", "Draft", "Evaluate"]

@@ -26,7 +26,7 @@ class BotProvider:
     OpenAI SDK at module import time when it isn't needed."""
 
     def create_hw_agent(self, student, period, schedule, conversation_id=None, previous_response_id=None):
-        from bots.quest_agent import HWAgent
+        from bots.quests.quest_agent import HWAgent
         return HWAgent(
             student, period, schedule,
             conversation_id=conversation_id,
@@ -47,7 +47,7 @@ class BotProvider:
         grade_level: Optional[str] = None,
         research_context: Optional[str] = None,
     ):
-        from bots.curriculum_agent import CurriculumAgent
+        from bots.curriculum.curriculum_agent import CurriculumAgent
         return CurriculumAgent(
             vector_store_ids=vector_store_ids,
             course_name=course_name,
@@ -67,7 +67,7 @@ class BotProvider:
         return create_ltg_agent(vector_store_id, curriculum)
 
     def create_schedule_agent(self, student, period, schedule, goal_text, previous_response_id=None):
-        from bots.ltg_schedule_agent import LTGScheduleAgent
+        from bots.quests.ltg_schedule_agent import LTGScheduleAgent
         return LTGScheduleAgent(
             student=student,
             period=period,
@@ -81,7 +81,7 @@ class BotProvider:
         return create_teacher_feedback_agent()
 
     def create_pptx_agent(self):
-        from bots.pptx_agent import PptxAgent
+        from bots.slideshow.pptx_agent import PptxAgent
         return PptxAgent()
 
     async def grade_submission(self, quest_data: dict, submission_text: str) -> dict:
