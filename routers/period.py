@@ -12,7 +12,6 @@ from pydantic import BaseModel
 
 from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_active_membership, require_roles
 from bots.protocol import BotProviderProtocol
-from data_access.teacher_dao import TeacherDAO
 from integrations import openai_vector_store
 from integrations.s3_service import (
     complete_multipart_upload,
@@ -30,12 +29,13 @@ from services.period.period_file_service import PeriodFileService
 from models.period import CourseMetadata
 from services.curriculum.curriculum_service import CurriculumService
 from services.period.period_management_service import PeriodManagementService
+from services.user.teacher_service import TeacherService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 period_management_service = PeriodManagementService()
 period_file_service = PeriodFileService()
-teacher_dao = TeacherDAO()
+_teacher_service = TeacherService()
 membership_service = MembershipService()
 
 
@@ -239,7 +239,7 @@ def create_period(
 
         if auth.role == Role.TEACHER and canvas_api_url and canvas_api_key:
             try:
-                teacher_dao.update_canvas_credentials(auth.sub, canvas_api_url, canvas_api_key)
+                _teacher_service.update_canvas_credentials(auth.sub, canvas_api_url, canvas_api_key)
             except Exception as e:
                 logger.warning("Failed to persist Canvas credentials for teacher %s: %s", auth.sub, e)
 
@@ -355,7 +355,7 @@ def update_period_setup(
 
         if auth.role == Role.TEACHER and canvas_api_url and canvas_api_key:
             try:
-                teacher_dao.update_canvas_credentials(auth.sub, canvas_api_url, canvas_api_key)
+                _teacher_service.update_canvas_credentials(auth.sub, canvas_api_url, canvas_api_key)
             except Exception as e:
                 logger.warning("Failed to persist Canvas credentials for teacher %s: %s", auth.sub, e)
 

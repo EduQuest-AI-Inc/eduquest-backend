@@ -5,20 +5,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from routers.deps import AuthPayload, Role, get_auth
-from data_access.enrollment_dao import EnrollmentDAO
-from data_access.parent_dao import ParentDAO
-from data_access.period_dao import PeriodDAO
-from data_access.quest_dao import QuestDAO
+from services.enrollment.enrollment_service import EnrollmentService
+from services.parent.parent_service import ParentService
+from services.period.period_management_service import PeriodManagementService
 from services.quest.quest_retrieval_service import QuestRetrievalService
 from services.quest.quest_service import QuestService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 quest_service = QuestService()
-quest_dao = QuestDAO()
-enrollment_dao = EnrollmentDAO()
-parent_dao = ParentDAO()
-period_dao = PeriodDAO()
+_enrollment_service = EnrollmentService()
+_parent_service = ParentService()
+_period_management_svc = PeriodManagementService()
 
 
 @router.get("/quests")
@@ -37,7 +35,7 @@ def get_quests(
 
 @router.get("/quests/{quest_id}")
 def get_quest(quest_id: str, auth: AuthPayload = Depends(get_auth)):
-    quest = quest_dao.get_quest_by_id(quest_id)
+    quest = quest_service.get_quest_by_id(quest_id)
     if quest:
         QuestRetrievalService.attach_grade_display(quest)
         return quest
@@ -53,13 +51,13 @@ def get_student_quests(
     """Teacher/parent route: fetch quests for a specific student."""
     if auth.sub != user_id:
         if auth.role == Role.PARENT:
-            linked = parent_dao.get_linked_student_ids(auth.sub)
+            linked = _parent_service.get_linked_student_ids(auth.sub)
             if user_id not in linked:
                 raise HTTPException(status_code=403, detail="Not authorized")
         else:
-            enrollments = enrollment_dao.get_enrollments_by_student(user_id)
+            enrollments = _enrollment_service.get_enrollments_by_student(user_id)
             period_ids = [e["period_id"] for e in enrollments]
-            caller_periods = period_dao.get_periods_by_owner_id(auth.sub)
+            caller_periods = _period_management_svc.get_periods_by_owner(auth.sub)
             caller_period_ids = {p["period_id"] for p in caller_periods}
             if not any(pid in caller_period_ids for pid in period_ids):
                 raise HTTPException(status_code=403, detail="Not authorized")
@@ -82,7 +80,7 @@ def update_quest_steps(
     body: UpdateStepsRequest,
     auth: AuthPayload = Depends(get_auth),
 ):
-    quest_dao.update_completed_steps(quest_id, body.completed_steps)
+    quest_service.update_completed_steps(quest_id, body.completed_steps)
     return {"message": "Steps updated", "quest_id": quest_id, "completed_steps": body.completed_steps}
 
 
@@ -112,7 +110,7 @@ def grade_quest(
     body: GradeQuestRequest,
     auth: AuthPayload = Depends(get_auth),
 ):
-    quest_dao.update_quest_grade_and_feedback(quest_id, body.grade, body.feedback)
+    quest_service.update_quest_grade_and_feedback(quest_id, body.grade, body.feedback)
     return {"message": "Grade and feedback submitted successfully", "quest_id": quest_id}
 
 

@@ -4,22 +4,20 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from bots.protocol import BotProviderProtocol
 from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_roles
-from data_access.lesson_pptx_dao import LessonPptxDAO
-from data_access.lesson_dao import LessonDAO
-from data_access.period_dao import PeriodDAO
-from data_access.enrollment_dao import EnrollmentDAO
-from data_access.parent_dao import ParentDAO
 from exceptions.validation_error import ValidationError
+from services.enrollment.enrollment_service import EnrollmentService
+from services.lessons.lessons_service import LessonsService
+from services.parent.parent_service import ParentService
+from services.period.period_management_service import PeriodManagementService
 from services.slides.pptx_generation_service import PptxGenerationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_lesson_pptx_dao = LessonPptxDAO()
-_lesson_dao = LessonDAO()
-_period_dao = PeriodDAO()
-_enrollment_dao = EnrollmentDAO()
-_parent_dao = ParentDAO()
+_lessons_svc = LessonsService()
+_period_svc = PeriodManagementService()
+_enrollment_svc = EnrollmentService()
+_parent_svc = ParentService()
 
 
 def _get_slides_service(
@@ -33,7 +31,7 @@ def get_pptx_status(
     period_id: str,
     auth: AuthPayload = Depends(get_auth),
 ):
-    period = _period_dao.get_period_by_id(period_id)
+    period = _period_svc.get_period_by_id(period_id)
     if not period:
         raise HTTPException(status_code=404, detail=f"Period '{period_id}' not found")
 
@@ -41,24 +39,24 @@ def get_pptx_status(
     if not is_owner:
         # Student: must be enrolled in the period
         if auth.role == Role.STUDENT:
-            enrollments = _enrollment_dao.get_enrollments_by_student(auth.sub)
+            enrollments = _enrollment_svc.get_enrollments_by_student(auth.sub)
             if not any(e["period_id"] == period_id for e in enrollments):
                 raise HTTPException(status_code=403, detail="Unauthorized")
         # Parent: must have a linked child enrolled in the period
         elif auth.role == Role.PARENT:
-            child_ids = _parent_dao.get_linked_student_ids(auth.sub)
+            child_ids = _parent_svc.get_linked_student_ids(auth.sub)
             enrolled_period_ids = {
                 e["period_id"]
                 for child_id in child_ids
-                for e in _enrollment_dao.get_enrollments_by_student(child_id)
+                for e in _enrollment_svc.get_enrollments_by_student(child_id)
             }
             if period_id not in enrolled_period_ids:
                 raise HTTPException(status_code=403, detail="Unauthorized")
         else:
             raise HTTPException(status_code=403, detail="Unauthorized")
 
-    pptx_rows = _lesson_pptx_dao.get_by_period(period_id)
-    lessons = {les["lesson_id"]: les for les in _lesson_dao.get_lessons_by_period(period_id)}
+    pptx_rows = _lessons_svc.get_pptx_by_period(period_id)
+    lessons = {les["lesson_id"]: les for les in _lessons_svc.get_lessons_by_period(period_id)}
 
     return [
         {
@@ -79,7 +77,7 @@ def restart_pptx_generation(
     auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
     slides_svc: PptxGenerationService = Depends(_get_slides_service),
 ):
-    period = _period_dao.get_period_by_id(period_id)
+    period = _period_svc.get_period_by_id(period_id)
     if not period:
         raise HTTPException(status_code=404, detail=f"Period '{period_id}' not found")
     if period["owner_id"] != auth.sub:

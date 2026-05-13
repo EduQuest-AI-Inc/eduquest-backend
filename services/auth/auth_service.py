@@ -31,6 +31,7 @@ def check_password_hash(hashed: str, password: str) -> bool:
 def _is_legacy_hash(hashed: str) -> bool:
     return hashed.startswith(_LEGACY_PREFIXES)
 
+from data_access.session_dao import SessionDAO
 from data_access.user_dao import UserDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
@@ -41,6 +42,7 @@ from models.parent import Parent
 from .password_policy import validate_password
 
 user_dao = UserDAO()
+session_dao = SessionDAO()
 student_dao = StudentDAO()
 teacher_dao = TeacherDAO()
 parent_dao = ParentDAO()
@@ -91,6 +93,18 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
     )
     student_dao.add_student(student)
     return {"success": True}
+
+
+def get_user_by_email(email: str):
+    return user_dao.get_by_email(email)
+
+
+def add_session(session) -> None:
+    session_dao.add_session(session)
+
+
+def get_student_by_id(user_id: str):
+    return student_dao.get_student_by_id(user_id)
 
 
 def authenticate_user(username: str, password: str, role: str) -> bool:

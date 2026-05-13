@@ -121,10 +121,10 @@ def require_student_viewer(student_id_param: str = "user_id"):
         auth: AuthPayload = Depends(require_student_viewer("user_id"))
     """
     from fastapi import Request
-    from data_access.parent_dao import ParentDAO
     from services.enrollment.enrollment_service import EnrollmentService
+    from services.parent.parent_service import ParentService
 
-    _parent_dao = ParentDAO()
+    _parent_svc = ParentService()
     _enrollment_svc = EnrollmentService()
 
     def _check(request: Request, auth: AuthPayload = Depends(get_auth)) -> AuthPayload:
@@ -136,7 +136,7 @@ def require_student_viewer(student_id_param: str = "user_id"):
             return auth  # accessing own data
 
         if auth.role == Role.PARENT:
-            linked = _parent_dao.get_linked_student_ids(auth.sub)
+            linked = _parent_svc.get_linked_student_ids(auth.sub)
             if student_id not in linked:
                 raise HTTPException(status_code=403, detail="Access denied")
         elif auth.role == Role.TEACHER:

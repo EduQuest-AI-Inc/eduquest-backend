@@ -204,6 +204,9 @@ class EnrollmentService:
             "remaining_enrollments": updated_enrollments,
         }
 
+    def get_enrollments_by_student(self, user_id: str) -> list:
+        return self.enrollment_dao.get_enrollments_by_student(user_id)
+
     def check_enrolled(self, user_id: str, period_id: str) -> None:
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
         if not any(e['user_id'] == user_id for e in enrollments):

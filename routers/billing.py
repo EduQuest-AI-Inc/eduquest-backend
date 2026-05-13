@@ -22,17 +22,17 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from data_access.user_dao import UserDAO
 from integrations import stripe_service
 from models.membership import MembershipPlan
 from routers.deps import AuthPayload, Role, require_roles
 from services.billing.membership_service import MembershipService
+from services.user.user_service import UserService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _membership_service = MembershipService()
-_user_dao = UserDAO()
+_user_service = UserService()
 
 
 def _require_role_value(auth: AuthPayload) -> str:
@@ -73,7 +73,7 @@ def create_checkout_session(
     if not price_id:
         raise HTTPException(status_code=500, detail="Plan price is not configured")
 
-    user = _user_dao.get_by_id(auth.sub)
+    user = _user_service.get_by_id(auth.sub)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 

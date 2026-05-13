@@ -1,21 +1,10 @@
 """
 Bot provider — factory for real and mock bot instances.
 
-Usage (Phase 3+, preferred):
-    Receive BotProviderProtocol via constructor injection.
-
-Usage (legacy shim — services still call this until Phase 3):
-    from bots.provider import get_bot_provider
-    agent = get_bot_provider().create_hw_agent(student, period, schedule)
-
-The canonical provider is selected once at startup in main.py lifespan and
-stored in app.state.bot_provider. get_bot_provider() is a non-caching shim
-that creates a fresh instance from MOCK_AI on each call; it exists only for
-backward compatibility with service files that have not yet been migrated to
-constructor injection. Do not add new callers — use routers.deps.get_bot_provider
-(a FastAPI dependency) or constructor injection instead.
+Receive BotProviderProtocol via constructor injection or via
+routers.deps.get_bot_provider (FastAPI Depends). The canonical provider is
+selected once at startup in main.py lifespan and stored in app.state.bot_provider.
 """
-import os
 from typing import Optional
 
 from bots.protocol import BotProviderProtocol  # noqa: F401 — re-exported for callers
@@ -224,14 +213,3 @@ class MockBotProvider(BotProvider):
     def runner(self):
         from bots._mocks import MockRunner
         return MockRunner
-
-
-def get_bot_provider() -> BotProvider:
-    """Non-caching shim — creates a fresh instance on each call from MOCK_AI env var.
-
-    Deprecated: migrate callers to constructor injection (Phase 3). Do not add new
-    callers. The canonical provider lives in app.state.bot_provider (see main.py).
-    """
-    if os.getenv("MOCK_AI", "").lower() in ("true", "1", "yes"):
-        return MockBotProvider()
-    return BotProvider()

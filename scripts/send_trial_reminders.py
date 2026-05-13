@@ -16,13 +16,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from services.billing.trial_reminder_service import run_reminder_pass  # noqa: E402
+from services.billing.trial_reminder_service import TrialReminderService  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)-8s %(name)s - %(message)s")
 
 
 def main() -> int:
-    result = run_reminder_pass()
+    result = TrialReminderService().run_pass()
     print(
         f"trial-reminder pass: candidates={result.candidates} sent={result.sent} "
         f"skipped_no_email={result.skipped_no_email} failed={result.failed}"

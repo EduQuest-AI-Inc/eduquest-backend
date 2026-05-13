@@ -6,9 +6,9 @@ from pydantic import BaseModel
 
 from routers.deps import AuthPayload, Role, get_bot_provider, require_active_membership
 from bots.protocol import BotProviderProtocol
-from data_access.period_dao import PeriodDAO
 from services.curriculum.curriculum_service import CurriculumService
 from services.enrollment.enrollment_service import EnrollmentService
+from services.period.period_management_service import PeriodManagementService
 from services.slides.pptx_generation_service import PptxGenerationService
 from exceptions.not_found_error import NotFoundError
 from exceptions.validation_error import ValidationError
@@ -16,7 +16,7 @@ from exceptions.validation_error import ValidationError
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_period_dao = PeriodDAO()
+_period_management_svc = PeriodManagementService()
 _enrollment_service = EnrollmentService()
 
 
@@ -98,7 +98,7 @@ class _SkillEditPayload(BaseModel):
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _assert_period_owner(period_id: str, user_id: str) -> None:
-    period = _period_dao.get_period_by_id(period_id)
+    period = _period_management_svc.get_period_by_id(period_id)
     if not period:
         logger.warning("period not found: period_id=%s", period_id)
         raise HTTPException(status_code=404, detail=f"Period '{period_id}' not found")
