@@ -207,8 +207,8 @@ See [bots/CLAUDE.md](bots/CLAUDE.md) for agent system and PPTX pipeline details.
 
 ```bash
 cd eduquest-backend
+make setup          # creates venv, installs all dependencies, installs pre-commit hook
 source venv/bin/activate
-pip install -r requirements.txt
 ```
 
 **Environment** — `.env` file:
