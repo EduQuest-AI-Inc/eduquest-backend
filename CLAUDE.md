@@ -126,6 +126,16 @@ services/[feature]/
 
 Router handlers that do more than one distinct thing extract underscore-prefixed helpers in the same file (e.g. `_validate_pilot_access()`, `_resolve_identity()`, `_handle_file_submission()`). These are private to the module — no helper should exceed 20 lines.
 
+## Layer Rules
+
+Rules below are the what; see [ARCH_DECISIONS.md](ARCH_DECISIONS.md) for the why.
+
+- **Routers are HTTP-boundary-only.** Parse request, call service, return response. No business logic in `routers/`.
+- **Service dependency injection.** Services declare DAOs, sub-services, integrations, and bot provider as constructor parameters with defaults (`def __init__(self, my_dao=None): self.my_dao = my_dao or MyDAO()`). Never instantiate inline.
+- **`integrations/` vs `utils/` boundary.** `integrations/` = external service adapters (outbound calls, credentials). `utils/` = local computation only (no network, no credentials). Renderers (PPTX, HTML, charts) belong in `utils/rendering/`.
+- **Auth enforcement split.** Role checks at router via `Depends(require_roles(...))`. Ownership checks raise `PermissionError` inside the service (because verification requires the same resource lookup). Enrollment checks at router top via `EnrollmentService().check_enrolled()` — service methods must not re-check enrollment.
+- **All S3 access through `integrations/s3_service.py`.** Never instantiate `boto3.client` directly.
+
 ## Error Handling
 
 Custom exceptions in `exceptions/` are caught by global handlers in `main.py`:
@@ -169,30 +179,7 @@ Use `logger = logging.getLogger(__name__)` at the top of every service and bot f
 - `JWT_EXPIRY_HOURS = 1` — JWT token lifetime
 - `INVITE_EXPIRY_HOURS = 24` — parent invite expiry
 
-## Agent System
-
-All agent code in `bots/` (not `EQ_agents/` — that directory no longer exists). Agents use OpenAI's Agents SDK (`from agents import Agent, Runner`).
-
-- `bots/grading_agent.py` (`GradingOrchestrator`) — produces per-skill float scores (0.0–1.0). Results are written to `aggregated_metrics` via `AggregatedMetricsDAO`.
-- `bots/schedule_agent.py` (`PeriodScheduleAgent`) — generates Week→Lesson→Concept→Skill schedule hierarchy. Accepts `research_context` (from Perplexity) to fill curriculum gaps when no files are uploaded.
-- `bots/coverage_evaluator.py` (`CoverageEvaluator`) — single `gpt-4o-mini` structured call; returns `sufficient`, `gaps`, and `research_queries`. Used before schedule generation to decide whether to call Perplexity.
-- `integrations/perplexity_service.py` (`PerplexityService`) — calls `POST https://api.perplexity.ai/v1/agent` with `{"preset": "deep-research", "input": ...}` via `httpx`. Response text is in `output[-1]["content"][0]["text"]` (last item of type "message" in the `output` array). NOT the OpenAI-compatible `/chat/completions` endpoint.
-
-## Slideshow / PPTX Pipeline
-
-The PPTX feature generates PowerPoint decks per lesson. Unlike the conversation agents (which use a stateful `OpenAIConversationsSession`), the slideshow pipeline is **stateless** — each generation is a fresh `Runner.run()` call with `max_turns=80`.
-
-**Agent chain:** `PptxAgent → OrchestratorAgent → ContentWriterAgent / VisualReviewAgent / SLIDE_TOOLS`
-
-- `bots/slideshow/pptx_agent.py` (`PptxAgent`) — top-level entry point; calls `OrchestratorAgent().run_async()`, then renders the resulting `CompleteSlideDeck` to `.pptx` (via `utils/rendering/pptx_renderer.py`) and HTML (via `utils/rendering/html_renderer.py`). Returns `{"pptx_bytes": bytes, "html_str": str}`.
-- `bots/slideshow/orchestrator_agent.py` (`OrchestratorAgent`) — triage agent; designs the deck and calls specialist sub-agents via `SLIDE_TOOLS` function tools. Returns a `CompleteSlideDeck`.
-- `bots/slideshow/content_writer_agent.py` (`ContentWriterAgent`) — writes `title`, `bullets`, and `speaker_notes` for one slide.
-- `bots/slideshow/visual_review_agent.py` (`VisualReviewAgent`) — reviews generated images; returns `approved`, `regenerate`, or `flag`.
-- `bots/tools/` — `SLIDE_TOOLS` are `@function_tool` wrappers registered to the orchestrator: `content_tool`, `image_tool`, `chart_tool`, `review_tool`, `html_tool`.
-
-**Status lifecycle:** `LessonPptx` rows transition `pending → generating → done | failed`. Managed by `services/slides/pptx_generation_service.py` (`PptxGenerationService`).
-
-**Mock:** `MockPptxAgent` lives in `bots/_mocks.py` alongside the other mocks. It generates a minimal real `.pptx` file using `python-pptx` and returns non-empty `html_str` so the HTML upload branch is exercised. `MockBotProvider.create_pptx_agent()` returns it.
+See [bots/CLAUDE.md](bots/CLAUDE.md) for agent system and PPTX pipeline details.
 
 ## Development
 

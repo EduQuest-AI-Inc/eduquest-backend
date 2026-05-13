@@ -47,6 +47,12 @@ All type annotations for the bot provider use `BotProviderProtocol` from `bots/p
 
 Individual bot classes (`HWAgent`, `GradingOrchestrator`, `CurriculumAgent`, etc.) are never imported or instantiated outside `bots/provider.py`. All bot creation goes through the provider factory methods. A direct import bypasses the abstraction boundary — if the provider is swapped, a directly-instantiated bot silently runs against the wrong configuration.
 
+### `@function_tool` wrappers are agent-boundary-only — same rule as routers
+
+A `@function_tool` body must do nothing except call a named public function and return its result. All business logic belongs in that extracted function, which accepts its dependencies as parameters. No module-level instantiation in `bots/tools/` files; use lazy initialisation (`_x: T | None = None`, set on first call) for any singleton that the thin wrapper needs to supply as a default.
+
+This is the agent-layer equivalent of "Routers are HTTP-boundary-only." The extracted function lives in `utils/` if it is pure control flow with injected dependencies, or in a dedicated service if it needs its own DAO/provider wiring.
+
 ### Services receive their dependencies — they never instantiate DAOs, services, integration modules, or the bot provider inline
 
 Service classes must declare their DAOs, sub-services, integration modules, and bot provider as constructor parameters with defaults, not create them inside methods. This is what makes unit tests possible without `@patch` — tests pass mock objects directly to the constructor.
@@ -96,9 +102,3 @@ Tests that need a mock bot provider pass `MockBotProvider()` directly to the ser
 ### Private methods are tested through the public API, not directly
 
 Test files must not call underscore-prefixed methods (`_check_profile`, `_extract_conversation_id`, etc.) directly. If the public-facing method covers all branches of a private method, the private tests are redundant and create rename-friction. If a private method is complex enough that the public path cannot reach all its branches in isolation, the right fix is to make it a standalone public function in a utility module — not to test it directly while leaving it private.
-
-### `@function_tool` wrappers are agent-boundary-only — same rule as routers
-
-A `@function_tool` body must do nothing except call a named public function and return its result. All business logic belongs in that extracted function, which accepts its dependencies as parameters. No module-level instantiation in `bots/tools/` files; use lazy initialisation (`_x: T | None = None`, set on first call) for any singleton that the thin wrapper needs to supply as a default.
-
-This is the agent-layer equivalent of "Routers are HTTP-boundary-only." The extracted function lives in `utils/` if it is pure control flow with injected dependencies, or in a dedicated service if it needs its own DAO/provider wiring.

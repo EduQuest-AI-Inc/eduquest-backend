@@ -1,5 +1,7 @@
 # CLAUDE.md — Data Access
 
+For rationale behind the DAO pattern, see [ARCH_DECISIONS.md](../ARCH_DECISIONS.md).
+
 All DAOs live in `data_access/` and extend `SupabaseBaseDAO` from [base_dao.py](base_dao.py).
 
 ## DAO Pattern
