@@ -15,14 +15,30 @@ For rationale behind bot provider selection and `@function_tool` boundary rules,
 
 All agent code uses OpenAI Agents SDK (`from agents import Agent, Runner`).
 
+**Top-level bots/**
 - `grading_agent.py` (`GradingOrchestrator`) — produces per-skill float scores (0.0–1.0); results written to `aggregated_metrics` via `AggregatedMetricsDAO`
-- `schedule_agent.py` (`PeriodScheduleAgent`) — generates Week→Lesson→Concept→Skill hierarchy; accepts `research_context` (from Perplexity) to fill gaps when no files are uploaded
-- `coverage_evaluator.py` (`CoverageEvaluator`) — single structured call; returns `sufficient`, `gaps`, `research_queries`; used before schedule generation to decide whether to call Perplexity
-- `ltg_agent.py` — long-term goal agent
+- `ltg_agent.py` — long-term goal conversational agent
 - `profile_agent.py` — student profile agent
 - `teacher_feedback_agent.py` — teacher feedback agent
 - `guardrails.py` — content safety guardrails
+- `protocol.py` — `BotProviderProtocol` and `PptxAgentProtocol`; all type annotations use these, never concrete classes
 - `provider.py` — `BotProvider` factory; `_mocks.py` — `MockBotProvider` and mock agents for tests
+
+**bots/curriculum/**
+- `curriculum_agent.py` (`CurriculumAgent`) — generates Week→Lesson→Concept→Skill hierarchy; accepts `research_context` (from Perplexity) to fill gaps when no files are uploaded
+- `coverage_evaluator.py` (`CoverageEvaluator`) — single structured OpenAI call (no Agent overhead); returns `sufficient`, `gaps`, `research_queries`; used before curriculum generation to decide whether to call Perplexity
+
+**bots/quests/**
+- `quest_agent.py` (`HWAgent`) — generates quest instructions and rubrics for all curriculum weeks
+- `ltg_schedule_agent.py` (`LtgScheduleAgent`) — turns a student's long-term goal into a week-by-week quest name sequence
+
+**bots/schemas/**
+- `rubric.py` — `Rubric` Pydantic schema
+- `instructions.py` — `Instructions` Pydantic schema
+- `curriculum.py` — output schemas for curriculum generation (Week/Lesson/Concept/Skill hierarchy)
+
+**bots/tools/**
+`SLIDE_TOOLS` are `@function_tool` wrappers: `content_tool`, `image_tool`, `chart_tool`, `review_tool`, `html_tool`, `knowledge_graph_tools`
 
 ## Perplexity Integration
 
@@ -38,7 +54,6 @@ Each generation is a stateless fresh `Runner.run()` call with `max_turns=80` (un
 - `slideshow/orchestrator_agent.py` (`OrchestratorAgent`) — designs deck, calls specialists via `SLIDE_TOOLS`
 - `slideshow/content_writer_agent.py` (`ContentWriterAgent`) — writes `title`, `bullets`, `speaker_notes` per slide
 - `slideshow/visual_review_agent.py` (`VisualReviewAgent`) — reviews images; returns `approved`, `regenerate`, or `flag`
-- `bots/tools/` — `SLIDE_TOOLS` are `@function_tool` wrappers: `content_tool`, `image_tool`, `chart_tool`, `review_tool`, `html_tool`
 
 **Status lifecycle:** `LessonPptx` rows transition `pending → generating → done | failed`. Managed by `services/slides/pptx_generation_service.py`.
 

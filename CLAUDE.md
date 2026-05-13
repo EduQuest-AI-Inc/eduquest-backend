@@ -15,10 +15,12 @@ eduquest-backend/
 │   ├── conversation.py             # /conversation — profile assistant, update assistant
 │   ├── curriculum.py               # /curriculum — per-period curriculum generation/approval
 │   ├── enrollment.py               # /enrollment — enroll/unenroll students
+│   ├── lessons.py                  # /lessons — presigned URLs for lesson PPTX and HTML
 │   ├── ltg.py                      # /period — LTG conversation routes (mounted under /period)
 │   ├── parent.py                   # /parent — parent invite, child lookup
 │   ├── period.py                   # /period — period CRUD, homework agent, file uploads
 │   ├── quest.py                    # /quest — quest retrieval, submission
+│   ├── slides.py                   # /slides — PPTX status by period, restart generation
 │   ├── teacher.py                  # /teacher — Canvas courses, skill-mastery analytics
 │   ├── user.py                     # /user — user profile, tutorial state
 │   └── waitlist.py                 # /pilot-waitlist — status, join
@@ -31,7 +33,7 @@ eduquest-backend/
 │   ├── curriculum/                 # curriculum_service.py
 │   ├── enrollment/                 # enrollment_service.py (CRUD, verify_and_enroll, unenroll,
 │   │                               #   get_my_periods, assert_enrolled)
-│   ├── knowledge_graph/            # knowledge_graph_service.py, curriculum_parser.py
+│   ├── knowledge_graph/            # knowledge_graph_service.py
 │   ├── period/                     # period_service.py, period_quest_service.py,
 │   │                               #   period_management_service.py, period_file_service.py
 │   ├── quest/                      # quest_service.py, quest_creation_service.py,
@@ -40,7 +42,8 @@ eduquest-backend/
 │   │                               #   events.py, track.py)
 │   ├── user/                       # user_service.py
 │   ├── waitlist/                   # waitlist_service.py
-│   └── parent/                     # parent_service.py
+│   ├── parent/                     # parent_service.py
+│   └── slides/                     # pptx_generation_service.py — status lifecycle (pending→generating→done|failed), restart_batch
 ├── models/                         # Pydantic domain models
 │   ├── user.py                     # Base User model
 │   ├── student.py                  # Student(User)
@@ -58,28 +61,42 @@ eduquest-backend/
 │   ├── session.py                  # Session — JWT session record
 │   ├── parent_invite.py            # ParentInvite — invite token for parent signup
 │   └── password_reset_token.py     # PasswordResetToken — reset link token
-├── bots/                           # All AI agent code (was EQ_agents/)
-│   ├── agent.py                    # HWAgent — quest instruction/rubric generation
+├── bots/                           # All AI agent code (subdirectory-organized)
 │   ├── grading_agent.py            # Multi-agent grading orchestrator
 │   ├── ltg_agent.py                # Long-term goal agent
 │   ├── guardrails.py               # Content safety guardrails
 │   ├── profile_agent.py            # Student profile agent
-│   ├── provider.py                 # Bot provider — factory for real and mock bot instances
+│   ├── protocol.py                 # BotProviderProtocol, PptxAgentProtocol
+│   ├── provider.py                 # BotProvider factory for real and mock instances
 │   ├── teacher_feedback_agent.py   # Teacher feedback agent
-│   ├── _mocks.py                   # Mock bot instances for testing
-│   └── schemas/rubric.py           # Rubric Pydantic schema
+│   ├── _mocks.py                   # MockBotProvider and mock agents for testing
+│   ├── curriculum/                 # curriculum_agent.py (Week→Lesson→Concept→Skill),
+│   │                               #   coverage_evaluator.py (decides Perplexity research)
+│   ├── quests/                     # quest_agent.py (HWAgent — instructions/rubric),
+│   │                               #   ltg_schedule_agent.py (LTG → per-week quest names)
+│   ├── schemas/                    # rubric.py, instructions.py, curriculum.py
+│   ├── slideshow/                  # pptx_agent.py, orchestrator_agent.py,
+│   │                               #   content_writer_agent.py, visual_review_agent.py
+│   └── tools/                      # @function_tool wrappers: content, image, chart,
+│                                   #   review, html, knowledge_graph_tools
 ├── integrations/                   # External service adapters (shared across features)
 │   ├── s3_service.py               # AWS S3 upload helpers
 │   ├── canvas_service.py           # Canvas LMS integration (canvasapi library)
+│   ├── nano_banana_client.py       # Gemini image generation for slides (NanoBananaClient)
+│   ├── openai_vector_store.py      # OpenAI vector store CRUD helpers (create, upload, delete)
 │   ├── perplexity_service.py       # Perplexity Agent API (deep-research preset) for curriculum research
 │   ├── stripe_service.py           # Stripe customer/subscription helpers, webhook signature
 │   └── email_service.py            # SES email sending
 ├── utils/
 │   ├── token_utils.py              # extract_auth_token(), get_user_id_from_token(), set_auth_cookie()
-│   └── validation_utils.py         # get_client_ip(request), normalize_email(email)
+│   ├── validation_utils.py         # get_client_ip(request), normalize_email(email)
+│   ├── pdf_utils.py                # preprocess_pdf() — strips large PDFs to headings + first sentences before upload
+│   ├── review_loop.py              # run_review_loop() — visual review retry logic (extracted for testability)
+│   └── rendering/                  # pptx_renderer.py, html_renderer.py, chart_generator.py
 ├── exceptions/                     # Custom exception classes → global HTTP status mappings
 │   ├── auth_error.py               # → 401
 │   ├── not_found_error.py          # → 404
+│   ├── permission_error.py         # → 403 (ownership checks in services)
 │   └── validation_error.py         # → 400
 ├── constants/
 │   └── timeouts.py                 # JWT_EXPIRY_HOURS, INVITE_EXPIRY_HOURS
@@ -95,9 +112,11 @@ eduquest-backend/
 - `/conversation` — profile assistant, update assistant
 - `/curriculum` — curriculum generation/approval per period
 - `/enrollment` — student enrollment
+- `/lessons` — `GET /{lesson_id}/pptx` and `GET /{lesson_id}/html` presigned URL endpoints
 - `/parent` — parent invite and child lookup
 - `/period` — period CRUD, homework agent; also the prefix for `ltg.py` (LTG conversation), which is a separate router file mounted under `/period`
 - `/quest` — quest retrieval, submission
+- `/slides` — `GET /{period_id}/pptx/status`, `POST /{period_id}/pptx/restart`
 - `/teacher` — Canvas courses, skill-mastery analytics
 - `/user` — user profile, tutorial state
 - `/pilot-waitlist` — status, join
@@ -143,6 +162,7 @@ Custom exceptions in `exceptions/` are caught by global handlers in `main.py`:
 - `ValidationError` → 400
 - `NotFoundError` → 404
 - `AuthError` → 401
+- `PermissionError` → 403
 - bare `Exception` → 500 (catch-all; logs full traceback)
 
 **Rule: route handlers must never catch bare `Exception` to convert it to a 500.** All unhandled exceptions bubble up to the global handler, which owns the 500 mapping. This keeps logging, error shape, and observability consistent across every route.
@@ -197,12 +217,14 @@ pip install -r requirements.txt
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 - `OPENAI_API_KEY`
 - `PERPLEXITY_API_KEY` — required for `PerplexityService` (Perplexity Agent API)
-- `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — S3 uploads + SES email
+- `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) — required for `NanoBananaClient` (Gemini image generation for slides)
+- `GEMINI_IMAGE_MODEL` (optional; defaults to `gemini-2.5-flash-image`)
+- `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_NAME` — S3 uploads + SES email
 - `SES_FROM_EMAIL`, `FRONTEND_BASE_URL` — password reset emails, Stripe redirect URLs
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — Stripe API + webhook signature
 - `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_GROWTH`, `STRIPE_PRICE_PRO` — Stripe price IDs for each plan
 - `PILOT_WAITLIST_ENABLED` (optional; default `true`)
-- `API_GATEWAY_URL` (optional)
+- `MOCK_AI` (optional; set to `true` to use `MockBotProvider` in development — no OpenAI calls)
 
 **Run**:
 
