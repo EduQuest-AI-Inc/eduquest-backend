@@ -103,6 +103,20 @@ CHECKS = [
 ]
 
 
+_DAO_EXEMPT = {"__init__.py", "config.py"}
+
+
+def check_dao_naming() -> list[tuple[str, str]]:
+    """Every file in data_access/ must end in _dao.py (except exemptions)."""
+    hits = []
+    for path in sorted((ROOT / "data_access").glob("*.py")):
+        if path.name in _DAO_EXEMPT:
+            continue
+        if not path.name.endswith("_dao.py"):
+            hits.append((str(path.relative_to(ROOT)), path.name))
+    return hits
+
+
 def main() -> int:
     failed = False
     for description, glob, pattern, exclude_paths, exclude_dirs in CHECKS:
@@ -112,6 +126,13 @@ def main() -> int:
             print(f"\n[ARCH] {description}")
             for rel, lineno, line in hits:
                 print(f"  {rel}:{lineno}: {line}")
+
+    dao_hits = check_dao_naming()
+    if dao_hits:
+        failed = True
+        print("\n[ARCH] data_access/ files must end in _dao.py (except __init__.py and config.py)")
+        for rel, name in dao_hits:
+            print(f"  {rel}: '{name}' does not end in _dao.py")
 
     if failed:
         print("\nArchitecture violations found. See ARCH_DECISIONS.md.")
