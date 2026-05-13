@@ -13,3 +13,11 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-push]
+
+      - id: pytest-unit
+        name: pytest (unit)
+        entry: venv/bin/pytest
+        args: [-m, unit, --tb=short, -q]
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
