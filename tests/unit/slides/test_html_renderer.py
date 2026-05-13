@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 
 from models.slide_plan import CompletedSlide, CompleteSlideDeck
+from utils.rendering.html_renderer import render_html
 
 pytestmark = pytest.mark.unit
-from utils.rendering.html_renderer import render_html
 
 
 def _deck() -> CompleteSlideDeck:

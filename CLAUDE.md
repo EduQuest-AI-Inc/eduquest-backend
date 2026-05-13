@@ -143,6 +143,17 @@ Handlers that must perform cleanup before propagating (e.g. `shutil.rmtree` on a
 
 **Service guard methods must not use an `assert_` prefix.** Python's `unittest.mock` treats any attribute starting with `assert_` as a potential misspelled assertion helper and raises `AttributeError` at test time. Use `check_*` or `verify_*` instead (e.g. `check_enrolled`, `check_can_create_class`).
 
+## Logging
+
+Route handlers don't need explicit logging — FastAPI's access log covers them. Everything running **outside the request/response cycle** is invisible without it, so these must be logged:
+
+- **BackgroundTasks and async pipelines**: log when the job starts (include relevant IDs and counts), when each significant step begins and completes, and when the job finishes.
+- **Agent runs**: log before and after each `Runner.run()` call with enough context to identify which lesson/period/user triggered it.
+- **External service calls** (S3, SES, Stripe, Perplexity): log failures with `exc_info=True`.
+- **All `except` blocks that swallow exceptions**: always log with `exc_info=True` so the full traceback is captured, not just the exception type and message.
+
+Use `logger = logging.getLogger(__name__)` at the top of every service and bot file that does any of the above.
+
 ## Auth Token Utilities
 
 `utils/token_utils.py`:

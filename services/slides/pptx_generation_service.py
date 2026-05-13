@@ -78,6 +78,7 @@ class PptxGenerationService:
         }
 
         pptx_rows = self.lesson_pptx_dao.get_by_period(period_id)
+        logger.info("pptx batch starting: period=%s lessons=%d", period_id, len(pptx_rows))
         curriculum = {
             "lessons": self.lesson_dao.get_lessons_by_period(period_id),
             "concepts": self.concept_dao.get_concepts_by_period(period_id),
@@ -85,6 +86,7 @@ class PptxGenerationService:
             "concept_skills": self.concept_skill_dao.get_all_for_period(period_id),
         }
         asyncio.run(self._run_batch_async(pptx_rows, curriculum, period_context))
+        logger.info("pptx batch complete: period=%s", period_id)
 
     async def _run_batch_async(
         self,
@@ -136,6 +138,7 @@ class PptxGenerationService:
                 "skills": skills,
             }
 
+            logger.info("pptx generating: lesson=%s name=%r", lesson_id, lesson.get("lesson_name"))
             self.lesson_pptx_dao.update_status(pptx_id, {"status": "generating"})
             try:
                 result = await self._bot_provider.create_pptx_agent().run(
@@ -152,11 +155,13 @@ class PptxGenerationService:
                     fields["html_key"] = html_key
 
                 self.lesson_pptx_dao.update_status(pptx_id, fields)
+                logger.info("pptx done: lesson=%s", lesson_id)
             except Exception as exc:
                 if os.getenv("PYTEST_CURRENT_TEST"):
                     raise
                 logger.error(
                     "pptx generation failed for lesson %s: %s: %s",
                     lesson_id, type(exc).__name__, exc,
+                    exc_info=True,
                 )
                 self.lesson_pptx_dao.update_status(pptx_id, {"status": "failed"})

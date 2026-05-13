@@ -9,9 +9,9 @@ import os
 import pytest
 
 from models.slide_plan import ChartSpec
+from utils.rendering.chart_generator import generate_chart, generate_chart_to_file
 
 pytestmark = pytest.mark.unit
-from utils.rendering.chart_generator import generate_chart, generate_chart_to_file
 
 
 def _spec(chart_type: str, description: str = "Test chart", data_hints: dict | None = None) -> ChartSpec:

@@ -107,7 +107,6 @@ class VisualReviewAgent:
                     user_message,
                 ],
                 response_format={"type": "json_object"},
-                temperature=0,
             )
 
             raw = response.choices[0].message.content or "{}"

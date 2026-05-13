@@ -23,7 +23,7 @@ def _result(decision: str, revised: str | None = None) -> VisualReviewResult:
 def _invoke_review_tool(**kwargs):
     """Replays the review-loop logic so we can unit-test the retry behavior
     without the @function_tool wrapper (which validates a strict JSON schema)."""
-    import tools.review_tool as rt
+    import bots.tools.review_tool as rt
     return _run_review_logic(rt, **kwargs)
 
 
