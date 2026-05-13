@@ -91,3 +91,16 @@ class TrialReminderService:
             skipped_no_email=skipped_no_email,
             failed=failed,
         )
+
+
+def run_reminder_pass(
+    membership_dao: Optional[MembershipDAO] = None,
+    user_dao: Optional[UserDAO] = None,
+    email_service=None,
+    now: Optional[datetime] = None,
+) -> ReminderRunResult:
+    return TrialReminderService(
+        membership_dao=membership_dao,
+        user_dao=user_dao,
+        email_service=email_service,
+    ).run_pass(now=now)

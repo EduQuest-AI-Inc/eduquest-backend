@@ -97,6 +97,8 @@ class PptxGenerationService:
             asyncio.run(self._run_batch_async(pptx_rows, curriculum, period_context))
             logger.info("pptx batch complete: period=%s", period_id)
         except Exception as exc:
+            if os.getenv("PYTEST_CURRENT_TEST"):
+                raise
             logger.error("pptx batch crashed: period=%s: %s", period_id, exc, exc_info=True)
             all_rows = self.lesson_pptx_dao.get_by_period(period_id)
             for row in all_rows:
