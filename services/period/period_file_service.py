@@ -4,7 +4,7 @@ import os
 from integrations.canvas_service import Course as CanvasCourse, course_to_json
 from integrations.s3_service import upload_file_to_s3
 from integrations import openai_vector_store
-from integrations.pdf_processor import preprocess_pdf
+from utils.pdf_utils import preprocess_pdf
 
 logger = logging.getLogger(__name__)
 

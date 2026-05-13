@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
-from bots.provider import get_bot_provider
+from bots.protocol import BotProviderProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +55,8 @@ def grade_student_submission(
     quest_data: Dict[str, Any],
     submission_path: Optional[str] = None,
     submission_text: Optional[str] = None,
+    *,
+    bot_provider: BotProviderProtocol,
 ) -> Dict[str, Any]:
     """
     Synchronous entry-point called from ``ConversationService``.
@@ -75,7 +77,7 @@ def grade_student_submission(
         len(submission_text),
     )
     try:
-        return asyncio.run(get_bot_provider().grade_submission(quest_data, submission_text))
+        return asyncio.run(bot_provider.grade_submission(quest_data, submission_text))
     except Exception as e:
         logger.error("Grading agent failed: %s", e, exc_info=True)
         raise

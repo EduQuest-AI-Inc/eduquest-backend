@@ -102,7 +102,7 @@ class MockHWAgent:
         self.schedule = schedule
 
     def run(self) -> list:
-        from bots.quest_agent import IndividualQuest
+        from bots.quests.quest_agent import IndividualQuest
 
         results = []
         for quest in self.schedule:
@@ -142,7 +142,7 @@ class MockLTGScheduleAgent:
         self._goal_text = goal_text or "complete the course"
 
     def run(self):
-        from bots.ltg_schedule_agent import ScheduleOutput, WeekQuest
+        from bots.quests.ltg_schedule_agent import ScheduleOutput, WeekQuest
 
         verbs = ["Build", "Design", "Analyze", "Create", "Apply",
                  "Investigate", "Prototype", "Compare", "Draft", "Evaluate"]
@@ -213,12 +213,12 @@ class MockCurriculumAgent:
     def __init__(
         self,
         vector_store_ids: list,
-        course_name: str = None,
-        start_date: str = None,
-        end_date: str = None,
-        course_description: str = None,
-        grade_level: str = None,
-        research_context: str = None,
+        course_name: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        course_description: str | None = None,
+        grade_level: str | None = None,
+        research_context: str | None = None,
     ):
         self._start_date = date.fromisoformat(start_date) if start_date else date.today()
         self._end_date = date.fromisoformat(end_date) if end_date else date.today()
@@ -321,3 +321,40 @@ class MockConversationsSession:
 
     def __init__(self, conversation_id=None):
         self._session_id = conversation_id or "mock-conversation-id-001"
+
+
+class MockPptxAgent:
+    """
+    Deterministic replacement for PptxAgent. Returns a minimal but real
+    .pptx file (title slide + one content slide per concept) so the file
+    can be opened after downloading. Uses python-pptx.
+    """
+
+    async def run(self, lesson: dict, period_context: dict) -> dict:
+        import io
+        from pptx import Presentation
+
+        prs = Presentation()
+        lesson_name = lesson.get("lesson_name", "Lesson")
+
+        title_slide = prs.slides.add_slide(prs.slide_layouts[0])
+        title_slide.shapes.title.text = f"[MOCK] {lesson_name}"
+        title_slide.placeholders[1].text = "EduQuest — Mock PowerPoint"
+
+        concepts = lesson.get("concepts", [])
+        skills = lesson.get("skills", [])
+        for concept in concepts:
+            concept_name = concept.get("concept_name", "Concept")
+            concept_skills = [s for s in skills if s.get("concept_name") == concept_name]
+            slide = prs.slides.add_slide(prs.slide_layouts[1])
+            slide.shapes.title.text = concept_name
+            tf = slide.placeholders[1].text_frame
+            tf.text = "Skills:"
+            for skill in concept_skills:
+                p = tf.add_paragraph()
+                p.text = f"• {skill.get('skill_name', '')}"
+                p.level = 1
+
+        buf = io.BytesIO()
+        prs.save(buf)
+        return {"pptx_bytes": buf.getvalue(), "html_str": "<html><body>[MOCK]</body></html>"}

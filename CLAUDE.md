@@ -1,6 +1,7 @@
 # CLAUDE.md — Backend
 
 See also: [data_access/CLAUDE.md](data_access/CLAUDE.md) for DAO and database patterns.
+See also: [ARCH_DECISIONS.md](ARCH_DECISIONS.md) for authoritative decisions on router boundaries, auth enforcement, enrollment checks, agent instantiation, service dependencies, and testing conventions.
 
 ## Package Layout
 
@@ -142,6 +143,17 @@ Handlers that must perform cleanup before propagating (e.g. `shutil.rmtree` on a
 
 **Service guard methods must not use an `assert_` prefix.** Python's `unittest.mock` treats any attribute starting with `assert_` as a potential misspelled assertion helper and raises `AttributeError` at test time. Use `check_*` or `verify_*` instead (e.g. `check_enrolled`, `check_can_create_class`).
 
+## Logging
+
+Route handlers don't need explicit logging — FastAPI's access log covers them. Everything running **outside the request/response cycle** is invisible without it, so these must be logged:
+
+- **BackgroundTasks and async pipelines**: log when the job starts (include relevant IDs and counts), when each significant step begins and completes, and when the job finishes.
+- **Agent runs**: log before and after each `Runner.run()` call with enough context to identify which lesson/period/user triggered it.
+- **External service calls** (S3, SES, Stripe, Perplexity): log failures with `exc_info=True`.
+- **All `except` blocks that swallow exceptions**: always log with `exc_info=True` so the full traceback is captured, not just the exception type and message.
+
+Use `logger = logging.getLogger(__name__)` at the top of every service and bot file that does any of the above.
+
 ## Auth Token Utilities
 
 `utils/token_utils.py`:
@@ -165,6 +177,22 @@ All agent code in `bots/` (not `EQ_agents/` — that directory no longer exists)
 - `bots/schedule_agent.py` (`PeriodScheduleAgent`) — generates Week→Lesson→Concept→Skill schedule hierarchy. Accepts `research_context` (from Perplexity) to fill curriculum gaps when no files are uploaded.
 - `bots/coverage_evaluator.py` (`CoverageEvaluator`) — single `gpt-4o-mini` structured call; returns `sufficient`, `gaps`, and `research_queries`. Used before schedule generation to decide whether to call Perplexity.
 - `integrations/perplexity_service.py` (`PerplexityService`) — calls `POST https://api.perplexity.ai/v1/agent` with `{"preset": "deep-research", "input": ...}` via `httpx`. Response text is in `output[-1]["content"][0]["text"]` (last item of type "message" in the `output` array). NOT the OpenAI-compatible `/chat/completions` endpoint.
+
+## Slideshow / PPTX Pipeline
+
+The PPTX feature generates PowerPoint decks per lesson. Unlike the conversation agents (which use a stateful `OpenAIConversationsSession`), the slideshow pipeline is **stateless** — each generation is a fresh `Runner.run()` call with `max_turns=80`.
+
+**Agent chain:** `PptxAgent → OrchestratorAgent → ContentWriterAgent / VisualReviewAgent / SLIDE_TOOLS`
+
+- `bots/slideshow/pptx_agent.py` (`PptxAgent`) — top-level entry point; calls `OrchestratorAgent().run_async()`, then renders the resulting `CompleteSlideDeck` to `.pptx` (via `utils/rendering/pptx_renderer.py`) and HTML (via `utils/rendering/html_renderer.py`). Returns `{"pptx_bytes": bytes, "html_str": str}`.
+- `bots/slideshow/orchestrator_agent.py` (`OrchestratorAgent`) — triage agent; designs the deck and calls specialist sub-agents via `SLIDE_TOOLS` function tools. Returns a `CompleteSlideDeck`.
+- `bots/slideshow/content_writer_agent.py` (`ContentWriterAgent`) — writes `title`, `bullets`, and `speaker_notes` for one slide.
+- `bots/slideshow/visual_review_agent.py` (`VisualReviewAgent`) — reviews generated images; returns `approved`, `regenerate`, or `flag`.
+- `bots/tools/` — `SLIDE_TOOLS` are `@function_tool` wrappers registered to the orchestrator: `content_tool`, `image_tool`, `chart_tool`, `review_tool`, `html_tool`.
+
+**Status lifecycle:** `LessonPptx` rows transition `pending → generating → done | failed`. Managed by `services/slides/pptx_generation_service.py` (`PptxGenerationService`).
+
+**Mock:** `MockPptxAgent` lives in `bots/_mocks.py` alongside the other mocks. It generates a minimal real `.pptx` file using `python-pptx` and returns non-empty `html_str` so the HTML upload branch is exercised. `MockBotProvider.create_pptx_agent()` returns it.
 
 ## Development
 

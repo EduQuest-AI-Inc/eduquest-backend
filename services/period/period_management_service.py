@@ -4,8 +4,8 @@ from datetime import date
 from typing import Optional
 
 from data_access.period_dao import PeriodDAO
-from exceptions.auth_error import AuthError
 from exceptions.not_found_error import NotFoundError
+from exceptions.permission_error import PermissionError
 from exceptions.validation_error import ValidationError
 from integrations import openai_vector_store
 from integrations.s3_service import delete_files_from_s3
@@ -110,7 +110,7 @@ class PeriodManagementService:
         if not period:
             raise NotFoundError("Period not found")
         if period.get("owner_id") != user_id:
-            raise AuthError("Not authorized to delete this period")
+            raise PermissionError("Not authorized to delete this period")
         vector_store_id = period.get("vector_store_id")
         if vector_store_id:
             openai_vector_store.delete_store(vector_store_id)

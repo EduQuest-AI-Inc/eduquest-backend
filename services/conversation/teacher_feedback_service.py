@@ -8,7 +8,7 @@ of the legacy ``update`` class from assistants.py.
 import asyncio
 from typing import Optional, Dict, Any
 
-from bots.provider import get_bot_provider
+from bots.protocol import BotProviderProtocol
 
 
 class TeacherFeedbackConversationService:
@@ -17,9 +17,10 @@ class TeacherFeedbackConversationService:
     OpenAI Conversations session.
     """
 
-    def __init__(self, conversation_id: Optional[str] = None) -> None:
-        self.agent = get_bot_provider().create_teacher_feedback_agent()
-        self.session = get_bot_provider().make_conversations_session(conversation_id)
+    def __init__(self, conversation_id: Optional[str] = None, *, bot_provider: BotProviderProtocol) -> None:
+        self._bot_provider = bot_provider
+        self.agent = bot_provider.create_teacher_feedback_agent()
+        self.session = bot_provider.make_conversations_session(conversation_id)
 
     async def _extract_conversation_id(self) -> Optional[str]:
         try:
@@ -60,7 +61,7 @@ class TeacherFeedbackConversationService:
             f"What have you noticed about this student?"
         )
 
-        result = await get_bot_provider().run_conversation(
+        result = await self._bot_provider.run_conversation(
             self.agent,
             initial_message,
             session=self.session,
@@ -77,7 +78,7 @@ class TeacherFeedbackConversationService:
 
     async def continue_conversation(self, user_message: str) -> Dict[str, Any]:
         """Continue an existing teacher-feedback conversation."""
-        result = await get_bot_provider().run_conversation(
+        result = await self._bot_provider.run_conversation(
             self.agent,
             user_message,
             session=self.session,
@@ -97,14 +98,18 @@ def initiate_teacher_feedback(
     student: Dict[str, Any],
     quests_summary: str,
     conversation_id: Optional[str] = None,
+    *,
+    bot_provider: BotProviderProtocol,
 ) -> Dict[str, Any]:
-    service = TeacherFeedbackConversationService(conversation_id)
+    service = TeacherFeedbackConversationService(conversation_id, bot_provider=bot_provider)
     return asyncio.run(service.initiate(student, quests_summary))
 
 
 def continue_teacher_feedback(
     conversation_id: str,
     user_message: str,
+    *,
+    bot_provider: BotProviderProtocol,
 ) -> Dict[str, Any]:
-    service = TeacherFeedbackConversationService(conversation_id)
+    service = TeacherFeedbackConversationService(conversation_id, bot_provider=bot_provider)
     return asyncio.run(service.continue_conversation(user_message))

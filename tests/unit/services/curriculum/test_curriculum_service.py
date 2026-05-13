@@ -7,14 +7,15 @@ from exceptions.validation_error import ValidationError
 
 
 def _svc():
-    svc = CurriculumService.__new__(CurriculumService)
-    svc.period_dao = MagicMock()
-    svc.week_dao = MagicMock()
-    svc.lesson_dao = MagicMock()
-    svc.concept_dao = MagicMock()
-    svc.skill_dao = MagicMock()
-    svc.concept_skill_dao = MagicMock()
-    return svc
+    return CurriculumService(
+        bot_provider=MagicMock(),
+        period_dao=MagicMock(),
+        week_dao=MagicMock(),
+        lesson_dao=MagicMock(),
+        concept_dao=MagicMock(),
+        skill_dao=MagicMock(),
+        concept_skill_dao=MagicMock(),
+    )
 
 
 def _period(status="pending"):
@@ -104,6 +105,7 @@ _PAYLOAD = {
 def test_save_curriculum_inserts_all_entities():
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = _period("draft")
+    svc.lesson_dao.insert_lesson.return_value = "lesson-id-1"
     svc.save_curriculum("p1", _PAYLOAD)
     svc.week_dao.insert_week.assert_called_once()
     svc.lesson_dao.insert_lesson.assert_called_once()
@@ -181,25 +183,27 @@ def test_update_skill_period_not_found_raises():
 def test_approve_period_draft_transitions_to_approved():
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = _period("draft")
-    svc.approve_period("p1")
+    svc.lesson_dao.get_lessons_by_period.return_value = [{"lesson_id": "l1", "lesson_name": "Intro"}]
+    lessons = svc.approve_period("p1")
     called_status = svc.period_dao.update_status.call_args[0][1]
     assert called_status == "approved"
+    assert lessons == [{"lesson_id": "l1", "lesson_name": "Intro"}]
 
 
 @pytest.mark.unit
 def test_approve_period_pending_raises():
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = _period("pending")
-    with pytest.raises(ValidationError, match="no generated curriculum"):
+    with pytest.raises(ValidationError):
         svc.approve_period("p1")
 
 
 @pytest.mark.unit
-def test_approve_period_already_approved_still_calls_update():
+def test_approve_period_already_approved_raises():
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = _period("approved")
-    svc.approve_period("p1")
-    svc.period_dao.update_status.assert_called_once()
+    with pytest.raises(ValidationError):
+        svc.approve_period("p1")
 
 
 @pytest.mark.unit

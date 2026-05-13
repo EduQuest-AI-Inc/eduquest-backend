@@ -118,3 +118,175 @@ def test_get_vector_store_id_not_found():
 
     with pytest.raises(NotFoundError):
         svc.get_vector_store_id("missing")
+
+
+# ---------------------------------------------------------------------------
+# update_status
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+def test_update_status_delegates_to_dao():
+    svc = _svc()
+
+    svc.update_status("p1", "active")
+
+    svc.period_dao.update_status.assert_called_once_with("p1", "active")
+
+
+# ---------------------------------------------------------------------------
+# update_setup
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+def test_update_setup_updates_and_returns_period():
+    svc = _svc()
+    updated_period = {"period_id": "p1", "name": "New Name"}
+    svc.period_dao.get_period_by_id.return_value = updated_period
+
+    result = svc.update_setup("p1", {"name": "New Name"})
+
+    svc.period_dao.update_period.assert_called_once_with("p1", {"name": "New Name"})
+    svc.period_dao.get_period_by_id.assert_called_once_with("p1")
+    assert result == updated_period
+
+
+@pytest.mark.unit
+def test_update_setup_returns_none_when_period_not_found():
+    svc = _svc()
+    svc.period_dao.get_period_by_id.return_value = None
+
+    result = svc.update_setup("missing", {"name": "Ghost"})
+
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# update_processing_status
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+def test_update_processing_status_delegates_to_dao():
+    svc = _svc()
+
+    svc.update_processing_status("p1", "processing")
+
+    svc.period_dao.update_period.assert_called_once_with("p1", {"processing_status": "processing"})
+
+
+# ---------------------------------------------------------------------------
+# update_vector_store_id
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+def test_update_vector_store_id_delegates_to_dao():
+    svc = _svc()
+
+    svc.update_vector_store_id("p1", "vs99")
+
+    svc.period_dao.update_period.assert_called_once_with("p1", {"vector_store_id": "vs99"})
+
+
+# ---------------------------------------------------------------------------
+# update_file_vector_store_ids
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+def test_update_file_vector_store_ids_delegates_to_dao():
+    svc = _svc()
+    ids = ["fvs1", "fvs2"]
+
+    svc.update_file_vector_store_ids("p1", ids)
+
+    svc.period_dao.update_period.assert_called_once_with("p1", {"file_vector_store_ids": ids})
+
+
+# ---------------------------------------------------------------------------
+# delete_period
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+def test_delete_period_raises_not_found_when_missing():
+    svc = _svc()
+    svc.period_dao.get_period_by_id.return_value = None
+
+    with pytest.raises(NotFoundError):
+        svc.delete_period("missing", "u1")
+
+
+@pytest.mark.unit
+def test_delete_period_raises_permission_error_when_not_owner():
+    from exceptions.permission_error import PermissionError
+
+    svc = _svc()
+    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "other_user"}
+
+    with pytest.raises(PermissionError):
+        svc.delete_period("p1", "u1")
+
+
+@pytest.mark.unit
+def test_delete_period_deletes_vector_store_and_s3_files(monkeypatch):
+    svc = _svc()
+    svc.period_dao.get_period_by_id.return_value = {
+        "period_id": "p1",
+        "owner_id": "u1",
+        "vector_store_id": "vs42",
+        "file_urls": ["s3/key1", "s3/key2"],
+    }
+
+    mock_delete_store = MagicMock()
+    mock_delete_s3 = MagicMock()
+    import services.period.period_management_service as svc_module
+    monkeypatch.setattr(svc_module.openai_vector_store, "delete_store", mock_delete_store)
+    monkeypatch.setattr(svc_module, "delete_files_from_s3", mock_delete_s3)
+
+    svc.delete_period("p1", "u1")
+
+    mock_delete_store.assert_called_once_with("vs42")
+    mock_delete_s3.assert_called_once_with(["s3/key1", "s3/key2"])
+    svc.period_dao.delete_period.assert_called_once_with("p1")
+
+
+@pytest.mark.unit
+def test_delete_period_skips_vector_store_when_none(monkeypatch):
+    svc = _svc()
+    svc.period_dao.get_period_by_id.return_value = {
+        "period_id": "p1",
+        "owner_id": "u1",
+        "vector_store_id": None,
+        "file_urls": [],
+    }
+
+    mock_delete_store = MagicMock()
+    mock_delete_s3 = MagicMock()
+    import services.period.period_management_service as svc_module
+    monkeypatch.setattr(svc_module.openai_vector_store, "delete_store", mock_delete_store)
+    monkeypatch.setattr(svc_module, "delete_files_from_s3", mock_delete_s3)
+
+    svc.delete_period("p1", "u1")
+
+    mock_delete_store.assert_not_called()
+    mock_delete_s3.assert_not_called()
+    svc.period_dao.delete_period.assert_called_once_with("p1")
+
+
+@pytest.mark.unit
+def test_delete_period_skips_local_file_urls(monkeypatch):
+    """File URLs prefixed with 'local/' are not passed to S3 delete."""
+    svc = _svc()
+    svc.period_dao.get_period_by_id.return_value = {
+        "period_id": "p1",
+        "owner_id": "u1",
+        "vector_store_id": None,
+        "file_urls": ["local/file.pdf", "s3/remote.pdf"],
+    }
+
+    mock_delete_store = MagicMock()
+    mock_delete_s3 = MagicMock()
+    import services.period.period_management_service as svc_module
+    monkeypatch.setattr(svc_module.openai_vector_store, "delete_store", mock_delete_store)
+    monkeypatch.setattr(svc_module, "delete_files_from_s3", mock_delete_s3)
+
+    svc.delete_period("p1", "u1")
+
+    mock_delete_s3.assert_called_once_with(["s3/remote.pdf"])
