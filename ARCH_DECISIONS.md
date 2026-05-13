@@ -47,9 +47,9 @@ All type annotations for the bot provider use `BotProviderProtocol` from `bots/p
 
 Individual bot classes (`HWAgent`, `GradingOrchestrator`, `CurriculumAgent`, etc.) are never imported or instantiated outside `bots/provider.py`. All bot creation goes through the provider factory methods. A direct import bypasses the abstraction boundary — if the provider is swapped, a directly-instantiated bot silently runs against the wrong configuration.
 
-### Services receive their dependencies — they never instantiate DAOs, services, or the bot provider inline
+### Services receive their dependencies — they never instantiate DAOs, services, integration modules, or the bot provider inline
 
-Service classes must declare their DAOs, sub-services, and bot provider as constructor parameters with defaults, not create them inside methods. This is what makes unit tests possible without `@patch` — tests pass mock objects directly to the constructor.
+Service classes must declare their DAOs, sub-services, integration modules, and bot provider as constructor parameters with defaults, not create them inside methods. This is what makes unit tests possible without `@patch` — tests pass mock objects directly to the constructor.
 
 ```python
 # Correct
@@ -65,6 +65,15 @@ def run_something(user_id):
 The bot provider follows the same rule. Services declare `bot_provider: BotProviderProtocol` as a constructor parameter and store it as `self._bot_provider`. No service imports or calls `get_bot_provider()` directly — that is the router's job via `Depends()`.
 
 Module-level orchestration functions (`run_*`) are also banned for the same reason. If logic needs its own DAOs, it belongs in a service class, not a free function.
+
+### `integrations/` vs `utils/` — network boundary rule
+
+The distinction between these two directories is whether the code needs a network call or a credential to function:
+
+- `integrations/` — external service adapters that make outbound network calls or require API credentials at runtime (S3, Canvas, Stripe, SES, Perplexity). These cannot run offline.
+- `utils/` — local library computation that runs offline: string manipulation, token handling, pure-Python rendering (matplotlib charts, python-pptx layout, Jinja2 HTML). No credentials, no network.
+
+Renderers (PPTX, HTML, chart generation) belong in `utils/rendering/` because they are local library calls using matplotlib, python-pptx, and Jinja2 — no API keys, no network. They must not live under `services/` or `integrations/`.
 
 ---
 

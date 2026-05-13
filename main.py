@@ -21,7 +21,7 @@ _req_log = logging.getLogger("eduquest.request")
 
 from routers import conversation, period, ltg, teacher, waitlist
 from routers import auth, user, enrollment, quest, parent
-from routers import curriculum, billing, lessons
+from routers import curriculum, billing, lessons, slides
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from exceptions.auth_error import AuthError
@@ -137,6 +137,7 @@ app.include_router(user.router, prefix="/user")
 app.include_router(waitlist.router, prefix="/pilot-waitlist")
 app.include_router(curriculum.router, prefix="/curriculum")
 app.include_router(lessons.router, prefix="/lessons")
+app.include_router(slides.router, prefix="/slides")
 app.include_router(billing.router, prefix="/billing")
 
 

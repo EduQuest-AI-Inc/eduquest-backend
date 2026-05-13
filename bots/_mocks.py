@@ -102,7 +102,7 @@ class MockHWAgent:
         self.schedule = schedule
 
     def run(self) -> list:
-        from bots.quest_agent import IndividualQuest
+        from bots.quests.quest_agent import IndividualQuest
 
         results = []
         for quest in self.schedule:
@@ -142,7 +142,7 @@ class MockLTGScheduleAgent:
         self._goal_text = goal_text or "complete the course"
 
     def run(self):
-        from bots.ltg_schedule_agent import ScheduleOutput, WeekQuest
+        from bots.quests.ltg_schedule_agent import ScheduleOutput, WeekQuest
 
         verbs = ["Build", "Design", "Analyze", "Create", "Apply",
                  "Investigate", "Prototype", "Compare", "Draft", "Evaluate"]
@@ -330,12 +330,7 @@ class MockPptxAgent:
     can be opened after downloading. Uses python-pptx.
     """
 
-    async def run(
-        self,
-        lesson: dict,
-        concepts: list[dict],
-        skills: list[dict],
-    ) -> bytes:
+    async def run(self, lesson: dict, period_context: dict) -> dict:
         import io
         from pptx import Presentation
 
@@ -346,6 +341,8 @@ class MockPptxAgent:
         title_slide.shapes.title.text = f"[MOCK] {lesson_name}"
         title_slide.placeholders[1].text = "EduQuest — Mock PowerPoint"
 
+        concepts = lesson.get("concepts", [])
+        skills = lesson.get("skills", [])
         for concept in concepts:
             concept_name = concept.get("concept_name", "Concept")
             concept_skills = [s for s in skills if s.get("concept_name") == concept_name]
@@ -360,4 +357,4 @@ class MockPptxAgent:
 
         buf = io.BytesIO()
         prs.save(buf)
-        return buf.getvalue()
+        return {"pptx_bytes": buf.getvalue(), "html_str": "<html><body>[MOCK]</body></html>"}

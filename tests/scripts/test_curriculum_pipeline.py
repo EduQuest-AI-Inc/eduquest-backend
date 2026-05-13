@@ -95,7 +95,7 @@ def _build_quest_entries(schedule: dict, enabled_weeks: list) -> list:
 
 
 async def main() -> None:
-    from bots.coverage_evaluator import CoverageEvaluator
+    from bots.curriculum.coverage_evaluator import CoverageEvaluator
     from integrations.perplexity_service import PerplexityService
     from bots.schedule_agent import PeriodScheduleAgent, PeriodScheduleSchema
 
@@ -237,7 +237,7 @@ async def main() -> None:
             schedule=quest_entries,
         )
     else:
-        from bots.quest_agent import HWAgent
+        from bots.quests.quest_agent import HWAgent
         hw_agent = HWAgent(
             student=MOCK_STUDENT,
             period=MOCK_PERIOD,

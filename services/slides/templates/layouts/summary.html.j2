@@ -1,0 +1,14 @@
+<section class="slide layout--summary" data-index="{{ slide.index }}">
+  <div class="header-bar"><h1>{{ slide.title }}</h1></div>
+  <div class="body">
+    <ul class="bullets" style="list-style: none; padding-left: 0;">
+      {% for b in slide.bullets %}
+        <li style="padding-left: 1.4em; position: relative;">
+          <span style="position: absolute; left: 0; color: var(--orange); font-weight: 700;">✓</span>
+          {{ b }}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="footer-bar"></div>
+</section>

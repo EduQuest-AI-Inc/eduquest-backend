@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from main import app
 from routers.deps import get_auth, require_active_membership, AuthPayload, Role
-from routers.curriculum import _get_curriculum_service
+from routers.curriculum import _get_curriculum_service, _get_slides_service
 from exceptions.not_found_error import NotFoundError
 
 _PERIOD_ID = "period-1"
@@ -180,12 +180,15 @@ class TestApprovePeriod:
     @pytest.mark.api
     def test_approve_period_success_returns_202(self, client):
         mock_cs = MagicMock()
-        mock_cs.approve_period.return_value = None
+        mock_cs.approve_period.return_value = [{"lesson_id": "l1", "lesson_name": "Intro"}]
+        mock_ss = MagicMock()
         app.dependency_overrides[_get_curriculum_service] = lambda: mock_cs
+        app.dependency_overrides[_get_slides_service] = lambda: mock_ss
         with patch("routers.curriculum._period_dao") as mock_dao:
             mock_dao.get_period_by_id.return_value = _OWNED_PERIOD
             resp = client.post(f"/curriculum/{_PERIOD_ID}/approve")
         app.dependency_overrides.pop(_get_curriculum_service, None)
+        app.dependency_overrides.pop(_get_slides_service, None)
         assert resp.status_code == 202
 
     @pytest.mark.api

@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import BackgroundTasks
 
-from bots.coverage_evaluator import CoverageEvaluator
+from bots.curriculum.coverage_evaluator import CoverageEvaluator
 from bots.protocol import BotProviderProtocol
 from data_access.concept_dao import ConceptDAO
 from data_access.concept_skill_dao import ConceptSkillDAO
@@ -29,14 +29,24 @@ _VALID_STATUSES = {"pending", "draft", "approved"}
 
 
 class CurriculumService:
-    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+    def __init__(
+        self,
+        *,
+        bot_provider: BotProviderProtocol,
+        period_dao=None,
+        week_dao=None,
+        lesson_dao=None,
+        concept_dao=None,
+        skill_dao=None,
+        concept_skill_dao=None,
+    ) -> None:
         self._bot_provider = bot_provider
-        self.period_dao = PeriodDAO()
-        self.week_dao = WeekDAO()
-        self.lesson_dao = LessonDAO()
-        self.concept_dao = ConceptDAO()
-        self.skill_dao = SkillDAO()
-        self.concept_skill_dao = ConceptSkillDAO()
+        self.period_dao = period_dao or PeriodDAO()
+        self.week_dao = week_dao or WeekDAO()
+        self.lesson_dao = lesson_dao or LessonDAO()
+        self.concept_dao = concept_dao or ConceptDAO()
+        self.skill_dao = skill_dao or SkillDAO()
+        self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO()
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -74,32 +84,15 @@ class CurriculumService:
         self._get_period_or_raise(period_id)
         self.skill_dao.update_skill(period_id, skill_name, fields)
 
-    def approve_period(self, period_id: str, background_tasks: BackgroundTasks) -> dict[str, Any]:
+    def approve_period(self, period_id: str) -> list[dict[str, Any]]:
         period = self._get_period_or_raise(period_id)
         if period["status"] != "draft":
             raise ValidationError(
                 f"Cannot approve: period status is '{period['status']}', must be 'draft'"
             )
-
-        from data_access.lesson_pptx_dao import LessonPptxDAO
-        from models.lesson_pptx import LessonPptx
-        from services.pptx.pptx_generation_service import PptxGenerationService
-
-        lesson_pptx_dao = LessonPptxDAO()
-        if lesson_pptx_dao.get_by_period(period_id):
-            raise ValidationError("Generation already running or completed for this period")
-
         lessons = self.lesson_dao.get_lessons_by_period(period_id)
-        for lesson in lessons:
-            lesson_pptx_dao.insert(LessonPptx(
-                lesson_id=lesson["lesson_id"],
-                period_id=period_id,
-                status="pending",
-            ))
-
         self.period_dao.update_status(period_id, "approved")
-        background_tasks.add_task(PptxGenerationService(bot_provider=self._bot_provider).run_batch, period_id)
-        return {"total_lessons": len(lessons)}
+        return lessons
 
     # ── private helpers ───────────────────────────────────────────────────────
 
