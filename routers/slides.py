@@ -1,13 +1,16 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
-from routers.deps import AuthPayload, Role, get_auth
+from bots.protocol import BotProviderProtocol
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_roles
 from data_access.lesson_pptx_dao import LessonPptxDAO
 from data_access.lesson_dao import LessonDAO
 from data_access.period_dao import PeriodDAO
 from data_access.enrollment_dao import EnrollmentDAO
 from data_access.parent_dao import ParentDAO
+from exceptions.validation_error import ValidationError
+from services.slides.pptx_generation_service import PptxGenerationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -17,6 +20,12 @@ _lesson_dao = LessonDAO()
 _period_dao = PeriodDAO()
 _enrollment_dao = EnrollmentDAO()
 _parent_dao = ParentDAO()
+
+
+def _get_slides_service(
+    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+) -> PptxGenerationService:
+    return PptxGenerationService(bot_provider=bot_provider)
 
 
 @router.get("/{period_id}/pptx/status")
@@ -61,3 +70,24 @@ def get_pptx_status(
         }
         for row in pptx_rows
     ]
+
+
+@router.post("/{period_id}/pptx/restart", status_code=202)
+def restart_pptx_generation(
+    period_id: str,
+    background_tasks: BackgroundTasks,
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
+    slides_svc: PptxGenerationService = Depends(_get_slides_service),
+):
+    period = _period_dao.get_period_by_id(period_id)
+    if not period:
+        raise HTTPException(status_code=404, detail=f"Period '{period_id}' not found")
+    if period["owner_id"] != auth.sub:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    try:
+        count = slides_svc.restart_batch(period_id, background_tasks)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return {"queued": count}

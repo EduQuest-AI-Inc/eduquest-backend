@@ -9,9 +9,7 @@ along with the (possibly-regenerated) image path.
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 
 from agents import function_tool
 
@@ -19,12 +17,18 @@ from bots.slideshow.visual_review_agent import VisualReviewAgent
 from models.slide_plan import ChartSpec
 from integrations import nano_banana_client
 from utils.rendering import chart_generator
+from utils.review_loop import run_review_loop
 
 logger = logging.getLogger(__name__)
 
-_MAX_RETRIES = 2
+_reviewer: VisualReviewAgent | None = None
 
-_reviewer = VisualReviewAgent()
+
+def _get_reviewer() -> VisualReviewAgent:
+    global _reviewer
+    if _reviewer is None:
+        _reviewer = VisualReviewAgent()
+    return _reviewer
 
 
 def _regenerate(
@@ -91,70 +95,15 @@ def review_visual(
     Side effects: 1–3 vision API calls + up to 2 regenerations.
     Retry safety: NOT free — call once per slide.
     """
-    current_path = image_path
-    current_prompt = original_prompt
-
-    try:
-        data_hints = json.loads(data_hints_json) if data_hints_json else {}
-    except json.JSONDecodeError:
-        data_hints = {}
-
-    for attempt in range(_MAX_RETRIES + 1):
-        try:
-            result = _reviewer.review(
-                image_path=current_path,
-                slide_title=slide_title,
-                concept_description=concept_description,
-                grade_level=grade_level,
-                original_prompt=current_prompt,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Review agent error: %s", exc)
-            return json.dumps(
-                {"status": "flagged", "image_path": current_path, "feedback": str(exc)}
-            )
-
-        if result.decision == "approved":
-            return json.dumps(
-                {
-                    "status": "approved",
-                    "image_path": current_path,
-                    "feedback": result.feedback,
-                }
-            )
-
-        if result.decision == "flag":
-            return json.dumps(
-                {
-                    "status": "flagged",
-                    "image_path": current_path,
-                    "feedback": result.feedback,
-                }
-            )
-
-        # decision == "regenerate"
-        if attempt >= _MAX_RETRIES:
-            break
-
-        revised = result.revised_prompt or current_prompt
-        new_path = _regenerate(visual_kind, revised, chart_type, data_hints)
-        if not new_path:
-            break
-
-        # Clean up the previous attempt's file
-        if current_path and current_path != image_path and os.path.exists(current_path):
-            try:
-                os.unlink(current_path)
-            except OSError:
-                pass
-
-        current_path = new_path
-        current_prompt = revised
-
-    return json.dumps(
-        {
-            "status": "placeholder",
-            "image_path": None,
-            "feedback": "Visual review exhausted retries; rendering placeholder.",
-        }
+    return run_review_loop(
+        _get_reviewer(),
+        _regenerate,
+        image_path,
+        slide_title,
+        concept_description,
+        grade_level,
+        original_prompt,
+        visual_kind,
+        chart_type,
+        data_hints_json,
     )
