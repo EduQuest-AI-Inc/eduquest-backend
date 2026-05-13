@@ -3,3 +3,13 @@ repos:
     rev: v0.15.12
     hooks:
       - id: ruff-check
+
+  - repo: local
+    hooks:
+      - id: pyright
+        name: pyright
+        entry: venv/bin/pyright
+        args: [--project, ../pyrightconfig.json, routers/, services/]
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
