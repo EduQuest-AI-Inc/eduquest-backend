@@ -140,6 +140,23 @@ def _membership_or_summer(
     return auth
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _run_summer_quest_generation(
+    period_id: str,
+    owner_id: str,
+    bot_provider: BotProviderProtocol,
+) -> None:
+    from services.period.period_summer_quest_service import PeriodSummerQuestService
+    try:
+        service = PeriodSummerQuestService(bot_provider=bot_provider)
+        service.generate_summer_quests(owner_id=owner_id, period_id=period_id)
+    except Exception as exc:
+        logger.error(
+            "Summer quest generation failed for period %s: %s", period_id, exc, exc_info=True
+        )
+
+
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 @router.post("/{period_id}/generate", status_code=202)
@@ -237,6 +254,7 @@ def approve_period(
     auth: AuthPayload = Depends(_membership_or_summer),
     svc: CurriculumService = Depends(_get_curriculum_service),
     slides_svc: PptxGenerationService = Depends(_get_slides_service),
+    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
 ):
     _assert_period_owner(period_id, auth.sub)
     try:
@@ -246,4 +264,12 @@ def approve_period(
         raise HTTPException(status_code=400, detail=str(exc))
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    period = _period_management_svc.get_period_by_id(period_id)
+    if period and period.get("is_summer_quest"):
+        background_tasks.add_task(
+            _run_summer_quest_generation,
+            period_id=period_id,
+            owner_id=auth.sub,
+            bot_provider=bot_provider,
+        )
     return {"total_lessons": len(lessons)}

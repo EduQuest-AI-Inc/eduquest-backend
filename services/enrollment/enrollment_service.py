@@ -92,22 +92,19 @@ class EnrollmentService:
     def get_my_periods(self, user_id: str) -> List[Dict[str, Any]]:
         enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)
         period_ids = [e['period_id'] for e in enrollments]
-
         ltg_map = self.ltg_goal_dao.get_by_student(user_id)
-
-        result = []
-        for pid in period_ids:
-            period = self.period_dao.get_period_by_id(pid)
-            if not period:
-                continue
-            result.append({
+        periods = {p['period_id']: p for p in self.period_dao.get_periods_by_ids(period_ids)}
+        return [
+            {
                 'period_id': pid,
-                'course_name': period.get('name', pid),
-                'file_urls': period.get('file_urls', []),
+                'course_name': periods[pid].get('name', pid),
+                'file_urls': periods[pid].get('file_urls', []),
                 'long_term_goal': ltg_map.get(pid),
-                'is_summer_quest': period.get('is_summer_quest', False),
-            })
-        return result
+                'is_summer_quest': periods[pid].get('is_summer_quest', False),
+            }
+            for pid in period_ids
+            if pid in periods
+        ]
 
     def get_parent_periods_for_student(self, student_id: str) -> List[Dict[str, Any]]:
         parents = self.parent_dao.get_parents_by_student_id(student_id)
