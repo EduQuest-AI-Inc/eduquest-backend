@@ -71,26 +71,26 @@ class TestGetQuestById:
 
     @pytest.mark.api
     def test_get_quest_by_id_found(self, client):
-        with patch("routers.quest.quest_dao") as mock_qd, \
+        with patch("routers.quest.quest_service") as mock_qs, \
              patch("routers.quest.QuestRetrievalService.attach_grade_display"):
-            mock_qd.get_quest_by_id.return_value = {"quest_id": "q1", "description": "Algebra"}
+            mock_qs.get_quest_by_id.return_value = {"quest_id": "q1", "description": "Algebra"}
             resp = client.get("/quest/quests/q1")
         assert resp.status_code == 200
         assert resp.json()["quest_id"] == "q1"
 
     @pytest.mark.api
     def test_get_quest_by_id_not_found_returns_404(self, client):
-        with patch("routers.quest.quest_dao") as mock_qd, \
+        with patch("routers.quest.quest_service") as mock_qs, \
              patch("routers.quest.QuestRetrievalService.attach_grade_display"):
-            mock_qd.get_quest_by_id.return_value = None
+            mock_qs.get_quest_by_id.return_value = None
             resp = client.get("/quest/quests/missing-id")
         assert resp.status_code == 404
         assert "detail" in resp.json()
 
     @pytest.mark.api
     def test_get_quest_by_id_exception_returns_500(self, client):
-        with patch("routers.quest.quest_dao") as mock_qd:
-            mock_qd.get_quest_by_id.side_effect = RuntimeError("crash")
+        with patch("routers.quest.quest_service") as mock_qs:
+            mock_qs.get_quest_by_id.side_effect = RuntimeError("crash")
             resp = client.get("/quest/quests/q1")
         assert resp.status_code == 500
 
@@ -108,22 +108,22 @@ class TestGetStudentQuests:
 
     @pytest.mark.api
     def test_get_student_quests_authorized_teacher(self, teacher_client):
-        with patch("routers.quest.enrollment_dao") as mock_ed, \
-             patch("routers.quest.period_dao") as mock_pd, \
+        with patch("routers.quest._enrollment_service") as mock_ed, \
+             patch("routers.quest._period_management_svc") as mock_pd, \
              patch("routers.quest.quest_service") as mock_qs, \
              patch("routers.quest.QuestRetrievalService.attach_grade_display"):
             mock_ed.get_enrollments_by_student.return_value = [{"period_id": "p1"}]
-            mock_pd.get_periods_by_owner_id.return_value = [{"period_id": "p1"}]
+            mock_pd.get_periods_by_owner.return_value = [{"period_id": "p1"}]
             mock_qs.get_quests_for_student.return_value = [{"quest_id": "q3"}]
             resp = teacher_client.get("/quest/quests/student/student-1")
         assert resp.status_code == 200
 
     @pytest.mark.api
     def test_get_student_quests_unauthorized_returns_403(self, other_teacher_client):
-        with patch("routers.quest.enrollment_dao") as mock_ed, \
-             patch("routers.quest.period_dao") as mock_pd:
+        with patch("routers.quest._enrollment_service") as mock_ed, \
+             patch("routers.quest._period_management_svc") as mock_pd:
             mock_ed.get_enrollments_by_student.return_value = [{"period_id": "p1"}]
-            mock_pd.get_periods_by_owner_id.return_value = [{"period_id": "p99"}]
+            mock_pd.get_periods_by_owner.return_value = [{"period_id": "p99"}]
             resp = other_teacher_client.get("/quest/quests/student/student-1")
         assert resp.status_code == 403
 
@@ -163,8 +163,8 @@ class TestGradeQuest:
 
     @pytest.mark.api
     def test_grade_quest_success(self, client):
-        with patch("routers.quest.quest_dao") as mock_qd:
-            mock_qd.update_quest_grade_and_feedback.return_value = None
+        with patch("routers.quest.quest_service") as mock_qs:
+            mock_qs.update_quest_grade_and_feedback.return_value = None
             resp = client.put(
                 "/quest/quests/q1/grade",
                 json={"grade": {"skill1": 0.8}, "feedback": "Good work"},
@@ -180,8 +180,8 @@ class TestGradeQuest:
 
     @pytest.mark.api
     def test_grade_quest_service_error_returns_500(self, client):
-        with patch("routers.quest.quest_dao") as mock_qd:
-            mock_qd.update_quest_grade_and_feedback.side_effect = RuntimeError("crash")
+        with patch("routers.quest.quest_service") as mock_qs:
+            mock_qs.update_quest_grade_and_feedback.side_effect = RuntimeError("crash")
             resp = client.put(
                 "/quest/quests/q1/grade",
                 json={"grade": {"skill1": 0.8}, "feedback": "Good work"},

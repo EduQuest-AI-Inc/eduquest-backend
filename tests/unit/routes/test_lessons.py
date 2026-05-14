@@ -57,13 +57,12 @@ class TestGetLessonPptx:
 
     @pytest.mark.api
     def test_teacher_can_download(self, teacher_client):
-        with patch("routers.lessons._lesson_pptx_dao") as mock_pptx_dao, \
-             patch("routers.lessons._lesson_dao") as mock_lesson_dao, \
-             patch("routers.lessons._period_dao") as mock_period_dao, \
+        with patch("routers.lessons._lessons_service") as mock_ls, \
+             patch("routers.lessons._period_management_svc") as mock_period_svc, \
              patch("routers.lessons.s3_service") as mock_s3:
-            mock_pptx_dao.get_latest_done.return_value = _DONE_ROW
-            mock_lesson_dao.get_by_lesson_id.return_value = _LESSON_ROW
-            mock_period_dao.get_period_by_id.return_value = _OWNED_PERIOD
+            mock_ls.get_latest_done_pptx.return_value = _DONE_ROW
+            mock_ls.get_lesson_by_id.return_value = _LESSON_ROW
+            mock_period_svc.get_period_by_id.return_value = _OWNED_PERIOD
             mock_s3.generate_presigned_url.return_value = _PRESIGNED_URL
 
             resp = teacher_client.get(f"/lessons/{_LESSON_ID}/pptx")
@@ -79,12 +78,11 @@ class TestGetLessonPptx:
         mock_enrollment = MagicMock()
         mock_enrollment.check_enrolled.return_value = None
 
-        with patch("routers.lessons._lesson_pptx_dao") as mock_pptx_dao, \
-             patch("routers.lessons._lesson_dao") as mock_lesson_dao, \
+        with patch("routers.lessons._lessons_service") as mock_ls, \
              patch("routers.lessons._enrollment_service", mock_enrollment), \
              patch("routers.lessons.s3_service") as mock_s3:
-            mock_pptx_dao.get_latest_done.return_value = _DONE_ROW
-            mock_lesson_dao.get_by_lesson_id.return_value = _LESSON_ROW
+            mock_ls.get_latest_done_pptx.return_value = _DONE_ROW
+            mock_ls.get_lesson_by_id.return_value = _LESSON_ROW
             mock_s3.generate_presigned_url.return_value = _PRESIGNED_URL
 
             resp = student_client.get(f"/lessons/{_LESSON_ID}/pptx")
@@ -97,9 +95,9 @@ class TestGetLessonPptx:
         mock_enrollment = MagicMock()
         mock_enrollment.check_enrolled.side_effect = ValidationError("not enrolled")
 
-        with patch("routers.lessons._lesson_pptx_dao") as mock_pptx_dao, \
+        with patch("routers.lessons._lessons_service") as mock_ls, \
              patch("routers.lessons._enrollment_service", mock_enrollment):
-            mock_pptx_dao.get_latest_done.return_value = _DONE_ROW
+            mock_ls.get_latest_done_pptx.return_value = _DONE_ROW
 
             resp = student_client.get(f"/lessons/{_LESSON_ID}/pptx")
 
@@ -107,10 +105,10 @@ class TestGetLessonPptx:
 
     @pytest.mark.api
     def test_non_owner_teacher_forbidden(self, other_teacher_client):
-        with patch("routers.lessons._lesson_pptx_dao") as mock_pptx_dao, \
-             patch("routers.lessons._period_dao") as mock_period_dao:
-            mock_pptx_dao.get_latest_done.return_value = _DONE_ROW
-            mock_period_dao.get_period_by_id.return_value = _OWNED_PERIOD  # owner_id = teacher-1, not other-teacher
+        with patch("routers.lessons._lessons_service") as mock_ls, \
+             patch("routers.lessons._period_management_svc") as mock_period_svc:
+            mock_ls.get_latest_done_pptx.return_value = _DONE_ROW
+            mock_period_svc.get_period_by_id.return_value = _OWNED_PERIOD  # owner_id = teacher-1, not other-teacher
 
             resp = other_teacher_client.get(f"/lessons/{_LESSON_ID}/pptx")
 
@@ -118,8 +116,8 @@ class TestGetLessonPptx:
 
     @pytest.mark.api
     def test_no_completed_pptx_not_found(self, teacher_client):
-        with patch("routers.lessons._lesson_pptx_dao") as mock_pptx_dao:
-            mock_pptx_dao.get_latest_done.return_value = None
+        with patch("routers.lessons._lessons_service") as mock_ls:
+            mock_ls.get_latest_done_pptx.return_value = None
 
             resp = teacher_client.get(f"/lessons/{_LESSON_ID}/pptx")
 

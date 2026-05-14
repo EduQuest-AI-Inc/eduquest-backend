@@ -19,9 +19,8 @@ def client():
 
 
 @pytest.mark.api
-@patch("routers.auth.user_dao")
-def test_teacher_signup_without_trial_confirmation_is_rejected(mock_user_dao, client):
-    mock_user_dao.get_by_email.return_value = None
+@patch("routers.auth.get_user_by_email", return_value=None)
+def test_teacher_signup_without_trial_confirmation_is_rejected(mock_get_user, client):
     resp = client.post("/auth/signup", json={
         "username": "teacher_x",
         "password": "SecurePass1",
@@ -37,11 +36,10 @@ def test_teacher_signup_without_trial_confirmation_is_rejected(mock_user_dao, cl
 @pytest.mark.api
 @patch("services.billing.membership_service.MembershipService.start_trial_if_eligible")
 @patch("routers.auth.register_user", return_value={"success": True})
-@patch("routers.auth.user_dao")
+@patch("routers.auth.get_user_by_email", return_value=None)
 def test_teacher_signup_with_confirmation_starts_trial(
-    mock_user_dao, mock_register, mock_start, client,
+    mock_get_user, mock_register, mock_start, client,
 ):
-    mock_user_dao.get_by_email.return_value = None
     resp = client.post("/auth/signup", json={
         "username": "teacher_x",
         "password": "SecurePass1",
@@ -60,11 +58,10 @@ def test_teacher_signup_with_confirmation_starts_trial(
 @pytest.mark.api
 @patch("services.billing.membership_service.MembershipService.start_trial_if_eligible")
 @patch("routers.auth.register_user", return_value={"success": True})
-@patch("routers.auth.user_dao")
+@patch("routers.auth.get_user_by_email", return_value=None)
 def test_student_signup_does_not_require_trial_confirmation(
-    mock_user_dao, mock_register, mock_start, client,
+    mock_get_user, mock_register, mock_start, client,
 ):
-    mock_user_dao.get_by_email.return_value = None
     resp = client.post("/auth/signup", json={
         "username": "stu1",
         "password": "SecurePass1",
