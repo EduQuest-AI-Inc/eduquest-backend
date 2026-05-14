@@ -15,7 +15,10 @@ from data_access.conversation_dao import ConversationDAO
 from data_access.period_dao import PeriodDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
+from exceptions.not_found_error import NotFoundError
+from exceptions.validation_error import ValidationError
 from integrations.s3_service import upload_file_to_s3
+from bots.protocol import BotProviderProtocol
 from models.conversation import Conversation
 from services.conversation.grading_service import grade_student_submission
 from services.conversation.profile_service import (
@@ -33,7 +36,8 @@ logger = logging.getLogger(__name__)
 
 
 class ConversationService:
-    def __init__(self) -> None:
+    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+        self._bot_provider = bot_provider
         self.student_dao = StudentDAO()
         self.conversation_dao = ConversationDAO()
         self.teacher_dao = TeacherDAO()
@@ -46,13 +50,13 @@ class ConversationService:
     def start_profile_assistant(self, user_id: str):
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
-            raise Exception("Student not found")
+            raise NotFoundError("Student not found")
 
-        result = initiate_profile_conversation(student)
+        result = initiate_profile_conversation(student, bot_provider=self._bot_provider)
 
         response_id = result.get("response_id")
         if not response_id:
-            raise Exception("Failed to obtain response_id from profile agent")
+            raise Exception("Failed to obtain response_id from profile agent")  # unexpected agent failure → 500
 
         conversation_id = str(uuid.uuid4())
         self.conversation_dao.add_conversation(Conversation(
@@ -72,12 +76,12 @@ class ConversationService:
             conversation_id, user_id, conversation_type
         )
         if not conversation:
-            raise Exception("Conversation not found")
+            raise NotFoundError("Conversation not found")
 
         last_response_id = conversation.get("last_response_id")
         if not isinstance(last_response_id, str):
-            raise Exception("Conversation has no response ID")
-        result = continue_profile_conversation(last_response_id, message)
+            raise NotFoundError("Conversation has no response ID")
+        result = continue_profile_conversation(last_response_id, message, bot_provider=self._bot_provider)
 
         new_response_id = result.get("response_id")
         if new_response_id:
@@ -117,44 +121,45 @@ class ConversationService:
             else self.student_dao.get_student_by_id(user_id)
         )
         if not user:
-            raise Exception(f"{'Instructor' if is_instructor else 'Student'} not found")
+            raise NotFoundError(f"{'Instructor' if is_instructor else 'Student'} not found")
 
         # Resolve period_id
         if is_instructor:
             if not period_id:
-                raise Exception("period_id is required for instructors")
+                raise ValidationError("period_id is required for instructors")
         else:
             if not quests_file:
-                raise Exception("quests_file is required for students")
+                raise ValidationError("quests_file is required for students")
             try:
                 quests_data = json.loads(quests_file)
                 if not quests_data or not isinstance(quests_data, list):
-                    raise Exception("Invalid quests data format")
+                    raise ValidationError("Invalid quests data format")
                 period_id = quests_data[0].get("period_id")
                 if not period_id:
-                    raise Exception("No period_id found in quest data")
+                    raise ValidationError("No period_id found in quest data")
             except json.JSONDecodeError as e:
-                raise Exception(f"Failed to parse quests JSON: {e}")
+                raise ValidationError(f"Failed to parse quests JSON: {e}")
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
-            raise Exception(f"Period with id {period_id} not found")
+            raise NotFoundError(f"Period with id {period_id} not found")
 
         # ----- Teacher path: multi-turn feedback via TeacherFeedbackAgent -----
         if is_instructor:
             if not user_id:
-                raise Exception("Instructor must provide a user_id to fetch quests")
+                raise ValidationError("Instructor must provide a user_id to fetch quests")
             from services.quest.quest_service import QuestService
             quests_data = QuestService().get_quests_for_student(user_id)
 
             target_student = self.student_dao.get_student_by_id(user_id)
             if not target_student:
-                raise Exception("Target student not found")
+                raise NotFoundError("Target student not found")
 
             quests_summary = json.dumps(quests_data, indent=2, default=str)
             result = initiate_teacher_feedback(
                 student=target_student,
                 quests_summary=quests_summary,
+                bot_provider=self._bot_provider,
             )
 
             conversation_id = result.get("conversation_id")
@@ -191,6 +196,7 @@ class ConversationService:
         grading_result = grade_student_submission(
             quest_data=quest_data,
             submission_path=submission_file,
+            bot_provider=self._bot_provider,
         )
 
         grade = grading_result.get("grade")
@@ -237,11 +243,11 @@ class ConversationService:
             conversation_id, user_id, "update"
         )
         if not conversation:
-            raise Exception("Conversation not found")
+            raise NotFoundError("Conversation not found")
 
         period_id = conversation.get("period_id")
 
-        result = continue_teacher_feedback(conversation_id, message)
+        result = continue_teacher_feedback(conversation_id, message, bot_provider=self._bot_provider)
 
         suggested_change = result.get("suggested_change")
         if suggested_change and period_id:
@@ -299,7 +305,7 @@ class ConversationService:
         """Delegate recommended changes to PeriodService."""
         try:
             from services.period.period_service import PeriodService
-            period_service = PeriodService()
+            period_service = PeriodService(bot_provider=self._bot_provider)
             quest_update_result = period_service.update_quests_with_recommended_change(
                 caller_id, caller_role, period_id, recommended_change,
             )

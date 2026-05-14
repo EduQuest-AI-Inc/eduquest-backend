@@ -31,6 +31,7 @@ def check_password_hash(hashed: str, password: str) -> bool:
 def _is_legacy_hash(hashed: str) -> bool:
     return hashed.startswith(_LEGACY_PREFIXES)
 
+from data_access.session_dao import SessionDAO
 from data_access.user_dao import UserDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
@@ -41,12 +42,13 @@ from models.parent import Parent
 from .password_policy import validate_password
 
 user_dao = UserDAO()
+session_dao = SessionDAO()
 student_dao = StudentDAO()
 teacher_dao = TeacherDAO()
 parent_dao = ParentDAO()
 
 
-def register_user(username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', grade: Optional[str] = None) -> dict:
+def register_user(username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', grade: Optional[str] = None, phone_number: Optional[str] = None) -> dict:
     """Register a new user (student, teacher, or parent)."""
     is_valid, error_msg = validate_password(password)
     if not is_valid:
@@ -64,6 +66,7 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
             first_name=first_name,
             last_name=last_name,
             email=email,
+            phone_number=phone_number,
             pilot_approved=False,
         )
         teacher_dao.add_teacher(teacher)
@@ -76,6 +79,7 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
             first_name=first_name,
             last_name=last_name,
             email=email,
+            phone_number=phone_number,
         )
         parent_dao.add_parent(parent)
         return {"success": True}
@@ -87,10 +91,23 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
         first_name=first_name,
         last_name=last_name,
         email=email,
+        phone_number=phone_number,
         grade=int(grade) if grade is not None else None,
     )
     student_dao.add_student(student)
     return {"success": True}
+
+
+def get_user_by_email(email: str):
+    return user_dao.get_by_email(email)
+
+
+def add_session(session) -> None:
+    session_dao.add_session(session)
+
+
+def get_student_by_id(user_id: str):
+    return student_dao.get_student_by_id(user_id)
 
 
 def authenticate_user(username: str, password: str, role: str) -> bool:

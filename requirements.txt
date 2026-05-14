@@ -21,3 +21,8 @@ ruff
 pyright
 pypdf
 pymupdf
+python-pptx
+google-genai
+matplotlib
+numpy
+jinja2

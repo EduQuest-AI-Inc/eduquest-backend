@@ -1,6 +1,11 @@
 import os
 import pytest
 
+# Integration fixture conventions:
+#   1. Always delete-before-insert for any fixture using a fixed ID — leftover rows
+#      from crashed runs cause duplicate-key ERRORs across all dependent tests.
+#   2. Print at the start of setup so fixture failures are locatable in pytest output.
+
 
 @pytest.fixture(scope="session")
 def supabase_required():
@@ -19,6 +24,8 @@ def db_period(supabase_required):
         name="Integration Test Period",
         vector_store_id="vs-test",
     )
+    print(f"\n[fixture] db_period setup: pre-deleting {p.period_id}")
+    dao.delete_period(p.period_id)
     dao.add_period(p)
     yield p
     dao.delete_period(p.period_id)
@@ -37,6 +44,7 @@ def db_user(supabase_required):
         password="hashed",
         role="student",
     )
+    print(f"\n[fixture] db_user setup: pre-deleting {u.user_id}")
     dao.delete(u.user_id)
     dao.add_user(u)
     yield u

@@ -8,11 +8,14 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from constants.timeouts import JWT_EXPIRY_HOURS
-from data_access.session_dao import SessionDAO
-from data_access.student_dao import StudentDAO
-from data_access.user_dao import UserDAO
 from models.session import Session
-from services.auth.auth_service import authenticate_user, register_user
+from services.auth.auth_service import (
+    add_session,
+    authenticate_user,
+    get_student_by_id,
+    get_user_by_email,
+    register_user,
+)
 from services.parent.parent_service import ParentService
 from services.auth.password_reset_service import get_password_reset_service
 from utils.token_utils import set_auth_cookie
@@ -24,9 +27,6 @@ router = APIRouter()
 JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret")
 JWT_ALGORITHM = "HS256"
 
-session_dao = SessionDAO()
-user_dao = UserDAO()
-student_dao = StudentDAO()
 _parent_service = ParentService()
 password_reset_service = get_password_reset_service()
 
@@ -52,6 +52,7 @@ class SignupRequest(BaseModel):
     last_name: str
     email: str
     grade: Optional[str] = None
+    phone_number: Optional[str] = None
     invite_code: Optional[str] = None
     # Required confirmation for parent/teacher accounts: explicit acknowledgement
     # that they are starting the 14-day no-card trial. The frontend renders the
@@ -73,13 +74,14 @@ def signup(body: SignupRequest):
         )
 
     normalized_email = body.email.strip().lower()
-    if user_dao.get_by_email(normalized_email):
+    if get_user_by_email(normalized_email):
         raise HTTPException(status_code=409, detail="Email address already in use")
 
     result = register_user(
         body.username, body.password, body.role,
         body.first_name, body.last_name, normalized_email,
         body.grade if body.role == "student" else None,
+        body.phone_number,
     )
     if not result.get("success"):
         error_message = result.get("error", "Registration failed")
@@ -128,11 +130,11 @@ def login(body: LoginRequest, response: Response):
 
     token = _mint_token(body.username, body.role)
     session = Session(auth_token=token, user_id=body.username, role=body.role)  # type: ignore[arg-type]
-    session_dao.add_session(session)
+    add_session(session)
 
     response_data: dict = {"token": token}
     if body.role == "student":
-        student = student_dao.get_student_by_id(body.username)
+        student = get_student_by_id(body.username)
         if student and (
             not student.get("strength")
             or not student.get("weakness")

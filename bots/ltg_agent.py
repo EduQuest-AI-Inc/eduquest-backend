@@ -18,20 +18,24 @@ class LTGResponse(BaseModel):
     chosen_goal: Optional[str] = Field(default=None, description="The goal chosen by the student, if any")
 
 
-def create_ltg_agent(vector_store_id: str) -> Agent:
-    """
-    Create an LTG agent configured to search the period's vector store.
+def create_ltg_agent(vector_store_id: str, curriculum: dict) -> Agent:
+    weeks = ", ".join(str(w.get("week_number", "")) for w in curriculum.get("weeks", []))
+    lessons = ", ".join(str(lesson.get("title", lesson.get("lesson_name", ""))) for lesson in curriculum.get("lessons", []))
+    concepts = ", ".join(str(c.get("name", c.get("concept_name", ""))) for c in curriculum.get("concepts", []))
+    skills = ", ".join(str(s.get("name", s.get("skill_name", ""))) for s in curriculum.get("skills", []))
 
-    Args:
-        vector_store_id: The OpenAI vector store ID for the period.
+    curriculum_block = f"""Class Curriculum:
+- Weeks: {weeks or "not specified"}
+- Lessons: {lessons or "not specified"}
+- Concepts: {concepts or "not specified"}
+- Skills: {skills or "not specified"}"""
 
-    Returns:
-        Configured Agent instance.
-    """
-    instructions = """You are a Long-Term Goal (LTG) Assistant for EduQuest. Your job is to help students choose a meaningful long-term goal that aligns with their course materials, strengths, weaknesses, interests, and learning style.
+    instructions = f"""You are a Long-Term Goal (LTG) Assistant for EduQuest. Your job is to help students choose a meaningful long-term goal that aligns with their course materials, strengths, weaknesses, interests, and learning style.
+
+{curriculum_block}
 
 **INITIAL RESPONSE (when student first introduces themselves):**
-1. Search the course materials using file_search to understand what the student will learn
+1. Use the curriculum structure above to understand what the student will learn, then use file_search to get deeper context on specific topics
 2. Suggest exactly 3 long-term goals that:
    - Incorporate the key topics from the course materials
    - Align with the student's strengths, weaknesses, interests, and learning style
@@ -44,7 +48,7 @@ If the student indicates they want to choose a goal (e.g., "I choose goal 1", "I
 - chosen_goal: "[full text of the chosen goal]"
 
 **IMPORTANT RULES:**
-- Always search course materials first using file_search
+- Use the curriculum structure provided above as your primary reference for course content
 - Make goals specific and actionable
 - Ensure goals incorporate course content meaningfully
 - Keep responses encouraging and supportive

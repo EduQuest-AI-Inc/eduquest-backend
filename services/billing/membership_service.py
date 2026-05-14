@@ -221,7 +221,7 @@ class MembershipService:
     def attach_stripe_customer(self, user_id: str, customer_id: str) -> None:
         self.dao.update(user_id, {"stripe_customer_id": customer_id})
 
-    def apply_stripe_subscription(self, subscription: Dict[str, Any]) -> Optional[str]:
+    def apply_stripe_subscription(self, subscription: Any) -> Optional[str]:
         """Mirror a Stripe Subscription object into the local membership row.
 
         Returns the user_id whose membership was synced, or None if we couldn't
@@ -304,7 +304,7 @@ class MembershipService:
 
     # ── Plan limit enforcement ─────────────────────────────────────────────
 
-    def assert_can_create_class(self, user_id: str, role: str) -> None:
+    def check_can_create_class(self, user_id: str, role: str) -> None:
         access = self.evaluate_access(user_id, role)
         if not access.has_active_membership:
             raise MembershipRequiredError(access)
@@ -319,7 +319,7 @@ class MembershipService:
                 f"Upgrade to add more.",
             )
 
-    def assert_can_add_student_to_period(self, owner_id: str, role: str, period_id: str) -> None:
+    def check_can_add_student_to_period(self, owner_id: str, role: str, period_id: str) -> None:
         access = self.evaluate_access(owner_id, role)
         if not access.has_active_membership:
             raise MembershipRequiredError(access)

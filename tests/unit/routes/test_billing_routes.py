@@ -3,7 +3,6 @@
 These tests exercise the FastAPI route definitions directly. They patch the
 billing service / Stripe layer so no Stripe calls leave the test process.
 """
-import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -95,10 +94,10 @@ def test_checkout_requires_price_env(teacher_client, monkeypatch):
 def test_checkout_creates_stripe_session(teacher_client, monkeypatch):
     monkeypatch.setenv("STRIPE_PRICE_STARTER", "price_starter")
 
-    with patch("routers.billing._user_dao") as user_dao, \
+    with patch("routers.billing._user_service") as user_svc, \
          patch("routers.billing._membership_service") as svc, \
          patch("routers.billing.stripe_service") as stripe:
-        user_dao.get_by_id.return_value = {
+        user_svc.get_by_id.return_value = {
             "user_id": "teacher-1", "email": "t@eduquestai.org",
             "first_name": "T", "last_name": "Acher",
         }
@@ -160,12 +159,12 @@ def test_webhook_rejects_bad_signature(monkeypatch):
 @pytest.mark.api
 def test_webhook_routes_subscription_updated(monkeypatch):
     monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", "whsec_test")
-    fake_event = {
-        "id": "evt_1",
-        "type": "customer.subscription.updated",
-        "data": {"object": {"id": "sub_1", "customer": "cus_1", "status": "active",
-                              "items": {"data": [{"price": {"id": "p"}}]}}},
-    }
+    fake_data_obj = {"id": "sub_1", "customer": "cus_1", "status": "active",
+                     "items": {"data": [{"price": {"id": "p"}}]}}
+    fake_event = MagicMock()
+    fake_event.id = "evt_1"
+    fake_event.type = "customer.subscription.updated"
+    fake_event.data.object = fake_data_obj
     with patch("routers.billing.stripe_service") as stripe, \
          patch("routers.billing._membership_service") as svc:
         stripe.construct_webhook_event.return_value = fake_event
@@ -178,11 +177,11 @@ def test_webhook_routes_subscription_updated(monkeypatch):
 @pytest.mark.api
 def test_webhook_subscription_deleted(monkeypatch):
     monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", "whsec_test")
-    fake_event = {
-        "id": "evt_1",
-        "type": "customer.subscription.deleted",
-        "data": {"object": {"id": "sub_1"}},
-    }
+    fake_data_obj = {"id": "sub_1"}
+    fake_event = MagicMock()
+    fake_event.id = "evt_1"
+    fake_event.type = "customer.subscription.deleted"
+    fake_event.data.object = fake_data_obj
     with patch("routers.billing.stripe_service") as stripe, \
          patch("routers.billing._membership_service") as svc:
         stripe.construct_webhook_event.return_value = fake_event

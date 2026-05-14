@@ -10,12 +10,20 @@ from fastapi import UploadFile
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, get_auth, require_roles
-from data_access.quest_dao import QuestDAO
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_roles
+from bots.protocol import BotProviderProtocol
 from services.conversation.conversation_service import ConversationService
+from services.quest.quest_retrieval_service import QuestRetrievalService
 logger = logging.getLogger(__name__)
 router = APIRouter()
-conversation_service = ConversationService()
+
+_quest_retrieval_service = QuestRetrievalService()
+
+
+def _get_conversation_service(
+    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+) -> ConversationService:
+    return ConversationService(bot_provider=bot_provider)
 
 
 # ---------------------------------------------------------------------------
@@ -23,11 +31,11 @@ conversation_service = ConversationService()
 # ---------------------------------------------------------------------------
 
 @router.post("/initiate-profile-assistant")
-def initiate_profile_assistant(auth: AuthPayload = Depends(require_roles(Role.STUDENT))):
-    try:
-        return conversation_service.start_profile_assistant(auth.sub)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+def initiate_profile_assistant(
+    auth: AuthPayload = Depends(require_roles(Role.STUDENT)),
+    svc: ConversationService = Depends(_get_conversation_service),
+):
+    return svc.start_profile_assistant(auth.sub)
 
 
 class ContinueProfileRequest(BaseModel):
@@ -40,9 +48,10 @@ class ContinueProfileRequest(BaseModel):
 def continue_profile_assistant(
     body: ContinueProfileRequest,
     auth: AuthPayload = Depends(get_auth),
+    svc: ConversationService = Depends(_get_conversation_service),
 ):
     try:
-        return conversation_service.continue_profile_assistant(
+        return svc.continue_profile_assistant(
             auth.sub,
             body.conversation_type,
             body.conversation_id,
@@ -52,8 +61,6 @@ def continue_profile_assistant(
         raise HTTPException(status_code=400, detail=str(e))
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -66,6 +73,7 @@ def continue_profile_assistant(
 async def initiate_update_assistant(
     request: Request,
     auth: AuthPayload = Depends(get_auth),
+    svc: ConversationService = Depends(_get_conversation_service),
 ):
     loop = asyncio.get_running_loop()
     content_type = request.headers.get("content-type", "")
@@ -98,7 +106,7 @@ async def initiate_update_assistant(
 
             # Fetch quest data to build quests_file JSON
             try:
-                quest_data = QuestDAO().get_quest_by_id(individual_quest_id)
+                quest_data = _quest_retrieval_service.get_quest_by_id(individual_quest_id)
                 if not quest_data:
                     raise HTTPException(status_code=404, detail="Quest not found")
                 if auth.role == Role.STUDENT and quest_data["user_id"] != auth.sub:
@@ -106,8 +114,8 @@ async def initiate_update_assistant(
                 quests_file = json.dumps([quest_data])
             except HTTPException:
                 raise
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Failed to fetch quest: {e}")
+            except Exception:
+                raise
 
             user_id = quest_data["user_id"]
             period_id = quest_data.get("period_id")
@@ -123,7 +131,7 @@ async def initiate_update_assistant(
             try:
                 result = await loop.run_in_executor(
                     None,
-                    lambda: conversation_service.start_update_assistant(
+                    lambda: svc.start_update_assistant(
                         quests_file=quests_file,
                         is_instructor=False,
                         caller_user_id=auth.sub,
@@ -168,7 +176,7 @@ async def initiate_update_assistant(
 
             result = await loop.run_in_executor(
                 None,
-                lambda: conversation_service.start_update_assistant(
+                lambda: svc.start_update_assistant(
                     quests_file=quests_file,
                     is_instructor=is_instructor,
                     caller_user_id=auth.sub,
@@ -187,9 +195,6 @@ async def initiate_update_assistant(
         raise HTTPException(status_code=400, detail=str(e))
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error("initiate-update-assistant failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 class ContinueUpdateRequest(BaseModel):
@@ -202,9 +207,10 @@ class ContinueUpdateRequest(BaseModel):
 def continue_update_assistant(
     body: ContinueUpdateRequest,
     auth: AuthPayload = Depends(get_auth),
+    svc: ConversationService = Depends(_get_conversation_service),
 ):
     try:
-        return conversation_service.continue_update_assistant(
+        return svc.continue_update_assistant(
             user_id=auth.sub,
             caller_role=auth.role,
             conversation_id=body.conversation_id,
@@ -214,5 +220,3 @@ def continue_update_assistant(
         raise HTTPException(status_code=400, detail=str(e))
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))

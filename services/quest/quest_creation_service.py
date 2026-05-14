@@ -19,7 +19,7 @@ class QuestCreationService:
                 description=quest_data.get("Name", ""),
                 skills=quest_data.get("Skills", ""),
                 week=quest_data.get("Week", 1),
-                instructions=[],
+                instructions="",
                 rubric={},
                 status="not_started",
             )
@@ -43,7 +43,7 @@ class QuestCreationService:
                 description=quest_data.get("Name", ""),
                 skills=quest_data.get("Skills", ""),
                 week=quest_data.get("Week", 1),
-                instructions=quest_data.get("instructions", []),
+                instructions=quest_data.get("instructions", ""),
                 rubric=quest_data.get("rubric", {}),
                 status="not_started",
             )

@@ -11,6 +11,7 @@ logging.basicConfig(
     force=True,
 )
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -20,12 +21,39 @@ _req_log = logging.getLogger("eduquest.request")
 
 from routers import conversation, period, ltg, teacher, waitlist
 from routers import auth, user, enrollment, quest, parent
-from routers import curriculum, billing
+from routers import curriculum, billing, lessons, slides, feedback
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from exceptions.auth_error import AuthError
+from exceptions.permission_error import PermissionError
 
-app = FastAPI(title="EduQuest Agent Service")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _log = logging.getLogger(__name__)
+
+    if os.getenv("MOCK_AI", "").lower() in ("true", "1", "yes"):
+        from bots.provider import MockBotProvider
+        from bots.protocol import BotProviderProtocol
+        provider: BotProviderProtocol = MockBotProvider()
+        _log.info("Bot provider: MockBotProvider (MOCK_AI=true)")
+    else:
+        from bots.provider import BotProvider
+        from bots.protocol import BotProviderProtocol
+        provider: BotProviderProtocol = BotProvider()
+        _log.info("Bot provider: BotProvider (live OpenAI)")
+    app.state.bot_provider = provider
+
+    from integrations.s3_service import s3, BUCKET_NAME
+    try:
+        s3.head_bucket(Bucket=BUCKET_NAME)
+        _log.info("S3 OK — bucket=%s endpoint=%s", BUCKET_NAME, s3.meta.endpoint_url)
+    except Exception as e:
+        _log.error("S3 connectivity FAILED — bucket=%s error=%s", BUCKET_NAME, e)
+    yield
+
+
+app = FastAPI(title="EduQuest Agent Service", lifespan=lifespan)
 
 allowed_origins = [
     "https://eduquestai.org",
@@ -82,16 +110,19 @@ async def auth_error_handler(request: Request, exc: AuthError):
     return JSONResponse(status_code=401, content={"error": str(exc)})
 
 
-@app.on_event("startup")
-async def check_s3_connectivity():
-    from integrations.s3_service import s3, BUCKET_NAME
-    import logging
-    _log = logging.getLogger(__name__)
-    try:
-        s3.head_bucket(Bucket=BUCKET_NAME)
-        _log.info("S3 OK — bucket=%s endpoint=%s", BUCKET_NAME, s3.meta.endpoint_url)
-    except Exception as e:
-        _log.error("S3 connectivity FAILED — bucket=%s error=%s", BUCKET_NAME, e)
+@app.exception_handler(PermissionError)
+async def permission_error_handler(request: Request, exc: PermissionError):
+    return JSONResponse(status_code=403, content={"error": str(exc)})
+
+
+_logger = logging.getLogger(__name__)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    _logger.error("Unhandled exception: %s %s — %s", request.method, request.url.path, exc, exc_info=True)
+    return JSONResponse(status_code=500, content={"error": "Internal server error"})
+
 
 
 app.include_router(auth.router, prefix="/auth")
@@ -105,7 +136,10 @@ app.include_router(teacher.router, prefix="/teacher")
 app.include_router(user.router, prefix="/user")
 app.include_router(waitlist.router, prefix="/pilot-waitlist")
 app.include_router(curriculum.router, prefix="/curriculum")
+app.include_router(lessons.router, prefix="/lessons")
+app.include_router(slides.router, prefix="/slides")
 app.include_router(billing.router, prefix="/billing")
+app.include_router(feedback.router, prefix="/feedback")
 
 
 @app.get("/helloworld")

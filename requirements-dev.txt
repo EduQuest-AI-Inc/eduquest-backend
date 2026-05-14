@@ -1,3 +1,4 @@
 autotyping
 monkeytype
+pre-commit
 pyright

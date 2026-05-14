@@ -1,7 +1,8 @@
 # HOW TO RUN TESTS (from eduquest-backend/ with venv active):
 #   pytest                                    # all tests
 #   pytest -m unit                            # unit tests only (no network)
-#   pytest -m integration                       # integration tests (hits real Supabase)
+#   pytest -m integration                     # integration tests (hits real Supabase)
+#   pytest -m api                             # API tests (hits real Supabase and makes HTTP calls to test app)
 #   pytest tests/test_teacher_dao.py          # single file
 #   pytest --cov=. --cov-report=html          # coverage report
 
@@ -24,17 +25,31 @@ sys.modules['agents'] = MagicMock()
 sys.modules['agents._config'] = MagicMock()
 sys.modules['agents.models'] = MagicMock()
 sys.modules['agents.model_settings'] = MagicMock()
-sys.modules['bots'] = MagicMock()
-sys.modules['bots.agent'] = MagicMock()
-sys.modules['bots.profile_agent'] = MagicMock()
-sys.modules['bots.ltg_agent'] = MagicMock()
-sys.modules['bots.grading_agent'] = MagicMock()
-sys.modules['bots.teacher_feedback_agent'] = MagicMock()
-sys.modules['bots.coverage_evaluator'] = MagicMock()
-sys.modules['bots.guardrails'] = MagicMock()
-sys.modules['bots.schemas'] = MagicMock()
-sys.modules['bots.schemas.rubric'] = MagicMock()
-sys.modules['bots.provider'] = MagicMock()
+# bots.provider is NOT stubbed — real module must be importable so BotProviderProtocol
+# and MockBotProvider are real classes (see 'Bot mocking uses MockBotProvider() constructor
+# injection' in ARCH_DECISIONS.md). Individual agent modules are still stubbed because they
+# import from the OpenAI SDK at module level; they are only loaded lazily inside provider
+# factory methods.
+sys.modules['bots.quest_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.profile_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.ltg_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.grading_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.teacher_feedback_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.coverage_evaluator'] = MagicMock()  # arch-ok
+sys.modules['bots.guardrails'] = MagicMock()  # arch-ok
+sys.modules['bots.schemas'] = MagicMock()  # arch-ok
+sys.modules['bots.schemas.rubric'] = MagicMock()  # arch-ok
+sys.modules['bots.slideshow'] = MagicMock()  # arch-ok
+sys.modules['bots.slideshow.pptx_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.slideshow.orchestrator_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.slideshow.content_writer_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.slideshow.visual_review_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.tools'] = MagicMock()  # arch-ok
+sys.modules['bots.tools.content_tool'] = MagicMock()  # arch-ok
+sys.modules['bots.tools.image_tool'] = MagicMock()  # arch-ok
+sys.modules['bots.tools.chart_tool'] = MagicMock()  # arch-ok
+sys.modules['bots.tools.review_tool'] = MagicMock()  # arch-ok
+sys.modules['bots.tools.html_tool'] = MagicMock()  # arch-ok
 
 mock_openai_module = MagicMock()
 mock_openai_client = MagicMock()
@@ -68,4 +83,10 @@ sys.modules['botocore.exceptions'] = MagicMock()
 # will raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set").
 os.environ.setdefault('SUPABASE_URL', 'http://localhost:54321')
 os.environ.setdefault('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
+
+# Eagerly import main so all routers/services are cached in sys.modules while
+# mocks are active. Without this, tests/unit/bots/conftest.py removes bots mocks
+# at collection time (before route test files are imported), causing 'from main
+# import app' in those files to see un-mocked bots and produce broken app state.
+import main  # noqa: F401
 

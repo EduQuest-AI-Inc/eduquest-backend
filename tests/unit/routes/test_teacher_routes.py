@@ -13,7 +13,7 @@ def _teacher_auth():
 @pytest.fixture(scope="module")
 def client():
     app.dependency_overrides[get_auth] = _teacher_auth
-    with TestClient(app) as c:
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
 
@@ -25,7 +25,7 @@ def client():
 class TestGetTeacherPeriods:
 
     @pytest.mark.api
-    @patch("api.routers.teacher.period_management_service")
+    @patch("routers.teacher.period_management_service")
     def test_get_periods_success(self, mock_svc, client):
         mock_svc.get_periods_by_owner.return_value = [
             {"period_id": "P1", "name": "Math"},
@@ -38,7 +38,7 @@ class TestGetTeacherPeriods:
         assert len(data["periods"]) == 2
 
     @pytest.mark.api
-    @patch("api.routers.teacher.period_management_service")
+    @patch("routers.teacher.period_management_service")
     def test_get_periods_empty(self, mock_svc, client):
         mock_svc.get_periods_by_owner.return_value = []
         resp = client.get("/teacher/periods")
@@ -46,7 +46,7 @@ class TestGetTeacherPeriods:
         assert resp.json()["periods"] == []
 
     @pytest.mark.api
-    @patch("api.routers.teacher.period_management_service")
+    @patch("routers.teacher.period_management_service")
     def test_get_periods_service_error_returns_500(self, mock_svc, client):
         mock_svc.get_periods_by_owner.side_effect = RuntimeError("db error")
         resp = client.get("/teacher/periods")
@@ -60,7 +60,7 @@ class TestGetTeacherPeriods:
 class TestTeacherCanvasCourses:
 
     @pytest.mark.api
-    @patch("api.routers.teacher.Canvas")
+    @patch("routers.teacher.Canvas")
     def test_list_canvas_courses_success(self, mock_canvas, client):
         mock_course = MagicMock(id=1)
         mock_course.name = "Physics 101"
@@ -79,7 +79,7 @@ class TestTeacherCanvasCourses:
         mock_user.get_courses.assert_called_once_with(enrollment_type="teacher")
 
     @pytest.mark.api
-    @patch("api.routers.teacher.Canvas")
+    @patch("routers.teacher.Canvas")
     def test_list_canvas_courses_invalid_credentials(self, mock_canvas, client):
         mock_canvas.return_value.get_current_user.side_effect = Exception("bad creds")
         resp = client.post(

@@ -23,7 +23,8 @@ class PasswordResetTokenDAO(SupabaseBaseDAO):
         })
 
     def get_token(self, token_hash: str) -> Optional[Dict[str, Any]]:
-        return self._select_by_id('token_hash', token_hash)
+        rows = self._select_eq('token_hash', token_hash)
+        return rows[0] if rows else None
 
     def is_token_valid(self, token_hash: str) -> Tuple[bool, Optional[Dict], Optional[str]]:
         token_data = self.get_token(token_hash)

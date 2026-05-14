@@ -114,6 +114,46 @@ def complete_multipart_upload(key: str, upload_id: str, parts: list) -> str:
     return key
 
 
+def upload_pptx(pptx_bytes: bytes, period_id: str, lesson_id: str) -> str:
+    """Upload PowerPoint bytes to S3 and return the key."""
+    import io
+    key = f"pptx/{period_id}/{lesson_id}.pptx"
+    if not BUCKET_NAME:
+        logger.warning("S3 upload skipped: S3_BUCKET_NAME not set")
+        return key
+    s3.upload_fileobj(
+        Fileobj=io.BytesIO(pptx_bytes),
+        Bucket=BUCKET_NAME,
+        Key=key,
+        ExtraArgs={
+            "ACL": "private",
+            "ContentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        },
+    )
+    return key
+
+
+def upload_html(html_str: str, period_id: str, lesson_id: str) -> str:
+    """Upload an HTML slide deck to S3 and return the key."""
+    key = f"slides/{period_id}/{lesson_id}.html"
+    if not BUCKET_NAME:
+        logger.warning("S3 upload skipped: S3_BUCKET_NAME not set")
+        return key
+    s3.put_object(
+        Bucket=BUCKET_NAME,
+        Key=key,
+        Body=html_str.encode("utf-8"),
+        ContentType="text/html; charset=utf-8",
+        ACL="private",
+    )
+    return key
+
+
+def generate_presigned_url(s3_key: str, expiry: int = 900) -> str:
+    """Return a presigned S3 GET URL for a PowerPoint file (default 15-min expiry)."""
+    return get_file_presigned_url(s3_key, expires_in=expiry)
+
+
 def download_file_from_s3(key: str, dest_path: str) -> bool:
     """Download an S3 object to dest_path. Returns False on failure."""
     try:

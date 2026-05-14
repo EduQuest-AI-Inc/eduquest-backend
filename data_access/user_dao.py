@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from models.user import User
 
 SHARED_USER_FIELDS = {
-    "first_name", "last_name", "email", "password", "last_login",
+    "first_name", "last_name", "email", "password", "last_login", "phone_number",
 }
 
 
@@ -21,7 +21,8 @@ class UserDAO(SupabaseBaseDAO):
         return self._select_by_id('user_id', user_id)
 
     def get_by_email(self, email: str) -> Optional[Dict[str, Any]]:
-        return self._select_by_id('email', email)
+        rows = self._select_eq('email', email)
+        return rows[0] if rows else None
 
     def update(self, user_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
         result = self._update({'user_id': user_id}, updates)

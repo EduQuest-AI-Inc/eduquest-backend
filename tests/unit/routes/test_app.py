@@ -13,6 +13,7 @@ def client():
 
 
 @pytest.mark.smoke
+@pytest.mark.unit
 def test_helloworld_endpoint(client):
     response = client.get("/helloworld")
     assert response.status_code == 200

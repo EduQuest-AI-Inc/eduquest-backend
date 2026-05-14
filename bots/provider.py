@@ -1,24 +1,13 @@
 """
 Bot provider — factory for real and mock bot instances.
 
-Usage:
-    from bots.provider import get_bot_provider
-
-    agent = get_bot_provider().create_hw_agent(student, period, schedule)
-
-Set MOCK_AI=true in your environment to use fast mock implementations
-that return instant hardcoded responses without hitting the OpenAI API.
-
-For programmatic override (e.g. pytest):
-    from bots.provider import set_bot_provider, MockBotProvider
-    set_bot_provider(MockBotProvider())
-    ...
-    set_bot_provider(None)  # reset to env-var-driven default
+Receive BotProviderProtocol via constructor injection or via
+routers.deps.get_bot_provider (FastAPI Depends). The canonical provider is
+selected once at startup in main.py lifespan and stored in app.state.bot_provider.
 """
-import os
 from typing import Optional
 
-_provider_instance: Optional["BotProvider"] = None
+from bots.protocol import BotProviderProtocol  # noqa: F401 — re-exported for callers
 
 
 class BotProvider:
@@ -26,7 +15,7 @@ class BotProvider:
     OpenAI SDK at module import time when it isn't needed."""
 
     def create_hw_agent(self, student, period, schedule, conversation_id=None, previous_response_id=None):
-        from bots.agent import HWAgent
+        from bots.quests.quest_agent import HWAgent
         return HWAgent(
             student, period, schedule,
             conversation_id=conversation_id,
@@ -47,7 +36,7 @@ class BotProvider:
         grade_level: Optional[str] = None,
         research_context: Optional[str] = None,
     ):
-        from bots.curriculum_agent import CurriculumAgent
+        from bots.curriculum.curriculum_agent import CurriculumAgent
         return CurriculumAgent(
             vector_store_ids=vector_store_ids,
             course_name=course_name,
@@ -62,13 +51,31 @@ class BotProvider:
         from bots.profile_agent import create_profile_agent
         return create_profile_agent()
 
-    def create_ltg_agent(self, vector_store_id: str):
+    def create_ltg_agent(self, vector_store_id: str, curriculum: dict):
         from bots.ltg_agent import create_ltg_agent
-        return create_ltg_agent(vector_store_id)
+        return create_ltg_agent(vector_store_id, curriculum)
+
+    def create_schedule_agent(self, student, period, schedule, goal_text, previous_response_id=None):
+        from bots.quests.ltg_schedule_agent import LTGScheduleAgent
+        return LTGScheduleAgent(
+            student=student,
+            period=period,
+            schedule=schedule,
+            goal_text=goal_text,
+            previous_response_id=previous_response_id,
+        )
 
     def create_teacher_feedback_agent(self):
         from bots.teacher_feedback_agent import create_teacher_feedback_agent
         return create_teacher_feedback_agent()
+
+    def create_curriculum_only_quest_agent(self, period: dict, schedule: list):
+        from bots.quests.curriculum_only_quest_agent import CurriculumOnlyQuestAgent
+        return CurriculumOnlyQuestAgent(period=period, schedule=schedule)
+
+    def create_pptx_agent(self):
+        from bots.slideshow.pptx_agent import PptxAgent
+        return PptxAgent()
 
     async def grade_submission(self, quest_data: dict, submission_text: str) -> dict:
         grading_input = self._build_grading_input(quest_data, submission_text)
@@ -94,6 +101,10 @@ class BotProvider:
         else:
             skills = []
         instructions = quest_data.get("instructions", quest_data.get("description", ""))
+        if isinstance(instructions, list):
+            instructions = "\n".join(
+                f"Step {s['step']}: {s['text']}" for s in instructions if isinstance(s, dict)
+            )
         return GradingInput(
             submission=submission_text,
             rubric=rubric,
@@ -178,13 +189,25 @@ class MockBotProvider(BotProvider):
         from bots.profile_agent import create_profile_agent
         return create_profile_agent()
 
-    def create_ltg_agent(self, vector_store_id: str):
+    def create_ltg_agent(self, vector_store_id: str, curriculum: dict):
         from bots.ltg_agent import create_ltg_agent
-        return create_ltg_agent(vector_store_id)
+        return create_ltg_agent(vector_store_id, curriculum)
+
+    def create_schedule_agent(self, student, period, schedule, goal_text, previous_response_id=None):
+        from bots._mocks import MockLTGScheduleAgent
+        return MockLTGScheduleAgent(student=student, schedule=schedule, goal_text=goal_text)
 
     def create_teacher_feedback_agent(self):
         from bots.teacher_feedback_agent import create_teacher_feedback_agent
         return create_teacher_feedback_agent()
+
+    def create_curriculum_only_quest_agent(self, period: dict, schedule: list):
+        from bots._mocks import MockCurriculumOnlyQuestAgent
+        return MockCurriculumOnlyQuestAgent(period=period, schedule=schedule)
+
+    def create_pptx_agent(self):
+        from bots._mocks import MockPptxAgent
+        return MockPptxAgent()
 
     async def run_conversation(self, agent, message: str, **kwargs):
         from bots._mocks import MockRunner
@@ -198,19 +221,3 @@ class MockBotProvider(BotProvider):
     def runner(self):
         from bots._mocks import MockRunner
         return MockRunner
-
-
-def get_bot_provider() -> BotProvider:
-    global _provider_instance
-    if _provider_instance is None:
-        if os.getenv("MOCK_AI", "").lower() in ("true", "1", "yes"):
-            _provider_instance = MockBotProvider()
-        else:
-            _provider_instance = BotProvider()
-    return _provider_instance
-
-
-def set_bot_provider(provider: Optional[BotProvider]) -> None:
-    """Override the global provider. Pass None to reset to env-var-driven default."""
-    global _provider_instance
-    _provider_instance = provider

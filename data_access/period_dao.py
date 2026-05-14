@@ -25,6 +25,7 @@ class PeriodDAO(SupabaseBaseDAO):
             'file_vector_store_ids': getattr(period, 'file_vector_store_ids', []),
             'processing_status': getattr(period, 'processing_status', 'pending'),
             'status': getattr(period, 'status', 'pending'),
+            'is_summer_quest': getattr(period, 'is_summer_quest', False),
         })
 
     def get_period_by_id(self, period_id: str) -> Optional[dict]:
@@ -38,6 +39,14 @@ class PeriodDAO(SupabaseBaseDAO):
 
     def delete_period(self, period_id: str) -> None:
         self._delete({'period_id': period_id})
+
+    def get_periods_by_ids(self, period_ids: List[str]) -> List[dict]:
+        if not period_ids:
+            return []
+        response = self._execute(
+            self._table().select('*').in_('period_id', period_ids)
+        )
+        return response.data if response.data else []
 
     def get_periods_by_owner_id(self, owner_id: str) -> List:
         return self._select_eq('owner_id', owner_id)

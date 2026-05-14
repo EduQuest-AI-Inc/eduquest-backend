@@ -7,7 +7,7 @@ via the Responses API, avoiding the Conversations API entirely.
 import asyncio
 from typing import Optional, Dict, Any
 
-from bots.provider import get_bot_provider
+from bots.protocol import BotProviderProtocol
 
 
 class ProfileConversationService:
@@ -15,8 +15,9 @@ class ProfileConversationService:
     Wraps the profile agent using previous_response_id for stateful tracking.
     """
 
-    def __init__(self, previous_response_id: Optional[str] = None) -> None:
-        self.agent = get_bot_provider().create_profile_agent()
+    def __init__(self, previous_response_id: Optional[str] = None, *, bot_provider: BotProviderProtocol) -> None:
+        self._bot_provider = bot_provider
+        self.agent = bot_provider.create_profile_agent()
         self.previous_response_id = previous_response_id
 
     async def initiate(self, student: Dict[str, Any]) -> Dict[str, Any]:
@@ -30,7 +31,7 @@ class ProfileConversationService:
         first_name = student.get("first_name", "Student")
         last_name = student.get("last_name", "")
         initial_message = f"Hello, I'm {first_name} {last_name}."
-        result = await get_bot_provider().run_conversation(self.agent, initial_message)
+        result = await self._bot_provider.run_conversation(self.agent, initial_message)
 
         response = result.final_output
         profile_complete, profile = self._check_profile(response)
@@ -50,7 +51,7 @@ class ProfileConversationService:
             Dict with ``response_id``, ``response``, ``profile_complete``,
             and optionally ``profile``.
         """
-        result = await get_bot_provider().run_conversation(
+        result = await self._bot_provider.run_conversation(
             self.agent,
             user_message,
             previous_response_id=self.previous_response_id,
@@ -83,14 +84,18 @@ class ProfileConversationService:
 
 def initiate_profile_conversation(
     student: Dict[str, Any],
+    *,
+    bot_provider: BotProviderProtocol,
 ) -> Dict[str, Any]:
-    service = ProfileConversationService()
+    service = ProfileConversationService(bot_provider=bot_provider)
     return asyncio.run(service.initiate(student))
 
 
 def continue_profile_conversation(
     previous_response_id: str,
     user_message: str,
+    *,
+    bot_provider: BotProviderProtocol,
 ) -> Dict[str, Any]:
-    service = ProfileConversationService(previous_response_id)
+    service = ProfileConversationService(previous_response_id, bot_provider=bot_provider)
     return asyncio.run(service.continue_conversation(user_message))

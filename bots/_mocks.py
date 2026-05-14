@@ -102,7 +102,7 @@ class MockHWAgent:
         self.schedule = schedule
 
     def run(self) -> list:
-        from bots.agent import IndividualQuest
+        from bots.quests.quest_agent import IndividualQuest
 
         results = []
         for quest in self.schedule:
@@ -132,6 +132,76 @@ class MockHWAgent:
                 },
             ))
         return results
+
+
+class MockLTGScheduleAgent:
+    """Fast replacement for LTGScheduleAgent — returns one goal-aligned name per schedule item."""
+
+    def __init__(self, student=None, schedule=None, goal_text=None, **kwargs):
+        self._schedule = schedule or []
+        self._goal_text = goal_text or "complete the course"
+
+    def run(self):
+        from bots.quests.ltg_schedule_agent import ScheduleOutput, WeekQuest
+
+        verbs = ["Build", "Design", "Analyze", "Create", "Apply",
+                 "Investigate", "Prototype", "Compare", "Draft", "Evaluate"]
+        goal_fragment = self._goal_text[:40].rstrip()
+        quests = []
+        for i, entry in enumerate(self._schedule):
+            week = entry.get("Week", i + 1) if isinstance(entry, dict) else i + 1
+            skills_raw = entry.get("Skills", "") if isinstance(entry, dict) else ""
+            first_skill = skills_raw.split(";")[0].strip() if skills_raw else "core skills"
+            verb = verbs[i % len(verbs)]
+            quest_name = f"[MOCK] {verb} a {first_skill} artifact toward: {goal_fragment}"
+            quests.append(WeekQuest(week=week, quest_name=quest_name))
+        return ScheduleOutput(quests=quests)
+
+
+class MockCurriculumOnlyQuestAgent:
+    """Fast replacement for CurriculumOnlyQuestAgent — returns a goal + one quest per schedule item."""
+
+    _VERBS = ["Build", "Design", "Analyze", "Create", "Apply",
+              "Investigate", "Prototype", "Compare", "Draft", "Evaluate"]
+
+    def __init__(self, period=None, schedule=None):
+        self._schedule = schedule or []
+
+    def run(self) -> tuple:
+        from bots.quests.curriculum_only_quest_agent import IndividualQuest
+        goal_text = (
+            "[MOCK] By the end of this quest, you will have applied core course concepts "
+            "through a series of hands-on projects."
+        )
+        quests = []
+        for idx, entry in enumerate(self._schedule):
+            week = entry.get("Week", idx + 1) if isinstance(entry, dict) else idx + 1
+            skills = entry.get("Skills", "core skills") if isinstance(entry, dict) else "core skills"
+            first_skill = skills.split(";")[0].strip() or "core skills"
+            verb = self._VERBS[idx % len(self._VERBS)]
+            quests.append(IndividualQuest(
+                Name=f"[MOCK] {verb} with {first_skill}",
+                Skills=skills,
+                Week=week,
+                instructions=[
+                    {"step": 1, "text": "[MOCK] Review the curriculum materials for this week."},
+                    {"step": 2, "text": "Complete the main activity described in the materials."},
+                    {"step": 3, "text": "Reflect on what you learned and submit your work."},
+                ],
+                rubric={
+                    "Criteria": {
+                        "Understanding": {
+                            "Score_0": "No attempt",
+                            "Score_1": "Minimal understanding",
+                            "Score_2": "Partial understanding",
+                            "Score_3": "Satisfactory understanding",
+                            "Score_4": "Good understanding",
+                            "Score_5": "Excellent understanding",
+                        }
+                    }
+                },
+            ))
+        return goal_text, quests
 
 
 class MockGradingOrchestrator:
@@ -189,12 +259,12 @@ class MockCurriculumAgent:
     def __init__(
         self,
         vector_store_ids: list,
-        course_name: str = None,
-        start_date: str = None,
-        end_date: str = None,
-        course_description: str = None,
-        grade_level: str = None,
-        research_context: str = None,
+        course_name: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        course_description: str | None = None,
+        grade_level: str | None = None,
+        research_context: str | None = None,
     ):
         self._start_date = date.fromisoformat(start_date) if start_date else date.today()
         self._end_date = date.fromisoformat(end_date) if end_date else date.today()
@@ -297,3 +367,40 @@ class MockConversationsSession:
 
     def __init__(self, conversation_id=None):
         self._session_id = conversation_id or "mock-conversation-id-001"
+
+
+class MockPptxAgent:
+    """
+    Deterministic replacement for PptxAgent. Returns a minimal but real
+    .pptx file (title slide + one content slide per concept) so the file
+    can be opened after downloading. Uses python-pptx.
+    """
+
+    async def run(self, lesson: dict, period_context: dict) -> dict:
+        import io
+        from pptx import Presentation
+
+        prs = Presentation()
+        lesson_name = lesson.get("lesson_name", "Lesson")
+
+        title_slide = prs.slides.add_slide(prs.slide_layouts[0])
+        title_slide.shapes.title.text = f"[MOCK] {lesson_name}"
+        title_slide.placeholders[1].text = "EduQuest — Mock PowerPoint"
+
+        concepts = lesson.get("concepts", [])
+        skills = lesson.get("skills", [])
+        for concept in concepts:
+            concept_name = concept.get("concept_name", "Concept")
+            concept_skills = [s for s in skills if s.get("concept_name") == concept_name]
+            slide = prs.slides.add_slide(prs.slide_layouts[1])
+            slide.shapes.title.text = concept_name
+            tf = slide.placeholders[1].text_frame
+            tf.text = "Skills:"
+            for skill in concept_skills:
+                p = tf.add_paragraph()
+                p.text = f"• {skill.get('skill_name', '')}"
+                p.level = 1
+
+        buf = io.BytesIO()
+        prs.save(buf)
+        return {"pptx_bytes": buf.getvalue(), "html_str": "<html><body>[MOCK]</body></html>"}

@@ -151,7 +151,8 @@ async def check_student_output_safety(
         model="gpt-4.1-mini",
         output_type=SafetyCheck,
     )
-    result = await Runner.run(safety_agent, output.response, context=ctx.context)
+    content = output.response if hasattr(output, "response") else str(output)
+    result = await Runner.run(safety_agent, content, context=ctx.context)
     if result.final_output.is_safe:
         return GuardrailFunctionOutput(
             output_info=result.final_output,

@@ -8,6 +8,12 @@ class QuestGradingService:
     def __init__(self) -> None:
         self.quest_dao = QuestDAO()
 
+    def update_completed_steps(self, quest_id: str, completed_steps: list) -> None:
+        self.quest_dao.update_completed_steps(quest_id, completed_steps)
+
+    def update_quest_grade_and_feedback(self, quest_id: str, grade: dict, feedback: str) -> None:
+        self.quest_dao.update_quest_grade_and_feedback(quest_id, grade, feedback)
+
     def update_quest_status(self, quest_id: str, status: str) -> dict:
         self.quest_dao.update_quest_status(quest_id, status)
         return {

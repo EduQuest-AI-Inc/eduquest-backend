@@ -122,7 +122,7 @@ def test_expired_trial_self_heals_to_expired():
 def test_create_class_blocked_without_membership():
     svc = _build_service(record=None)
     with pytest.raises(MembershipRequiredError):
-        svc.assert_can_create_class("teacher_1", "teacher")
+        svc.check_can_create_class("teacher_1", "teacher")
 
 
 @pytest.mark.unit
@@ -137,7 +137,7 @@ def test_create_class_blocked_at_starter_limit():
         periods=[{"period_id": str(i), "status": "approved"} for i in range(5)],
     )
     with pytest.raises(PlanLimitExceededError):
-        svc.assert_can_create_class("u", "teacher")
+        svc.check_can_create_class("u", "teacher")
 
 
 @pytest.mark.unit
@@ -152,7 +152,7 @@ def test_create_class_allowed_under_limit():
         periods=[{"period_id": str(i), "status": "approved"} for i in range(2)],
     )
     # Should not raise.
-    svc.assert_can_create_class("u", "teacher")
+    svc.check_can_create_class("u", "teacher")
 
 
 @pytest.mark.unit
@@ -167,7 +167,7 @@ def test_pro_plan_has_unlimited_students_per_class():
         enrollments=[{"user_id": str(i)} for i in range(50)],
     )
     # Should not raise even with 50 students enrolled.
-    svc.assert_can_add_student_to_period("u", "parent", "p1")
+    svc.check_can_add_student_to_period("u", "parent", "p1")
 
 
 @pytest.mark.unit
@@ -182,7 +182,7 @@ def test_starter_plan_blocks_21st_student():
         enrollments=[{"user_id": str(i)} for i in range(20)],
     )
     with pytest.raises(PlanLimitExceededError):
-        svc.assert_can_add_student_to_period("u", "parent", "p1")
+        svc.check_can_add_student_to_period("u", "parent", "p1")
 
 
 # ── Stripe sync ────────────────────────────────────────────────────────────────

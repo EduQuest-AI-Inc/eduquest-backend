@@ -73,6 +73,9 @@ class ParentService:
 
     # -- Student helpers ------------------------------------------------------
 
+    def get_linked_student_ids(self, user_id: str) -> list:
+        return self.parent_dao.get_linked_student_ids(user_id)
+
     def get_linked_students(self, user_id: str) -> list:
         linked_ids = self.parent_dao.get_linked_student_ids(user_id)
         students = []

@@ -71,14 +71,16 @@ class PasswordResetRateLimitDAO(SupabaseBaseDAO):
 
     def _is_on_cooldown(self, email_lc: str) -> bool:
         key = self._get_cooldown_key(email_lc)
-        item = self._select_by_id('key', key)
+        rows = self._select_eq('key', key)
+        item = rows[0] if rows else None
         if not item:
             return False
         now = datetime.now(timezone.utc).isoformat()
         return item.get('expires_at', '') > now
 
     def _get_count(self, key: str) -> int:
-        item = self._select_by_id('key', key)
+        rows = self._select_eq('key', key)
+        item = rows[0] if rows else None
         if not item:
             return 0
         now = datetime.now(timezone.utc).isoformat()

@@ -1,5 +1,7 @@
 # CLAUDE.md — Data Access
 
+For rationale behind the DAO pattern, see [ARCH_DECISIONS.md](../ARCH_DECISIONS.md).
+
 All DAOs live in `data_access/` and extend `SupabaseBaseDAO` from [base_dao.py](base_dao.py).
 
 ## DAO Pattern
@@ -18,8 +20,8 @@ One file per Supabase table.
 
 `SupabaseBaseDAO` exposes thin wrappers around the PostgREST query builder:
 
-- `_select_by_id(id_column, id_value)` — single-row lookup; returns `None` when missing
-- `_select_eq(column, value)` — multi-row lookup as a list
+- `_select_by_id(id_column, id_value)` — single-row lookup via `.maybe_single()`; only use on true primary key columns
+- `_select_eq(column, value)` — multi-row lookup as a list; use this for any UNIQUE non-PK column (email, code, hash, etc.) — `maybe_single()` returns `None` for both "0 rows" and silent PostgREST failures, making bugs invisible
 - `_insert(data)` — strict insert; raises on conflict
 - `_upsert(data)` — insert-or-update on primary key
 - `_update(filters, updates)` — partial update; returns the updated rows
@@ -66,6 +68,7 @@ Role tables (`student`, `teacher`, `parent`) hold only role-specific fields and 
 | `StudentSkillMasteryDAO` | `student_skill_mastery` | Boolean mastery per (student, period, skill); written by grading orchestrator using `MASTERY_CUTOFF = 0.70`. |
 | `AggregatedMetricsDAO` | `aggregated_metrics` | Class-level percentages per skill per week — `% of students who mastered`. |
 | `WeekDAO` / `LessonDAO` / `ConceptDAO` / `SkillDAO` / `ConceptSkillDAO` | `week`, `lesson`, `concept`, `skill`, `concept_skill` | Curriculum knowledge graph (Week → Lesson → Concept → Skill). |
+| `LessonPptxDAO` | `lesson_pptx` | Per-lesson PowerPoint generation state and S3 key. Methods: `insert`, `update_status`, `get_by_period`, `get_by_lesson_id`, `get_latest_done`. |
 | `MaterialFilesDAO` | `material_files` | Uploaded teacher materials per period. |
 | `WaitlistDAO` | `pilot_waitlist` | Pilot program waitlist entries. |
 | `PasswordResetTokenDAO` | `password_reset_token` | One-shot reset token, hashed before storage. |

@@ -6,8 +6,8 @@ from typing import Any
 
 from fastapi import BackgroundTasks
 
-from bots.coverage_evaluator import CoverageEvaluator
-from bots.provider import get_bot_provider
+from bots.curriculum.coverage_evaluator import CoverageEvaluator
+from bots.protocol import BotProviderProtocol
 from data_access.concept_dao import ConceptDAO
 from data_access.concept_skill_dao import ConceptSkillDAO
 from data_access.lesson_dao import LessonDAO
@@ -29,22 +29,34 @@ _VALID_STATUSES = {"pending", "draft", "approved"}
 
 
 class CurriculumService:
-    def __init__(self) -> None:
-        self.period_dao = PeriodDAO()
-        self.week_dao = WeekDAO()
-        self.lesson_dao = LessonDAO()
-        self.concept_dao = ConceptDAO()
-        self.skill_dao = SkillDAO()
-        self.concept_skill_dao = ConceptSkillDAO()
+    def __init__(
+        self,
+        *,
+        bot_provider: BotProviderProtocol,
+        period_dao=None,
+        week_dao=None,
+        lesson_dao=None,
+        concept_dao=None,
+        skill_dao=None,
+        concept_skill_dao=None,
+    ) -> None:
+        self._bot_provider = bot_provider
+        self.period_dao = period_dao or PeriodDAO()
+        self.week_dao = week_dao or WeekDAO()
+        self.lesson_dao = lesson_dao or LessonDAO()
+        self.concept_dao = concept_dao or ConceptDAO()
+        self.skill_dao = skill_dao or SkillDAO()
+        self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO()
 
     # ── public API ────────────────────────────────────────────────────────────
 
     def trigger_generation(self, period_id: str, background_tasks: BackgroundTasks) -> None:
         period = self._get_period_or_raise(period_id)
-        if period.get("status", "pending") != "pending":
+        if period.get("status", "pending") not in {"pending", "failed"}:
             raise ValidationError(
                 f"Cannot generate curriculum: period is already in '{period['status']}' status"
             )
+        self.period_dao.update_status(period_id, "generating")
         background_tasks.add_task(self._run_generation, period_id)
 
     def get_curriculum(self, period_id: str) -> dict[str, Any]:
@@ -73,11 +85,15 @@ class CurriculumService:
         self._get_period_or_raise(period_id)
         self.skill_dao.update_skill(period_id, skill_name, fields)
 
-    def approve_period(self, period_id: str) -> None:
+    def approve_period(self, period_id: str) -> list[dict[str, Any]]:
         period = self._get_period_or_raise(period_id)
-        if period["status"] == "pending":
-            raise ValidationError("Cannot approve a period with no generated curriculum")
+        if period["status"] != "draft":
+            raise ValidationError(
+                f"Cannot approve: period status is '{period['status']}', must be 'draft'"
+            )
+        lessons = self.lesson_dao.get_lessons_by_period(period_id)
         self.period_dao.update_status(period_id, "approved")
+        return lessons
 
     # ── private helpers ───────────────────────────────────────────────────────
 
@@ -95,6 +111,8 @@ class CurriculumService:
             if not period:
                 logger.error("_run_generation: period %s not found", period_id)
                 return
+
+            self.period_dao.update_status(period_id, "generating")
 
             start_date = period.get("start_date") or date.today().isoformat()
             end_date = period.get("end_date") or date.today().isoformat()
@@ -133,7 +151,7 @@ class CurriculumService:
                 period_id, mode, start_date, end_date,
             )
 
-            bot = get_bot_provider().create_curriculum_agent(
+            bot = self._bot_provider.create_curriculum_agent(
                 vector_store_ids=vector_store_ids,
                 course_name=period.get("name") or "",
                 start_date=str(start_date),
@@ -164,6 +182,7 @@ class CurriculumService:
                 self.period_dao.update_status(period_id, "failed")
             except Exception:
                 logger.exception("could not set status=failed for period %s", period_id)
+            raise
 
     def _curriculum_result_to_payload(self, period_id: str, result) -> dict[str, Any]:
         """Convert CurriculumResult (bot output) into the save_curriculum payload shape."""
@@ -229,18 +248,21 @@ class CurriculumService:
                 week_end=w.get("week_end") or None,
             ))
 
+        lesson_id_by_name: dict[str, str] = {}
         for ls in payload.get("lessons", []):
-            self.lesson_dao.insert_lesson(Lesson(
+            lesson_id = self.lesson_dao.insert_lesson(Lesson(
                 period_id=period_id,
                 lesson_name=ls["lesson_name"],
                 week_number=ls["week_number"],
             ))
+            lesson_id_by_name[ls["lesson_name"]] = lesson_id
 
         for c in payload.get("concepts", []):
             self.concept_dao.insert_concept(Concept(
                 period_id=period_id,
                 concept_name=c["concept_name"],
                 lesson_name=c["lesson_name"],
+                lesson_id=lesson_id_by_name.get(c["lesson_name"]),
                 description=c.get("description"),
                 prerequisites=c.get("prerequisites") or [],
                 key_takeaways=c.get("key_takeaways") or [],

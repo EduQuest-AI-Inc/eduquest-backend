@@ -1,13 +1,19 @@
+import logging
 from datetime import date, timedelta
 from typing import Dict, Any, Optional
 from data_access.period_dao import PeriodDAO
 from data_access.student_dao import StudentDAO
 from data_access.enrollment_dao import EnrollmentDAO
 from data_access.ltg_conversation_dao import LtgConversationDAO
+from data_access.student_long_term_goal_dao import StudentLongTermGoalDAO
+from exceptions.not_found_error import NotFoundError
+from exceptions.validation_error import ValidationError
 
-from bots.provider import get_bot_provider
+from bots.protocol import BotProviderProtocol
 from services.curriculum.curriculum_service import CurriculumService
 from services.quest.quest_service import QuestService
+
+logger = logging.getLogger(__name__)
 
 
 def _friday_of_week(start: date, week_num: int) -> date:
@@ -19,34 +25,34 @@ def _friday_of_week(start: date, week_num: int) -> date:
 
 class PeriodQuestService:
 
-    def __init__(self) -> None:
+    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+        self._bot_provider = bot_provider
         self.period_dao = PeriodDAO()
         self.student_dao = StudentDAO()
         self.enrollment_dao = EnrollmentDAO()
-        self.curriculum_service = CurriculumService()
+        self.curriculum_service = CurriculumService(bot_provider=bot_provider)
         self.ltg_conversation_dao = LtgConversationDAO()
+        self.ltg_goal_dao = StudentLongTermGoalDAO()
         self.quest_service = QuestService()
 
     def _assert_enrolled(self, caller_id: str, period_id: str) -> None:
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
         if not any(e['user_id'] == caller_id for e in enrollments):
-            raise Exception(f"Student {caller_id} is not enrolled in period {period_id}")
+            raise ValidationError(f"Student {caller_id} is not enrolled in period {period_id}")
 
     def start_homework_agent(self, caller_id: str, period_id: str) -> Dict[str, Any]:
-        self._assert_enrolled(caller_id, period_id)
-
         student = self.student_dao.get_student_by_id(caller_id)
         if not student:
-            raise Exception("Student not found")
+            raise NotFoundError("Student not found")
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
-            raise Exception("Period not found")
+            raise NotFoundError("Period not found")
 
         curriculum = self.curriculum_service.get_curriculum(period_id)
         weeks = curriculum.get('weeks', [])
         if not weeks:
-            raise Exception("No curriculum found. Teacher must generate and approve a curriculum first.")
+            raise NotFoundError("No curriculum found. Teacher must generate and approve a curriculum first.")
 
         all_lessons = curriculum.get('lessons', [])
         lessons_by_week: Dict[int, list] = {}
@@ -83,18 +89,48 @@ class PeriodQuestService:
             schedule_quests.append(quest_entry)
 
         if not schedule_quests:
-            raise Exception("No quests could be built from curriculum weeks.")
+            raise ValidationError("No quests could be built from curriculum weeks.")
 
         ltg_conv_id = self.ltg_conversation_dao.get_conversation_id(caller_id, period_id)
         if not ltg_conv_id:
-            raise Exception(
+            raise NotFoundError(
                 "No LTG conversation found for this period. "
                 "Student must complete the Long-Term Goal conversation before generating quests."
             )
 
         ltg_response_id = self.ltg_conversation_dao.get_last_response_id(caller_id, period_id)
 
-        homework_agent = get_bot_provider().create_hw_agent(student, period, schedule_quests, previous_response_id=ltg_response_id)
+        goal_text = self.ltg_goal_dao.get_by_student_and_period(caller_id, period_id)
+        if goal_text:
+            try:
+                schedule_agent = self._bot_provider.create_schedule_agent(
+                    student=student,
+                    period=period,
+                    schedule=schedule_quests,
+                    goal_text=goal_text,
+                    previous_response_id=ltg_response_id,
+                )
+                schedule_output = schedule_agent.run()
+                name_by_week = {wq.week: wq.quest_name for wq in schedule_output.quests}
+                for quest in schedule_quests:
+                    if quest["Week"] in name_by_week:
+                        quest["Name"] = name_by_week[quest["Week"]]
+                logger.info(
+                    "LTGScheduleAgent enriched %d/%d quest names for student %s",
+                    len(schedule_output.quests), len(schedule_quests), caller_id,
+                )
+            except Exception as exc:
+                logger.error(
+                    "LTGScheduleAgent failed for student %s — falling back to generic names: %s",
+                    caller_id, exc,
+                )
+        else:
+            logger.info(
+                "No LTG goal found for student %s in period %s — using generic quest names.",
+                caller_id, period_id,
+            )
+
+        homework_agent = self._bot_provider.create_hw_agent(student, period, schedule_quests, previous_response_id=ltg_response_id)
         homework = homework_agent.run()
 
         homework_dict = self._normalize_homework(homework)
@@ -119,15 +155,15 @@ class PeriodQuestService:
 
         student = self.student_dao.get_student_by_id(caller_id)
         if not student:
-            raise Exception(f"Student not found: {caller_id}")
+            raise NotFoundError(f"Student not found: {caller_id}")
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
-            raise Exception("Period not found")
+            raise NotFoundError("Period not found")
 
         existing_quests = self.quest_service.get_quests_for_student_and_period(caller_id, period_id)
         if not existing_quests:
-            raise Exception("No existing quests found. Cannot update without existing quest structure.")
+            raise NotFoundError("No existing quests found. Cannot update without existing quest structure.")
 
         incomplete_quests = [
             {"Name": q.get('description', ''), "Skills": q.get('skills', ''), "Week": q.get('week', 1)}
@@ -148,7 +184,7 @@ class PeriodQuestService:
         ltg_response_id = self.ltg_conversation_dao.get_last_response_id(caller_id, period_id)
         student_with_context = {**student, 'recommended_change': recommended_change}
 
-        homework_agent = get_bot_provider().create_hw_agent(student_with_context, period, incomplete_quests, previous_response_id=ltg_response_id)
+        homework_agent = self._bot_provider.create_hw_agent(student_with_context, period, incomplete_quests, previous_response_id=ltg_response_id)
         homework = homework_agent.run()
         homework_dict = self._normalize_homework(homework)
 

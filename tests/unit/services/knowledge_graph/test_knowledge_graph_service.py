@@ -3,55 +3,54 @@ from unittest.mock import MagicMock
 import pytest
 
 from exceptions.validation_error import ValidationError
-from models.period_schedule import PeriodSchedule
 from models.student_skill_mastery import MASTERY_CUTOFF, StudentSkillMastery
 from services.knowledge_graph.knowledge_graph_service import KnowledgeGraphService
 
+# ---------------------------------------------------------------------------
+# Shared test data — mirrors what the normalized tables would return
+# ---------------------------------------------------------------------------
 
-def _schedule_payload():
-    return {
-        "weeks": [
-            {
-                "week": 1,
-                "lessons": [
-                    {
-                        "lesson_id": "L1",
-                        "concepts": [
-                            {
-                                "concept_id": "C1",
-                                "name": "Variables",
-                                "prerequisites": [],
-                                "skills": ["assign_variable"],
-                                "mastery_threshold": 0.8,
-                                "cognitive_load": "low",
-                            },
-                            {
-                                "concept_id": "C2",
-                                "name": "Loops",
-                                "prerequisites": ["C1"],
-                                "skills": ["write_for_loop"],
-                                "mastery_threshold": 0.9,
-                                "cognitive_load": "medium",
-                            },
-                        ],
-                    }
-                ],
-            }
-        ]
-    }
+CONCEPTS = [
+    {
+        "concept_name": "Variables",
+        "lesson_name": "L1",
+        "prerequisites": [],
+        "metadata": {"cognitive_load": "low"},
+    },
+    {
+        "concept_name": "Loops",
+        "lesson_name": "L1",
+        "prerequisites": ["Variables"],
+        "metadata": {"cognitive_load": "medium"},
+    },
+]
+
+SKILLS = [
+    {"skill_name": "assign_variable", "mastery_threshold": 0.8},
+    {"skill_name": "write_for_loop", "mastery_threshold": 0.9},
+]
+
+CS_LINKS = [
+    {"concept_name": "Variables", "skill_name": "assign_variable"},
+    {"concept_name": "Loops", "skill_name": "write_for_loop"},
+]
 
 
-def _service(period_dao=None, mastery_dao=None) -> KnowledgeGraphService:
-    schedule_dao = period_dao or MagicMock()
-    if period_dao is None:
-        schedule_dao.get_by_period_id.return_value = PeriodSchedule(
-            period_id="p1", schedule_json=_schedule_payload()
-        )
+def _service(concept_dao=None, skill_dao=None, cs_dao=None, mastery_dao=None) -> KnowledgeGraphService:
+    cd = concept_dao or MagicMock(get_concepts_by_period=MagicMock(return_value=CONCEPTS))
+    sd = skill_dao or MagicMock(get_skills_by_period=MagicMock(return_value=SKILLS))
+    csd = cs_dao or MagicMock(get_all_for_period=MagicMock(return_value=CS_LINKS))
     return KnowledgeGraphService(
-        period_schedule_dao=schedule_dao,
+        concept_dao=cd,
+        skill_dao=sd,
+        concept_skill_dao=csd,
         student_skill_mastery_dao=mastery_dao or MagicMock(),
     )
 
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
 
 @pytest.mark.unit
 def test_get_graph_zeroes_unscored_skills():
@@ -66,7 +65,7 @@ def test_get_graph_zeroes_unscored_skills():
     assert skills["assign_variable"]["mastered"] is False
     assert skills["assign_variable"]["threshold"] == 0.8
     assert skills["write_for_loop"]["threshold"] == 0.9
-    # edge from C1's skill to C2's skill
+    # edge from Variables' skill to Loops' skill
     assert {"from": "assign_variable", "to": "write_for_loop"} in graph["edges"]
 
 
@@ -108,8 +107,21 @@ def test_get_graph_surfaces_orphan_mastery_rows():
 
     graph = svc.get_graph("s1", "p1")
     orphan = next(n for n in graph["nodes"] if n["skill"] == "orphaned_skill")
-    assert orphan["concept_id"] is None
+    assert orphan["concept_name"] is None
     assert orphan["threshold"] == MASTERY_CUTOFF
+
+
+@pytest.mark.unit
+def test_get_graph_includes_cognitive_load():
+    mastery_dao = MagicMock()
+    mastery_dao.get_for_student.return_value = []
+    svc = _service(mastery_dao=mastery_dao)
+
+    graph = svc.get_graph("s1", "p1")
+    skills = {n["skill"]: n for n in graph["nodes"]}
+
+    assert skills["assign_variable"]["cognitive_load"] == "low"
+    assert skills["write_for_loop"]["cognitive_load"] == "medium"
 
 
 @pytest.mark.unit
@@ -138,7 +150,7 @@ def test_update_mastery_uses_curriculum_threshold():
 
     row = svc.update_mastery("s1", "p1", "write_for_loop", 0.92)
 
-    assert captured["threshold"] == 0.9  # comes from concept C2
+    assert captured["threshold"] == 0.9  # from the Loops concept
     assert row.mastered is True
 
 
@@ -192,10 +204,10 @@ def test_get_unlocked_concepts_only_returns_ready_concepts():
     svc = _service(mastery_dao=mastery_dao)
 
     unlocked = svc.get_unlocked_concepts("s1", "p1")
-    ids = {c["concept_id"] for c in unlocked}
+    names = {c["concept_name"] for c in unlocked}
 
-    # Only C1 has no prereqs and is therefore unlocked initially.
-    assert ids == {"C1"}
+    # Only Variables has no prereqs and is therefore unlocked initially.
+    assert names == {"Variables"}
 
 
 @pytest.mark.unit
@@ -213,18 +225,21 @@ def test_get_unlocked_concepts_after_mastering_prereqs():
     svc = _service(mastery_dao=mastery_dao)
 
     unlocked = svc.get_unlocked_concepts("s1", "p1")
-    ids = {c["concept_id"] for c in unlocked}
-    assert ids == {"C1", "C2"}
+    names = {c["concept_name"] for c in unlocked}
+    assert names == {"Variables", "Loops"}
 
 
 @pytest.mark.unit
-def test_empty_schedule_does_not_blow_up():
-    period_dao = MagicMock()
-    period_dao.get_by_period_id.return_value = None
+def test_empty_curriculum_does_not_blow_up():
+    concept_dao = MagicMock(get_concepts_by_period=MagicMock(return_value=[]))
+    skill_dao = MagicMock(get_skills_by_period=MagicMock(return_value=[]))
+    cs_dao = MagicMock(get_all_for_period=MagicMock(return_value=[]))
     mastery_dao = MagicMock()
     mastery_dao.get_for_student.return_value = []
     svc = KnowledgeGraphService(
-        period_schedule_dao=period_dao,
+        concept_dao=concept_dao,
+        skill_dao=skill_dao,
+        concept_skill_dao=cs_dao,
         student_skill_mastery_dao=mastery_dao,
     )
 
