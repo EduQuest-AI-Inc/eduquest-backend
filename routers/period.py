@@ -10,7 +10,7 @@ from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_active_membership, require_roles
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period as _get_period_dep, require_active_membership, require_roles
 from bots.protocol import BotProviderProtocol
 from integrations import openai_vector_store
 from integrations.s3_service import (
@@ -419,10 +419,8 @@ def add_files_to_period(
 def get_period(
     period_id: str,
     auth: AuthPayload = Depends(require_active_membership),
+    period: dict = Depends(_get_period_dep),
 ):
-    period = period_management_service.get_period_by_id(period_id)
-    if not period:
-        raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
         raise HTTPException(status_code=403, detail="Unauthorized")
     return {"period": period}
@@ -432,9 +430,10 @@ def get_period(
 def delete_period(
     period_id: str,
     auth: AuthPayload = Depends(require_active_membership),
+    period: dict = Depends(_get_period_dep),
 ):
     try:
-        period_management_service.delete_period(period_id, auth.sub)
+        period_management_service.delete_period(period_id, auth.sub, period=period)
     except ValueError as ve:
         raise HTTPException(status_code=404, detail=str(ve))
     except PermissionError:
@@ -465,10 +464,8 @@ def generate_summer_quests(
     background_tasks: BackgroundTasks,
     auth: AuthPayload = Depends(get_auth),
     bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+    period: dict = Depends(_get_period_dep),
 ):
-    period = period_management_service.get_period_by_id(period_id)
-    if not period:
-        raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
         raise HTTPException(status_code=403, detail="Unauthorized")
     if not period.get("is_summer_quest"):

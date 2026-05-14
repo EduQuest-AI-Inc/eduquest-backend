@@ -33,6 +33,14 @@ Supabase RLS is the secondary enforcement layer. Do not duplicate RLS logic in P
 
 Audit: `pytest tests/unit/routes/test_rbac_audit.py` verifies every route either has an auth dependency or is listed in `EXPLICITLY_PUBLIC_ROUTES`.
 
+### Shared resource fetching — fetch once at the router, pass the object down
+
+When multiple services in a single request need the same database row, fetch it once in a router-level `Depends()` and pass the object as a parameter to every service that needs it. Services must not re-query a resource they have already been given.
+
+The canonical example is `period`: routes that call several sub-services all operating on the same period should declare a `get_period(period_id, auth)` dependency in `deps.py` that fetches the row once and raises `NotFoundError` if missing. Each service method then accepts a `Period` parameter instead of a `period_id` and never calls the DAO itself.
+
+This is the inverse of the ownership-check rule above: ownership checks stay in the service because the service is the first to fetch the resource; shared-resource fetching moves to the router because the resource is needed before any service is called and would otherwise be fetched redundantly by each one.
+
 ### The frontend never calls Supabase for data reads or writes — all domain data goes through FastAPI
 
 The frontend uses the Supabase client SDK for auth only (sign-up, sign-in, session management).

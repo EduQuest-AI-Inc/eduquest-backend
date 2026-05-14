@@ -120,8 +120,8 @@ class PeriodManagementService:
             raise NotFoundError("Period not found")
         return period['vector_store_id']
 
-    def delete_period(self, period_id: str, user_id: str) -> None:
-        period = self.period_dao.get_period_by_id(period_id)
+    def delete_period(self, period_id: str, user_id: str, period: dict | None = None) -> None:
+        period = period or self.period_dao.get_period_by_id(period_id)
         if not period:
             raise NotFoundError("Period not found")
         if period.get("owner_id") != user_id:

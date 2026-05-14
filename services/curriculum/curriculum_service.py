@@ -50,8 +50,8 @@ class CurriculumService:
 
     # ── public API ────────────────────────────────────────────────────────────
 
-    def trigger_generation(self, period_id: str, background_tasks: BackgroundTasks) -> None:
-        period = self._get_period_or_raise(period_id)
+    def trigger_generation(self, period_id: str, background_tasks: BackgroundTasks, period: dict | None = None) -> None:
+        period = period or self._get_period_or_raise(period_id)
         if period.get("status", "pending") not in {"pending", "failed"}:
             raise ValidationError(
                 f"Cannot generate curriculum: period is already in '{period['status']}' status"
@@ -59,8 +59,8 @@ class CurriculumService:
         self.period_dao.update_status(period_id, "generating")
         background_tasks.add_task(self._run_generation, period_id)
 
-    def get_curriculum(self, period_id: str) -> dict[str, Any]:
-        period = self._get_period_or_raise(period_id)
+    def get_curriculum(self, period_id: str, period: dict | None = None) -> dict[str, Any]:
+        period = period or self._get_period_or_raise(period_id)
         return {
             "period_status": period["status"],
             "weeks": self.week_dao.get_weeks_by_period(period_id),
@@ -70,23 +70,26 @@ class CurriculumService:
             "concept_skills": self.concept_skill_dao.get_all_for_period(period_id),
         }
 
-    def save_curriculum(self, period_id: str, payload: dict[str, Any]) -> None:
-        self._get_period_or_raise(period_id)
+    def save_curriculum(self, period_id: str, payload: dict[str, Any], period: dict | None = None) -> None:
+        if period is None:
+            self._get_period_or_raise(period_id)
         self._bulk_replace(period_id, payload)
 
-    def update_concept(self, period_id: str, concept_name: str, fields: dict[str, Any]) -> None:
-        self._get_period_or_raise(period_id)
+    def update_concept(self, period_id: str, concept_name: str, fields: dict[str, Any], period: dict | None = None) -> None:
+        if period is None:
+            self._get_period_or_raise(period_id)
         existing = self.concept_dao.get_concept(period_id, concept_name)
         if not existing:
             raise NotFoundError(f"Concept '{concept_name}' not found in period '{period_id}'")
         self.concept_dao.update_concept(period_id, concept_name, fields)
 
-    def update_skill(self, period_id: str, skill_name: str, fields: dict[str, Any]) -> None:
-        self._get_period_or_raise(period_id)
+    def update_skill(self, period_id: str, skill_name: str, fields: dict[str, Any], period: dict | None = None) -> None:
+        if period is None:
+            self._get_period_or_raise(period_id)
         self.skill_dao.update_skill(period_id, skill_name, fields)
 
-    def approve_period(self, period_id: str) -> list[dict[str, Any]]:
-        period = self._get_period_or_raise(period_id)
+    def approve_period(self, period_id: str, period: dict | None = None) -> list[dict[str, Any]]:
+        period = period or self._get_period_or_raise(period_id)
         if period["status"] != "draft":
             raise ValidationError(
                 f"Cannot approve: period status is '{period['status']}', must be 'draft'"
