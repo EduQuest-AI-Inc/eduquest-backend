@@ -88,7 +88,14 @@ def _process_period_files(
         period_management_service.update_processing_status(period_id, "ready")
 
         try:
-            CurriculumService(bot_provider=bot_provider)._run_generation(period_id)
+            current_period = period_management_service.get_period_by_id(period_id)
+            if current_period and current_period.get("status") not in {"generating", "draft", "approved"}:
+                CurriculumService(bot_provider=bot_provider)._run_generation(period_id)
+            else:
+                logger.info(
+                    "Auto curriculum generation skipped for period %s: status=%s",
+                    period_id, (current_period or {}).get("status"),
+                )
         except Exception as exc:
             logger.error("Auto curriculum generation failed for period %s: %s", period_id, exc, exc_info=True)
     except Exception as e:

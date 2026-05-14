@@ -52,10 +52,11 @@ class CurriculumService:
 
     def trigger_generation(self, period_id: str, background_tasks: BackgroundTasks) -> None:
         period = self._get_period_or_raise(period_id)
-        if period.get("status", "pending") != "pending":
+        if period.get("status", "pending") not in {"pending", "failed"}:
             raise ValidationError(
                 f"Cannot generate curriculum: period is already in '{period['status']}' status"
             )
+        self.period_dao.update_status(period_id, "generating")
         background_tasks.add_task(self._run_generation, period_id)
 
     def get_curriculum(self, period_id: str) -> dict[str, Any]:
@@ -110,6 +111,8 @@ class CurriculumService:
             if not period:
                 logger.error("_run_generation: period %s not found", period_id)
                 return
+
+            self.period_dao.update_status(period_id, "generating")
 
             start_date = period.get("start_date") or date.today().isoformat()
             end_date = period.get("end_date") or date.today().isoformat()
