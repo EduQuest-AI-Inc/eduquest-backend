@@ -8,6 +8,7 @@ from exceptions.not_found_error import NotFoundError
 def _svc():
     svc = PeriodManagementService.__new__(PeriodManagementService)
     svc.period_dao = MagicMock()
+    svc.enrollment_dao = MagicMock()
     return svc
 
 
@@ -290,3 +291,61 @@ def test_delete_period_skips_local_file_urls(monkeypatch):
     svc.delete_period("p1", "u1")
 
     mock_delete_s3.assert_called_once_with(["s3/remote.pdf"])
+
+
+# ---------------------------------------------------------------------------
+# is_summer_quest
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+def test_create_period_summer_quest_flag_stored():
+    svc = _svc()
+    svc.period_dao.get_period_by_id.return_value = None
+
+    result = svc.create_period(
+        course="My Quest",
+        user_id="u1",
+        vector_store_id="vs1",
+        file_urls=[],
+        is_summer_quest=True,
+    )
+
+    assert result["is_summer_quest"] is True
+    added_period = svc.period_dao.add_period.call_args[0][0]
+    assert added_period.is_summer_quest is True
+
+
+@pytest.mark.unit
+def test_create_period_summer_quest_auto_enrolls_creator():
+    svc = _svc()
+    svc.period_dao.get_period_by_id.return_value = None
+
+    result = svc.create_period(
+        course="My Quest",
+        user_id="u1",
+        vector_store_id="vs1",
+        file_urls=[],
+        is_summer_quest=True,
+    )
+
+    svc.enrollment_dao.add_enrollment.assert_called_once()
+    enrollment_arg = svc.enrollment_dao.add_enrollment.call_args[0][0]
+    assert enrollment_arg.user_id == "u1"
+    assert enrollment_arg.period_id == result["period_id"]
+    assert enrollment_arg.semester == "Summer"
+
+
+@pytest.mark.unit
+def test_create_period_non_summer_quest_does_not_enroll():
+    svc = _svc()
+    svc.period_dao.get_period_by_id.return_value = None
+
+    svc.create_period(
+        course="Normal Class",
+        user_id="u1",
+        vector_store_id="vs1",
+        file_urls=[],
+        is_summer_quest=False,
+    )
+
+    svc.enrollment_dao.add_enrollment.assert_not_called()

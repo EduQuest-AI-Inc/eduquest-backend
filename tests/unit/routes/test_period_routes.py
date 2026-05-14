@@ -76,11 +76,22 @@ class TestCreatePeriod:
         assert resp.status_code == 422
 
     @pytest.mark.api
-    @pytest.mark.parametrize("missing_field", ["course_description", "grade_level", "start_date", "end_date"])
+    @pytest.mark.parametrize("missing_field", ["course_description", "start_date", "end_date"])
     def test_create_period_missing_required_field_returns_422(self, client, missing_field):
         payload = {k: v for k, v in VALID_CREATE_PERIOD_PAYLOAD.items() if k != missing_field}
         resp = client.post("/period/create-period", data=payload, files=[])
         assert resp.status_code == 422
+
+    @pytest.mark.api
+    def test_create_period_summer_quest_skips_membership_gate(self, client):
+        with patch("routers.period.membership_service") as mock_ms, \
+             patch("routers.period.period_management_service") as mock_pms:
+            mock_pms.create_period.return_value = {"period_id": "SQ-ABCD-1234", "name": "My Quest", "is_summer_quest": True}
+            payload = {k: v for k, v in VALID_CREATE_PERIOD_PAYLOAD.items() if k != "grade_level"}
+            payload["is_summer_quest"] = "true"
+            resp = client.post("/period/create-period", data=payload, files=[])
+        assert resp.status_code == 201
+        mock_ms.check_can_create_class.assert_not_called()
 
     @pytest.mark.api
     def test_create_period_exception_returns_500(self, client):

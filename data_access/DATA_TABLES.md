@@ -180,6 +180,7 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | `course_metadata`    | jsonb     | nullable    | Structured class metadata: learning_objectives, primary_standard, additional_standards, specific_standard_codes |
 | `processing_status`  | text      | NOT NULL DEFAULT 'ready' | `pending` while files process; `ready` on success; `failed` on error |
 | `status`             | text      | NOT NULL DEFAULT 'pending' | Curriculum lifecycle: `"pending"` → `"draft"` (bot wrote rows) → `"approved"` (teacher confirmed) |
+| `is_summer_quest`    | boolean   | NOT NULL DEFAULT false | `true` if this period is a summer quest; `false` for a normal class |
 | `created_at`         | timestamptz | NOT NULL    |                                           |
 
 **RLS:** Enabled

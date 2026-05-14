@@ -25,6 +25,7 @@ class PeriodDAO(SupabaseBaseDAO):
             'file_vector_store_ids': getattr(period, 'file_vector_store_ids', []),
             'processing_status': getattr(period, 'processing_status', 'pending'),
             'status': getattr(period, 'status', 'pending'),
+            'is_summer_quest': getattr(period, 'is_summer_quest', False),
         })
 
     def get_period_by_id(self, period_id: str) -> Optional[dict]:

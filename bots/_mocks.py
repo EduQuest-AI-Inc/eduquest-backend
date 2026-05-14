@@ -158,6 +158,52 @@ class MockLTGScheduleAgent:
         return ScheduleOutput(quests=quests)
 
 
+class MockCurriculumOnlyQuestAgent:
+    """Fast replacement for CurriculumOnlyQuestAgent — returns a goal + one quest per schedule item."""
+
+    _VERBS = ["Build", "Design", "Analyze", "Create", "Apply",
+              "Investigate", "Prototype", "Compare", "Draft", "Evaluate"]
+
+    def __init__(self, period=None, schedule=None):
+        self._schedule = schedule or []
+
+    def run(self) -> tuple:
+        from bots.quests.curriculum_only_quest_agent import IndividualQuest
+        goal_text = (
+            "[MOCK] By the end of this quest, you will have applied core course concepts "
+            "through a series of hands-on projects."
+        )
+        quests = []
+        for idx, entry in enumerate(self._schedule):
+            week = entry.get("Week", idx + 1) if isinstance(entry, dict) else idx + 1
+            skills = entry.get("Skills", "core skills") if isinstance(entry, dict) else "core skills"
+            first_skill = skills.split(";")[0].strip() or "core skills"
+            verb = self._VERBS[idx % len(self._VERBS)]
+            quests.append(IndividualQuest(
+                Name=f"[MOCK] {verb} with {first_skill}",
+                Skills=skills,
+                Week=week,
+                instructions=[
+                    {"step": 1, "text": "[MOCK] Review the curriculum materials for this week."},
+                    {"step": 2, "text": "Complete the main activity described in the materials."},
+                    {"step": 3, "text": "Reflect on what you learned and submit your work."},
+                ],
+                rubric={
+                    "Criteria": {
+                        "Understanding": {
+                            "Score_0": "No attempt",
+                            "Score_1": "Minimal understanding",
+                            "Score_2": "Partial understanding",
+                            "Score_3": "Satisfactory understanding",
+                            "Score_4": "Good understanding",
+                            "Score_5": "Excellent understanding",
+                        }
+                    }
+                },
+            ))
+        return goal_text, quests
+
+
 class MockGradingOrchestrator:
     """Fast replacement for GradingOrchestrator."""
 

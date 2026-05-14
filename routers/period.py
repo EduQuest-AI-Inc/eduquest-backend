@@ -176,30 +176,31 @@ def create_period(
     start_date: str = Form(...),
     end_date: str = Form(...),
     course_description: str = Form(...),
-    grade_level: str = Form(...),
+    grade_level: Optional[str] = Form(default=None),
     mastery_threshold: Optional[float] = Form(default=None),
     learning_objectives: Optional[str] = Form(default=None),
     primary_standard: Optional[str] = Form(default=None),
     additional_standards: List[str] = Form(default=[]),
     specific_standard_codes: Optional[str] = Form(default=None),
     status: Optional[str] = Form(default="pending"),
+    is_summer_quest: bool = Form(default=False),
     auth: AuthPayload = Depends(get_auth),
     bot_provider: BotProviderProtocol = Depends(get_bot_provider),
 ):
     if status not in ("pending", "setup_draft"):
         raise HTTPException(status_code=400, detail="Invalid status value")
 
-    # Membership gate: parent/teacher need an active trial or paid subscription
-    # to create classes, and the plan's class limit is enforced server-side.
-    try:
-        membership_service.check_can_create_class(auth.sub, auth.role.value)
-    except MembershipRequiredError as e:
-        raise _membership_required_response(e)
-    except PlanLimitExceededError as e:
-        raise HTTPException(
-            status_code=403,
-            detail={"error": str(e), "code": "PLAN_LIMIT_EXCEEDED"},
-        )
+    # Summer side quests are free — no membership check required.
+    if not is_summer_quest:
+        try:
+            membership_service.check_can_create_class(auth.sub, auth.role.value)
+        except MembershipRequiredError as e:
+            raise _membership_required_response(e)
+        except PlanLimitExceededError as e:
+            raise HTTPException(
+                status_code=403,
+                detail={"error": str(e), "code": "PLAN_LIMIT_EXCEEDED"},
+            )
 
     raw_metadata = CourseMetadata(
         learning_objectives=learning_objectives,
@@ -234,6 +235,7 @@ def create_period(
             course_metadata=course_metadata,
             processing_status="ready" if is_draft else "pending",
             status=status,
+            is_summer_quest=is_summer_quest,
         )
         period_id = period["period_id"]
 
@@ -430,6 +432,48 @@ def delete_period(
         raise HTTPException(status_code=404, detail=str(ve))
     except PermissionError:
         raise HTTPException(status_code=403, detail="Unauthorized")
+
+
+# ─── Summer side quests ───────────────────────────────────────────────────────
+
+
+def _run_summer_quest_generation(
+    period_id: str,
+    owner_id: str,
+    bot_provider: BotProviderProtocol,
+) -> None:
+    from services.period.period_summer_quest_service import PeriodSummerQuestService
+    try:
+        service = PeriodSummerQuestService(bot_provider=bot_provider)
+        service.generate_summer_quests(owner_id=owner_id, period_id=period_id)
+    except Exception as exc:
+        logger.error(
+            "Summer quest generation failed for period %s: %s", period_id, exc, exc_info=True
+        )
+
+
+@router.post("/period/{period_id}/summer-quests/generate", status_code=202)
+def generate_summer_quests(
+    period_id: str,
+    background_tasks: BackgroundTasks,
+    auth: AuthPayload = Depends(get_auth),
+    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+):
+    period = period_management_service.get_period_by_id(period_id)
+    if not period:
+        raise HTTPException(status_code=404, detail="Period not found")
+    if period.get("owner_id") != auth.sub:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    if not period.get("is_summer_quest"):
+        raise HTTPException(status_code=400, detail="This endpoint is only for summer side quests")
+
+    background_tasks.add_task(
+        _run_summer_quest_generation,
+        period_id=period_id,
+        owner_id=auth.sub,
+        bot_provider=bot_provider,
+    )
+    return {"message": "Summer quest generation started"}
 
 
 # ─── Files ────────────────────────────────────────────────────────────────────
