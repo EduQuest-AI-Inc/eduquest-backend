@@ -5,8 +5,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from routers.deps import AuthPayload, Role, get_auth, require_active_membership, require_roles, require_student_viewer
-from data_access.period_dao import PeriodDAO
-from data_access.user_dao import UserDAO
 from services.billing.membership_service import (
     MembershipRequiredError,
     MembershipService,
@@ -14,14 +12,16 @@ from services.billing.membership_service import (
 )
 from services.enrollment.enrollment_service import EnrollmentService
 from services.parent.parent_service import ParentService
+from services.period.period_management_service import PeriodManagementService
+from services.user.user_service import UserService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 service = EnrollmentService()
 parent_service = ParentService()
 membership_service = MembershipService()
-_period_dao = PeriodDAO()
-_user_dao = UserDAO()
+_period_management_svc = PeriodManagementService()
+_user_service = UserService()
 
 
 # ─── Request models ───────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ def enroll(body: EnrollRequest, auth: AuthPayload = Depends(get_auth)):
 
 @router.get("/enrollments/{period_id}")
 def get_enrollments(period_id: str, auth: AuthPayload = Depends(require_active_membership)):
-    period = _period_dao.get_period_by_id(period_id)
+    period = _period_management_svc.get_period_by_id(period_id)
     if not period:
         raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
@@ -64,7 +64,7 @@ def get_enrollments(period_id: str, auth: AuthPayload = Depends(require_active_m
 
 @router.get("/student-profile/{period_id}/{user_id}")
 def get_student_profile(period_id: str, user_id: str, auth: AuthPayload = Depends(require_active_membership)):
-    period = _period_dao.get_period_by_id(period_id)
+    period = _period_management_svc.get_period_by_id(period_id)
     if not period:
         raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
@@ -90,10 +90,10 @@ def verify_period(body: VerifyPeriodRequest, auth: AuthPayload = Depends(get_aut
     # Enforce the OWNER's plan student-per-class limit at enrollment time.
     # This protects the owner from over-quota even though students aren't
     # paying — without it a parent on Starter could end up with > 20 students.
-    period = _period_dao.get_period_by_id(body.period_id)
+    period = _period_management_svc.get_period_by_id(body.period_id)
     if period:
         owner_id = period.get("owner_id")
-        owner = _user_dao.get_by_id(owner_id) if owner_id else None
+        owner = _user_service.get_by_id(owner_id) if owner_id else None
         owner_role = owner.get("role") if owner else None
         if owner_id and owner_role in ("teacher", "parent"):
             try:

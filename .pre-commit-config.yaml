@@ -1,0 +1,30 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.12
+    hooks:
+      - id: ruff-check
+
+  - repo: local
+    hooks:
+      - id: check-arch
+        name: architecture lint
+        entry: venv/bin/python scripts/check_arch.py
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: pyright
+        name: pyright
+        entry: venv/bin/pyright
+        args: [--project, ../pyrightconfig.json, routers/, services/]
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: pytest-unit
+        name: pytest (unit)
+        entry: venv/bin/pytest
+        args: [-m, unit, --tb=short, -q]
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

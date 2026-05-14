@@ -5,29 +5,21 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from routers.deps import AuthPayload, get_auth, require_student_viewer
-from data_access.parent_dao import ParentDAO
-from data_access.student_dao import StudentDAO
-from data_access.teacher_dao import TeacherDAO
-from data_access.user_dao import UserDAO
 from services.user.user_service import UserService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 user_service = UserService()
-student_dao = StudentDAO()
-teacher_dao = TeacherDAO()
-parent_dao = ParentDAO()
-user_dao = UserDAO()
 
 _ROLE_FETCHERS = {
-    "student": lambda uid: student_dao.get_student_by_id(uid),
-    "teacher": lambda uid: teacher_dao.get_teacher_by_id(uid),
-    "parent":  lambda uid: parent_dao.get_parent_by_id(uid),
+    "student": lambda uid: user_service.get_student_by_id(uid),
+    "teacher": lambda uid: user_service.get_teacher_by_id(uid),
+    "parent":  lambda uid: user_service.get_parent_by_id(uid),
 }
 
 
 def _fetch_user_profile(user_id: str) -> Optional[dict]:
-    user = user_dao.get_by_id(user_id)
+    user = user_service.get_by_id(user_id)
     if not user:
         return None
     role = user.get("role") or ""

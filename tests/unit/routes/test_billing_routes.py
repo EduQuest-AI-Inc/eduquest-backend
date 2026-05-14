@@ -94,10 +94,10 @@ def test_checkout_requires_price_env(teacher_client, monkeypatch):
 def test_checkout_creates_stripe_session(teacher_client, monkeypatch):
     monkeypatch.setenv("STRIPE_PRICE_STARTER", "price_starter")
 
-    with patch("routers.billing._user_dao") as user_dao, \
+    with patch("routers.billing._user_service") as user_svc, \
          patch("routers.billing._membership_service") as svc, \
          patch("routers.billing.stripe_service") as stripe:
-        user_dao.get_by_id.return_value = {
+        user_svc.get_by_id.return_value = {
             "user_id": "teacher-1", "email": "t@eduquestai.org",
             "first_name": "T", "last_name": "Acher",
         }

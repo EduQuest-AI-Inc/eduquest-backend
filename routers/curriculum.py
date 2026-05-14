@@ -4,11 +4,11 @@ from typing import Any, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, get_bot_provider, require_active_membership
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider
 from bots.protocol import BotProviderProtocol
-from data_access.period_dao import PeriodDAO
 from services.curriculum.curriculum_service import CurriculumService
 from services.enrollment.enrollment_service import EnrollmentService
+from services.period.period_management_service import PeriodManagementService
 from services.slides.pptx_generation_service import PptxGenerationService
 from exceptions.not_found_error import NotFoundError
 from exceptions.validation_error import ValidationError
@@ -16,7 +16,7 @@ from exceptions.validation_error import ValidationError
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_period_dao = PeriodDAO()
+_period_management_svc = PeriodManagementService()
 _enrollment_service = EnrollmentService()
 
 
@@ -98,7 +98,7 @@ class _SkillEditPayload(BaseModel):
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _assert_period_owner(period_id: str, user_id: str) -> None:
-    period = _period_dao.get_period_by_id(period_id)
+    period = _period_management_svc.get_period_by_id(period_id)
     if not period:
         logger.warning("period not found: period_id=%s", period_id)
         raise HTTPException(status_code=404, detail=f"Period '{period_id}' not found")
@@ -117,13 +117,53 @@ def _assert_student_enrolled(period_id: str, user_id: str) -> None:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
 
+def _membership_or_summer(
+    period_id: str,
+    auth: AuthPayload = Depends(get_auth),
+) -> AuthPayload:
+    """Bypass the membership gate for summer side quests; enforce it for all others."""
+    period = _period_management_svc.get_period_by_id(period_id)
+    if period and period.get("is_summer_quest"):
+        return auth
+    if auth.role not in (Role.TEACHER, Role.PARENT):
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "Forbidden", "code": "OWNER_ROLE_REQUIRED"},
+        )
+    from services.billing.membership_service import MembershipService
+    access = MembershipService().evaluate_access(auth.sub, auth.role.value)
+    if not access.has_active_membership:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "Active membership required", "code": "MEMBERSHIP_REQUIRED"},
+        )
+    return auth
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _run_summer_quest_generation(
+    period_id: str,
+    owner_id: str,
+    bot_provider: BotProviderProtocol,
+) -> None:
+    from services.period.period_summer_quest_service import PeriodSummerQuestService
+    try:
+        service = PeriodSummerQuestService(bot_provider=bot_provider)
+        service.generate_summer_quests(owner_id=owner_id, period_id=period_id)
+    except Exception as exc:
+        logger.error(
+            "Summer quest generation failed for period %s: %s", period_id, exc, exc_info=True
+        )
+
+
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 @router.post("/{period_id}/generate", status_code=202)
 def trigger_generation(
     period_id: str,
     background_tasks: BackgroundTasks,
-    auth: AuthPayload = Depends(require_active_membership),
+    auth: AuthPayload = Depends(_membership_or_summer),
     svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     _assert_period_owner(period_id, auth.sub)
@@ -139,11 +179,15 @@ def trigger_generation(
 @router.get("/{period_id}")
 def get_curriculum(
     period_id: str,
-    auth: AuthPayload = Depends(require_active_membership),
+    auth: AuthPayload = Depends(_membership_or_summer),
     svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     if auth.role == Role.STUDENT:
-        _assert_student_enrolled(period_id, auth.sub)
+        period = _period_management_svc.get_period_by_id(period_id)
+        if period and period.get("is_summer_quest") and period.get("owner_id") == auth.sub:
+            pass  # student owns this summer quest — allow through
+        else:
+            _assert_student_enrolled(period_id, auth.sub)
     else:
         _assert_period_owner(period_id, auth.sub)
     try:
@@ -156,7 +200,7 @@ def get_curriculum(
 def save_curriculum(
     period_id: str,
     payload: _SavePayload,
-    auth: AuthPayload = Depends(require_active_membership),
+    auth: AuthPayload = Depends(_membership_or_summer),
     svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     _assert_period_owner(period_id, auth.sub)
@@ -174,7 +218,7 @@ def update_concept(
     period_id: str,
     concept_name: str,
     payload: _ConceptEditPayload,
-    auth: AuthPayload = Depends(require_active_membership),
+    auth: AuthPayload = Depends(_membership_or_summer),
     svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     _assert_period_owner(period_id, auth.sub)
@@ -191,7 +235,7 @@ def update_skill(
     period_id: str,
     skill_name: str,
     payload: _SkillEditPayload,
-    auth: AuthPayload = Depends(require_active_membership),
+    auth: AuthPayload = Depends(_membership_or_summer),
     svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     _assert_period_owner(period_id, auth.sub)
@@ -207,9 +251,10 @@ def update_skill(
 def approve_period(
     period_id: str,
     background_tasks: BackgroundTasks,
-    auth: AuthPayload = Depends(require_active_membership),
+    auth: AuthPayload = Depends(_membership_or_summer),
     svc: CurriculumService = Depends(_get_curriculum_service),
     slides_svc: PptxGenerationService = Depends(_get_slides_service),
+    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
 ):
     _assert_period_owner(period_id, auth.sub)
     try:
@@ -219,4 +264,12 @@ def approve_period(
         raise HTTPException(status_code=400, detail=str(exc))
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    period = _period_management_svc.get_period_by_id(period_id)
+    if period and period.get("is_summer_quest"):
+        background_tasks.add_task(
+            _run_summer_quest_generation,
+            period_id=period_id,
+            owner_id=auth.sub,
+            bot_provider=bot_provider,
+        )
     return {"total_lessons": len(lessons)}

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from services.billing.trial_reminder_service import run_reminder_pass
+from services.billing.trial_reminder_service import TrialReminderService
 
 
 @pytest.mark.unit
@@ -18,11 +18,11 @@ def test_reminder_skips_user_with_no_email():
     ]
     user_dao.get_by_id.return_value = {"first_name": "T", "email": None}
 
-    res = run_reminder_pass(
+    res = TrialReminderService(
         membership_dao=membership_dao,
         user_dao=user_dao,
         email_service=email_svc,
-    )
+    ).run_pass()
 
     assert res.candidates == 1
     assert res.skipped_no_email == 1
@@ -45,11 +45,11 @@ def test_reminder_sent_marks_membership():
         "success": True, "message_id": "x"
     }
 
-    res = run_reminder_pass(
+    res = TrialReminderService(
         membership_dao=membership_dao,
         user_dao=user_dao,
         email_service=email_svc,
-    )
+    ).run_pass()
 
     assert res.sent == 1
     assert res.failed == 0
@@ -73,11 +73,11 @@ def test_reminder_failure_does_not_mark_membership():
         "success": False, "error": "boom"
     }
 
-    res = run_reminder_pass(
+    res = TrialReminderService(
         membership_dao=membership_dao,
         user_dao=user_dao,
         email_service=email_svc,
-    )
+    ).run_pass()
 
     assert res.failed == 1
     membership_dao.update.assert_not_called()

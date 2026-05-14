@@ -8,18 +8,21 @@ because the SDK serializes tool results back into the model's context as text.
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 from agents import function_tool
 
 from bots.slideshow.content_writer_agent import ContentWriterAgent
 
+_CONTENT_TIMEOUT_S = 60
+
 # Single shared writer instance — agent objects are stateless / reusable.
 _writer = ContentWriterAgent()
 
 
 @function_tool
-def write_slide_content(
+async def write_slide_content(
     layout: str,
     title_hint: str,
     concept_name: str,
@@ -56,15 +59,23 @@ def write_slide_content(
         skills = json.loads(skills_json) if skills_json else []
     except json.JSONDecodeError:
         skills = []
-    content = _writer.run(
-        layout=layout,
-        title_hint=title_hint,
-        concept_name=concept_name,
-        concept_description=concept_description,
-        key_takeaways=key_takeaways,
-        common_misconceptions=common_misconceptions,
-        skills=skills,
-        grade_level=grade_level,
-        course_context=course_context,
-    )
+    try:
+        content = await asyncio.wait_for(
+            _writer.run_async(
+                layout=layout,
+                title_hint=title_hint,
+                concept_name=concept_name,
+                concept_description=concept_description,
+                key_takeaways=key_takeaways,
+                common_misconceptions=common_misconceptions,
+                skills=skills,
+                grade_level=grade_level,
+                course_context=course_context,
+            ),
+            timeout=_CONTENT_TIMEOUT_S,
+        )
+    except asyncio.TimeoutError:
+        raise RuntimeError(
+            f"Slide content generation timed out after {_CONTENT_TIMEOUT_S} s"
+        )
     return json.dumps(content.model_dump())

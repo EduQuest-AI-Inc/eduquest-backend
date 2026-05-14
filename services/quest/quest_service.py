@@ -36,5 +36,11 @@ class QuestService:
     def update_quest_status(self, quest_id: str, status: str):
         return self._grading.update_quest_status(quest_id, status)
 
+    def update_completed_steps(self, quest_id: str, completed_steps: list) -> None:
+        self._grading.update_completed_steps(quest_id, completed_steps)
+
+    def update_quest_grade_and_feedback(self, quest_id: str, grade: dict, feedback: str) -> None:
+        self._grading.update_quest_grade_and_feedback(quest_id, grade, feedback)
+
     def update_quests_preserving_completed_data(self, schedule_data, homework_data, user_id, period_id):
         return self._grading.update_quests_preserving_completed_data(schedule_data, homework_data, user_id, period_id)

@@ -12,10 +12,12 @@ from pydantic import BaseModel
 
 from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_roles
 from bots.protocol import BotProviderProtocol
-from data_access.quest_dao import QuestDAO
 from services.conversation.conversation_service import ConversationService
+from services.quest.quest_retrieval_service import QuestRetrievalService
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+_quest_retrieval_service = QuestRetrievalService()
 
 
 def _get_conversation_service(
@@ -104,7 +106,7 @@ async def initiate_update_assistant(
 
             # Fetch quest data to build quests_file JSON
             try:
-                quest_data = QuestDAO().get_quest_by_id(individual_quest_id)
+                quest_data = _quest_retrieval_service.get_quest_by_id(individual_quest_id)
                 if not quest_data:
                     raise HTTPException(status_code=404, detail="Quest not found")
                 if auth.role == Role.STUDENT and quest_data["user_id"] != auth.sub:

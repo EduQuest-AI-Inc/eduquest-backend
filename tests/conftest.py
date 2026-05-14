@@ -30,26 +30,26 @@ sys.modules['agents.model_settings'] = MagicMock()
 # injection' in ARCH_DECISIONS.md). Individual agent modules are still stubbed because they
 # import from the OpenAI SDK at module level; they are only loaded lazily inside provider
 # factory methods.
-sys.modules['bots.quest_agent'] = MagicMock()
-sys.modules['bots.profile_agent'] = MagicMock()
-sys.modules['bots.ltg_agent'] = MagicMock()
-sys.modules['bots.grading_agent'] = MagicMock()
-sys.modules['bots.teacher_feedback_agent'] = MagicMock()
-sys.modules['bots.coverage_evaluator'] = MagicMock()
-sys.modules['bots.guardrails'] = MagicMock()
-sys.modules['bots.schemas'] = MagicMock()
-sys.modules['bots.schemas.rubric'] = MagicMock()
-sys.modules['bots.slideshow'] = MagicMock()
-sys.modules['bots.slideshow.pptx_agent'] = MagicMock()
-sys.modules['bots.slideshow.orchestrator_agent'] = MagicMock()
-sys.modules['bots.slideshow.content_writer_agent'] = MagicMock()
-sys.modules['bots.slideshow.visual_review_agent'] = MagicMock()
-sys.modules['bots.tools'] = MagicMock()
-sys.modules['bots.tools.content_tool'] = MagicMock()
-sys.modules['bots.tools.image_tool'] = MagicMock()
-sys.modules['bots.tools.chart_tool'] = MagicMock()
-sys.modules['bots.tools.review_tool'] = MagicMock()
-sys.modules['bots.tools.html_tool'] = MagicMock()
+sys.modules['bots.quest_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.profile_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.ltg_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.grading_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.teacher_feedback_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.coverage_evaluator'] = MagicMock()  # arch-ok
+sys.modules['bots.guardrails'] = MagicMock()  # arch-ok
+sys.modules['bots.schemas'] = MagicMock()  # arch-ok
+sys.modules['bots.schemas.rubric'] = MagicMock()  # arch-ok
+sys.modules['bots.slideshow'] = MagicMock()  # arch-ok
+sys.modules['bots.slideshow.pptx_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.slideshow.orchestrator_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.slideshow.content_writer_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.slideshow.visual_review_agent'] = MagicMock()  # arch-ok
+sys.modules['bots.tools'] = MagicMock()  # arch-ok
+sys.modules['bots.tools.content_tool'] = MagicMock()  # arch-ok
+sys.modules['bots.tools.image_tool'] = MagicMock()  # arch-ok
+sys.modules['bots.tools.chart_tool'] = MagicMock()  # arch-ok
+sys.modules['bots.tools.review_tool'] = MagicMock()  # arch-ok
+sys.modules['bots.tools.html_tool'] = MagicMock()  # arch-ok
 
 mock_openai_module = MagicMock()
 mock_openai_client = MagicMock()
