@@ -5,12 +5,16 @@ file path.
 
 from __future__ import annotations
 
+import asyncio
+
 from agents import function_tool
 
 from integrations.nano_banana_client import (
     NanoBananaClient,
     NanoBananaError,
 )
+
+_IMAGE_TIMEOUT_S = 120
 
 _client: NanoBananaClient | None = None
 
@@ -23,7 +27,7 @@ def _get_client() -> NanoBananaClient:
 
 
 @function_tool
-def generate_nano_banana_image(prompt: str) -> str:
+async def generate_nano_banana_image(prompt: str) -> str:
     """Generate an AI illustration via Nano Banana (Gemini) and return its temp PNG file path.
 
     Use this for free-form illustrations: anatomy diagrams, historical scenes,
@@ -38,14 +42,20 @@ def generate_nano_banana_image(prompt: str) -> str:
               illustration style, clean white background, labeled in English."
 
     Returns:
-      Absolute path to a temp PNG (caller cleans up). On API errors, returns
-      a string starting with "ERROR:" so the orchestrator can fall back to
-      a placeholder layout.
+      Absolute path to a temp PNG (caller cleans up).
 
     Side effects: ONE Gemini API call; writes a temp file.
     Retry safety: idempotent but not free - avoid blind retries.
     """
     try:
-        return _get_client().generate_image_to_file(prompt)
+        return await asyncio.wait_for(
+            asyncio.to_thread(_get_client().generate_image_to_file, prompt),
+            timeout=_IMAGE_TIMEOUT_S,
+        )
+    except asyncio.TimeoutError:
+        raise RuntimeError(
+            f"Image generation timed out after {_IMAGE_TIMEOUT_S} s; "
+            "use a text-only layout for this slide."
+        )
     except NanoBananaError as exc:
-        return f"ERROR: Nano Banana generation failed: {exc}"
+        raise RuntimeError(f"Image generation failed: {exc}") from exc

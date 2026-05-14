@@ -25,11 +25,10 @@ def client():
 class TestGetProfile:
 
     @pytest.mark.api
-    @patch("routers.user.user_dao")
-    @patch("routers.user.student_dao")
-    def test_get_profile_success(self, mock_student_dao, mock_user_dao, client):
-        mock_user_dao.get_by_id.return_value = {"user_id": "stu-1", "role": "student"}
-        mock_student_dao.get_student_by_id.return_value = {
+    @patch("routers.user.user_service")
+    def test_get_profile_success(self, mock_svc, client):
+        mock_svc.get_by_id.return_value = {"user_id": "stu-1", "role": "student"}
+        mock_svc.get_student_by_id.return_value = {
             "user_id": "stu-1",
             "first_name": "Jane",
             "last_name": "Doe",
@@ -42,19 +41,18 @@ class TestGetProfile:
         assert data["role"] == "student"
 
     @pytest.mark.api
-    @patch("routers.user.user_dao")
-    def test_get_profile_user_not_found(self, mock_user_dao, client):
-        mock_user_dao.get_by_id.return_value = None
+    @patch("routers.user.user_service")
+    def test_get_profile_user_not_found(self, mock_svc, client):
+        mock_svc.get_by_id.return_value = None
         resp = client.get("/user/profile")
         assert resp.status_code == 404
 
     @pytest.mark.api
-    @patch("routers.user.user_dao")
-    @patch("routers.user.teacher_dao")
-    def test_get_profile_strips_teacher_canvas_key(self, mock_teacher_dao, mock_user_dao, client):
+    @patch("routers.user.user_service")
+    def test_get_profile_strips_teacher_canvas_key(self, mock_svc, client):
         app.dependency_overrides[get_auth] = lambda: AuthPayload(sub="tch-1", role="teacher", token="fake-token")
-        mock_user_dao.get_by_id.return_value = {"user_id": "tch-1", "role": "teacher"}
-        mock_teacher_dao.get_teacher_by_id.return_value = {
+        mock_svc.get_by_id.return_value = {"user_id": "tch-1", "role": "teacher"}
+        mock_svc.get_teacher_by_id.return_value = {
             "user_id": "tch-1",
             "canvas_api_key": "secret",
         }

@@ -32,61 +32,62 @@ class ReminderRunResult:
     failed: int
 
 
-def run_reminder_pass(
-    now: Optional[datetime] = None,
-    *,
-    membership_dao: Optional[MembershipDAO] = None,
-    user_dao: Optional[UserDAO] = None,
-    email_service=None,
-) -> ReminderRunResult:
-    """Send 7-day-out trial reminders. Returns counts for observability."""
-    now = now or datetime.now(timezone.utc)
-    cutoff = now + timedelta(days=REMINDER_LEAD_DAYS)
-    cutoff_iso = cutoff.isoformat()
+class TrialReminderService:
+    def __init__(
+        self,
+        membership_dao: Optional[MembershipDAO] = None,
+        user_dao: Optional[UserDAO] = None,
+        email_service=None,
+    ):
+        self.membership_dao = membership_dao or MembershipDAO()
+        self.user_dao = user_dao or UserDAO()
+        self.email_service = email_service or get_email_service()
 
-    membership_dao = membership_dao or MembershipDAO()
-    user_dao = user_dao or UserDAO()
-    email_service = email_service or get_email_service()
+    def run_pass(self, now: Optional[datetime] = None) -> ReminderRunResult:
+        """Send 7-day-out trial reminders. Returns counts for observability."""
+        now = now or datetime.now(timezone.utc)
+        cutoff = now + timedelta(days=REMINDER_LEAD_DAYS)
+        cutoff_iso = cutoff.isoformat()
 
-    candidates = membership_dao.list_trialing_needing_reminder(cutoff_iso)
-    sent = 0
-    skipped_no_email = 0
-    failed = 0
+        candidates = self.membership_dao.list_trialing_needing_reminder(cutoff_iso)
+        sent = 0
+        skipped_no_email = 0
+        failed = 0
 
-    for record in candidates:
-        user_id = record["user_id"]
-        user = user_dao.get_by_id(user_id)
-        if not user or not user.get("email"):
-            skipped_no_email += 1
-            continue
+        for record in candidates:
+            user_id = record["user_id"]
+            user = self.user_dao.get_by_id(user_id)
+            if not user or not user.get("email"):
+                skipped_no_email += 1
+                continue
 
-        trial_ends_at = record.get("trial_ends_at")
-        days_left = REMINDER_LEAD_DAYS
-        try:
-            if trial_ends_at:
-                end_dt = datetime.fromisoformat(trial_ends_at.replace("Z", "+00:00"))
-                days_left = max((end_dt - now).days, 1)
-        except ValueError:
-            pass
+            trial_ends_at = record.get("trial_ends_at")
+            days_left = REMINDER_LEAD_DAYS
+            try:
+                if trial_ends_at:
+                    end_dt = datetime.fromisoformat(trial_ends_at.replace("Z", "+00:00"))
+                    days_left = max((end_dt - now).days, 1)
+            except ValueError:
+                pass
 
-        result = email_service.send_trial_reminder_email(
-            to_email=user["email"],
-            first_name=user.get("first_name", ""),
-            days_left=days_left,
+            result = self.email_service.send_trial_reminder_email(
+                to_email=user["email"],
+                first_name=user.get("first_name", ""),
+                days_left=days_left,
+            )
+            if result.get("success"):
+                self.membership_dao.update(user_id, {"reminder_sent_at": now.isoformat()})
+                sent += 1
+            else:
+                failed += 1
+
+        logger.info(
+            "trial_reminder.pass candidates=%d sent=%d skipped_no_email=%d failed=%d",
+            len(candidates), sent, skipped_no_email, failed,
         )
-        if result.get("success"):
-            membership_dao.update(user_id, {"reminder_sent_at": now.isoformat()})
-            sent += 1
-        else:
-            failed += 1
-
-    logger.info(
-        "trial_reminder.pass candidates=%d sent=%d skipped_no_email=%d failed=%d",
-        len(candidates), sent, skipped_no_email, failed,
-    )
-    return ReminderRunResult(
-        candidates=len(candidates),
-        sent=sent,
-        skipped_no_email=skipped_no_email,
-        failed=failed,
-    )
+        return ReminderRunResult(
+            candidates=len(candidates),
+            sent=sent,
+            skipped_no_email=skipped_no_email,
+            failed=failed,
+        )

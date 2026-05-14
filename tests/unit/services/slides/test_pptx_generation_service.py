@@ -63,8 +63,8 @@ def _period_row():
     }
 
 
-def _pptx_row(pptx_id="px1", lesson_id="l1", period_id="p1"):
-    return {"pptx_id": pptx_id, "lesson_id": lesson_id, "period_id": period_id}
+def _pptx_row(pptx_id="px1", lesson_id="l1", period_id="p1", status="pending"):
+    return {"pptx_id": pptx_id, "lesson_id": lesson_id, "period_id": period_id, "status": status}
 
 
 # ── start_batch — guard ───────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ def test_start_batch_returns_lesson_count():
 def test_run_batch_builds_curriculum_from_all_daos():
     svc = _svc(agent=_mock_agent())
     svc.period_dao.get_period_by_id.return_value = _period_row()
-    svc.lesson_pptx_dao.get_by_period.return_value = []
+    svc.lesson_pptx_dao.get_by_period.return_value = [_pptx_row()]
     svc.lesson_dao.get_lessons_by_period.return_value = []
     svc.concept_dao.get_concepts_by_period.return_value = []
     svc.skill_dao.get_skills_by_period.return_value = []

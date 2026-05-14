@@ -38,7 +38,7 @@ class TestVerifyPeriod:
 
     @pytest.mark.api
     def test_verify_period_success(self, client):
-        with patch("routers.enrollment._period_dao") as mock_pd, \
+        with patch("routers.enrollment._period_management_svc") as mock_pd, \
              patch("routers.enrollment.service") as mock_ps:
             mock_pd.get_period_by_id.return_value = None  # skip owner membership check
             mock_ps.verify_period_id.return_value = {"period_id": "p1", "name": "Math"}

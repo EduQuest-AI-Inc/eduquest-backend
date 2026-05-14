@@ -15,10 +15,12 @@ eduquest-backend/
 │   ├── conversation.py             # /conversation — profile assistant, update assistant
 │   ├── curriculum.py               # /curriculum — per-period curriculum generation/approval
 │   ├── enrollment.py               # /enrollment — enroll/unenroll students
+│   ├── lessons.py                  # /lessons — presigned URLs for lesson PPTX and HTML
 │   ├── ltg.py                      # /period — LTG conversation routes (mounted under /period)
 │   ├── parent.py                   # /parent — parent invite, child lookup
 │   ├── period.py                   # /period — period CRUD, homework agent, file uploads
 │   ├── quest.py                    # /quest — quest retrieval, submission
+│   ├── slides.py                   # /slides — PPTX status by period, restart generation
 │   ├── teacher.py                  # /teacher — Canvas courses, skill-mastery analytics
 │   ├── user.py                     # /user — user profile, tutorial state
 │   └── waitlist.py                 # /pilot-waitlist — status, join
@@ -31,7 +33,7 @@ eduquest-backend/
 │   ├── curriculum/                 # curriculum_service.py
 │   ├── enrollment/                 # enrollment_service.py (CRUD, verify_and_enroll, unenroll,
 │   │                               #   get_my_periods, assert_enrolled)
-│   ├── knowledge_graph/            # knowledge_graph_service.py, curriculum_parser.py
+│   ├── knowledge_graph/            # knowledge_graph_service.py
 │   ├── period/                     # period_service.py, period_quest_service.py,
 │   │                               #   period_management_service.py, period_file_service.py
 │   ├── quest/                      # quest_service.py, quest_creation_service.py,
@@ -40,7 +42,8 @@ eduquest-backend/
 │   │                               #   events.py, track.py)
 │   ├── user/                       # user_service.py
 │   ├── waitlist/                   # waitlist_service.py
-│   └── parent/                     # parent_service.py
+│   ├── parent/                     # parent_service.py
+│   └── slides/                     # pptx_generation_service.py — status lifecycle (pending→generating→done|failed), restart_batch
 ├── models/                         # Pydantic domain models
 │   ├── user.py                     # Base User model
 │   ├── student.py                  # Student(User)
@@ -58,28 +61,42 @@ eduquest-backend/
 │   ├── session.py                  # Session — JWT session record
 │   ├── parent_invite.py            # ParentInvite — invite token for parent signup
 │   └── password_reset_token.py     # PasswordResetToken — reset link token
-├── bots/                           # All AI agent code (was EQ_agents/)
-│   ├── agent.py                    # HWAgent — quest instruction/rubric generation
+├── bots/                           # All AI agent code (subdirectory-organized)
 │   ├── grading_agent.py            # Multi-agent grading orchestrator
 │   ├── ltg_agent.py                # Long-term goal agent
 │   ├── guardrails.py               # Content safety guardrails
 │   ├── profile_agent.py            # Student profile agent
-│   ├── provider.py                 # Bot provider — factory for real and mock bot instances
+│   ├── protocol.py                 # BotProviderProtocol, PptxAgentProtocol
+│   ├── provider.py                 # BotProvider factory for real and mock instances
 │   ├── teacher_feedback_agent.py   # Teacher feedback agent
-│   ├── _mocks.py                   # Mock bot instances for testing
-│   └── schemas/rubric.py           # Rubric Pydantic schema
+│   ├── _mocks.py                   # MockBotProvider and mock agents for testing
+│   ├── curriculum/                 # curriculum_agent.py (Week→Lesson→Concept→Skill),
+│   │                               #   coverage_evaluator.py (decides Perplexity research)
+│   ├── quests/                     # quest_agent.py (HWAgent — instructions/rubric),
+│   │                               #   ltg_schedule_agent.py (LTG → per-week quest names)
+│   ├── schemas/                    # rubric.py, instructions.py, curriculum.py
+│   ├── slideshow/                  # pptx_agent.py, orchestrator_agent.py,
+│   │                               #   content_writer_agent.py, visual_review_agent.py
+│   └── tools/                      # @function_tool wrappers: content, image, chart,
+│                                   #   review, html, knowledge_graph_tools
 ├── integrations/                   # External service adapters (shared across features)
 │   ├── s3_service.py               # AWS S3 upload helpers
 │   ├── canvas_service.py           # Canvas LMS integration (canvasapi library)
+│   ├── nano_banana_client.py       # Gemini image generation for slides (NanoBananaClient)
+│   ├── openai_vector_store.py      # OpenAI vector store CRUD helpers (create, upload, delete)
 │   ├── perplexity_service.py       # Perplexity Agent API (deep-research preset) for curriculum research
 │   ├── stripe_service.py           # Stripe customer/subscription helpers, webhook signature
 │   └── email_service.py            # SES email sending
 ├── utils/
 │   ├── token_utils.py              # extract_auth_token(), get_user_id_from_token(), set_auth_cookie()
-│   └── validation_utils.py         # get_client_ip(request), normalize_email(email)
+│   ├── validation_utils.py         # get_client_ip(request), normalize_email(email)
+│   ├── pdf_utils.py                # preprocess_pdf() — strips large PDFs to headings + first sentences before upload
+│   ├── review_loop.py              # run_review_loop() — visual review retry logic (extracted for testability)
+│   └── rendering/                  # pptx_renderer.py, html_renderer.py, chart_generator.py
 ├── exceptions/                     # Custom exception classes → global HTTP status mappings
 │   ├── auth_error.py               # → 401
 │   ├── not_found_error.py          # → 404
+│   ├── permission_error.py         # → 403 (ownership checks in services)
 │   └── validation_error.py         # → 400
 ├── constants/
 │   └── timeouts.py                 # JWT_EXPIRY_HOURS, INVITE_EXPIRY_HOURS
@@ -95,9 +112,11 @@ eduquest-backend/
 - `/conversation` — profile assistant, update assistant
 - `/curriculum` — curriculum generation/approval per period
 - `/enrollment` — student enrollment
+- `/lessons` — `GET /{lesson_id}/pptx` and `GET /{lesson_id}/html` presigned URL endpoints
 - `/parent` — parent invite and child lookup
 - `/period` — period CRUD, homework agent; also the prefix for `ltg.py` (LTG conversation), which is a separate router file mounted under `/period`
 - `/quest` — quest retrieval, submission
+- `/slides` — `GET /{period_id}/pptx/status`, `POST /{period_id}/pptx/restart`
 - `/teacher` — Canvas courses, skill-mastery analytics
 - `/user` — user profile, tutorial state
 - `/pilot-waitlist` — status, join
@@ -126,6 +145,16 @@ services/[feature]/
 
 Router handlers that do more than one distinct thing extract underscore-prefixed helpers in the same file (e.g. `_validate_pilot_access()`, `_resolve_identity()`, `_handle_file_submission()`). These are private to the module — no helper should exceed 20 lines.
 
+## Layer Rules
+
+Rules below are the what; see [ARCH_DECISIONS.md](ARCH_DECISIONS.md) for the why.
+
+- **Routers are HTTP-boundary-only.** Parse request, call service, return response. No business logic in `routers/`.
+- **Service dependency injection.** Services declare DAOs, sub-services, integrations, and bot provider as constructor parameters with defaults (`def __init__(self, my_dao=None): self.my_dao = my_dao or MyDAO()`). Never instantiate inline.
+- **`integrations/` vs `utils/` boundary.** `integrations/` = external service adapters (outbound calls, credentials). `utils/` = local computation only (no network, no credentials). Renderers (PPTX, HTML, charts) belong in `utils/rendering/`.
+- **Auth enforcement split.** Role checks at router via `Depends(require_roles(...))`. Ownership checks raise `PermissionError` inside the service (because verification requires the same resource lookup). Enrollment checks at router top via `EnrollmentService().check_enrolled()` — service methods must not re-check enrollment.
+- **All S3 access through `integrations/s3_service.py`.** Never instantiate `boto3.client` directly.
+
 ## Error Handling
 
 Custom exceptions in `exceptions/` are caught by global handlers in `main.py`:
@@ -133,6 +162,7 @@ Custom exceptions in `exceptions/` are caught by global handlers in `main.py`:
 - `ValidationError` → 400
 - `NotFoundError` → 404
 - `AuthError` → 401
+- `PermissionError` → 403
 - bare `Exception` → 500 (catch-all; logs full traceback)
 
 **Rule: route handlers must never catch bare `Exception` to convert it to a 500.** All unhandled exceptions bubble up to the global handler, which owns the 500 mapping. This keeps logging, error shape, and observability consistent across every route.
@@ -169,30 +199,7 @@ Use `logger = logging.getLogger(__name__)` at the top of every service and bot f
 - `JWT_EXPIRY_HOURS = 1` — JWT token lifetime
 - `INVITE_EXPIRY_HOURS = 24` — parent invite expiry
 
-## Agent System
-
-All agent code in `bots/` (not `EQ_agents/` — that directory no longer exists). Agents use OpenAI's Agents SDK (`from agents import Agent, Runner`).
-
-- `bots/grading_agent.py` (`GradingOrchestrator`) — produces per-skill float scores (0.0–1.0). Results are written to `aggregated_metrics` via `AggregatedMetricsDAO`.
-- `bots/schedule_agent.py` (`PeriodScheduleAgent`) — generates Week→Lesson→Concept→Skill schedule hierarchy. Accepts `research_context` (from Perplexity) to fill curriculum gaps when no files are uploaded.
-- `bots/coverage_evaluator.py` (`CoverageEvaluator`) — single `gpt-4o-mini` structured call; returns `sufficient`, `gaps`, and `research_queries`. Used before schedule generation to decide whether to call Perplexity.
-- `integrations/perplexity_service.py` (`PerplexityService`) — calls `POST https://api.perplexity.ai/v1/agent` with `{"preset": "deep-research", "input": ...}` via `httpx`. Response text is in `output[-1]["content"][0]["text"]` (last item of type "message" in the `output` array). NOT the OpenAI-compatible `/chat/completions` endpoint.
-
-## Slideshow / PPTX Pipeline
-
-The PPTX feature generates PowerPoint decks per lesson. Unlike the conversation agents (which use a stateful `OpenAIConversationsSession`), the slideshow pipeline is **stateless** — each generation is a fresh `Runner.run()` call with `max_turns=80`.
-
-**Agent chain:** `PptxAgent → OrchestratorAgent → ContentWriterAgent / VisualReviewAgent / SLIDE_TOOLS`
-
-- `bots/slideshow/pptx_agent.py` (`PptxAgent`) — top-level entry point; calls `OrchestratorAgent().run_async()`, then renders the resulting `CompleteSlideDeck` to `.pptx` (via `utils/rendering/pptx_renderer.py`) and HTML (via `utils/rendering/html_renderer.py`). Returns `{"pptx_bytes": bytes, "html_str": str}`.
-- `bots/slideshow/orchestrator_agent.py` (`OrchestratorAgent`) — triage agent; designs the deck and calls specialist sub-agents via `SLIDE_TOOLS` function tools. Returns a `CompleteSlideDeck`.
-- `bots/slideshow/content_writer_agent.py` (`ContentWriterAgent`) — writes `title`, `bullets`, and `speaker_notes` for one slide.
-- `bots/slideshow/visual_review_agent.py` (`VisualReviewAgent`) — reviews generated images; returns `approved`, `regenerate`, or `flag`.
-- `bots/tools/` — `SLIDE_TOOLS` are `@function_tool` wrappers registered to the orchestrator: `content_tool`, `image_tool`, `chart_tool`, `review_tool`, `html_tool`.
-
-**Status lifecycle:** `LessonPptx` rows transition `pending → generating → done | failed`. Managed by `services/slides/pptx_generation_service.py` (`PptxGenerationService`).
-
-**Mock:** `MockPptxAgent` lives in `bots/_mocks.py` alongside the other mocks. It generates a minimal real `.pptx` file using `python-pptx` and returns non-empty `html_str` so the HTML upload branch is exercised. `MockBotProvider.create_pptx_agent()` returns it.
+See [bots/CLAUDE.md](bots/CLAUDE.md) for agent system and PPTX pipeline details.
 
 ## Development
 
@@ -200,8 +207,8 @@ The PPTX feature generates PowerPoint decks per lesson. Unlike the conversation 
 
 ```bash
 cd eduquest-backend
+make setup          # creates venv, installs all dependencies, installs pre-commit hook
 source venv/bin/activate
-pip install -r requirements.txt
 ```
 
 **Environment** — `.env` file:
@@ -210,12 +217,14 @@ pip install -r requirements.txt
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 - `OPENAI_API_KEY`
 - `PERPLEXITY_API_KEY` — required for `PerplexityService` (Perplexity Agent API)
-- `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — S3 uploads + SES email
+- `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) — required for `NanoBananaClient` (Gemini image generation for slides)
+- `GEMINI_IMAGE_MODEL` (optional; defaults to `gemini-2.5-flash-image`)
+- `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_NAME` — S3 uploads + SES email
 - `SES_FROM_EMAIL`, `FRONTEND_BASE_URL` — password reset emails, Stripe redirect URLs
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — Stripe API + webhook signature
 - `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_GROWTH`, `STRIPE_PRICE_PRO` — Stripe price IDs for each plan
 - `PILOT_WAITLIST_ENABLED` (optional; default `true`)
-- `API_GATEWAY_URL` (optional)
+- `MOCK_AI` (optional; set to `true` to use `MockBotProvider` in development — no OpenAI calls)
 
 **Run**:
 

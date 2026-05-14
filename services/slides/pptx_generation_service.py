@@ -19,6 +19,7 @@ from models.lesson_pptx import LessonPptx
 logger = logging.getLogger(__name__)
 
 _SEMAPHORE_LIMIT = 8
+_AGENT_TIMEOUT_S = 15 * 60
 
 
 class PptxGenerationService:
@@ -77,16 +78,50 @@ class PptxGenerationService:
             "course_description": period.get("course_description", "") if period else "",
         }
 
-        pptx_rows = self.lesson_pptx_dao.get_by_period(period_id)
+        pptx_rows = [
+            row for row in self.lesson_pptx_dao.get_by_period(period_id)
+            if row.get("status") == "pending"
+        ]
         logger.info("pptx batch starting: period=%s lessons=%d", period_id, len(pptx_rows))
+        if not pptx_rows:
+            logger.info("pptx batch: no pending lessons, skipping: period=%s", period_id)
+            return
+
         curriculum = {
             "lessons": self.lesson_dao.get_lessons_by_period(period_id),
             "concepts": self.concept_dao.get_concepts_by_period(period_id),
             "skills": self.skill_dao.get_skills_by_period(period_id),
             "concept_skills": self.concept_skill_dao.get_all_for_period(period_id),
         }
-        asyncio.run(self._run_batch_async(pptx_rows, curriculum, period_context))
-        logger.info("pptx batch complete: period=%s", period_id)
+        try:
+            asyncio.run(self._run_batch_async(pptx_rows, curriculum, period_context))
+            logger.info("pptx batch complete: period=%s", period_id)
+        except Exception as exc:
+            if os.getenv("PYTEST_CURRENT_TEST"):
+                raise
+            logger.error("pptx batch crashed: period=%s: %s", period_id, exc, exc_info=True)
+            all_rows = self.lesson_pptx_dao.get_by_period(period_id)
+            for row in all_rows:
+                if row.get("status") not in ("done", "failed"):
+                    self.lesson_pptx_dao.update_status(row["pptx_id"], {"status": "failed"})
+
+    def restart_batch(self, period_id: str, background_tasks: BackgroundTasks) -> int:
+        """Reset stuck/failed lessons to pending and re-queue generation.
+
+        Returns the number of lessons reset.
+        Raises ValidationError if there is nothing to retry.
+        """
+        rows = self.lesson_pptx_dao.get_by_period(period_id)
+        stuck = [r for r in rows if r.get("status") in ("generating", "failed")]
+        if not stuck:
+            raise ValidationError("No failed or stuck lessons to retry")
+
+        for row in stuck:
+            self.lesson_pptx_dao.update_status(row["pptx_id"], {"status": "pending"})
+
+        background_tasks.add_task(self.run_batch, period_id)
+        logger.info("pptx restart queued: period=%s lessons=%d", period_id, len(stuck))
+        return len(stuck)
 
     async def _run_batch_async(
         self,
@@ -141,8 +176,9 @@ class PptxGenerationService:
             logger.info("pptx generating: lesson=%s name=%r", lesson_id, lesson.get("lesson_name"))
             self.lesson_pptx_dao.update_status(pptx_id, {"status": "generating"})
             try:
-                result = await self._bot_provider.create_pptx_agent().run(
-                    lesson_with_context, period_context
+                result = await asyncio.wait_for(
+                    self._bot_provider.create_pptx_agent().run(lesson_with_context, period_context),
+                    timeout=_AGENT_TIMEOUT_S,
                 )
                 pptx_bytes = result["pptx_bytes"]
                 html_str = result.get("html_str", "")

@@ -135,7 +135,7 @@ def test_get_my_periods_success():
         {"period_id": "p2"},
     ]
     svc.ltg_goal_dao.get_by_student.return_value = {"p1": "Be a doctor"}
-    svc.period_dao.get_period_by_id.side_effect = [
+    svc.period_dao.get_periods_by_ids.return_value = [
         {"period_id": "p1", "name": "Math"},
         {"period_id": "p2", "name": "Science"},
     ]
@@ -153,7 +153,7 @@ def test_get_my_periods_skips_missing_periods():
     svc = _make_service()
     svc.enrollment_dao.get_enrollments_by_student.return_value = [{"period_id": "gone"}]
     svc.ltg_goal_dao.get_by_student.return_value = {}
-    svc.period_dao.get_period_by_id.return_value = None
+    svc.period_dao.get_periods_by_ids.return_value = []
 
     result = svc.get_my_periods("u1")
 

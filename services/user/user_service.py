@@ -1,7 +1,9 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from data_access.parent_dao import ParentDAO
 from data_access.session_dao import SessionDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
+from data_access.user_dao import UserDAO
 
 class UserService:
 
@@ -9,6 +11,8 @@ class UserService:
         self.session_dao = SessionDAO()
         self.student_dao = StudentDAO()
         self.teacher_dao = TeacherDAO()
+        self.parent_dao = ParentDAO()
+        self.user_dao = UserDAO()
 
     def get_user_profile(self, auth_token: str) -> Dict[str, Any]:
         sessions = self.session_dao.get_sessions_by_auth_token(auth_token)
@@ -50,4 +54,16 @@ class UserService:
     def needs_tutorial(self, user_id: str) -> bool:
         """Check if student needs tutorial"""
         return self.student_dao.needs_tutorial(user_id)
+
+    def get_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        return self.user_dao.get_by_id(user_id)
+
+    def get_student_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        return self.student_dao.get_student_by_id(user_id)
+
+    def get_teacher_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        return self.teacher_dao.get_teacher_by_id(user_id)
+
+    def get_parent_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        return self.parent_dao.get_parent_by_id(user_id)
 

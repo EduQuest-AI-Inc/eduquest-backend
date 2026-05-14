@@ -29,6 +29,7 @@ class Period(BaseModel):
     file_vector_store_ids: List[str] = []
     processing_status: str = "pending"
     status: str = "pending"
+    is_summer_quest: bool = False
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_item(self):

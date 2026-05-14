@@ -5,18 +5,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from routers.deps import AuthPayload, Role, require_roles
-from data_access.aggregated_metrics_dao import AggregatedMetricsDAO
-from data_access.period_dao import PeriodDAO
-from data_access.teacher_dao import TeacherDAO
 from services.period.period_management_service import PeriodManagementService
+from services.user.teacher_service import TeacherService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 period_management_service = PeriodManagementService()
-aggregated_metrics_dao = AggregatedMetricsDAO()
-period_dao_t = PeriodDAO()
-teacher_dao = TeacherDAO()
+_teacher_service = TeacherService()
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +52,7 @@ def list_canvas_courses(
             except Exception:
                 continue
         try:
-            teacher_dao.update_canvas_credentials(auth.sub, body.api_url, body.api_key)
+            _teacher_service.update_canvas_credentials(auth.sub, body.api_url, body.api_key)
         except Exception as e:
             logger.warning("Failed to persist Canvas credentials for %s: %s", auth.sub, e)
         return {"courses": courses}
@@ -75,9 +71,9 @@ def get_skill_mastery(
     period_id: str = Query(...),
     auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
 ):
-    period = period_dao_t.get_period_by_id(period_id)
+    period = period_management_service.get_period_by_id(period_id)
     if not period:
         raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
         raise HTTPException(status_code=403, detail="Forbidden")
-    return aggregated_metrics_dao.get_by_period_id(period_id)
+    return _teacher_service.get_aggregated_metrics(period_id)
