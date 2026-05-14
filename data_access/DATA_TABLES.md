@@ -73,6 +73,7 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | `last_name`  | text | NOT NULL |                                          |
 | `email`      | text | NOT NULL |                                          |
 | `password`   | text        | NOT NULL | Hashed (bcrypt)                        |
+| `phone_number` | text      | nullable |                                          |
 | `last_login` | timestamptz | nullable |                                          |
 | `role`       | text        | NOT NULL | `"student"` \| `"teacher"` \| `"parent"` |
 | `created_at` | timestamptz | NOT NULL | Account creation time (DEFAULT now())    |

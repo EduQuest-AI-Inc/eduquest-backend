@@ -17,6 +17,7 @@ class ParentDAO(SupabaseBaseDAO):
             'last_name': parent.last_name,
             'email': parent.email,
             'password': parent.password,
+            'phone_number': getattr(parent, 'phone_number', None),
             'role': 'parent',
         })
         try:

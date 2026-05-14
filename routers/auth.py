@@ -52,6 +52,7 @@ class SignupRequest(BaseModel):
     last_name: str
     email: str
     grade: Optional[str] = None
+    phone_number: Optional[str] = None
     invite_code: Optional[str] = None
     # Required confirmation for parent/teacher accounts: explicit acknowledgement
     # that they are starting the 14-day no-card trial. The frontend renders the
@@ -80,6 +81,7 @@ def signup(body: SignupRequest):
         body.username, body.password, body.role,
         body.first_name, body.last_name, normalized_email,
         body.grade if body.role == "student" else None,
+        body.phone_number,
     )
     if not result.get("success"):
         error_message = result.get("error", "Registration failed")

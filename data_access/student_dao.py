@@ -19,6 +19,7 @@ class StudentDAO(SupabaseBaseDAO):
             'last_name': student.last_name,
             'email': student.email,
             'password': student.password,
+            'phone_number': getattr(student, 'phone_number', None),
             'role': 'student',
         })
         try:

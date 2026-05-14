@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from models.user import User
 
 SHARED_USER_FIELDS = {
-    "first_name", "last_name", "email", "password", "last_login",
+    "first_name", "last_name", "email", "password", "last_login", "phone_number",
 }
 
 
