@@ -9,9 +9,13 @@ along with the (possibly-regenerated) image path.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 
 from agents import function_tool
+
+_REVIEW_TIMEOUT_S = 300
 
 from bots.slideshow.visual_review_agent import VisualReviewAgent
 from models.slide_plan import ChartSpec
@@ -55,7 +59,7 @@ def _regenerate(
 
 
 @function_tool
-def review_visual(
+async def review_visual(
     image_path: str,
     slide_title: str,
     concept_description: str,
@@ -95,15 +99,26 @@ def review_visual(
     Side effects: 1–3 vision API calls + up to 2 regenerations.
     Retry safety: NOT free — call once per slide.
     """
-    return run_review_loop(
-        _get_reviewer(),
-        _regenerate,
-        image_path,
-        slide_title,
-        concept_description,
-        grade_level,
-        original_prompt,
-        visual_kind,
-        chart_type,
-        data_hints_json,
-    )
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(
+                run_review_loop,
+                _get_reviewer(),
+                _regenerate,
+                image_path,
+                slide_title,
+                concept_description,
+                grade_level,
+                original_prompt,
+                visual_kind,
+                chart_type,
+                data_hints_json,
+            ),
+            timeout=_REVIEW_TIMEOUT_S,
+        )
+    except asyncio.TimeoutError:
+        return json.dumps({
+            "status": "placeholder",
+            "image_path": None,
+            "feedback": f"Visual review timed out after {_REVIEW_TIMEOUT_S} s; rendering placeholder.",
+        })

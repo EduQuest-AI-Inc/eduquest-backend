@@ -98,5 +98,8 @@ Return a SlideContent object with `title`, `bullets`, and `speaker_notes`.
         result = await Runner.run(self.agent, prompt)
         return result.final_output
 
+    async def run_async(self, **kwargs) -> SlideContent:
+        return await self._run_async(**kwargs)
+
     def run(self, **kwargs) -> SlideContent:
         return asyncio.run(self._run_async(**kwargs))

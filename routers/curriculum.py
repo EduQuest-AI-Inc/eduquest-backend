@@ -4,7 +4,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, get_bot_provider, require_active_membership
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider
 from bots.protocol import BotProviderProtocol
 from services.curriculum.curriculum_service import CurriculumService
 from services.enrollment.enrollment_service import EnrollmentService
@@ -117,13 +117,36 @@ def _assert_student_enrolled(period_id: str, user_id: str) -> None:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
 
+def _membership_or_summer(
+    period_id: str,
+    auth: AuthPayload = Depends(get_auth),
+) -> AuthPayload:
+    """Bypass the membership gate for summer side quests; enforce it for all others."""
+    period = _period_management_svc.get_period_by_id(period_id)
+    if period and period.get("is_summer_quest"):
+        return auth
+    if auth.role not in (Role.TEACHER, Role.PARENT):
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "Forbidden", "code": "OWNER_ROLE_REQUIRED"},
+        )
+    from services.billing.membership_service import MembershipService
+    access = MembershipService().evaluate_access(auth.sub, auth.role.value)
+    if not access.has_active_membership:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "Active membership required", "code": "MEMBERSHIP_REQUIRED"},
+        )
+    return auth
+
+
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 @router.post("/{period_id}/generate", status_code=202)
 def trigger_generation(
     period_id: str,
     background_tasks: BackgroundTasks,
-    auth: AuthPayload = Depends(require_active_membership),
+    auth: AuthPayload = Depends(_membership_or_summer),
     svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     _assert_period_owner(period_id, auth.sub)
@@ -139,11 +162,15 @@ def trigger_generation(
 @router.get("/{period_id}")
 def get_curriculum(
     period_id: str,
-    auth: AuthPayload = Depends(require_active_membership),
+    auth: AuthPayload = Depends(_membership_or_summer),
     svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     if auth.role == Role.STUDENT:
-        _assert_student_enrolled(period_id, auth.sub)
+        period = _period_management_svc.get_period_by_id(period_id)
+        if period and period.get("is_summer_quest") and period.get("owner_id") == auth.sub:
+            pass  # student owns this summer quest — allow through
+        else:
+            _assert_student_enrolled(period_id, auth.sub)
     else:
         _assert_period_owner(period_id, auth.sub)
     try:
@@ -156,7 +183,7 @@ def get_curriculum(
 def save_curriculum(
     period_id: str,
     payload: _SavePayload,
-    auth: AuthPayload = Depends(require_active_membership),
+    auth: AuthPayload = Depends(_membership_or_summer),
     svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     _assert_period_owner(period_id, auth.sub)
@@ -174,7 +201,7 @@ def update_concept(
     period_id: str,
     concept_name: str,
     payload: _ConceptEditPayload,
-    auth: AuthPayload = Depends(require_active_membership),
+    auth: AuthPayload = Depends(_membership_or_summer),
     svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     _assert_period_owner(period_id, auth.sub)
@@ -191,7 +218,7 @@ def update_skill(
     period_id: str,
     skill_name: str,
     payload: _SkillEditPayload,
-    auth: AuthPayload = Depends(require_active_membership),
+    auth: AuthPayload = Depends(_membership_or_summer),
     svc: CurriculumService = Depends(_get_curriculum_service),
 ):
     _assert_period_owner(period_id, auth.sub)
@@ -207,7 +234,7 @@ def update_skill(
 def approve_period(
     period_id: str,
     background_tasks: BackgroundTasks,
-    auth: AuthPayload = Depends(require_active_membership),
+    auth: AuthPayload = Depends(_membership_or_summer),
     svc: CurriculumService = Depends(_get_curriculum_service),
     slides_svc: PptxGenerationService = Depends(_get_slides_service),
 ):

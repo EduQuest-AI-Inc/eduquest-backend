@@ -4,16 +4,19 @@ chart_tool — generates a chart/diagram PNG and returns its file path.
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 from agents import function_tool
+
+_CHART_TIMEOUT_S = 15
 
 from models.slide_plan import ChartSpec
 from utils.rendering import chart_generator
 
 
 @function_tool
-def generate_chart_image(
+async def generate_chart_image(
     chart_type: str,
     description: str,
     data_hints_json: str,
@@ -53,4 +56,12 @@ def generate_chart_image(
         description=description,
         data_hints=data_hints,
     )
-    return chart_generator.generate_chart_to_file(spec)
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(chart_generator.generate_chart_to_file, spec),
+            timeout=_CHART_TIMEOUT_S,
+        )
+    except asyncio.TimeoutError:
+        raise RuntimeError(
+            f"Chart generation timed out after {_CHART_TIMEOUT_S} s"
+        )
