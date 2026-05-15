@@ -31,7 +31,18 @@ class ProfileConversationService:
         first_name = student.get("first_name", "Student")
         last_name = student.get("last_name", "")
         initial_message = f"Hello, I'm {first_name} {last_name}."
-        result = await self._bot_provider.run_conversation(self.agent, initial_message)
+        result = await self._bot_provider.run_conversation(
+            self.agent,
+            initial_message,
+            trace_workflow_name="profile_conversation",
+            trace_group_id=student.get("user_id"),
+            trace_metadata={
+                "conversation_type": "profile",
+                "phase": "initiate",
+                "has_student_name": bool(first_name or last_name),
+                "has_previous_response_id": False,
+            },
+        )
 
         response = result.final_output
         profile_complete, profile = self._check_profile(response)
@@ -55,6 +66,13 @@ class ProfileConversationService:
             self.agent,
             user_message,
             previous_response_id=self.previous_response_id,
+            trace_workflow_name="profile_conversation",
+            trace_group_id=self.previous_response_id,
+            trace_metadata={
+                "conversation_type": "profile",
+                "phase": "continue",
+                "has_previous_response_id": bool(self.previous_response_id),
+            },
         )
 
         response = result.final_output

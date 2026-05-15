@@ -150,6 +150,10 @@ def test_profile_initiate_happy_path():
     call_message = mock_provider.run_conversation.call_args[0][1]
     assert "Alice" in call_message
     assert "Smith" in call_message
+    call_kwargs = mock_provider.run_conversation.call_args[1]
+    assert call_kwargs["trace_workflow_name"] == "profile_conversation"
+    assert call_kwargs["trace_metadata"]["conversation_type"] == "profile"
+    assert call_kwargs["trace_metadata"]["phase"] == "initiate"
 
 
 @pytest.mark.unit
@@ -186,6 +190,8 @@ def test_profile_continue_passes_previous_response_id():
     svc = _profile_svc(previous_response_id="rid-prev", mock_provider=mock_provider)
     result = asyncio.run(svc.continue_conversation("I like reading"))
     assert mock_provider.run_conversation.call_args[1]["previous_response_id"] == "rid-prev"
+    assert mock_provider.run_conversation.call_args[1]["trace_workflow_name"] == "profile_conversation"
+    assert mock_provider.run_conversation.call_args[1]["trace_group_id"] == "rid-prev"
     assert "response_id" in result
     assert "response" in result
     assert "profile_complete" in result
@@ -290,6 +296,9 @@ def test_feedback_initiate_happy_path():
     assert "Alice Smith" in call_args[0][1]
     assert "quest json" in call_args[0][1]
     assert call_args[1]["session"] is svc.session
+    assert call_args[1]["trace_workflow_name"] == "teacher_feedback_conversation"
+    assert call_args[1]["trace_metadata"]["phase"] == "initiate"
+    assert call_args[1]["trace_metadata"]["conversation_type"] == "teacher_feedback"
 
 
 @pytest.mark.unit
@@ -321,6 +330,8 @@ def test_feedback_continue_happy_path():
     assert call_args[0][0] is svc.agent
     assert call_args[0][1] == "Adjust week 3"
     assert call_args[1]["session"] is svc.session
+    assert call_args[1]["trace_workflow_name"] == "teacher_feedback_conversation"
+    assert call_args[1]["trace_metadata"]["phase"] == "continue"
 
 
 @pytest.mark.unit

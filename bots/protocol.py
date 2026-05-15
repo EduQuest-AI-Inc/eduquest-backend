@@ -51,6 +51,15 @@ class BotProviderProtocol(Protocol):
 
     def make_conversations_session(self, conversation_id=None) -> Any: ...
 
-    async def run_conversation(self, agent, message: str, **kwargs) -> Any: ...
+    async def run_conversation(
+        self,
+        agent,
+        message: str,
+        *,
+        trace_workflow_name: Optional[str] = None,
+        trace_group_id: Optional[str] = None,
+        trace_metadata: Optional[dict[str, Any]] = None,
+        **kwargs,
+    ) -> Any: ...
 
     async def grade_submission(self, quest_data: dict, submission_text: str) -> dict: ...
