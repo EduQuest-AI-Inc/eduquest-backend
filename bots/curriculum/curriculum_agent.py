@@ -11,6 +11,8 @@ from typing import List
 from agents import Agent, Runner, FileSearchTool, trace, ModelSettings
 import asyncio
 
+from bots.model_config import CURRICULUM_SCHEDULE_MODEL, CURRICULUM_SCHEDULE_REASONING_EFFORT
+
 logger = logging.getLogger(__name__)
 
 # Add the parent directory to Python path so we can import from eduquest-backend
@@ -112,8 +114,10 @@ class CurriculumAgent:
         self.agent = Agent(
             name="Period Schedule Agent",
             instructions=instructions,
-            model="gpt-5.5",
-            model_settings=ModelSettings(reasoning=Reasoning(effort="high")),
+            model=CURRICULUM_SCHEDULE_MODEL,
+            model_settings=ModelSettings(
+                reasoning=Reasoning(effort=CURRICULUM_SCHEDULE_REASONING_EFFORT)
+            ),
             tools=tools,  # type: ignore[arg-type]
             output_type=CurriculumScheduleSchema
         )
@@ -274,8 +278,12 @@ PROCESS
     async def _run_async(self) -> CurriculumScheduleSchema:
         mode = "files" if self.vector_store_ids else ("research" if self.research_context else "description")
         logger.info(
-            "CurriculumAgent starting: course=%r mode=%s weeks=%d model=gpt-5.5",
-            self.course_name, mode, self._num_weeks,
+            "CurriculumAgent starting: course=%r mode=%s weeks=%d model=%s reasoning=%s",
+            self.course_name,
+            mode,
+            self._num_weeks,
+            CURRICULUM_SCHEDULE_MODEL,
+            CURRICULUM_SCHEDULE_REASONING_EFFORT,
         )
         t0 = time.monotonic()
         grade_line = f"Grade level: {self.grade_level or 'Not specified'}"

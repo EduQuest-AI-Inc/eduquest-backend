@@ -207,7 +207,7 @@ class MockCurriculumOnlyQuestAgent:
 class MockGradingOrchestrator:
     """Fast replacement for GradingOrchestrator."""
 
-    async def grade_submission(self, grading_input: Any) -> Any:
+    async def grade_submission(self, grading_input: Any, **kwargs) -> Any:
         from bots.grading_agent import GradingResult
 
         skill_mastery = {skill: 0.75 for skill in (grading_input.skills or ["general"])}

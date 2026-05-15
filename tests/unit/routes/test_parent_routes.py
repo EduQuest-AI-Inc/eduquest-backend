@@ -93,3 +93,100 @@ class TestGetStudents:
             mock_ps.get_linked_students.side_effect = RuntimeError("fail")
             resp = client.get("/parent/students")
         assert resp.status_code == 500
+
+
+class TestEnrollStudent:
+
+    @pytest.mark.api
+    def test_enroll_student_success(self, client):
+        with (
+            patch("routers.parent.enrollment_service") as mock_es,
+            patch("routers.parent.period_management_service") as mock_pms,
+            patch("routers.parent.user_service") as mock_us,
+            patch("routers.parent.membership_service") as mock_ms,
+        ):
+            mock_es.validate_parent_enrollment_preconditions.return_value = None
+            mock_pms.get_period_by_id.return_value = {"owner_id": "owner-1", "name": "Math"}
+            mock_us.get_by_id.return_value = {"role": "parent"}
+            mock_ms.check_can_add_student_to_period.return_value = None
+            mock_es.verify_period_id.return_value = {"period_id": "p1", "name": "Math"}
+
+            resp = client.post(
+                "/parent/enroll-student",
+                json={"student_id": "s1", "period_id": "p1"},
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["message"] == "Student enrolled in class"
+        assert body["period"]["period_id"] == "p1"
+
+    @pytest.mark.api
+    def test_enroll_student_not_linked_returns_400(self, client):
+        from exceptions.validation_error import ValidationError as EQValidationError
+        with patch("routers.parent.enrollment_service") as mock_es:
+            mock_es.validate_parent_enrollment_preconditions.side_effect = EQValidationError(
+                "Student is not linked to this parent account"
+            )
+            resp = client.post(
+                "/parent/enroll-student",
+                json={"student_id": "s-other", "period_id": "p1"},
+            )
+        assert resp.status_code == 400
+
+    @pytest.mark.api
+    def test_enroll_student_already_enrolled_returns_400(self, client):
+        from exceptions.validation_error import ValidationError as EQValidationError
+        with patch("routers.parent.enrollment_service") as mock_es:
+            mock_es.validate_parent_enrollment_preconditions.side_effect = EQValidationError(
+                "Student is already enrolled in this class"
+            )
+            resp = client.post(
+                "/parent/enroll-student",
+                json={"student_id": "s1", "period_id": "p1"},
+            )
+        assert resp.status_code == 400
+
+    @pytest.mark.api
+    def test_enroll_student_owner_inactive_returns_403(self, client):
+        from services.billing.membership_service import MembershipRequiredError
+        with (
+            patch("routers.parent.enrollment_service") as mock_es,
+            patch("routers.parent.period_management_service") as mock_pms,
+            patch("routers.parent.user_service") as mock_us,
+            patch("routers.parent.membership_service") as mock_ms,
+        ):
+            mock_es.validate_parent_enrollment_preconditions.return_value = None
+            mock_pms.get_period_by_id.return_value = {"owner_id": "owner-1"}
+            mock_us.get_by_id.return_value = {"role": "teacher"}
+            mock_ms.check_can_add_student_to_period.side_effect = MembershipRequiredError("inactive")
+
+            resp = client.post(
+                "/parent/enroll-student",
+                json={"student_id": "s1", "period_id": "p1"},
+            )
+
+        assert resp.status_code == 403
+        assert resp.json()["detail"]["code"] == "OWNER_MEMBERSHIP_INACTIVE"
+
+    @pytest.mark.api
+    def test_enroll_student_plan_limit_returns_403(self, client):
+        from services.billing.membership_service import PlanLimitExceededError
+        with (
+            patch("routers.parent.enrollment_service") as mock_es,
+            patch("routers.parent.period_management_service") as mock_pms,
+            patch("routers.parent.user_service") as mock_us,
+            patch("routers.parent.membership_service") as mock_ms,
+        ):
+            mock_es.validate_parent_enrollment_preconditions.return_value = None
+            mock_pms.get_period_by_id.return_value = {"owner_id": "owner-1"}
+            mock_us.get_by_id.return_value = {"role": "teacher"}
+            mock_ms.check_can_add_student_to_period.side_effect = PlanLimitExceededError("limit hit")
+
+            resp = client.post(
+                "/parent/enroll-student",
+                json={"student_id": "s1", "period_id": "p1"},
+            )
+
+        assert resp.status_code == 403
+        assert resp.json()["detail"]["code"] == "PLAN_LIMIT_EXCEEDED"

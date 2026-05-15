@@ -12,6 +12,12 @@ from typing import Any
 from agents import Agent, FileSearchTool, Runner, trace
 from pydantic import BaseModel, Field
 
+from bots.model_config import (
+    CURRICULUM_ONLY_INSTRUCTION_MODEL,
+    CURRICULUM_ONLY_LTG_MODEL,
+    CURRICULUM_ONLY_QUEST_NAME_MODEL,
+    CURRICULUM_ONLY_RUBRIC_MODEL,
+)
 from bots.schemas.instructions import Instructions
 from bots.schemas.rubric import Rubric
 
@@ -198,7 +204,7 @@ class CurriculumOnlyQuestAgent:
             agent = Agent(
                 name="Curriculum LTG Generator",
                 instructions=_LTG_INSTRUCTIONS,
-                model="gpt-5.5",
+                model=CURRICULUM_ONLY_LTG_MODEL,
                 output_type=LongTermGoalOutput,
                 tools=self._tools,
             )
@@ -218,7 +224,7 @@ class CurriculumOnlyQuestAgent:
             agent = Agent(
                 name="Curriculum Quest Name Designer",
                 instructions=_QUEST_NAME_INSTRUCTIONS,
-                model="gpt-5.5",
+                model=CURRICULUM_ONLY_QUEST_NAME_MODEL,
                 output_type=QuestScheduleOutput,
                 tools=self._tools,
             )
@@ -247,7 +253,7 @@ class CurriculumOnlyQuestAgent:
             agent = Agent(
                 name="Curriculum Instruction Generator",
                 instructions=_INSTRUCTION_INSTRUCTIONS,
-                model="gpt-5.5",
+                model=CURRICULUM_ONLY_INSTRUCTION_MODEL,
                 output_type=Instructions,
                 tools=self._tools,
             )
@@ -263,7 +269,7 @@ class CurriculumOnlyQuestAgent:
             agent = Agent(
                 name="Curriculum Rubric Generator",
                 instructions=_RUBRIC_INSTRUCTIONS,
-                model="gpt-5.5",
+                model=CURRICULUM_ONLY_RUBRIC_MODEL,
                 output_type=Rubric,
             )
             result = await Runner.run(  # type: ignore[arg-type]

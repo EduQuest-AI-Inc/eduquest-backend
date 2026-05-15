@@ -7,8 +7,11 @@ Uses a single structured OpenAI completion (no Agent overhead) for speed.
 import os
 from typing import List, Optional
 
+from agents import generation_span, trace
 from openai import OpenAI
 from pydantic import BaseModel
+
+from bots.model_config import COVERAGE_EVALUATOR_MODEL
 
 
 class CoverageResult(BaseModel):
@@ -94,13 +97,49 @@ Course name: {course_name}{grade_context}
 Evaluate whether the above information is sufficient to generate a complete \
 semester schedule. Identify gaps and provide research queries if needed."""
 
-        completion = self._client.beta.chat.completions.parse(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format=CoverageResult,
-        )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        with trace(
+            "coverage_evaluation",
+            metadata={
+                "has_files": has_files,
+                "has_grade_level": bool(grade_level),
+                "course_name_len": len(course_name),
+                "description_len": len(description_text),
+            },
+        ):
+            with generation_span(
+                input=messages,
+                model=COVERAGE_EVALUATOR_MODEL,
+                model_config={"response_format": "CoverageResult"},
+            ) as span:
+                completion = self._client.beta.chat.completions.parse(
+                    model=COVERAGE_EVALUATOR_MODEL,
+                    messages=messages,
+                    response_format=CoverageResult,
+                )
+                parsed = completion.choices[0].message.parsed
+                span.span_data.output = [
+                    {"role": "assistant", "content": _coverage_result_json(parsed)}
+                ]
+                usage = getattr(completion, "usage", None)
+                if usage:
+                    span.span_data.usage = _model_dump(usage)
 
-        return completion.choices[0].message.parsed
+        return parsed
+
+
+def _coverage_result_json(result: CoverageResult) -> str:
+    if hasattr(result, "model_dump_json"):
+        return result.model_dump_json()
+    return result.json()
+
+
+def _model_dump(value) -> dict:
+    if hasattr(value, "model_dump"):
+        return value.model_dump()
+    if hasattr(value, "dict"):
+        return value.dict()
+    return {}

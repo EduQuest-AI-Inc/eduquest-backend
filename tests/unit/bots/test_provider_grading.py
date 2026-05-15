@@ -1,3 +1,6 @@
+import asyncio
+import sys
+
 import pytest
 from unittest.mock import MagicMock
 
@@ -97,3 +100,51 @@ def test_format_grading_result_joins_changes():
     result = BotProvider._format_grading_result(r)
     assert result["recommended_change"] == "Fix intro; Add citations"
     assert result["change"] is True
+
+
+@pytest.mark.unit
+def test_run_conversation_merges_trace_run_config_and_preserves_runner_kwargs(monkeypatch):
+    from bots.provider import BotProvider
+    from bots.tracing import hashed_trace_group_id
+
+    class FakeRunConfig:
+        def __init__(self):
+            self.workflow_name = "Existing"
+            self.group_id = None
+            self.trace_metadata = None
+            self.trace_include_sensitive_data = False
+
+    captured = {}
+
+    class FakeRunner:
+        @staticmethod
+        async def run(agent, message, **kwargs):
+            captured["agent"] = agent
+            captured["message"] = message
+            captured["kwargs"] = kwargs
+            return "ok"
+
+    monkeypatch.setattr(sys.modules["agents"], "RunConfig", FakeRunConfig, raising=False)
+    monkeypatch.setattr(sys.modules["agents"], "Runner", FakeRunner, raising=False)
+
+    session = MagicMock()
+    result = asyncio.run(
+        BotProvider().run_conversation(
+            "agent",
+            "message",
+            previous_response_id="prev-1",
+            session=session,
+            trace_workflow_name="profile_conversation",
+            trace_group_id="student-1",
+            trace_metadata={"phase": "continue"},
+        )
+    )
+
+    assert result == "ok"
+    assert captured["kwargs"]["previous_response_id"] == "prev-1"
+    assert captured["kwargs"]["session"] is session
+    run_config = captured["kwargs"]["run_config"]
+    assert run_config.workflow_name == "profile_conversation"
+    assert run_config.group_id == hashed_trace_group_id("student-1")
+    assert run_config.trace_metadata == {"phase": "continue"}
+    assert run_config.trace_include_sensitive_data is True

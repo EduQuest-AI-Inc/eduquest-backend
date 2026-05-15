@@ -16,3 +16,6 @@ class SkillDAO(SupabaseBaseDAO):
 
     def update_skill(self, period_id: str, skill_name: str, fields: dict[str, Any]) -> None:
         self._update({'period_id': period_id, 'skill_name': skill_name}, fields)
+
+    def delete_all_for_period(self, period_id: str) -> None:
+        self._delete({'period_id': period_id})

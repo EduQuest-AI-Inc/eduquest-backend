@@ -8,6 +8,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from agents import Agent
+from bots.model_config import TEACHER_FEEDBACK_MODEL
 
 
 # --- Pydantic schemas ---
@@ -46,6 +47,6 @@ Ask specific questions to gather actionable insights."""
     return Agent(
         name="Teacher Feedback Agent",
         instructions=instructions,
-        model="gpt-5",
+        model=TEACHER_FEEDBACK_MODEL,
         output_type=TeacherFeedbackResponse,
     )

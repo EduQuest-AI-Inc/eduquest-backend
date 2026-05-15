@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from agents import Agent
 
 from bots.guardrails import check_student_output_safety
+from bots.model_config import PROFILE_CONVERSATION_MODEL
 
 
 # --- Pydantic schemas ---
@@ -60,7 +61,7 @@ Here's how you will interact with users and gain information about the student:
     return Agent(
         name="Initial Conversation Agent",
         instructions=instructions,
-        model="gpt-4.1-mini",
+        model=PROFILE_CONVERSATION_MODEL,
         output_type=ProfileResponse,
         output_guardrails=[check_student_output_safety],
     )

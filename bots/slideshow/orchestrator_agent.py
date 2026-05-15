@@ -17,6 +17,7 @@ from agents import Agent, ModelSettings, Runner, custom_span
 from dotenv import load_dotenv
 
 from models.slide_plan import CompleteSlideDeck
+from bots.model_config import SLIDE_ORCHESTRATOR_MODEL
 from bots.tools import SLIDE_TOOLS
 
 load_dotenv()
@@ -89,8 +90,7 @@ class OrchestratorAgent:
         self.agent = Agent(
             name="Slide Orchestrator",
             instructions=_INSTRUCTIONS,
-            # GPT-5.5 for high-complexity multi-agent orchestration and full deck assembly.
-            model="gpt-5.5",
+            model=SLIDE_ORCHESTRATOR_MODEL,
             tools=SLIDE_TOOLS,
             output_type=CompleteSlideDeck,
             model_settings=ModelSettings(parallel_tool_calls=True),

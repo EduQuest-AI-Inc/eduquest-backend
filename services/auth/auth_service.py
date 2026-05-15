@@ -114,6 +114,8 @@ def authenticate_user(username: str, password: str, role: str) -> bool:
     user = user_dao.get_by_id(username)
     if not user or user.get('role') != role:
         return False
+    if user.get('login_disabled'):
+        return False
     stored_hash = user['password']
     if not check_password_hash(stored_hash, password):
         return False

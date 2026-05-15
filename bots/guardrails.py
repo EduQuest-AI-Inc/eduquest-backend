@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from agents import (
     Agent,
     Runner,
+    custom_span,
     input_guardrail,
     output_guardrail,
     GuardrailFunctionOutput,
@@ -20,6 +21,8 @@ from agents import (
     MessageOutputItem,
     TResponseInputItem,
 )
+from bots.model_config import STUDENT_SAFETY_MODEL
+from bots.tracing import build_trace_run_config
 try:
     from guardrails.runtime import load_config_bundle, instantiate_guardrails, run_guardrails
     _HAS_GUARDRAILS_RUNTIME = True
@@ -48,17 +51,17 @@ student_input_guardrails_config = {
         },
         {
             "name": "Jailbreak",
-            "config": {"model": "gpt-4.1-mini", "confidence_threshold": 0.7},
+            "config": {"model": STUDENT_SAFETY_MODEL, "confidence_threshold": 0.7},
         },
         {
             "name": "Prompt Injection Detection",
-            "config": {"model": "gpt-4.1-mini", "confidence_threshold": 0.7},
+            "config": {"model": STUDENT_SAFETY_MODEL, "confidence_threshold": 0.7},
         },
         {
             "name": "Custom Prompt Check",
             "config": {
                 "system_prompt_details": "Raise the guardrail if user expresses any experience of abuse.",
-                "model": "gpt-4.1-mini",
+                "model": STUDENT_SAFETY_MODEL,
                 "confidence_threshold": 0.7,
             },
         },
@@ -120,10 +123,19 @@ async def check_student_input_safety(
 
         Return is_safe as true if appropriate, false if inappropriate.
         If not safe, provide a brief reason.""",
-        model="gpt-4.1-mini",
+        model=STUDENT_SAFETY_MODEL,
         output_type=SafetyCheck,
     )
-    result = await Runner.run(safety_agent, input_str, context=ctx.context)
+    with custom_span("student_input_safety_check", data={"input_type": type(input_str).__name__}):
+        result = await Runner.run(
+            safety_agent,
+            input_str,
+            context=ctx.context,
+            run_config=build_trace_run_config(
+                workflow_name="student_input_safety_check",
+                metadata={"guardrail_type": "input"},
+            ),
+        )
     return GuardrailFunctionOutput(
         output_info=result.final_output,
         tripwire_triggered=not result.final_output.is_safe,
@@ -148,11 +160,20 @@ async def check_student_output_safety(
 
         Return is_safe as true if appropriate, false if needs modification.
         If not safe, provide a brief reason.""",
-        model="gpt-4.1-mini",
+        model=STUDENT_SAFETY_MODEL,
         output_type=SafetyCheck,
     )
     content = output.response if hasattr(output, "response") else str(output)
-    result = await Runner.run(safety_agent, content, context=ctx.context)
+    with custom_span("student_output_safety_check", data={"output_type": type(output).__name__}):
+        result = await Runner.run(
+            safety_agent,
+            content,
+            context=ctx.context,
+            run_config=build_trace_run_config(
+                workflow_name="student_output_safety_check",
+                metadata={"guardrail_type": "output"},
+            ),
+        )
     if result.final_output.is_safe:
         return GuardrailFunctionOutput(
             output_info=result.final_output,

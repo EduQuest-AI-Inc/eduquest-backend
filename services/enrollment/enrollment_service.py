@@ -210,6 +210,17 @@ class EnrollmentService:
         if not any(e['user_id'] == user_id for e in enrollments):
             raise ValidationError(f"Student {user_id} is not enrolled in period {period_id}")
 
+    def validate_parent_enrollment_preconditions(
+        self, parent_id: str, student_id: str, period_id: str
+    ) -> None:
+        """Raise ValidationError if student is not linked to parent or is already enrolled."""
+        linked = self.parent_dao.get_linked_student_ids(parent_id)
+        if student_id not in linked:
+            raise ValidationError("Student is not linked to this parent account")
+        existing = self.enrollment_dao.get_enrollments_by_student(student_id)
+        if any(e["period_id"] == period_id for e in existing):
+            raise ValidationError("Student is already enrolled in this class")
+
     def _cleanup_tutorial_periods(self, user_id: str) -> None:
         existing_enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)
         enrolled_period_ids = [e['period_id'] for e in existing_enrollments]

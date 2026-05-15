@@ -16,7 +16,7 @@ break the real OpenAI/Perplexity calls). Run directly:
     # Tweak these constants below to test different courses / descriptions.
 
 Requirements:
-    OPENAI_API_KEY     — for CoverageEvaluator (gpt-4o-mini)
+    OPENAI_API_KEY     — for CoverageEvaluator (see bots/model_config.py)
     PERPLEXITY_API_KEY — for PerplexityService (deep-research preset)
 """
 import asyncio
