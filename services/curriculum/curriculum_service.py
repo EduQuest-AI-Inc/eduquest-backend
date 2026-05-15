@@ -15,6 +15,7 @@ from data_access.period_dao import PeriodDAO
 from data_access.skill_dao import SkillDAO
 from data_access.week_dao import WeekDAO
 from exceptions.not_found_error import NotFoundError
+from exceptions.permission_error import PermissionError
 from exceptions.validation_error import ValidationError
 from integrations.perplexity_service import PerplexityService
 from models.concept import Concept
@@ -51,6 +52,7 @@ class CurriculumService:
     # ── public API ────────────────────────────────────────────────────────────
 
     def trigger_generation(self, period_id: str, background_tasks: BackgroundTasks) -> None:
+        self._check_not_fork(period_id)
         period = self._get_period_or_raise(period_id)
         if period.get("status", "pending") not in {"pending", "failed"}:
             raise ValidationError(
@@ -71,10 +73,12 @@ class CurriculumService:
         }
 
     def save_curriculum(self, period_id: str, payload: dict[str, Any]) -> None:
+        self._check_not_fork(period_id)
         self._get_period_or_raise(period_id)
         self._bulk_replace(period_id, payload)
 
     def update_concept(self, period_id: str, concept_name: str, fields: dict[str, Any]) -> None:
+        self._check_not_fork(period_id)
         self._get_period_or_raise(period_id)
         existing = self.concept_dao.get_concept(period_id, concept_name)
         if not existing:
@@ -82,10 +86,12 @@ class CurriculumService:
         self.concept_dao.update_concept(period_id, concept_name, fields)
 
     def update_skill(self, period_id: str, skill_name: str, fields: dict[str, Any]) -> None:
+        self._check_not_fork(period_id)
         self._get_period_or_raise(period_id)
         self.skill_dao.update_skill(period_id, skill_name, fields)
 
     def approve_period(self, period_id: str) -> list[dict[str, Any]]:
+        self._check_not_fork(period_id)
         period = self._get_period_or_raise(period_id)
         if period["status"] != "draft":
             raise ValidationError(
@@ -102,6 +108,11 @@ class CurriculumService:
         if not period:
             raise NotFoundError(f"Period '{period_id}' not found")
         return period
+
+    def _check_not_fork(self, period_id: str) -> None:
+        period = self._get_period_or_raise(period_id)
+        if period.get("forked_from_period_id"):
+            raise PermissionError("Curriculum cannot be modified on a forked class")
 
     def _run_generation(self, period_id: str) -> None:
         t0 = time.monotonic()

@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
+from exceptions.validation_error import ValidationError
 from services.enrollment.enrollment_service import EnrollmentService
 
 
@@ -9,6 +10,7 @@ def _svc():
     svc.enrollment_dao = MagicMock()
     svc.student_dao = MagicMock()
     svc.period_dao = MagicMock()
+    svc.parent_dao = MagicMock()
     return svc
 
 
@@ -115,3 +117,37 @@ def test_delete_enrollment():
 
     svc.enrollment_dao.delete_enrollment.assert_called_once_with("s1", "p1")
     assert "message" in result, f"expected 'message' key, got {result!r}"
+
+
+# ─── validate_parent_enrollment_preconditions ─────────────────────────────────
+
+@pytest.mark.unit
+def test_validate_parent_enrollment_preconditions_passes():
+    svc = _svc()
+    svc.parent_dao.get_linked_student_ids.return_value = ["s1", "s2"]
+    svc.enrollment_dao.get_enrollments_by_student.return_value = [{"period_id": "p-other"}]
+
+    # Should not raise
+    svc.validate_parent_enrollment_preconditions("parent-1", "s1", "p1")
+
+    svc.parent_dao.get_linked_student_ids.assert_called_once_with("parent-1")
+    svc.enrollment_dao.get_enrollments_by_student.assert_called_once_with("s1")
+
+
+@pytest.mark.unit
+def test_validate_parent_enrollment_preconditions_unlinked_raises():
+    svc = _svc()
+    svc.parent_dao.get_linked_student_ids.return_value = ["s2", "s3"]
+
+    with pytest.raises(ValidationError, match="not linked"):
+        svc.validate_parent_enrollment_preconditions("parent-1", "s1", "p1")
+
+
+@pytest.mark.unit
+def test_validate_parent_enrollment_preconditions_already_enrolled_raises():
+    svc = _svc()
+    svc.parent_dao.get_linked_student_ids.return_value = ["s1"]
+    svc.enrollment_dao.get_enrollments_by_student.return_value = [{"period_id": "p1"}]
+
+    with pytest.raises(ValidationError, match="already enrolled"):
+        svc.validate_parent_enrollment_preconditions("parent-1", "s1", "p1")

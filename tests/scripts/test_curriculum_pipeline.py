@@ -19,7 +19,7 @@ break the real OpenAI/Perplexity calls). Run directly:
     MOCK_AI=true python tests/scripts/test_curriculum_pipeline.py
 
 Requirements:
-    OPENAI_API_KEY     — for CoverageEvaluator (gpt-4o-mini) and HWAgent
+    OPENAI_API_KEY     — for CoverageEvaluator and HWAgent (see bots/model_config.py)
     PERPLEXITY_API_KEY — for PerplexityService (deep-research preset)
 """
 import asyncio

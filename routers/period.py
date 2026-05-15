@@ -312,6 +312,8 @@ def update_period_setup(
         raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
         raise HTTPException(status_code=403, detail="Unauthorized")
+    if period.get("forked_from_period_id"):
+        raise HTTPException(status_code=403, detail="Use /period/{period_id}/fork-metadata to update a forked class")
     if period.get("status") != "setup_draft":
         raise HTTPException(status_code=400, detail="Period is not a setup draft")
 
@@ -409,6 +411,8 @@ def add_files_to_period(
         raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
         raise HTTPException(status_code=403, detail="Unauthorized")
+    if period.get("forked_from_period_id"):
+        raise HTTPException(status_code=403, detail="Cannot add files to a forked class")
 
     existing = period.get("file_urls") or []
     period_management_service.update_file_urls(payload.period_id, existing + payload.file_keys)
@@ -439,6 +443,40 @@ def delete_period(
         raise HTTPException(status_code=404, detail=str(ve))
     except PermissionError:
         raise HTTPException(status_code=403, detail="Unauthorized")
+
+
+# ─── Fork metadata ────────────────────────────────────────────────────────────
+
+class _ForkMetadataUpdate(BaseModel):
+    name: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    grade_level: Optional[str] = None
+    mastery_threshold: Optional[float] = None
+
+
+@router.patch("/period/{period_id}/fork-metadata")
+def update_fork_metadata(
+    period_id: str,
+    body: _ForkMetadataUpdate,
+    auth: AuthPayload = Depends(require_active_membership),
+):
+    period = period_management_service.get_period_by_id(period_id)
+    if not period:
+        raise HTTPException(status_code=404, detail="Period not found")
+    if period.get("owner_id") != auth.sub:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    if not period.get("forked_from_period_id"):
+        raise HTTPException(
+            status_code=400,
+            detail="Use /period/{period_id}/setup to update a non-forked class",
+        )
+    _ALLOWED = {"name", "start_date", "end_date", "grade_level", "mastery_threshold"}
+    updates = {k: v for k, v in body.model_dump(exclude_none=True).items() if k in _ALLOWED}
+    if not updates:
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+    updated = period_management_service.update_setup(period_id, updates)
+    return {"message": "Fork settings updated", "period": updated}
 
 
 # ─── Summer side quests ───────────────────────────────────────────────────────

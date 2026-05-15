@@ -83,6 +83,10 @@ def test_initiate_happy_path():
     assert result["goal_3"] == "G3"
     assert result["chosen_goal"] is None
     mock_provider.run_conversation.assert_called_once()
+    call_kwargs = mock_provider.run_conversation.call_args[1]
+    assert call_kwargs["trace_workflow_name"] == "ltg_conversation"
+    assert call_kwargs["trace_metadata"]["conversation_type"] == "ltg"
+    assert call_kwargs["trace_metadata"]["phase"] == "initiate"
 
 
 @pytest.mark.unit
@@ -132,6 +136,9 @@ def test_continue_conversation_goal_chosen():
     assert result["message"] == "Master algebra"
     assert result["chosen_goal"] == "Master algebra"
     assert mock_provider.run_conversation.call_args[1]["previous_response_id"] == "prev-99"
+    assert mock_provider.run_conversation.call_args[1]["trace_workflow_name"] == "ltg_conversation"
+    assert mock_provider.run_conversation.call_args[1]["trace_group_id"] == "prev-99"
+    assert mock_provider.run_conversation.call_args[1]["trace_metadata"]["phase"] == "continue"
 
 
 @pytest.mark.unit

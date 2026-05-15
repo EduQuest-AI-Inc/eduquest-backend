@@ -8,6 +8,8 @@ from typing import Optional
 from pydantic import BaseModel, Field
 from agents import Agent, FileSearchTool
 
+from bots.model_config import LTG_CONVERSATION_MODEL
+
 
 class LTGResponse(BaseModel):
     """Structured output from the LTG agent."""
@@ -58,7 +60,7 @@ If the student indicates they want to choose a goal (e.g., "I choose goal 1", "I
     return Agent(
         name="Long-Term Goal Assistant",
         instructions=instructions,
-        model="gpt-5.4",
+        model=LTG_CONVERSATION_MODEL,
         output_type=LTGResponse,
         tools=[
             FileSearchTool(

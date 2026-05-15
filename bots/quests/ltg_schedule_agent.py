@@ -5,6 +5,8 @@ from typing import Optional
 from agents import Agent, Runner, FileSearchTool, trace
 from pydantic import BaseModel, Field
 
+from bots.model_config import LTG_SCHEDULE_MODEL
+
 logger = logging.getLogger(__name__)
 
 
@@ -99,7 +101,7 @@ class LTGScheduleAgent:
         self._agent = Agent(
             name="LTG Schedule Designer",
             instructions=_SYSTEM_INSTRUCTIONS,
-            model="gpt-5.5",
+            model=LTG_SCHEDULE_MODEL,
             output_type=ScheduleOutput,
             tools=tools,
         )
