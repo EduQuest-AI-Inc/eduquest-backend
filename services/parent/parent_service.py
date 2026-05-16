@@ -106,7 +106,7 @@ class ParentService:
         self.student_dao.add_student(student)
 
         parent = self.parent_dao.get_parent_by_id(parent_id)
-        linked_ids = list(parent.get("linked_student_ids") or [])
+        linked_ids = list((parent or {}).get("linked_student_ids") or [])
         linked_ids.append(student_id)
         try:
             self.parent_dao.update_parent(parent_id, {"linked_student_ids": linked_ids})
@@ -124,17 +124,18 @@ class ParentService:
 
     def get_linked_students(self, user_id: str) -> list:
         linked_ids = self.parent_dao.get_linked_student_ids(user_id)
+        if not linked_ids:
+            return []
+        rows = self.student_dao.get_students_by_ids(linked_ids)
         students = []
-        for student_id in linked_ids:
-            student = self.student_dao.get_student_by_id(student_id)
-            if student:
-                email = student.get("email", "")
-                students.append({
-                    "user_id": student_id,
-                    "first_name": student.get("first_name", ""),
-                    "last_name": student.get("last_name", ""),
-                    "grade": student.get("grade", ""),
-                    "email": "" if email.endswith("@internal.eduquestai.org") else email,
-                    "interest": student.get("interest") or [],
-                })
+        for student in rows:
+            email = student.get("email", "")
+            students.append({
+                "user_id": student.get("user_id", ""),
+                "first_name": student.get("first_name", ""),
+                "last_name": student.get("last_name", ""),
+                "grade": student.get("grade", ""),
+                "email": "" if email.endswith("@internal.eduquestai.org") else email,
+                "interest": student.get("interest") or [],
+            })
         return students

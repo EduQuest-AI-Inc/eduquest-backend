@@ -10,7 +10,7 @@ from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_active_membership, require_roles
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period as _get_period_dep, require_active_membership, require_roles
 from bots.protocol import BotProviderProtocol
 from integrations import openai_vector_store
 from integrations.s3_service import (
@@ -26,6 +26,7 @@ from services.billing.membership_service import (
     PlanLimitExceededError,
 )
 from services.period.period_file_service import PeriodFileService
+from services.period.period_summer_quest_service import PeriodSummerQuestService
 from models.period import CourseMetadata
 from services.curriculum.curriculum_service import CurriculumService
 from services.period.period_management_service import PeriodManagementService
@@ -423,10 +424,8 @@ def add_files_to_period(
 def get_period(
     period_id: str,
     auth: AuthPayload = Depends(require_active_membership),
+    period: dict = Depends(_get_period_dep),
 ):
-    period = period_management_service.get_period_by_id(period_id)
-    if not period:
-        raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
         raise HTTPException(status_code=403, detail="Unauthorized")
     return {"period": period}
@@ -436,9 +435,10 @@ def get_period(
 def delete_period(
     period_id: str,
     auth: AuthPayload = Depends(require_active_membership),
+    period: dict = Depends(_get_period_dep),
 ):
     try:
-        period_management_service.delete_period(period_id, auth.sub)
+        period_management_service.delete_period(period_id, auth.sub, period=period)
     except ValueError as ve:
         raise HTTPException(status_code=404, detail=str(ve))
     except PermissionError:
@@ -482,42 +482,21 @@ def update_fork_metadata(
 # ─── Summer side quests ───────────────────────────────────────────────────────
 
 
-def _run_summer_quest_generation(
-    period_id: str,
-    owner_id: str,
-    bot_provider: BotProviderProtocol,
-) -> None:
-    from services.period.period_summer_quest_service import PeriodSummerQuestService
-    try:
-        service = PeriodSummerQuestService(bot_provider=bot_provider)
-        service.generate_summer_quests(owner_id=owner_id, period_id=period_id)
-    except Exception as exc:
-        logger.error(
-            "Summer quest generation failed for period %s: %s", period_id, exc, exc_info=True
-        )
-
-
 @router.post("/period/{period_id}/summer-quests/generate", status_code=202)
 def generate_summer_quests(
     period_id: str,
     background_tasks: BackgroundTasks,
     auth: AuthPayload = Depends(get_auth),
     bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+    period: dict = Depends(_get_period_dep),
 ):
-    period = period_management_service.get_period_by_id(period_id)
-    if not period:
-        raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
         raise HTTPException(status_code=403, detail="Unauthorized")
     if not period.get("is_summer_quest"):
         raise HTTPException(status_code=400, detail="This endpoint is only for summer side quests")
 
-    background_tasks.add_task(
-        _run_summer_quest_generation,
-        period_id=period_id,
-        owner_id=auth.sub,
-        bot_provider=bot_provider,
-    )
+    svc = PeriodSummerQuestService(bot_provider=bot_provider)
+    background_tasks.add_task(svc.run_as_background_task, owner_id=auth.sub, period_id=period_id)
     return {"message": "Summer quest generation started"}
 
 

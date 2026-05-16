@@ -44,16 +44,15 @@ class PptxGenerationService:
         self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO()
         self._s3 = s3 or s3_service
 
-    def start_batch(
+    def prepare_batch(
         self,
         period_id: str,
-        background_tasks: BackgroundTasks,
         lessons: list[dict[str, Any]],
     ) -> int:
-        """Create LessonPptx records and schedule background generation.
+        """Create LessonPptx records without scheduling generation.
 
         Raises ValidationError if generation is already running or completed.
-        Returns the number of lessons queued.
+        Returns the number of lessons created.
         """
         if self.lesson_pptx_dao.get_by_period(period_id):
             raise ValidationError("Generation already running or completed for this period")
@@ -65,8 +64,22 @@ class PptxGenerationService:
                 status="pending",
             ))
 
-        background_tasks.add_task(self.run_batch, period_id)
         return len(lessons)
+
+    def start_batch(
+        self,
+        period_id: str,
+        background_tasks: BackgroundTasks,
+        lessons: list[dict[str, Any]],
+    ) -> int:
+        """Create LessonPptx records and schedule background generation.
+
+        Raises ValidationError if generation is already running or completed.
+        Returns the number of lessons queued.
+        """
+        count = self.prepare_batch(period_id, lessons)
+        background_tasks.add_task(self.run_batch, period_id)
+        return count
 
     def run_batch(self, period_id: str) -> None:
         """Sync entry point for BackgroundTasks. Reads state then drives the async batch."""

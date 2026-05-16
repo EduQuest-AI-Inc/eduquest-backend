@@ -24,3 +24,6 @@ class ConceptDAO(SupabaseBaseDAO):
 
     def update_concept(self, period_id: str, concept_name: str, fields: dict[str, Any]) -> None:
         self._update({'period_id': period_id, 'concept_name': concept_name}, fields)
+
+    def delete_all_for_period(self, period_id: str) -> None:
+        self._delete({'period_id': period_id})

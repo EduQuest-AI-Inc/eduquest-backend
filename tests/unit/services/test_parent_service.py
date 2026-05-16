@@ -38,7 +38,7 @@ def test_get_linked_students_empty():
 def test_get_linked_students_success():
     svc = _svc()
     svc.parent_dao.get_linked_student_ids.return_value = ["s1", "s2"]
-    svc.student_dao.get_student_by_id.side_effect = [
+    svc.student_dao.get_students_by_ids.return_value = [
         {"first_name": "Alice", "last_name": "A", "grade": "10", "email": "a@eduquestai.org"},
         {"first_name": "Bob", "last_name": "B", "grade": "11", "email": "b@eduquestai.org"},
     ]

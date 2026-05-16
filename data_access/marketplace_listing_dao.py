@@ -1,7 +1,6 @@
 from typing import Any, Optional
 
 from data_access.base_dao import SupabaseBaseDAO
-from exceptions.validation_error import ValidationError
 from models.marketplace_listing import MarketplaceListing
 
 

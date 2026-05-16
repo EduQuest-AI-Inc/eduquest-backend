@@ -73,6 +73,10 @@ class BotProvider:
         from bots.quests.curriculum_only_quest_agent import CurriculumOnlyQuestAgent
         return CurriculumOnlyQuestAgent(period=period, schedule=schedule)
 
+    def create_coverage_evaluator(self):
+        from bots.curriculum.coverage_evaluator import CoverageEvaluator
+        return CoverageEvaluator()
+
     def create_pptx_agent(self):
         from bots.slideshow.pptx_agent import PptxAgent
         return PptxAgent()
@@ -238,6 +242,10 @@ class MockBotProvider(BotProvider):
     def create_curriculum_only_quest_agent(self, period: dict, schedule: list):
         from bots._mocks import MockCurriculumOnlyQuestAgent
         return MockCurriculumOnlyQuestAgent(period=period, schedule=schedule)
+
+    def create_coverage_evaluator(self):
+        from bots._mocks import MockCoverageEvaluator
+        return MockCoverageEvaluator()
 
     def create_pptx_agent(self):
         from bots._mocks import MockPptxAgent

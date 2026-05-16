@@ -362,6 +362,14 @@ class MockCurriculumAgent:
         return self.run().model_dump()
 
 
+class MockCoverageEvaluator:
+    """Fast replacement for CoverageEvaluator — always reports sufficient coverage."""
+
+    def evaluate(self, course_name, course_description, has_files, grade_level=None):
+        from bots.curriculum.coverage_evaluator import CoverageResult
+        return CoverageResult(sufficient=True, gaps=[], research_queries=[])
+
+
 class MockConversationsSession:
     """Duck-typed stand-in for agents.OpenAIConversationsSession."""
 
