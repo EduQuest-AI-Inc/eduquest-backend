@@ -26,6 +26,7 @@ from services.billing.membership_service import (
     PlanLimitExceededError,
 )
 from services.period.period_file_service import PeriodFileService
+from services.period.period_summer_quest_service import run_summer_quest_background_task as _run_summer_quest_generation
 from models.period import CourseMetadata
 from services.curriculum.curriculum_service import CurriculumService
 from services.period.period_management_service import PeriodManagementService
@@ -479,21 +480,6 @@ def update_fork_metadata(
 
 
 # ─── Summer side quests ───────────────────────────────────────────────────────
-
-
-def _run_summer_quest_generation(
-    period_id: str,
-    owner_id: str,
-    bot_provider: BotProviderProtocol,
-) -> None:
-    from services.period.period_summer_quest_service import PeriodSummerQuestService
-    try:
-        service = PeriodSummerQuestService(bot_provider=bot_provider)
-        service.generate_summer_quests(owner_id=owner_id, period_id=period_id)
-    except Exception as exc:
-        logger.error(
-            "Summer quest generation failed for period %s: %s", period_id, exc, exc_info=True
-        )
 
 
 @router.post("/period/{period_id}/summer-quests/generate", status_code=202)

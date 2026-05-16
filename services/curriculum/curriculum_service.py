@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import logging
 import time
 from datetime import date
@@ -64,14 +65,17 @@ class CurriculumService:
 
     def get_curriculum(self, period_id: str, period: dict | None = None) -> dict[str, Any]:
         period = period or self._get_period_or_raise(period_id)
-        return {
-            "period_status": period["status"],
-            "weeks": self.week_dao.get_weeks_by_period(period_id),
-            "lessons": self.lesson_dao.get_lessons_by_period(period_id),
-            "concepts": self.concept_dao.get_concepts_by_period(period_id),
-            "skills": self.skill_dao.get_skills_by_period(period_id),
-            "concept_skills": self.concept_skill_dao.get_all_for_period(period_id),
+        fetchers = {
+            "weeks": lambda: self.week_dao.get_weeks_by_period(period_id),
+            "lessons": lambda: self.lesson_dao.get_lessons_by_period(period_id),
+            "concepts": lambda: self.concept_dao.get_concepts_by_period(period_id),
+            "skills": lambda: self.skill_dao.get_skills_by_period(period_id),
+            "concept_skills": lambda: self.concept_skill_dao.get_all_for_period(period_id),
         }
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {key: executor.submit(fn) for key, fn in fetchers.items()}
+            results = {key: fut.result() for key, fut in futures.items()}
+        return {"period_status": period["status"], **results}
 
     def save_curriculum(self, period_id: str, payload: dict[str, Any], period: dict | None = None) -> None:
         if period is None:

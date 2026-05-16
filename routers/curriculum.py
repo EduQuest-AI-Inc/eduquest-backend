@@ -1,3 +1,4 @@
+import concurrent.futures
 import logging
 from typing import Any, Optional
 
@@ -8,6 +9,7 @@ from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_peri
 from bots.protocol import BotProviderProtocol
 from services.curriculum.curriculum_service import CurriculumService
 from services.enrollment.enrollment_service import EnrollmentService
+from services.period.period_summer_quest_service import run_summer_quest_background_task as _run_summer_quest_generation
 from services.slides.pptx_generation_service import PptxGenerationService
 from exceptions.not_found_error import NotFoundError
 from exceptions.validation_error import ValidationError
@@ -95,6 +97,29 @@ class _SkillEditPayload(BaseModel):
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+def _run_slides_and_quests_parallel(
+    slides_svc: PptxGenerationService,
+    period_id: str,
+    owner_id: str,
+    bot_provider: BotProviderProtocol,
+) -> None:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(slides_svc.run_batch, period_id),
+            executor.submit(
+                _run_summer_quest_generation,
+                period_id=period_id,
+                owner_id=owner_id,
+                bot_provider=bot_provider,
+            ),
+        ]
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                future.result()
+            except Exception as exc:
+                logger.error("Parallel generation task failed: %s", exc, exc_info=True)
+
+
 def _assert_period_owner(period: dict, user_id: str) -> None:
     if period["owner_id"] != user_id:
         logger.warning(
@@ -136,20 +161,6 @@ def _membership_or_summer(
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _run_summer_quest_generation(
-    period_id: str,
-    owner_id: str,
-    bot_provider: BotProviderProtocol,
-) -> None:
-    from services.period.period_summer_quest_service import PeriodSummerQuestService
-    try:
-        service = PeriodSummerQuestService(bot_provider=bot_provider)
-        service.generate_summer_quests(owner_id=owner_id, period_id=period_id)
-    except Exception as exc:
-        logger.error(
-            "Summer quest generation failed for period %s: %s", period_id, exc, exc_info=True
-        )
-
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
@@ -169,6 +180,22 @@ def trigger_generation(
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     return {"message": "Curriculum generation started"}
+
+
+@router.get("/{period_id}/status")
+def get_curriculum_status(
+    period_id: str,
+    auth: AuthPayload = Depends(_membership_or_summer),
+    period: dict = Depends(get_period),
+):
+    if auth.role == Role.STUDENT:
+        if period.get("is_summer_quest") and period.get("owner_id") == auth.sub:
+            pass
+        else:
+            _assert_student_enrolled(period_id, auth.sub)
+    else:
+        _assert_period_owner(period, auth.sub)
+    return {"period_status": period["status"]}
 
 
 @router.get("/{period_id}")
@@ -258,16 +285,19 @@ def approve_period(
     _assert_period_owner(period, auth.sub)
     try:
         lessons = svc.approve_period(period_id, period=period)
-        slides_svc.start_batch(period_id, background_tasks, lessons)
+        if period.get("is_summer_quest"):
+            slides_svc.prepare_batch(period_id, lessons)
+            background_tasks.add_task(
+                _run_slides_and_quests_parallel,
+                slides_svc=slides_svc,
+                period_id=period_id,
+                owner_id=auth.sub,
+                bot_provider=bot_provider,
+            )
+        else:
+            slides_svc.start_batch(period_id, background_tasks, lessons)
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    if period.get("is_summer_quest"):
-        background_tasks.add_task(
-            _run_summer_quest_generation,
-            period_id=period_id,
-            owner_id=auth.sub,
-            bot_provider=bot_provider,
-        )
     return {"total_lessons": len(lessons)}
