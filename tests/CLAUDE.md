@@ -24,8 +24,7 @@ tests/
 │   │   ├── auth/, billing/, conversation/, curriculum/,
 │   │   ├── knowledge_graph/, period/, quest/, slides/
 │   └── slides/         # Slides generation service tests
-├── integration/        # Full-stack integration tests (requires live Supabase)
-└── scripts/            # Curriculum and schedule pipeline test scripts
+└── integration/        # Full-stack integration tests (requires live Supabase)
 ```
 
 ## Running Tests
