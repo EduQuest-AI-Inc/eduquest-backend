@@ -23,6 +23,7 @@ from typing import Dict, Any, Optional
 import asyncio
 from bots.schemas.rubric import Rubric
 from bots.schemas.instructions import Instructions
+from bots.model_config import QUEST_INSTRUCTION_MODEL, QUEST_RUBRIC_MODEL
 import re
 
 
@@ -111,7 +112,7 @@ class HWAgent:
                 - No escape sequences (no \\n, \\r, \\t)
                 - No numbered prefixes in the text (the step number is stored separately)
                 """,
-                model="gpt-5.5",
+                model=QUEST_INSTRUCTION_MODEL,
                 output_type=Instructions,
             )
 
@@ -158,7 +159,7 @@ class HWAgent:
                 Make each criterion's scoring descriptions specific to what you're evaluating in that area.
                 Each score level should clearly describe what performance looks like for that criterion at that level.
                 """,
-                model="gpt-5.5",
+                model=QUEST_RUBRIC_MODEL,
                 output_type=Rubric
             )
             

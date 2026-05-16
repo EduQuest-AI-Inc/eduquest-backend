@@ -3,7 +3,7 @@ from enum import Enum
 from typing import FrozenSet, Optional
 
 import jwt
-from fastapi import Cookie, Depends, Header, HTTPException, Request
+from fastapi import Cookie, Depends, Header, HTTPException, Path, Request
 
 JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret")
 JWT_ALGORITHM = "HS256"
@@ -109,6 +109,14 @@ def get_bot_provider(request: Request):
     """FastAPI dependency — reads the provider initialised in main.py lifespan."""
     from bots.protocol import BotProviderProtocol  # noqa: F401
     return request.app.state.bot_provider
+
+
+def get_period(period_id: str = Path(...)) -> dict:
+    from data_access.period_dao import PeriodDAO
+    period = PeriodDAO().get_period_by_id(period_id)
+    if not period:
+        raise HTTPException(status_code=404, detail=f"Period '{period_id}' not found")
+    return period
 
 
 def require_student_viewer(student_id_param: str = "user_id"):

@@ -19,6 +19,7 @@ class TeacherFeedbackConversationService:
 
     def __init__(self, conversation_id: Optional[str] = None, *, bot_provider: BotProviderProtocol) -> None:
         self._bot_provider = bot_provider
+        self.conversation_id = conversation_id
         self.agent = bot_provider.create_teacher_feedback_agent()
         self.session = bot_provider.make_conversations_session(conversation_id)
 
@@ -60,18 +61,28 @@ class TeacherFeedbackConversationService:
             f"Here is their quest data:\n{quests_summary}\n"
             f"What have you noticed about this student?"
         )
+        conversation_id = getattr(self, "conversation_id", None)
 
         result = await self._bot_provider.run_conversation(
             self.agent,
             initial_message,
             session=self.session,
+            trace_workflow_name="teacher_feedback_conversation",
+            trace_group_id=conversation_id,
+            trace_metadata={
+                "conversation_type": "teacher_feedback",
+                "phase": "initiate",
+                "has_existing_conversation_id": bool(conversation_id),
+                "has_student_name": bool(student_name),
+                "has_quest_summary": bool(quests_summary),
+            },
         )
 
         response = result.final_output
-        conversation_id = await self._extract_conversation_id()
+        extracted_conversation_id = await self._extract_conversation_id()
 
         return {
-            "conversation_id": conversation_id,
+            "conversation_id": extracted_conversation_id,
             "response": response.response,
             "suggested_change": response.suggested_change,
         }
@@ -82,6 +93,13 @@ class TeacherFeedbackConversationService:
             self.agent,
             user_message,
             session=self.session,
+            trace_workflow_name="teacher_feedback_conversation",
+            trace_group_id=getattr(self, "conversation_id", None),
+            trace_metadata={
+                "conversation_type": "teacher_feedback",
+                "phase": "continue",
+                "has_existing_conversation_id": bool(getattr(self, "conversation_id", None)),
+            },
         )
 
         response = result.final_output

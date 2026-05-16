@@ -120,16 +120,27 @@ class PeriodManagementService:
             raise NotFoundError("Period not found")
         return period['vector_store_id']
 
-    def delete_period(self, period_id: str, user_id: str) -> None:
-        period = self.period_dao.get_period_by_id(period_id)
+    def delete_period(self, period_id: str, user_id: str, period: dict | None = None) -> None:
+        period = period or self.period_dao.get_period_by_id(period_id)
         if not period:
             raise NotFoundError("Period not found")
         if period.get("owner_id") != user_id:
             raise PermissionError("Not authorized to delete this period")
-        vector_store_id = period.get("vector_store_id")
-        if vector_store_id:
-            openai_vector_store.delete_store(vector_store_id)
-        file_keys = [u for u in (period.get("file_urls") or []) if not u.startswith("local/")]
-        if file_keys:
-            delete_files_from_s3(file_keys)
+        is_fork = bool(period.get("forked_from_period_id"))
+        if is_fork:
+            # Assets belong to the original class — never delete them from a fork
+            pass
+        else:
+            # Block deletion if any forks still reference this class
+            if self.period_dao.get_forks_by_period(period_id):
+                raise ValidationError(
+                    "Cannot delete a class that has active forks in the marketplace. "
+                    "Unpublish the marketplace listing first, then ask fork owners to delete their copies."
+                )
+            vector_store_id = period.get("vector_store_id")
+            if vector_store_id:
+                openai_vector_store.delete_store(vector_store_id)
+            file_keys = [u for u in (period.get("file_urls") or []) if not u.startswith("local/")]
+            if file_keys:
+                delete_files_from_s3(file_keys)
         self.period_dao.delete_period(period_id)

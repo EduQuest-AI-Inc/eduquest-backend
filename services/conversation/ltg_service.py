@@ -29,6 +29,7 @@ class LTGConversationService:
     def __init__(self, vector_store_id: str, curriculum: dict, previous_response_id: Optional[str] = None, *, bot_provider: BotProviderProtocol) -> None:
         self._bot_provider = bot_provider
         self.vector_store_id = vector_store_id
+        self.has_curriculum = bool(curriculum)
         self.previous_response_id = previous_response_id
         self.agent = bot_provider.create_ltg_agent(vector_store_id, curriculum)
 
@@ -52,7 +53,20 @@ class LTGConversationService:
             f"that incorporate what I'll learn in this class."
         )
 
-        result = await self._bot_provider.run_conversation(self.agent, initial_message)
+        result = await self._bot_provider.run_conversation(
+            self.agent,
+            initial_message,
+            trace_workflow_name="ltg_conversation",
+            trace_group_id=getattr(self, "vector_store_id", None),
+            trace_metadata={
+                "conversation_type": "ltg",
+                "phase": "initiate",
+                "has_vector_store": bool(getattr(self, "vector_store_id", None)),
+                "has_curriculum": bool(getattr(self, "has_curriculum", False)),
+                "has_grade": bool(grade),
+                "has_previous_response_id": False,
+            },
+        )
 
         response = result.final_output
 
@@ -71,6 +85,15 @@ class LTGConversationService:
             self.agent,
             user_message,
             previous_response_id=self.previous_response_id,
+            trace_workflow_name="ltg_conversation",
+            trace_group_id=self.previous_response_id or getattr(self, "vector_store_id", None),
+            trace_metadata={
+                "conversation_type": "ltg",
+                "phase": "continue",
+                "has_vector_store": bool(getattr(self, "vector_store_id", None)),
+                "has_curriculum": bool(getattr(self, "has_curriculum", False)),
+                "has_previous_response_id": bool(self.previous_response_id),
+            },
         )
 
         response = result.final_output

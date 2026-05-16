@@ -207,7 +207,7 @@ class MockCurriculumOnlyQuestAgent:
 class MockGradingOrchestrator:
     """Fast replacement for GradingOrchestrator."""
 
-    async def grade_submission(self, grading_input: Any) -> Any:
+    async def grade_submission(self, grading_input: Any, **kwargs) -> Any:
         from bots.grading_agent import GradingResult
 
         skill_mastery = {skill: 0.75 for skill in (grading_input.skills or ["general"])}
@@ -360,6 +360,14 @@ class MockCurriculumAgent:
 
     async def run_and_get_json_async(self) -> dict:
         return self.run().model_dump()
+
+
+class MockCoverageEvaluator:
+    """Fast replacement for CoverageEvaluator — always reports sufficient coverage."""
+
+    def evaluate(self, course_name, course_description, has_files, grade_level=None):
+        from bots.curriculum.coverage_evaluator import CoverageResult
+        return CoverageResult(sufficient=True, gaps=[], research_queries=[])
 
 
 class MockConversationsSession:

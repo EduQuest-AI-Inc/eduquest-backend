@@ -73,6 +73,10 @@ class BotProvider:
         from bots.quests.curriculum_only_quest_agent import CurriculumOnlyQuestAgent
         return CurriculumOnlyQuestAgent(period=period, schedule=schedule)
 
+    def create_coverage_evaluator(self):
+        from bots.curriculum.coverage_evaluator import CoverageEvaluator
+        return CoverageEvaluator()
+
     def create_pptx_agent(self):
         from bots.slideshow.pptx_agent import PptxAgent
         return PptxAgent()
@@ -80,7 +84,11 @@ class BotProvider:
     async def grade_submission(self, quest_data: dict, submission_text: str) -> dict:
         grading_input = self._build_grading_input(quest_data, submission_text)
         orchestrator = self.create_grading_orchestrator()
-        result = await orchestrator.grade_submission(grading_input)
+        result = await orchestrator.grade_submission(
+            grading_input,
+            trace_group_id=quest_data.get("individual_quest_id") or quest_data.get("quest_id"),
+            trace_metadata=self._build_grading_trace_metadata(quest_data, grading_input),
+        )
         return self._format_grading_result(result)
 
     @staticmethod
@@ -131,8 +139,38 @@ class BotProvider:
             ),
         }
 
-    async def run_conversation(self, agent, message: str, **kwargs):
+    @staticmethod
+    def _build_grading_trace_metadata(quest_data: dict, grading_input) -> dict:
+        rubric = grading_input.rubric
+        return {
+            "skill_count": len(grading_input.skills),
+            "rubric_type": type(rubric).__name__,
+            "rubric_key_count": len(rubric) if isinstance(rubric, dict) else 0,
+            "submission_text_len": len(grading_input.submission),
+            "has_quest_id": bool(quest_data.get("quest_id")),
+            "has_individual_quest_id": bool(quest_data.get("individual_quest_id")),
+        }
+
+    async def run_conversation(
+        self,
+        agent,
+        message: str,
+        *,
+        trace_workflow_name: Optional[str] = None,
+        trace_group_id: Optional[str] = None,
+        trace_metadata: Optional[dict] = None,
+        **kwargs,
+    ):
         from agents import Runner
+        from bots.tracing import build_trace_run_config
+
+        if trace_workflow_name or trace_group_id or trace_metadata:
+            kwargs["run_config"] = build_trace_run_config(
+                kwargs.get("run_config"),
+                workflow_name=trace_workflow_name,
+                group_id=trace_group_id,
+                metadata=trace_metadata,
+            )
         return await Runner.run(agent, message, **kwargs)
 
     def make_conversations_session(self, conversation_id=None):
@@ -205,11 +243,24 @@ class MockBotProvider(BotProvider):
         from bots._mocks import MockCurriculumOnlyQuestAgent
         return MockCurriculumOnlyQuestAgent(period=period, schedule=schedule)
 
+    def create_coverage_evaluator(self):
+        from bots._mocks import MockCoverageEvaluator
+        return MockCoverageEvaluator()
+
     def create_pptx_agent(self):
         from bots._mocks import MockPptxAgent
         return MockPptxAgent()
 
-    async def run_conversation(self, agent, message: str, **kwargs):
+    async def run_conversation(
+        self,
+        agent,
+        message: str,
+        *,
+        trace_workflow_name: Optional[str] = None,
+        trace_group_id: Optional[str] = None,
+        trace_metadata: Optional[dict] = None,
+        **kwargs,
+    ):
         from bots._mocks import MockRunner
         return await MockRunner.run(agent, message, **kwargs)
 

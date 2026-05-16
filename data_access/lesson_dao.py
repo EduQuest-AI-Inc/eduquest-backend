@@ -20,3 +20,6 @@ class LessonDAO(SupabaseBaseDAO):
 
     def update_lesson(self, lesson_id: str, fields: dict[str, Any]) -> None:
         self._update({'lesson_id': lesson_id}, fields)
+
+    def delete_all_for_period(self, period_id: str) -> None:
+        self._delete({'period_id': period_id})

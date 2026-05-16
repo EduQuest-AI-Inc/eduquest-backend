@@ -26,6 +26,7 @@ class PeriodDAO(SupabaseBaseDAO):
             'processing_status': getattr(period, 'processing_status', 'pending'),
             'status': getattr(period, 'status', 'pending'),
             'is_summer_quest': getattr(period, 'is_summer_quest', False),
+            'forked_from_period_id': getattr(period, 'forked_from_period_id', None),
         })
 
     def get_period_by_id(self, period_id: str) -> Optional[dict]:
@@ -50,6 +51,9 @@ class PeriodDAO(SupabaseBaseDAO):
 
     def get_periods_by_owner_id(self, owner_id: str) -> List:
         return self._select_eq('owner_id', owner_id)
+
+    def get_forks_by_period(self, original_period_id: str) -> List[dict]:
+        return self._select_eq('forked_from_period_id', original_period_id)
 
     def update_status(self, period_id: str, status: str) -> None:
         self._update({'period_id': period_id}, {'status': status})

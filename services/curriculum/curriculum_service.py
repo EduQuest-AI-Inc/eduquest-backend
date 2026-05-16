@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import logging
 import time
 from datetime import date
@@ -6,7 +7,6 @@ from typing import Any
 
 from fastapi import BackgroundTasks
 
-from bots.curriculum.coverage_evaluator import CoverageEvaluator
 from bots.protocol import BotProviderProtocol
 from data_access.concept_dao import ConceptDAO
 from data_access.concept_skill_dao import ConceptSkillDAO
@@ -15,6 +15,7 @@ from data_access.period_dao import PeriodDAO
 from data_access.skill_dao import SkillDAO
 from data_access.week_dao import WeekDAO
 from exceptions.not_found_error import NotFoundError
+from exceptions.permission_error import PermissionError
 from exceptions.validation_error import ValidationError
 from integrations.perplexity_service import PerplexityService
 from models.concept import Concept
@@ -39,6 +40,7 @@ class CurriculumService:
         concept_dao=None,
         skill_dao=None,
         concept_skill_dao=None,
+        perplexity_service=None,
     ) -> None:
         self._bot_provider = bot_provider
         self.period_dao = period_dao or PeriodDAO()
@@ -47,10 +49,12 @@ class CurriculumService:
         self.concept_dao = concept_dao or ConceptDAO()
         self.skill_dao = skill_dao or SkillDAO()
         self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO()
+        self._perplexity_service = perplexity_service
 
     # ── public API ────────────────────────────────────────────────────────────
 
     def trigger_generation(self, period_id: str, background_tasks: BackgroundTasks) -> None:
+        self._check_not_fork(period_id)
         period = self._get_period_or_raise(period_id)
         if period.get("status", "pending") not in {"pending", "failed"}:
             raise ValidationError(
@@ -59,34 +63,45 @@ class CurriculumService:
         self.period_dao.update_status(period_id, "generating")
         background_tasks.add_task(self._run_generation, period_id)
 
-    def get_curriculum(self, period_id: str) -> dict[str, Any]:
-        period = self._get_period_or_raise(period_id)
-        return {
-            "period_status": period["status"],
-            "weeks": self.week_dao.get_weeks_by_period(period_id),
-            "lessons": self.lesson_dao.get_lessons_by_period(period_id),
-            "concepts": self.concept_dao.get_concepts_by_period(period_id),
-            "skills": self.skill_dao.get_skills_by_period(period_id),
-            "concept_skills": self.concept_skill_dao.get_all_for_period(period_id),
+    def get_curriculum(self, period_id: str, period: dict | None = None) -> dict[str, Any]:
+        period = period or self._get_period_or_raise(period_id)
+        fetchers = {
+            "weeks": lambda: self.week_dao.get_weeks_by_period(period_id),
+            "lessons": lambda: self.lesson_dao.get_lessons_by_period(period_id),
+            "concepts": lambda: self.concept_dao.get_concepts_by_period(period_id),
+            "skills": lambda: self.skill_dao.get_skills_by_period(period_id),
+            "concept_skills": lambda: self.concept_skill_dao.get_all_for_period(period_id),
         }
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {key: executor.submit(fn) for key, fn in fetchers.items()}
+            results = {key: fut.result() for key, fut in futures.items()}
+        return {"period_status": period["status"], **results}
 
-    def save_curriculum(self, period_id: str, payload: dict[str, Any]) -> None:
-        self._get_period_or_raise(period_id)
+    def save_curriculum(self, period_id: str, payload: dict[str, Any], period: dict | None = None) -> None:
+        if period is None:
+            self._check_not_fork(period_id)
+            self._get_period_or_raise(period_id)
         self._bulk_replace(period_id, payload)
 
-    def update_concept(self, period_id: str, concept_name: str, fields: dict[str, Any]) -> None:
-        self._get_period_or_raise(period_id)
+    def update_concept(self, period_id: str, concept_name: str, fields: dict[str, Any], period: dict | None = None) -> None:
+        if period is None:
+            self._check_not_fork(period_id)
+            self._get_period_or_raise(period_id)
         existing = self.concept_dao.get_concept(period_id, concept_name)
         if not existing:
             raise NotFoundError(f"Concept '{concept_name}' not found in period '{period_id}'")
         self.concept_dao.update_concept(period_id, concept_name, fields)
 
-    def update_skill(self, period_id: str, skill_name: str, fields: dict[str, Any]) -> None:
-        self._get_period_or_raise(period_id)
+    def update_skill(self, period_id: str, skill_name: str, fields: dict[str, Any], period: dict | None = None) -> None:
+        if period is None:
+            self._check_not_fork(period_id)
+            self._get_period_or_raise(period_id)
         self.skill_dao.update_skill(period_id, skill_name, fields)
 
-    def approve_period(self, period_id: str) -> list[dict[str, Any]]:
-        period = self._get_period_or_raise(period_id)
+    def approve_period(self, period_id: str, period: dict | None = None) -> list[dict[str, Any]]:
+        if period is None:
+            self._check_not_fork(period_id)
+        period = period or self._get_period_or_raise(period_id)
         if period["status"] != "draft":
             raise ValidationError(
                 f"Cannot approve: period status is '{period['status']}', must be 'draft'"
@@ -102,6 +117,11 @@ class CurriculumService:
         if not period:
             raise NotFoundError(f"Period '{period_id}' not found")
         return period
+
+    def _check_not_fork(self, period_id: str) -> None:
+        period = self._get_period_or_raise(period_id)
+        if period.get("forked_from_period_id"):
+            raise PermissionError("Curriculum cannot be modified on a forked class")
 
     def _run_generation(self, period_id: str) -> None:
         t0 = time.monotonic()
@@ -128,7 +148,7 @@ class CurriculumService:
 
             if not vector_store_ids:
                 try:
-                    coverage = CoverageEvaluator().evaluate(
+                    coverage = self._bot_provider.create_coverage_evaluator().evaluate(
                         course_name=period.get("name") or "",
                         course_description=course_description,
                         has_files=False,
@@ -136,8 +156,9 @@ class CurriculumService:
                     )
                     if not coverage.sufficient and coverage.research_queries:
                         queries = coverage.research_queries[:3]
+                        perplexity_svc = self._perplexity_service or PerplexityService()
                         research_context = asyncio.run(
-                            PerplexityService().research(queries, max_steps=5)
+                            perplexity_svc.research(queries, max_steps=5)
                         )
                 except Exception as e:
                     logger.warning(
@@ -292,7 +313,7 @@ class CurriculumService:
     def _delete_all(self, period_id: str) -> None:
         """Delete all curriculum rows for a period in dependency order."""
         self.concept_skill_dao.delete_all_for_period(period_id)
-        self.concept_dao._delete({'period_id': period_id})
-        self.skill_dao._delete({'period_id': period_id})
-        self.lesson_dao._delete({'period_id': period_id})
+        self.concept_dao.delete_all_for_period(period_id)
+        self.skill_dao.delete_all_for_period(period_id)
+        self.lesson_dao.delete_all_for_period(period_id)
         self.week_dao.delete_weeks_by_period(period_id)

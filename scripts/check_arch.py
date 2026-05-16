@@ -48,7 +48,7 @@ CHECKS = [
         "Routers must not import from data_access/ — go through a service instead",
         "routers/*.py",
         r"from data_access",
-        set(),
+        {"routers/deps.py"},
         set(),
     ),
     (

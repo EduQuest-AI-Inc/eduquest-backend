@@ -1,9 +1,10 @@
 """
 Visual Review Agent
 
-Uses GPT-4o vision to review generated images (from Nano Banana or the chart
-generator) before they are placed on slides. Returns an approval decision,
-feedback, and - when the image should be regenerated - an improved prompt.
+Uses a vision-capable OpenAI model to review generated images (from Nano Banana
+or the chart generator) before they are placed on slides. Returns an approval
+decision, feedback, and - when the image should be regenerated - an improved
+prompt.
 
 Uses the raw OpenAI client directly (not the openai-agents SDK) because we
 need to pass base64 image content in the message, which is simpler with the
@@ -21,6 +22,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import ValidationError
 
+from bots.model_config import SLIDE_VISUAL_REVIEW_MODEL
 from models.slide_plan import VisualReviewResult
 
 load_dotenv()
@@ -97,11 +99,11 @@ class VisualReviewAgent:
         span_data: dict[str, str] = {
             "slide_title": slide_title,
             "grade_level": grade_level,
-            "model": "gpt-5.5",
+            "model": SLIDE_VISUAL_REVIEW_MODEL,
         }
         with custom_span("visual_review", data=span_data):
             response = self._client.chat.completions.create(
-                model="gpt-5.5",
+                model=SLIDE_VISUAL_REVIEW_MODEL,
                 messages=[
                     {"role": "system", "content": _SYSTEM_PROMPT},
                     user_message,

@@ -21,6 +21,7 @@ class StudentDAO(SupabaseBaseDAO):
             'password': student.password,
             'phone_number': getattr(student, 'phone_number', None),
             'role': 'student',
+            'login_disabled': getattr(student, 'login_disabled', False),
         })
         try:
             self._insert({
@@ -32,6 +33,9 @@ class StudentDAO(SupabaseBaseDAO):
                 'learning_style': getattr(student, 'learning_style', None),
                 'completed_tutorial': getattr(student, 'completed_tutorial', False),
                 'school_name': getattr(student, 'school_name', None),
+                'account_status': getattr(student, 'account_status', 'active'),
+                'created_by_parent_id': getattr(student, 'created_by_parent_id', None),
+                'claimed_at': getattr(student, 'claimed_at', None),
             })
         except Exception:
             self._user_dao.delete(student.user_id)
@@ -39,6 +43,22 @@ class StudentDAO(SupabaseBaseDAO):
 
     def get_student_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         return self._join_user('user_id', user_id)
+
+    def get_students_by_ids(self, user_ids: list) -> list:
+        if not user_ids:
+            return []
+        response = self._execute(
+            self.client.table(self.table_name)
+            .select('*, user!inner(*)')
+            .in_('user_id', user_ids)
+        )
+        results = []
+        for row in (response.data or []):
+            row = dict(row)
+            user_data = row.pop('user', {})
+            row.update(user_data)
+            results.append(row)
+        return results
 
     def get_student_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         user = self._user_dao.get_by_email(email)

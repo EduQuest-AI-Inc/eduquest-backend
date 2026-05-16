@@ -3,20 +3,19 @@
 Manual integration test for the schedule generation pipeline:
   CoverageEvaluator → PerplexityService (deep-research) → PeriodScheduleAgent
 
-This is a standalone script — NOT collected by pytest (conftest mocks would
-break the real OpenAI/Perplexity calls). Run directly:
+Run directly from the repo root:
 
     cd eduquest-backend
     source venv/bin/activate
-    python tests/scripts/test_schedule_pipeline.py
+    python scripts/schedule_pipeline.py
 
     # To skip the live OpenAI schedule agent call (steps 1 & 2 still run live):
-    MOCK_AI=true python tests/scripts/test_schedule_pipeline.py
+    MOCK_AI=true python scripts/schedule_pipeline.py
 
     # Tweak these constants below to test different courses / descriptions.
 
 Requirements:
-    OPENAI_API_KEY     — for CoverageEvaluator (gpt-4o-mini)
+    OPENAI_API_KEY     — for CoverageEvaluator (see bots/model_config.py)
     PERPLEXITY_API_KEY — for PerplexityService (deep-research preset)
 """
 import asyncio

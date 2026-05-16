@@ -8,18 +8,17 @@ Manual integration test for the full curriculum creation pipeline:
   Stage 4: Quest entry building — simulate teacher selecting quest-enabled weeks
   Stage 5: HWAgent              — generate per-student quests (instructions + rubric)
 
-This is a standalone script — NOT collected by pytest (conftest mocks would
-break the real OpenAI/Perplexity calls). Run directly:
+Run directly from the repo root:
 
     cd eduquest-backend
     source venv/bin/activate
-    python tests/scripts/test_curriculum_pipeline.py
+    python scripts/curriculum_pipeline.py
 
     # Fast mode — mocks OpenAI schedule + HW agent; Perplexity still runs live:
-    MOCK_AI=true python tests/scripts/test_curriculum_pipeline.py
+    MOCK_AI=true python scripts/curriculum_pipeline.py
 
 Requirements:
-    OPENAI_API_KEY     — for CoverageEvaluator (gpt-4o-mini) and HWAgent
+    OPENAI_API_KEY     — for CoverageEvaluator and HWAgent (see bots/model_config.py)
     PERPLEXITY_API_KEY — for PerplexityService (deep-research preset)
 """
 import asyncio

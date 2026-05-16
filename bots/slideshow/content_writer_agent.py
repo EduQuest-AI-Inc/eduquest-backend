@@ -17,6 +17,7 @@ from agents import Agent, Runner
 from dotenv import load_dotenv
 
 from models.slide_plan import SlideContent
+from bots.model_config import SLIDE_CONTENT_WRITER_MODEL
 
 load_dotenv()
 
@@ -58,7 +59,7 @@ class ContentWriterAgent:
         self.agent = Agent(
             name="Slide Copywriter",
             instructions=_INSTRUCTIONS,
-            model="gpt-5.4-mini",
+            model=SLIDE_CONTENT_WRITER_MODEL,
             output_type=SlideContent,
         )
 
