@@ -163,7 +163,7 @@ def trigger_generation(
 ):
     _assert_period_owner(period, auth.sub)
     try:
-        svc.trigger_generation(period_id, background_tasks, period=period)
+        svc.trigger_generation(period_id, background_tasks)
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except NotFoundError as exc:

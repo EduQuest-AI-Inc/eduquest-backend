@@ -106,7 +106,7 @@ class ParentService:
         self.student_dao.add_student(student)
 
         parent = self.parent_dao.get_parent_by_id(parent_id)
-        linked_ids = list(parent.get("linked_student_ids") or [])
+        linked_ids = list((parent or {}).get("linked_student_ids") or [])
         linked_ids.append(student_id)
         try:
             self.parent_dao.update_parent(parent_id, {"linked_student_ids": linked_ids})
