@@ -25,17 +25,28 @@ def _friday_of_week(start: date, week_num: int) -> date:
 
 class PeriodQuestService:
 
-    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+    def __init__(
+        self,
+        *,
+        bot_provider: BotProviderProtocol,
+        period_dao=None,
+        student_dao=None,
+        enrollment_dao=None,
+        curriculum_service=None,
+        ltg_conversation_dao=None,
+        ltg_goal_dao=None,
+        quest_service=None,
+    ) -> None:
         self._bot_provider = bot_provider
-        self.period_dao = PeriodDAO()
-        self.student_dao = StudentDAO()
-        self.enrollment_dao = EnrollmentDAO()
-        self.curriculum_service = CurriculumService(bot_provider=bot_provider)
-        self.ltg_conversation_dao = LtgConversationDAO()
-        self.ltg_goal_dao = StudentLongTermGoalDAO()
-        self.quest_service = QuestService()
+        self.period_dao = period_dao or PeriodDAO()
+        self.student_dao = student_dao or StudentDAO()
+        self.enrollment_dao = enrollment_dao or EnrollmentDAO()
+        self.curriculum_service = curriculum_service or CurriculumService(bot_provider=bot_provider)
+        self.ltg_conversation_dao = ltg_conversation_dao or LtgConversationDAO()
+        self.ltg_goal_dao = ltg_goal_dao or StudentLongTermGoalDAO()
+        self.quest_service = quest_service or QuestService()
 
-    def _assert_enrolled(self, caller_id: str, period_id: str) -> None:
+    def _check_enrolled(self, caller_id: str, period_id: str) -> None:
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
         if not any(e['user_id'] == caller_id for e in enrollments):
             raise ValidationError(f"Student {caller_id} is not enrolled in period {period_id}")
@@ -151,7 +162,9 @@ class PeriodQuestService:
     def update_quests_with_recommended_change(
         self, caller_id: str, caller_role: str, period_id: str, recommended_change: str
     ) -> Dict[str, Any]:
-        self._assert_enrolled(caller_id, period_id)
+        # arch-ok: period_id is resolved from quest data inside ConversationService, not from the
+        # request body, so the router cannot call EnrollmentService.check_enrolled() up front.
+        self._check_enrolled(caller_id, period_id)
 
         student = self.student_dao.get_student_by_id(caller_id)
         if not student:

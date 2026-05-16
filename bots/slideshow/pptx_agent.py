@@ -14,7 +14,7 @@ import os
 
 from agents import custom_span, trace
 
-from bots.slideshow.orchestrator_agent import OrchestratorAgent
+from bots.slideshow.orchestrator_agent import OrchestratorAgent  # arch-ok: intra-bots composition
 from utils.rendering import html_renderer, pptx_renderer
 
 logger = logging.getLogger(__name__)

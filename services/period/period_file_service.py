@@ -10,8 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class PeriodFileService:
-    def __init__(self) -> None:
-        pass
+    def __init__(self, material_files_dao=None) -> None:
+        from data_access.material_files_dao import MaterialFilesDAO
+        self._material_files_dao = material_files_dao or MaterialFilesDAO()
 
     def append_canvas_data(
         self,
@@ -54,9 +55,8 @@ class PeriodFileService:
         Returns list of file-level vector store IDs."""
         import hashlib
         import json
-        from data_access.material_files_dao import MaterialFilesDAO
 
-        dao = MaterialFilesDAO()
+        dao = self._material_files_dao
         file_vs_ids = []
 
         for original_path in file_paths:

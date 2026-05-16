@@ -6,7 +6,6 @@ from typing import Any
 
 from fastapi import BackgroundTasks
 
-from bots.curriculum.coverage_evaluator import CoverageEvaluator
 from bots.protocol import BotProviderProtocol
 from data_access.concept_dao import ConceptDAO
 from data_access.concept_skill_dao import ConceptSkillDAO
@@ -40,6 +39,7 @@ class CurriculumService:
         concept_dao=None,
         skill_dao=None,
         concept_skill_dao=None,
+        perplexity_service=None,
     ) -> None:
         self._bot_provider = bot_provider
         self.period_dao = period_dao or PeriodDAO()
@@ -48,6 +48,7 @@ class CurriculumService:
         self.concept_dao = concept_dao or ConceptDAO()
         self.skill_dao = skill_dao or SkillDAO()
         self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO()
+        self._perplexity_service = perplexity_service
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ class CurriculumService:
 
             if not vector_store_ids:
                 try:
-                    coverage = CoverageEvaluator().evaluate(
+                    coverage = self._bot_provider.create_coverage_evaluator().evaluate(
                         course_name=period.get("name") or "",
                         course_description=course_description,
                         has_files=False,
@@ -151,8 +152,9 @@ class CurriculumService:
                     )
                     if not coverage.sufficient and coverage.research_queries:
                         queries = coverage.research_queries[:3]
+                        perplexity_svc = self._perplexity_service or PerplexityService()
                         research_context = asyncio.run(
-                            PerplexityService().research(queries, max_steps=5)
+                            perplexity_svc.research(queries, max_steps=5)
                         )
                 except Exception as e:
                     logger.warning(

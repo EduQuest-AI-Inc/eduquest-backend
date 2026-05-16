@@ -21,6 +21,8 @@ Role enforcement lives exclusively at the **router layer** via FastAPI `Depends(
 
 Enrollment checks — verifying a user is a member of a specific period — are also an authorization concern, not business logic. They belong at the router layer. Since `period_id` always arrives from the request body, call `EnrollmentService().check_enrolled(user_id, period_id)` at the top of the handler, before any service call. Service methods must not perform enrollment checks.
 
+**Exception:** `PeriodQuestService._check_enrolled` in `services/period/period_quest_service.py`. The `period_id` here is resolved from quest data fetched *inside* `ConversationService` — it is not present in the request body at router time, so the router cannot perform the check up front. The method is marked `# arch-ok` at its call site.
+
 Three roles: `Role.STUDENT`, `Role.TEACHER`, `Role.PARENT` — defined as a `str, Enum` in `api/deps.py` alongside `AuthPayload` and `get_auth()`.
 
 Canonical dependencies (all in `api/deps.py`):
@@ -60,6 +62,8 @@ Individual bot classes (`HWAgent`, `GradingOrchestrator`, `CurriculumAgent`, etc
 A `@function_tool` body must do nothing except call a named public function and return its result. All business logic belongs in that extracted function, which accepts its dependencies as parameters. No module-level instantiation in `bots/tools/` files; use lazy initialisation (`_x: T | None = None`, set on first call) for any singleton that the thin wrapper needs to supply as a default.
 
 This is the agent-layer equivalent of "Routers are HTTP-boundary-only." The extracted function lives in `utils/` if it is pure control flow with injected dependencies, or in a dedicated service if it needs its own DAO/provider wiring.
+
+**`@function_tool` → sub-agent pattern:** `SLIDE_TOOLS` in `bots/tools/` call `ContentWriterAgent` and `VisualReviewAgent` as sub-agents. This is the intended multi-agent design and is **not** a violation of the "individual bot classes never imported outside `bots/provider.py`" rule. The full call chain is `PptxAgent (provider entry point) → OrchestratorAgent → SLIDE_TOOLS (@function_tool) → ContentWriterAgent / VisualReviewAgent`. When `MockBotProvider` is active, `MockPptxAgent` replaces the entire `PptxAgent` entry point, so `OrchestratorAgent` and its `SLIDE_TOOLS` never execute — the mock boundary is correct. Additionally, `bots/slideshow/pptx_agent.py` imports `OrchestratorAgent` directly; this is intra-`bots/` composition between the public entry point and its private implementation detail, not a service-layer violation.
 
 ### Services receive their dependencies — they never instantiate DAOs, services, integration modules, or the bot provider inline
 
