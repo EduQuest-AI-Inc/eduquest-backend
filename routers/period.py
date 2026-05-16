@@ -26,7 +26,7 @@ from services.billing.membership_service import (
     PlanLimitExceededError,
 )
 from services.period.period_file_service import PeriodFileService
-from services.period.period_summer_quest_service import run_summer_quest_background_task as _run_summer_quest_generation
+from services.period.period_summer_quest_service import PeriodSummerQuestService
 from models.period import CourseMetadata
 from services.curriculum.curriculum_service import CurriculumService
 from services.period.period_management_service import PeriodManagementService
@@ -495,12 +495,8 @@ def generate_summer_quests(
     if not period.get("is_summer_quest"):
         raise HTTPException(status_code=400, detail="This endpoint is only for summer side quests")
 
-    background_tasks.add_task(
-        _run_summer_quest_generation,
-        period_id=period_id,
-        owner_id=auth.sub,
-        bot_provider=bot_provider,
-    )
+    svc = PeriodSummerQuestService(bot_provider=bot_provider)
+    background_tasks.add_task(svc.run_as_background_task, owner_id=auth.sub, period_id=period_id)
     return {"message": "Summer quest generation started"}
 
 

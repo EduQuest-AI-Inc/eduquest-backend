@@ -13,20 +13,6 @@ from services.quest.quest_service import QuestService
 logger = logging.getLogger(__name__)
 
 
-def run_summer_quest_background_task(
-    period_id: str,
-    owner_id: str,
-    bot_provider: BotProviderProtocol,
-) -> None:
-    try:
-        service = PeriodSummerQuestService(bot_provider=bot_provider)
-        service.generate_summer_quests(owner_id=owner_id, period_id=period_id)
-    except Exception as exc:
-        logger.error(
-            "Summer quest generation failed for period %s: %s", period_id, exc, exc_info=True
-        )
-
-
 
 def _build_schedule(curriculum: dict[str, Any]) -> list[dict[str, Any]]:
     """Assemble the [{Week, Skills}] list the CurriculumOnlyQuestAgent expects."""
@@ -149,3 +135,11 @@ class PeriodSummerQuestService:
             "goal_text": goal_text,
             "saved_quests": save_result,
         }
+
+    def run_as_background_task(self, owner_id: str, period_id: str) -> None:
+        try:
+            self.generate_summer_quests(owner_id=owner_id, period_id=period_id)
+        except Exception as exc:
+            logger.error(
+                "Summer quest generation failed for period %s: %s", period_id, exc, exc_info=True
+            )

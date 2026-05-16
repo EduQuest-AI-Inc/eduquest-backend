@@ -9,7 +9,7 @@ from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_peri
 from bots.protocol import BotProviderProtocol
 from services.curriculum.curriculum_service import CurriculumService
 from services.enrollment.enrollment_service import EnrollmentService
-from services.period.period_summer_quest_service import run_summer_quest_background_task as _run_summer_quest_generation
+from services.period.period_summer_quest_service import PeriodSummerQuestService
 from services.slides.pptx_generation_service import PptxGenerationService
 from exceptions.not_found_error import NotFoundError
 from exceptions.validation_error import ValidationError
@@ -103,15 +103,11 @@ def _run_slides_and_quests_parallel(
     owner_id: str,
     bot_provider: BotProviderProtocol,
 ) -> None:
+    summer_svc = PeriodSummerQuestService(bot_provider=bot_provider)
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         futures = [
             executor.submit(slides_svc.run_batch, period_id),
-            executor.submit(
-                _run_summer_quest_generation,
-                period_id=period_id,
-                owner_id=owner_id,
-                bot_provider=bot_provider,
-            ),
+            executor.submit(summer_svc.run_as_background_task, owner_id=owner_id, period_id=period_id),
         ]
         for future in concurrent.futures.as_completed(futures):
             try:
