@@ -1,6 +1,6 @@
 # Supabase Table Reference
 
-Quick reference for all 23 tables in the EduQuest Supabase database, grouped by domain.
+Quick reference for all 28 tables in the EduQuest Supabase database, grouped by domain.
 
 **RLS identity expression:** All policies use `(auth.jwt() ->> 'sub')` — reads the JWT `sub` claim as text, directly matching `user_id` values. Do **not** use `auth.uid()` — it casts to UUID and silently returns null for username-format IDs.
 
@@ -20,43 +20,57 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 5. [period](#period) — a class period owned by a teacher or parent
 6. [enrollment](#enrollment) — student ↔ period membership
 7. [parent_invite](#parent_invite) — invite codes for parents to link to a student and view their progress
+8. [period_schedule](#period_schedule) — per-period schedule JSON, quest-enabled weeks, OpenAI file reference
 
 **Curriculum**
 
-20. [week](#week) — week rows within a period (start/end dates)
-21. [lesson](#lesson) — a lesson belonging to a week within a period
-22. [concept](#concept) — a concept taught in a lesson, with rich metadata
-23. [skill](#skill) — a measurable skill for a period with mastery config
-24. [concept_skill](#concept_skill) — junction: which concepts develop which skills
+9. [week](#week) — week rows within a period (start/end dates)
+10. [lesson](#lesson) — a lesson belonging to a week within a period
+11. [lesson_pptx](#lesson_pptx) — per-lesson PowerPoint generation state + S3 reference
+12. [concept](#concept) — a concept taught in a lesson, with rich metadata
+13. [skill](#skill) — a measurable skill for a period with mastery config
+14. [concept_skill](#concept_skill) — junction: which concepts develop which skills
 
 **File Deduplication**
 
-19. [material_files](#material_files) — dedup registry: SHA-256 hash → OpenAI file + vector store
+15. [material_files](#material_files) — dedup registry: SHA-256 hash → OpenAI file + vector store
 
 **AI Conversations**
 
-9. [conversation](#conversation) — general AI chat session metadata
-10. [ltg_conversation](#ltg_conversation) — long-term goal chat session per student/period
+16. [conversation](#conversation) — general AI chat session metadata
+17. [ltg_conversation](#ltg_conversation) — long-term goal chat session per student/period
 
 **Quests & Skill Tracking**
 
-11. [quest](#quest) — individual student quest assignment
-12. [student_skill_mastery](#student_skill_mastery) — per-skill mastery record per student/period
-13. [aggregated_metrics](#aggregated_metrics) — weekly class-wide skill percentage rollups
+18. [quest](#quest) — individual student quest assignment
+19. [student_skill_mastery](#student_skill_mastery) — per-skill mastery record per student/period
+20. [aggregated_metrics](#aggregated_metrics) — weekly class-wide skill percentage rollups
 
 **Student Goals**
 
-14. [student_long_term_goal](#student_long_term_goal) — student's long-term learning goal per period
+21. [student_long_term_goal](#student_long_term_goal) — student's long-term learning goal per period
 
 **Auth & Sessions**
 
-15. [session](#session) — active JWT sessions
-16. [password_reset_token](#password_reset_token) — single-use tokens for password reset
-17. [password_reset_rate_limit](#password_reset_rate_limit) — rate-limit counters for reset requests
+22. [session](#session) — active JWT sessions
+23. [password_reset_token](#password_reset_token) — single-use tokens for password reset
+24. [password_reset_rate_limit](#password_reset_rate_limit) — rate-limit counters for reset requests
 
 **Onboarding**
 
-18. [waitlist](#waitlist) — teacher pilot study waitlist
+25. [waitlist](#waitlist) — teacher pilot study waitlist
+
+**Billing**
+
+26. [membership](#membership) — trial + Stripe subscription record per teacher/parent
+
+**Marketplace**
+
+27. [marketplace_listing](#marketplace_listing) — published period listings in the resource marketplace
+
+**Feedback**
+
+28. [user_feedback](#user_feedback) — in-app feedback messages submitted by users
 
 ---
 
@@ -77,6 +91,7 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | `last_login` | timestamptz | nullable |                                          |
 | `role`       | text        | NOT NULL | `"student"` \| `"teacher"` \| `"parent"` |
 | `created_at` | timestamptz | NOT NULL | Account creation time (DEFAULT now())    |
+| `login_disabled` | boolean | NOT NULL DEFAULT false | Set true to block login without deleting account |
 
 **RLS:** Enabled
 
@@ -95,13 +110,16 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | Field                | Type      | Constraints | Notes                                   |
 | -------------------- | --------- | ----------- | --------------------------------------- |
 | `user_id`            | text      | PK → `user` |                                         |
-| `grade`              | integer   | NOT NULL    | Grade level (e.g. `9`)                  |
+| `grade`              | integer   | nullable    | Grade level (e.g. `9`)                  |
 | `strength`           | text[]  | nullable    | Self-reported strengths                 |
 | `weakness`           | text[]  | nullable    | Self-reported weaknesses                |
 | `interest`           | text[]  | nullable    | Self-reported interests                 |
-| `learning_style`     | text      | nullable    |                                         |
-| `completed_tutorial` | boolean   | NOT NULL    | Whether the onboarding tutorial is done |
+| `learning_style`     | text[]  | nullable    | Self-reported learning styles (array)   |
+| `completed_tutorial` | boolean   | NOT NULL DEFAULT false | Whether the onboarding tutorial is done |
 | `school_name`        | text      | nullable    |                                         |
+| `account_status`     | text      | NOT NULL DEFAULT 'active' | `"active"` \| `"unclaimed"` — unclaimed accounts are created by a parent |
+| `created_by_parent_id` | text    | nullable    | FK → `user.user_id`; set when a parent creates the student account |
+| `claimed_at`         | timestamptz | nullable  | Timestamp when an unclaimed student account is claimed by the student |
 
 **RLS:** Enabled
 
@@ -170,7 +188,7 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | `owner_id`           | text      | NOT NULL    | FK → `user.user_id` (teacher or parent)   |
 | `vector_store_id`         | text    | nullable    | OpenAI vector store ID for period-specific content (Canvas JSON, schedule JSON) |
 | `file_vector_store_ids`   | text[]  | NOT NULL DEFAULT '{}' | Per-file vector store IDs for uploaded course materials (deduped across periods) |
-| `file_url`                | text[]  | nullable    | S3 URLs of uploaded course files          |
+| `file_urls`               | text[]  | NOT NULL DEFAULT '{}' | S3 URLs of uploaded course files          |
 | `canvas_course_id`        | integer | nullable    | Canvas course ID for LMS sync             |
 | `canvas_course_name` | text      | nullable    |                                           |
 | `start_date`         | date      | nullable    |                                           |
@@ -182,6 +200,7 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | `processing_status`  | text      | NOT NULL DEFAULT 'ready' | `pending` while files process; `ready` on success; `failed` on error |
 | `status`             | text      | NOT NULL DEFAULT 'pending' | Curriculum lifecycle: `"pending"` → `"draft"` (bot wrote rows) → `"approved"` (teacher confirmed) |
 | `is_summer_quest`    | boolean   | NOT NULL DEFAULT false | `true` if this period is a summer quest; `false` for a normal class |
+| `forked_from_period_id` | text   | nullable    | FK → `period.period_id`; set when this period was forked from a marketplace listing |
 | `created_at`         | timestamptz | NOT NULL    |                                           |
 
 **RLS:** Enabled
@@ -215,6 +234,29 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | SELECT    | Enrolled student (self — `user_id = sub`) |
 | INSERT    | Self only (`user_id = sub` WITH CHECK) |
 | DELETE    | Self only (`user_id = sub`) |
+
+### `period_schedule`
+
+> Per-period schedule configuration. Stores the raw schedule JSON (uploaded or Canvas-synced), the OpenAI file ID for that JSON (used in the vector store), and which week numbers have quests enabled.
+
+| Field                    | Type        | Constraints                      | Notes                                               |
+| ------------------------ | ----------- | -------------------------------- | --------------------------------------------------- |
+| `period_id`              | text        | PK → `period`                    |                                                     |
+| `schedule_json`          | jsonb       | nullable                         | Raw schedule data (Canvas or teacher-uploaded)      |
+| `schedule_openai_file_id` | text       | nullable                         | OpenAI Files API ID for the schedule JSON           |
+| `quest_enabled_weeks`    | integer[]   | NOT NULL DEFAULT '{}'            | Week numbers for which quests are generated         |
+| `created_at`             | timestamptz | NOT NULL DEFAULT now()           |                                                     |
+| `last_updated_at`        | timestamptz | NOT NULL DEFAULT now()           | Updated on every write                              |
+
+**RLS:** Enabled
+
+| Operation            | Who  |
+| -------------------- | ---- |
+| SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
+| SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
+| INSERT/UPDATE/DELETE | FastAPI only |
+
+---
 
 ### `parent_invite`
 
@@ -292,7 +334,8 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | `lesson_id`  | uuid        | NOT NULL FK → `lesson.lesson_id` |                                                 |
 | `period_id`  | text        | NOT NULL FK → `period`           | Denormalized for RLS                            |
 | `status`     | text        | NOT NULL DEFAULT 'pending'       | `pending` \| `generating` \| `done` \| `failed` |
-| `s3_key`     | text        | nullable                         | Null until generation succeeds                  |
+| `s3_key`     | text        | nullable                         | Null until PPTX generation succeeds             |
+| `html_key`   | text        | nullable                         | S3 key for the HTML version of the lesson slides |
 | `created_at` | timestamptz | NOT NULL DEFAULT now()           |                                                 |
 | `updated_at` | timestamptz | NOT NULL DEFAULT now()           | Updated on every status change                  |
 
@@ -315,6 +358,7 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | ---------------------- | ----------- | ----------------------------------------- | ----------------------------------------- |
 | `period_id`            | text        | PK (composite) → `period`                 |                                           |
 | `concept_name`         | text        | PK (composite)                            |                                           |
+| `lesson_id`            | uuid        | NOT NULL → FK `lesson.lesson_id`          | Direct FK to the lesson (preferred over lesson_name join) |
 | `lesson_name`          | text        | NOT NULL → FK `lesson(period_id, lesson_name)` |                                      |
 | `description`          | text        | nullable                                  | Plain-text summary of the concept         |
 | `prerequisites`        | jsonb       | nullable                                  | List of prerequisite concepts/skills      |
@@ -444,6 +488,7 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | `grade`           | jsonb        | nullable    | Grading output — see shape below                          |
 | `feedback`        | text         | nullable    | AI or teacher feedback                                    |
 | `due_date`        | timestamptz  | nullable    |                                                           |
+| `completed_steps` | jsonb        | nullable DEFAULT '[]' | Array tracking which steps the student has completed |
 | `created_at`      | timestamptz  | NOT NULL    |                                                           |
 | `last_updated_at` | timestamptz  | NOT NULL    | Auto-updated on every write                               |
 
@@ -481,8 +526,8 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | `student_id` | text      | PK (composite) → `user`   |                                     |
 | `period_id`  | text      | PK (composite) → `period` |                                     |
 | `skill_name` | text      | PK (composite)            |                                     |
-| `mastered`   | boolean   | NOT NULL                  |                                     |
-| `score`      | numeric     | NOT NULL                  | Latest aggregated score (0.0 – 1.0) |
+| `mastered`   | boolean   | NOT NULL DEFAULT false    |                                     |
+| `score`      | numeric     | nullable                  | Latest aggregated score (0.0 – 1.0) |
 | `updated_at` | timestamptz | NOT NULL                  |                                     |
 
 **RLS:** Enabled — note: PK column is `student_id`, not `user_id`
@@ -573,7 +618,7 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | `used_at`    | timestamptz | nullable    | Set when the token is consumed                 |
 | `burned_at`  | timestamptz | nullable    | Set when the token is invalidated due to abuse |
 | `attempts`   | integer   | NOT NULL    | Confirmation attempts; token burns after 5     |
-| `request_ip` | text      | nullable    |                                                |
+| `request_ip` | inet      | nullable    |                                                |
 | `user_agent` | text      | nullable    |                                                |
 
 **RLS:** Disabled — FastAPI service role only
@@ -623,6 +668,80 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 
 ---
 
+## Billing
+
+### `membership`
+
+> Trial and Stripe subscription record for teacher and parent accounts. One row per user; students never have a row. Managed exclusively by `MembershipService`.
+
+| Field                     | Type              | Constraints              | Notes                                                            |
+| ------------------------- | ----------------- | ------------------------ | ---------------------------------------------------------------- |
+| `user_id`                 | text              | PK → `user`              |                                                                  |
+| `role`                    | text              | NOT NULL                 | `"teacher"` \| `"parent"` only                                  |
+| `status`                  | membership_status | NOT NULL DEFAULT 'none'  | Enum: `none` \| `trialing` \| `active` \| `past_due` \| `canceled` \| `expired` |
+| `plan`                    | membership_plan   | nullable                 | Enum: `starter` \| `growth` \| `pro`                            |
+| `class_limit`             | integer           | nullable                 | Max periods allowed under current plan                          |
+| `students_per_class_limit` | integer          | nullable                 | Max students per period under current plan                      |
+| `trial_started_at`        | timestamptz       | nullable                 |                                                                  |
+| `trial_ends_at`           | timestamptz       | nullable                 |                                                                  |
+| `reminder_sent_at`        | timestamptz       | nullable                 | When the trial-ending reminder email was sent                   |
+| `stripe_customer_id`      | text              | nullable                 |                                                                  |
+| `stripe_subscription_id`  | text              | nullable                 |                                                                  |
+| `stripe_price_id`         | text              | nullable                 |                                                                  |
+| `current_period_end`      | timestamptz       | nullable                 | Stripe billing period end                                        |
+| `cancel_at_period_end`    | boolean           | NOT NULL DEFAULT false   | Stripe cancel-at-period-end flag                                |
+| `created_at`              | timestamptz       | NOT NULL DEFAULT now()   |                                                                  |
+| `updated_at`              | timestamptz       | NOT NULL DEFAULT now()   | Must be kept non-null; use `default_factory` in Pydantic model  |
+| `delete_after`            | timestamptz       | nullable                 | Soft-delete timestamp; row is eligible for cleanup after this   |
+
+**RLS:** Enabled
+
+| Operation     | Who  |
+| ------------- | ---- |
+| SELECT        | Self (`user_id = sub`) |
+| INSERT/UPDATE/DELETE | FastAPI only |
+
+---
+
+## Marketplace
+
+### `marketplace_listing`
+
+> Published period listings in the resource marketplace. Tracks publish state, fork count, and tags. Managed by `MarketplaceListingDAO`.
+
+| Field          | Type        | Constraints              | Notes                                                  |
+| -------------- | ----------- | ------------------------ | ------------------------------------------------------ |
+| `listing_id`   | uuid        | PK DEFAULT gen_random_uuid() |                                                    |
+| `period_id`    | text        | NOT NULL → `period`      |                                                        |
+| `published_by` | text        | NOT NULL → `user`        | FK → `user.user_id` (the teacher who published)        |
+| `tags`         | text[]      | nullable DEFAULT '{}'    | Subject or grade tags for filtering                    |
+| `fork_count`   | integer     | NOT NULL DEFAULT 0       | Number of times this listing has been forked           |
+| `is_published` | boolean     | NOT NULL DEFAULT true    | `false` to soft-hide from the marketplace              |
+| `created_at`   | timestamptz | NOT NULL DEFAULT now()   |                                                        |
+| `updated_at`   | timestamptz | NOT NULL DEFAULT now()   |                                                        |
+| `delete_after` | timestamptz | nullable                 | Soft-delete timestamp                                  |
+
+**RLS:** Disabled — FastAPI service role only
+
+---
+
+## Feedback
+
+### `user_feedback`
+
+> In-app feedback messages submitted by students or teachers. Read by the FastAPI feedback router.
+
+| Field         | Type        | Constraints              | Notes                              |
+| ------------- | ----------- | ------------------------ | ---------------------------------- |
+| `feedback_id` | uuid        | PK DEFAULT gen_random_uuid() |                                |
+| `user_id`     | text        | NOT NULL → `user`        |                                    |
+| `message`     | text        | NOT NULL                 | Raw feedback text from the user    |
+| `created_at`  | timestamptz | NOT NULL DEFAULT now()   |                                    |
+
+**RLS:** Disabled — FastAPI service role only
+
+---
+
 ## Quick Reference
 
 | Table                       | PK                                    | Purpose                                   |
@@ -651,6 +770,10 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | `skill`                     | `(period_id, skill_name)`             | Measurable skill with mastery config              |
 | `concept_skill`             | `(period_id, concept_name, skill_name)` | Junction: concepts → skills they develop        |
 | `material_files`            | `file_hash`                           | SHA-256 dedup registry for uploaded course files |
+| `period_schedule`           | `period_id`                           | Schedule JSON, OpenAI file ID, quest-enabled weeks |
+| `membership`                | `user_id`                             | Trial + Stripe subscription for teachers/parents  |
+| `marketplace_listing`       | `listing_id`                          | Published period in the resource marketplace      |
+| `user_feedback`             | `feedback_id`                         | In-app feedback messages from users               |
 
 ---
 
@@ -667,4 +790,8 @@ Quick reference for all 23 tables in the EduQuest Supabase database, grouped by 
 | `vector_store_id`  | text        | NOT NULL UNIQUE | Per-file vector store; embeddings live here  |
 | `created_at`       | timestamptz | NOT NULL    | Auto-set on first upload                         |
 
-**RLS:** Disabled — FastAPI service role only
+**RLS:** Enabled
+
+| Operation     | Who  |
+| ------------- | ---- |
+| INSERT/UPDATE/DELETE | FastAPI only |

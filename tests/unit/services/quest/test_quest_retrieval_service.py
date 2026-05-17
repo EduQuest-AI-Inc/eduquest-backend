@@ -75,3 +75,32 @@ def test_verify_quest_structure_success():
     assert result["quests"]["total_count"] == 2
     assert "quest_ids" in result["quests"]
     assert "weeks" in result["quests"]
+
+
+# ── parse_grade_data edge cases ────────────────────────────────────────────────
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("grade,expected_score,expected_display", [
+    ({}, "Score not available", "Score not available"),   # empty dict — no overall_score key
+    (0,   "0",    "0"),                                   # integer zero (falsy) → legacy string path
+    (3.14, "3.14", "3.14"),                               # float → legacy string path
+    ([],  "[]",   "[]"),                                  # list → legacy string path
+])
+def test_parse_grade_data_edge_cases(grade, expected_score, expected_display):
+    result = QuestRetrievalService.parse_grade_data(grade)
+    assert result["overall_score"] == expected_score, (
+        f"grade={grade!r}: expected overall_score={expected_score!r}, got {result['overall_score']!r}"
+    )
+    assert result["display_grade"] == expected_display, (
+        f"grade={grade!r}: expected display_grade={expected_display!r}, got {result['display_grade']!r}"
+    )
+
+
+@pytest.mark.unit
+def test_parse_grade_data_dict_missing_overall_score():
+    """Dict with only detailed_grade key — overall_score falls back to sentinel."""
+    grade = {"detailed_grade": {"algebra": 0.85}}
+    result = QuestRetrievalService.parse_grade_data(grade)
+    assert result["overall_score"] == "Score not available"
+    assert result["detailed_grade"] == {"algebra": 0.85}
