@@ -114,3 +114,11 @@ Tests that need a mock bot provider pass `MockBotProvider()` directly to the ser
 ### Private methods are tested through the public API, not directly
 
 Test files must not call underscore-prefixed methods (`_check_profile`, `_extract_conversation_id`, etc.) directly. If the public-facing method covers all branches of a private method, the private tests are redundant and create rename-friction. If a private method is complex enough that the public path cannot reach all its branches in isolation, the right fix is to make it a standalone public function in a utility module — not to test it directly while leaving it private.
+
+### No `PYTEST_CURRENT_TEST` guards in production code
+
+Production code must never contain `if os.getenv("PYTEST_CURRENT_TEST"): raise`. This pattern hides failure paths from tests rather than fixing them — it makes a broad `except` behave differently in tests and in production, which defeats the purpose of testing. If a broad `except` makes a failure mode untestable, split the `try` block into narrower scopes instead (one for the agent/external-call result, one for the S3 upload, etc.) so each can be exercised independently by injecting a mock that raises.
+
+### External service calls in services must be wrapped in `try/except`
+
+Every call to S3, Stripe, SES, Canvas, Perplexity, or any other external service inside a service method must be wrapped in `try/except`. For non-critical side-effects (audit uploads, analytics, fire-and-forget notifications) log-and-swallow with `exc_info=True` and continue. For operations that are critical to the caller's primary flow, re-raise as `ValidationError` (400) with a user-facing message. Bare unhandled exceptions from external clients produce opaque 500s that are invisible in monitoring until a user reports them and block all preceding work (e.g. a grading result already computed) from reaching the user.

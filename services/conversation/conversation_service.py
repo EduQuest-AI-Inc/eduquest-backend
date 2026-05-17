@@ -185,13 +185,19 @@ class ConversationService:
         quests_data = json.loads(quests_file)
         quest_data = quests_data[0] if quests_data else {}
 
-        # Upload submission to S3
+        # Upload submission to S3 — non-critical audit trail; grading proceeds on failure
         s3_key = None
         if submission_file and period_id and user_id and individual_quest_id:
             timestamp = int(time.time())
             filename = f"{timestamp}_{os.path.basename(submission_file)}"
             folder = f"periods/{period_id}/students/{user_id}/{individual_quest_id}"
-            s3_key = upload_file_to_s3(submission_file, filename=filename, folder=folder)
+            try:
+                s3_key = upload_file_to_s3(submission_file, filename=filename, folder=folder)
+            except Exception as exc:
+                logger.warning(
+                    "S3 upload failed for quest submission user=%s quest=%s, continuing without upload: %s",
+                    user_id, individual_quest_id, exc, exc_info=True,
+                )
 
         grading_result = grade_student_submission(
             quest_data=quest_data,

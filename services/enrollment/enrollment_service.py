@@ -159,7 +159,7 @@ class EnrollmentService:
         self.enrollment_dao.add_enrollment(enrollment)
 
         if period_id != TUTORIAL_PERIOD_ID:
-            self._cleanup_tutorial_periods(user_id)
+            self.cleanup_tutorial_periods(user_id)
 
         return period
 
@@ -221,7 +221,7 @@ class EnrollmentService:
         if any(e["period_id"] == period_id for e in existing):
             raise ValidationError("Student is already enrolled in this class")
 
-    def _cleanup_tutorial_periods(self, user_id: str) -> None:
+    def cleanup_tutorial_periods(self, user_id: str) -> None:
         existing_enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)
         enrolled_period_ids = [e['period_id'] for e in existing_enrollments]
         if TUTORIAL_PERIOD_ID in enrolled_period_ids:

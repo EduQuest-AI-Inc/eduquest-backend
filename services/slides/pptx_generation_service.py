@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 from typing import Any
 
 from fastapi import BackgroundTasks
@@ -110,8 +109,6 @@ class PptxGenerationService:
             asyncio.run(self._run_batch_async(pptx_rows, curriculum, period_context))
             logger.info("pptx batch complete: period=%s", period_id)
         except Exception as exc:
-            if os.getenv("PYTEST_CURRENT_TEST"):
-                raise
             logger.error("pptx batch crashed: period=%s: %s", period_id, exc, exc_info=True)
             all_rows = self.lesson_pptx_dao.get_by_period(period_id)
             for row in all_rows:
@@ -188,6 +185,8 @@ class PptxGenerationService:
 
             logger.info("pptx generating: lesson=%s name=%r", lesson_id, lesson.get("lesson_name"))
             self.lesson_pptx_dao.update_status(pptx_id, {"status": "generating"})
+
+            # --- Agent run ---
             try:
                 result = await asyncio.wait_for(
                     self._bot_provider.create_pptx_agent().run(lesson_with_context, period_context),
@@ -195,7 +194,23 @@ class PptxGenerationService:
                 )
                 pptx_bytes = result["pptx_bytes"]
                 html_str = result.get("html_str", "")
+            except asyncio.TimeoutError:
+                logger.error(
+                    "pptx agent timed out (>%ss) for lesson %s",
+                    _AGENT_TIMEOUT_S, lesson_id,
+                )
+                self.lesson_pptx_dao.update_status(pptx_id, {"status": "failed"})
+                return
+            except Exception as exc:
+                logger.error(
+                    "pptx agent failed for lesson %s: %s",
+                    lesson_id, exc, exc_info=True,
+                )
+                self.lesson_pptx_dao.update_status(pptx_id, {"status": "failed"})
+                return
 
+            # --- S3 upload ---
+            try:
                 pptx_key = self._s3.upload_pptx(pptx_bytes, row["period_id"], lesson_id)
                 fields: dict[str, Any] = {"status": "done", "s3_key": pptx_key}
 
@@ -206,11 +221,8 @@ class PptxGenerationService:
                 self.lesson_pptx_dao.update_status(pptx_id, fields)
                 logger.info("pptx done: lesson=%s", lesson_id)
             except Exception as exc:
-                if os.getenv("PYTEST_CURRENT_TEST"):
-                    raise
                 logger.error(
-                    "pptx generation failed for lesson %s: %s: %s",
-                    lesson_id, type(exc).__name__, exc,
-                    exc_info=True,
+                    "pptx S3 upload failed for lesson %s: %s",
+                    lesson_id, exc, exc_info=True,
                 )
                 self.lesson_pptx_dao.update_status(pptx_id, {"status": "failed"})

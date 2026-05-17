@@ -392,3 +392,49 @@ def test_get_parent_periods_includes_approved_only():
 
     assert len(result) == 1
     assert result[0]["period_id"] == "p1"
+
+
+# ── cleanup_tutorial_periods ──────────────────────────────────────────────────
+
+from services.enrollment.enrollment_service import TUTORIAL_PERIOD_ID
+
+
+@pytest.mark.unit
+def test_cleanup_tutorial_periods_removes_tutorial_when_enrolled():
+    svc = _svc()
+    svc.enrollment_dao.get_enrollments_by_student.return_value = [
+        {"period_id": TUTORIAL_PERIOD_ID},
+        {"period_id": "real-period-1"},
+    ]
+
+    svc.cleanup_tutorial_periods("s1")
+
+    svc.enrollment_dao.delete_enrollment.assert_called_once_with("s1", TUTORIAL_PERIOD_ID)
+
+
+@pytest.mark.unit
+def test_cleanup_tutorial_periods_noop_when_not_in_tutorial():
+    svc = _svc()
+    svc.enrollment_dao.get_enrollments_by_student.return_value = [
+        {"period_id": "real-period-1"},
+    ]
+
+    svc.cleanup_tutorial_periods("s1")
+
+    svc.enrollment_dao.delete_enrollment.assert_not_called()
+
+
+@pytest.mark.unit
+def test_verify_period_id_triggers_tutorial_cleanup_on_real_class():
+    svc = _svc()
+    period = {"period_id": "real-period-1", "owner_id": "o1", "status": "approved"}
+    svc.period_dao.get_period_by_id.return_value = period
+    svc.user_dao.get_by_id.return_value = {"user_id": "o1", "role": "teacher"}
+    svc.student_dao.get_student_by_id.return_value = {"user_id": "s1"}
+    svc.enrollment_dao.get_enrollments_by_student.return_value = [
+        {"period_id": TUTORIAL_PERIOD_ID},
+    ]
+
+    svc.verify_period_id("s1", "real-period-1")
+
+    svc.enrollment_dao.delete_enrollment.assert_called_with("s1", TUTORIAL_PERIOD_ID)
