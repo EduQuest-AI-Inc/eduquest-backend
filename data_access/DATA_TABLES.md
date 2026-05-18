@@ -2,6 +2,8 @@
 
 Quick reference for all 28 tables in the EduQuest Supabase database, grouped by domain.
 
+See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgREST `rpc/`.
+
 **RLS identity expression:** All policies use `(auth.jwt() ->> 'sub')` — reads the JWT `sub` claim as text, directly matching `user_id` values. Do **not** use `auth.uid()` — it casts to UUID and silently returns null for username-format IDs.
 
 ---
