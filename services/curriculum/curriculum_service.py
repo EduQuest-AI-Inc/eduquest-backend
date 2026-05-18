@@ -79,13 +79,11 @@ class CurriculumService:
 
     def save_curriculum(self, period_id: str, payload: dict[str, Any], period: dict | None = None) -> None:
         if period is None:
-            self._check_not_fork(period_id)
             self._get_period_or_raise(period_id)
         self._bulk_replace(period_id, payload)
 
     def update_concept(self, period_id: str, concept_name: str, fields: dict[str, Any], period: dict | None = None) -> None:
         if period is None:
-            self._check_not_fork(period_id)
             self._get_period_or_raise(period_id)
         existing = self.concept_dao.get_concept(period_id, concept_name)
         if not existing:
@@ -94,7 +92,6 @@ class CurriculumService:
 
     def update_skill(self, period_id: str, skill_name: str, fields: dict[str, Any], period: dict | None = None) -> None:
         if period is None:
-            self._check_not_fork(period_id)
             self._get_period_or_raise(period_id)
         self.skill_dao.update_skill(period_id, skill_name, fields)
 
