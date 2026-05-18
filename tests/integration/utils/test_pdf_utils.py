@@ -2,15 +2,18 @@
 Integration tests for utils/pdf_utils.py — preprocess_pdf().
 
 PDF fixtures are generated at test time using PyMuPDF so no binary files need
-to be checked into the repo. A "large" PDF is faked by writing enough
-repetition to exceed the 20 MB threshold.
+to be checked into the repo. The size threshold is patched to 64 KB in all
+"large PDF" tests so fixture generation takes ~15 pages instead of ~5000.
 """
 import os
 import tempfile
 import pytest
 import fitz  # pymupdf
 
-from utils.pdf_utils import preprocess_pdf, _SIZE_THRESHOLD_BYTES
+import utils.pdf_utils as pdf_utils_module
+from utils.pdf_utils import preprocess_pdf
+
+_TEST_THRESHOLD = 4 * 1024  # 4 KB — sits between the small (~2 KB) and large (~17 KB) fixtures
 
 
 # ── Fixture builders ──────────────────────────────────────────────────────────
@@ -37,15 +40,11 @@ def _make_digital_pdf(tmp_path: str, page_count: int = 3) -> str:
 
 
 def _make_large_digital_pdf(tmp_path: str) -> str:
-    """Create a digital PDF that exceeds the 20 MB threshold."""
+    """Create a digital PDF that exceeds _TEST_THRESHOLD bytes (~17 KB at 25 pages)."""
     doc = fitz.open()
-    # Each page inserts ~5 KB of text; we need >20 MB worth
-    # Generate enough pages so the saved file exceeds the threshold
-    pages_needed = (_SIZE_THRESHOLD_BYTES // (4 * 1024)) + 50  # generous margin
-    for page_num in range(pages_needed):
+    for page_num in range(25):
         page = doc.new_page()
         page.insert_text((72, 72), f"Section {page_num}: Big Heading Here", fontsize=20)
-        # Long body paragraph to bulk out file size
         body = ("Word " * 300).strip() + ". Second sentence discarded by preprocessing."
         page.insert_text((72, 120), body, fontsize=11)
 
@@ -58,10 +57,11 @@ def _make_large_digital_pdf(tmp_path: str) -> str:
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
-def test_small_pdf_returns_original_path():
+def test_small_pdf_returns_original_path(monkeypatch):
+    monkeypatch.setattr(pdf_utils_module, "_SIZE_THRESHOLD_BYTES", _TEST_THRESHOLD)
     with tempfile.TemporaryDirectory() as tmp:
         pdf_path = _make_digital_pdf(tmp)
-        assert os.path.getsize(pdf_path) < _SIZE_THRESHOLD_BYTES, "fixture is unexpectedly large"
+        assert os.path.getsize(pdf_path) < _TEST_THRESHOLD, "fixture is unexpectedly large"
 
         result = preprocess_pdf(pdf_path)
 
@@ -69,10 +69,11 @@ def test_small_pdf_returns_original_path():
 
 
 @pytest.mark.integration
-def test_large_digital_pdf_returns_preprocessed_txt_path():
+def test_large_digital_pdf_returns_preprocessed_txt_path(monkeypatch):
+    monkeypatch.setattr(pdf_utils_module, "_SIZE_THRESHOLD_BYTES", _TEST_THRESHOLD)
     with tempfile.TemporaryDirectory() as tmp:
         pdf_path = _make_large_digital_pdf(tmp)
-        assert os.path.getsize(pdf_path) >= _SIZE_THRESHOLD_BYTES, "fixture did not reach 20 MB threshold"
+        assert os.path.getsize(pdf_path) >= _TEST_THRESHOLD, "fixture did not reach threshold"
 
         result = preprocess_pdf(pdf_path)
 
@@ -82,7 +83,8 @@ def test_large_digital_pdf_returns_preprocessed_txt_path():
 
 
 @pytest.mark.integration
-def test_large_digital_pdf_preprocessed_content_contains_headings():
+def test_large_digital_pdf_preprocessed_content_contains_headings(monkeypatch):
+    monkeypatch.setattr(pdf_utils_module, "_SIZE_THRESHOLD_BYTES", _TEST_THRESHOLD)
     with tempfile.TemporaryDirectory() as tmp:
         pdf_path = _make_large_digital_pdf(tmp)
         result = preprocess_pdf(pdf_path)
@@ -94,7 +96,8 @@ def test_large_digital_pdf_preprocessed_content_contains_headings():
 
 
 @pytest.mark.integration
-def test_large_digital_pdf_body_text_truncated_to_first_sentence():
+def test_large_digital_pdf_body_text_truncated_to_first_sentence(monkeypatch):
+    monkeypatch.setattr(pdf_utils_module, "_SIZE_THRESHOLD_BYTES", _TEST_THRESHOLD)
     with tempfile.TemporaryDirectory() as tmp:
         pdf_path = _make_large_digital_pdf(tmp)
         result = preprocess_pdf(pdf_path)

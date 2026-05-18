@@ -45,9 +45,12 @@ def preprocess_pdf(file_path: str) -> str:
                 if not all_spans:
                     continue
 
-                block_text = " ".join(span["text"] for span in all_spans).strip()
-                if not block_text:
+                raw = " ".join(span["text"] for span in all_spans).strip()
+                if not raw:
                     continue
+                # PyMuPDF can return surrogate or otherwise non-UTF-8-encodable
+                # characters when glyph-to-Unicode mapping is incomplete; replace them.
+                block_text = raw.encode("utf-8", errors="replace").decode("utf-8")
 
                 max_size = max(span["size"] for span in all_spans)
                 is_bold = any(span["flags"] & 16 for span in all_spans)  # bit 4 = bold
