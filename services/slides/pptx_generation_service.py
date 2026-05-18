@@ -11,6 +11,7 @@ from data_access.lesson_dao import LessonDAO
 from data_access.lesson_pptx_dao import LessonPptxDAO
 from data_access.period_dao import PeriodDAO
 from data_access.skill_dao import SkillDAO
+from exceptions.not_found_error import NotFoundError
 from exceptions.validation_error import ValidationError
 from integrations import s3_service
 from models.lesson_pptx import LessonPptx
@@ -118,6 +119,7 @@ class PptxGenerationService:
     def restart_batch(self, period_id: str, background_tasks: BackgroundTasks) -> int:
         """Reset stuck/failed lessons to pending and re-queue generation.
 
+        Skips lessons that have already reached 3 attempts.
         Returns the number of lessons reset.
         Raises ValidationError if there is nothing to retry.
         """
@@ -126,12 +128,42 @@ class PptxGenerationService:
         if not stuck:
             raise ValidationError("No failed or stuck lessons to retry")
 
-        for row in stuck:
+        retryable = [r for r in stuck if r.get("attempt_count", 0) < 3]
+        exhausted = len(stuck) - len(retryable)
+        if not retryable:
+            raise ValidationError("All failed lessons have reached the maximum retry limit (3 attempts)")
+
+        for row in retryable:
             self.lesson_pptx_dao.update_status(row["pptx_id"], {"status": "pending"})
 
         background_tasks.add_task(self.run_batch, period_id)
-        logger.info("pptx restart queued: period=%s lessons=%d", period_id, len(stuck))
-        return len(stuck)
+        logger.info(
+            "pptx restart queued: period=%s lessons=%d skipped=%d",
+            period_id, len(retryable), exhausted,
+        )
+        return len(retryable)
+
+    def regenerate_lesson(self, lesson_id: str, background_tasks: BackgroundTasks) -> dict:
+        """Reset a single lesson to pending and re-queue generation.
+
+        Raises NotFoundError if no pptx record exists for the lesson.
+        Raises ValidationError if the lesson has reached 3 attempts.
+        Returns the pptx_id of the reset record.
+        """
+        row = self.lesson_pptx_dao.get_by_lesson_id(lesson_id)
+        if not row:
+            raise NotFoundError(f"No PowerPoint record found for lesson {lesson_id}")
+        if row.get("attempt_count", 0) >= 3:
+            raise ValidationError("Maximum generation attempts (3) reached for this lesson")
+
+        self.lesson_pptx_dao.update_status(row["pptx_id"], {
+            "status": "pending",
+            "s3_key": None,
+            "html_key": None,
+        })
+        background_tasks.add_task(self.run_batch, row["period_id"])
+        logger.info("pptx regenerate queued: lesson=%s period=%s", lesson_id, row["period_id"])
+        return {"pptx_id": row["pptx_id"]}
 
     async def _run_batch_async(
         self,
@@ -184,7 +216,10 @@ class PptxGenerationService:
             }
 
             logger.info("pptx generating: lesson=%s name=%r", lesson_id, lesson.get("lesson_name"))
-            self.lesson_pptx_dao.update_status(pptx_id, {"status": "generating"})
+            self.lesson_pptx_dao.update_status(pptx_id, {
+                "status": "generating",
+                "attempt_count": row.get("attempt_count", 0) + 1,
+            })
 
             # --- Agent run ---
             try:

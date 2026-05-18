@@ -60,6 +60,7 @@ def get_pptx_status(
             "lesson_name": lessons.get(row["lesson_id"], {}).get("lesson_name"),
             "week_number": lessons.get(row["lesson_id"], {}).get("week_number"),
             "pptx_status": row["status"],
+            "attempt_count": row.get("attempt_count", 0),
         }
         for row in pptx_rows
     ]
@@ -69,7 +70,7 @@ def get_pptx_status(
 def restart_pptx_generation(
     period_id: str,
     background_tasks: BackgroundTasks,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
     slides_svc: PptxGenerationService = Depends(_get_slides_service),
     period: dict = Depends(get_period),
 ):

@@ -15,6 +15,9 @@ class LessonsService:
     def get_lesson_by_id(self, lesson_id: str) -> Optional[dict]:
         return self.lesson_dao.get_by_lesson_id(lesson_id)
 
+    def get_pptx_by_lesson_id(self, lesson_id: str) -> Optional[dict]:
+        return self.lesson_pptx_dao.get_by_lesson_id(lesson_id)
+
     def get_pptx_by_period(self, period_id: str) -> list:
         return self.lesson_pptx_dao.get_by_period(period_id)
 

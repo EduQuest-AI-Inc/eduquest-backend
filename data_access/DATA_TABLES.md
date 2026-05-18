@@ -336,10 +336,11 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `lesson_id`  | uuid        | NOT NULL FK → `lesson.lesson_id` |                                                 |
 | `period_id`  | text        | NOT NULL FK → `period`           | Denormalized for RLS                            |
 | `status`     | text        | NOT NULL DEFAULT 'pending'       | `pending` \| `generating` \| `done` \| `failed` |
-| `s3_key`     | text        | nullable                         | Null until PPTX generation succeeds             |
-| `html_key`   | text        | nullable                         | S3 key for the HTML version of the lesson slides |
-| `created_at` | timestamptz | NOT NULL DEFAULT now()           |                                                 |
-| `updated_at` | timestamptz | NOT NULL DEFAULT now()           | Updated on every status change                  |
+| `s3_key`       | text        | nullable                         | Null until PPTX generation succeeds             |
+| `html_key`     | text        | nullable                         | S3 key for the HTML version of the lesson slides |
+| `attempt_count`| integer     | NOT NULL DEFAULT 0               | Incremented on each generation attempt; capped at 3 |
+| `created_at`   | timestamptz | NOT NULL DEFAULT now()           |                                                 |
+| `updated_at`   | timestamptz | NOT NULL DEFAULT now()           | Updated on every status change                  |
 
 **RLS:** Enabled
 
