@@ -35,6 +35,7 @@ class ContinueLTGRequest(BaseModel):
     conversation_id: str
     message: str
     period_id: Optional[str] = None
+    student_id: Optional[str] = None
 
 
 class InitiateHomeworkRequest(BaseModel):
@@ -79,8 +80,18 @@ def continue_ltg_conversation(
     period_service: PeriodService = Depends(_get_period_service),
 ):
     try:
+        if body.student_id and body.student_id != auth.sub:
+            period = _period_mgmt.get_period_by_id(body.period_id)
+            if not period or period.get("owner_id") != auth.sub:
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Not authorized to continue LTG for this student"},
+                )
+            effective_user_id = body.student_id
+        else:
+            effective_user_id = auth.sub
         return period_service.continue_ltg_conversation(
-            auth.sub,
+            effective_user_id,
             body.conversation_type,
             body.conversation_id,
             body.message,
