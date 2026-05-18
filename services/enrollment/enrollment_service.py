@@ -97,7 +97,7 @@ class EnrollmentService:
         return [
             {
                 'period_id': pid,
-                'course_name': periods[pid].get('name', pid),
+                'name': periods[pid].get('name', pid),
                 'file_urls': periods[pid].get('file_urls', []),
                 'long_term_goal': ltg_map.get(pid),
                 'is_summer_quest': periods[pid].get('is_summer_quest', False),
