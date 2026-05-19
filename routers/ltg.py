@@ -81,6 +81,8 @@ def continue_ltg_conversation(
 ):
     try:
         if body.student_id and body.student_id != auth.sub:
+            if not body.period_id:
+                return JSONResponse(status_code=400, content={"detail": "period_id is required when student_id is provided"})
             period = _period_mgmt.get_period_by_id(body.period_id)
             if not period or period.get("owner_id") != auth.sub:
                 return JSONResponse(
