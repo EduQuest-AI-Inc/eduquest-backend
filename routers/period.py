@@ -24,7 +24,6 @@ from responses.period import (
     UpdatePeriodResponse,
 )
 from bots.protocol import BotProviderProtocol
-from integrations import openai_vector_store
 from integrations.s3_service import (
     complete_multipart_upload,
     create_multipart_upload,
@@ -71,7 +70,7 @@ def _process_period_files(
             temp_dir, file_paths, canvas_api_url, canvas_api_key, canvas_course_id
         )
 
-        vector_store_id = openai_vector_store.create_empty(course_name)
+        vector_store_id = bot_provider.create_vector_store(course_name)
         period_management_service.update_vector_store_id(period_id, vector_store_id)
 
         # Download presigned-uploaded files from S3 into temp_dir for local processing
@@ -92,9 +91,9 @@ def _process_period_files(
         period_management_service.update_file_urls(period_id, all_s3_keys)
 
         try:
-            file_vs_ids = period_file_service.ingest_to_openai(vector_store_id, all_local_paths)
+            file_vs_ids = bot_provider.ingest_files_to_vector_store(vector_store_id, all_local_paths)
         except Exception as e:
-            logger.error("ingest_to_openai failed for period %s: %s", period_id, e, exc_info=True)
+            logger.error("ingest_files_to_vector_store failed for period %s: %s", period_id, e, exc_info=True)
             raise
         period_management_service.update_file_vector_store_ids(period_id, file_vs_ids)
 

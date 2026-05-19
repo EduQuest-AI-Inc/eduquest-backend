@@ -11,7 +11,8 @@ from exceptions.validation_error import ValidationError
 
 from bots.protocol import BotProviderProtocol
 from services.curriculum.curriculum_service import CurriculumService
-from services.quest.quest_service import QuestService
+from services.quest.quest_grading_service import QuestGradingService
+from services.quest.quest_retrieval_service import QuestRetrievalService
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,8 @@ class PeriodQuestService:
         curriculum_service=None,
         ltg_conversation_dao=None,
         ltg_goal_dao=None,
-        quest_service=None,
+        quest_retrieval_service=None,
+        quest_grading_service=None,
     ) -> None:
         self._bot_provider = bot_provider
         self.period_dao = period_dao or PeriodDAO()
@@ -44,7 +46,8 @@ class PeriodQuestService:
         self.curriculum_service = curriculum_service or CurriculumService(bot_provider=bot_provider)
         self.ltg_conversation_dao = ltg_conversation_dao or LtgConversationDAO()
         self.ltg_goal_dao = ltg_goal_dao or StudentLongTermGoalDAO()
-        self.quest_service = quest_service or QuestService()
+        self.quest_retrieval_service = quest_retrieval_service or QuestRetrievalService()
+        self.quest_grading_service = quest_grading_service or QuestGradingService()
 
     def _check_enrolled(self, caller_id: str, period_id: str) -> None:
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
@@ -147,7 +150,7 @@ class PeriodQuestService:
         homework_dict = self._normalize_homework(homework)
         schedule_dict = {"list_of_quests": schedule_quests}
 
-        save_result = self.quest_service.update_quests_preserving_completed_data(
+        save_result = self.quest_grading_service.update_quests_preserving_completed_data(
             schedule_dict, homework_dict, caller_id, period_id
         )
 
@@ -174,7 +177,7 @@ class PeriodQuestService:
         if not period:
             raise NotFoundError("Period not found")
 
-        existing_quests = self.quest_service.get_quests_for_student_and_period(caller_id, period_id)
+        existing_quests = self.quest_retrieval_service.get_quests_for_student_and_period(caller_id, period_id)
         if not existing_quests:
             raise NotFoundError("No existing quests found. Cannot update without existing quest structure.")
 
@@ -201,7 +204,7 @@ class PeriodQuestService:
         homework = homework_agent.run()
         homework_dict = self._normalize_homework(homework)
 
-        update_result = self.quest_service.update_quests_preserving_completed_data(
+        update_result = self.quest_grading_service.update_quests_preserving_completed_data(
             {"list_of_quests": incomplete_quests}, homework_dict, caller_id, period_id
         )
 

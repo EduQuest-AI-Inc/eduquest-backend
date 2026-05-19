@@ -24,7 +24,7 @@ class StudentSummary(BaseModel):
     user_id: str
     first_name: str
     last_name: str
-    grade: str
+    grade: int
     email: str
     interest: list[Any] = []
 

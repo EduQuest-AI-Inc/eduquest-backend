@@ -52,7 +52,7 @@ class TestGetQuests:
 
     @pytest.mark.api
     def test_get_quests_no_period_id_calls_get_all(self, client):
-        with patch("routers.quest.quest_service") as mock_qs, \
+        with patch("routers.quest._retrieval_service") as mock_qs, \
              patch("routers.quest.QuestRetrievalService.attach_grade_display"):
             mock_qs.get_quests_for_student.return_value = [_QUEST]
             resp = client.get("/quest/quests")
@@ -64,7 +64,7 @@ class TestGetQuests:
     @pytest.mark.api
     def test_get_quests_with_period_id_calls_period_filtered(self, client):
         quest_p1 = {**_QUEST, "quest_id": "q2"}
-        with patch("routers.quest.quest_service") as mock_qs, \
+        with patch("routers.quest._retrieval_service") as mock_qs, \
              patch("routers.quest.QuestRetrievalService.attach_grade_display"):
             mock_qs.get_quests_for_student_and_period.return_value = [quest_p1]
             resp = client.get("/quest/quests", params={"period_id": "p1"})
@@ -74,7 +74,7 @@ class TestGetQuests:
 
     @pytest.mark.api
     def test_get_quests_service_error_returns_500(self, client):
-        with patch("routers.quest.quest_service") as mock_qs, \
+        with patch("routers.quest._retrieval_service") as mock_qs, \
              patch("routers.quest.QuestRetrievalService.attach_grade_display"):
             mock_qs.get_quests_for_student.side_effect = RuntimeError("crash")
             resp = client.get("/quest/quests")
@@ -85,7 +85,7 @@ class TestGetQuestById:
 
     @pytest.mark.api
     def test_get_quest_by_id_found(self, client):
-        with patch("routers.quest.quest_service") as mock_qs, \
+        with patch("routers.quest._retrieval_service") as mock_qs, \
              patch("routers.quest.QuestRetrievalService.attach_grade_display"):
             mock_qs.get_quest_by_id.return_value = _QUEST
             resp = client.get("/quest/quests/q1")
@@ -94,7 +94,7 @@ class TestGetQuestById:
 
     @pytest.mark.api
     def test_get_quest_by_id_not_found_returns_404(self, client):
-        with patch("routers.quest.quest_service") as mock_qs, \
+        with patch("routers.quest._retrieval_service") as mock_qs, \
              patch("routers.quest.QuestRetrievalService.attach_grade_display"):
             mock_qs.get_quest_by_id.return_value = None
             resp = client.get("/quest/quests/missing-id")
@@ -103,7 +103,7 @@ class TestGetQuestById:
 
     @pytest.mark.api
     def test_get_quest_by_id_exception_returns_500(self, client):
-        with patch("routers.quest.quest_service") as mock_qs:
+        with patch("routers.quest._retrieval_service") as mock_qs:
             mock_qs.get_quest_by_id.side_effect = RuntimeError("crash")
             resp = client.get("/quest/quests/q1")
         assert resp.status_code == 500
@@ -113,7 +113,7 @@ class TestGetStudentQuests:
 
     @pytest.mark.api
     def test_get_student_quests_same_user_skips_authorization(self, client):
-        with patch("routers.quest.quest_service") as mock_qs, \
+        with patch("routers.quest._retrieval_service") as mock_qs, \
              patch("routers.quest.QuestRetrievalService.attach_grade_display"):
             mock_qs.get_quests_for_student.return_value = [_QUEST]
             resp = client.get("/quest/quests/student/user-1")
@@ -124,7 +124,7 @@ class TestGetStudentQuests:
     def test_get_student_quests_authorized_teacher(self, teacher_client):
         with patch("routers.quest._enrollment_service") as mock_ed, \
              patch("routers.quest._period_management_svc") as mock_pd, \
-             patch("routers.quest.quest_service") as mock_qs, \
+             patch("routers.quest._retrieval_service") as mock_qs, \
              patch("routers.quest.QuestRetrievalService.attach_grade_display"):
             mock_ed.get_enrollments_by_student.return_value = [{"period_id": "p1"}]
             mock_pd.get_periods_by_owner.return_value = [{"period_id": "p1"}]
@@ -143,7 +143,7 @@ class TestGetStudentQuests:
 
     @pytest.mark.api
     def test_get_student_quests_service_error_returns_500(self, client):
-        with patch("routers.quest.quest_service") as mock_qs, \
+        with patch("routers.quest._retrieval_service") as mock_qs, \
              patch("routers.quest.QuestRetrievalService.attach_grade_display"):
             mock_qs.get_quests_for_student.side_effect = RuntimeError("crash")
             resp = client.get("/quest/quests/student/user-1")
@@ -154,7 +154,7 @@ class TestUpdateQuestStatus:
 
     @pytest.mark.api
     def test_update_quest_status_valid_status(self, client):
-        with patch("routers.quest.quest_service") as mock_qs:
+        with patch("routers.quest._grading_service") as mock_qs:
             mock_qs.update_quest_status.return_value = {
                 "message": "Successfully updated quest q1 status to completed",
                 "quest_id": "q1",
@@ -171,7 +171,7 @@ class TestUpdateQuestStatus:
 
     @pytest.mark.api
     def test_update_quest_status_service_error_returns_500(self, client):
-        with patch("routers.quest.quest_service") as mock_qs:
+        with patch("routers.quest._grading_service") as mock_qs:
             mock_qs.update_quest_status.side_effect = RuntimeError("crash")
             resp = client.put("/quest/quests/q1/status", json={"status": "completed"})
         assert resp.status_code == 500
@@ -181,7 +181,7 @@ class TestGradeQuest:
 
     @pytest.mark.api
     def test_grade_quest_success(self, client):
-        with patch("routers.quest.quest_service") as mock_qs:
+        with patch("routers.quest._grading_service") as mock_qs:
             mock_qs.update_quest_grade_and_feedback.return_value = None
             resp = client.put(
                 "/quest/quests/q1/grade",
@@ -198,7 +198,7 @@ class TestGradeQuest:
 
     @pytest.mark.api
     def test_grade_quest_service_error_returns_500(self, client):
-        with patch("routers.quest.quest_service") as mock_qs:
+        with patch("routers.quest._grading_service") as mock_qs:
             mock_qs.update_quest_grade_and_feedback.side_effect = RuntimeError("crash")
             resp = client.put(
                 "/quest/quests/q1/grade",
@@ -211,7 +211,7 @@ class TestVerifyQuestStructure:
 
     @pytest.mark.api
     def test_verify_quest_structure_success(self, client):
-        with patch("routers.quest.quest_service") as mock_qs:
+        with patch("routers.quest._retrieval_service") as mock_qs:
             mock_qs.verify_quest_structure.return_value = {"is_valid": True, "missing_weeks": []}
             resp = client.get("/quest/verify-quest-structure/p1")
         assert resp.status_code == 200
@@ -219,7 +219,7 @@ class TestVerifyQuestStructure:
 
     @pytest.mark.api
     def test_verify_quest_structure_exception_returns_500(self, client):
-        with patch("routers.quest.quest_service") as mock_qs:
+        with patch("routers.quest._retrieval_service") as mock_qs:
             mock_qs.verify_quest_structure.side_effect = RuntimeError("crash")
             resp = client.get("/quest/verify-quest-structure/p1")
         assert resp.status_code == 500

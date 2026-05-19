@@ -148,8 +148,8 @@ class ConversationService:
         if is_instructor:
             if not user_id:
                 raise ValidationError("Instructor must provide a user_id to fetch quests")
-            from services.quest.quest_service import QuestService
-            quests_data = QuestService().get_quests_for_student(user_id)
+            from services.quest.quest_retrieval_service import QuestRetrievalService
+            quests_data = QuestRetrievalService().get_quests_for_student(user_id)
 
             target_student = self.student_dao.get_student_by_id(user_id)
             if not target_student:
@@ -283,8 +283,8 @@ class ConversationService:
                 logger.info("Saved grade %s for quest %s", overall_score, individual_quest_id)
                 return
 
-            from services.quest.quest_service import QuestService
-            quests = QuestService().get_quests_for_student(user_id)
+            from services.quest.quest_retrieval_service import QuestRetrievalService
+            quests = QuestRetrievalService().get_quests_for_student(user_id)
             target_quest = None
             for quest in quests:
                 if period_id and quest.get("week") == week and quest.get("period_id") == period_id:

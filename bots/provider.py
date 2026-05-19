@@ -14,6 +14,8 @@ class BotProvider:
     """Returns real bot instances. All imports are lazy to avoid loading the
     OpenAI SDK at module import time when it isn't needed."""
 
+    is_mock: bool = False
+
     def create_hw_agent(self, student, period, schedule, conversation_id=None, previous_response_id=None):
         from bots.quests.quest_agent import HWAgent
         return HWAgent(
@@ -184,6 +186,14 @@ class BotProvider:
         from agents import Runner
         return Runner
 
+    def create_vector_store(self, name: str) -> str:
+        from integrations import openai_vector_store
+        return openai_vector_store.create_empty(name)
+
+    def ingest_files_to_vector_store(self, vector_store_id: str, file_paths: list) -> list:
+        from services.period.period_file_service import PeriodFileService
+        return PeriodFileService().ingest_to_openai(vector_store_id, file_paths)
+
 
 class MockBotProvider(BotProvider):
     """Returns fast mock implementations. Real Agent objects are still created
@@ -272,3 +282,9 @@ class MockBotProvider(BotProvider):
     def runner(self):
         from bots._mocks import MockRunner
         return MockRunner
+
+    def create_vector_store(self, name: str) -> str:
+        return "mock-vs-id"
+
+    def ingest_files_to_vector_store(self, vector_store_id: str, file_paths: list) -> list:
+        return []
