@@ -76,7 +76,7 @@ stages:
               cd eduquest-backend
               source venv/bin/activate
               python -c "import json; from main import app; print(json.dumps(app.openapi()))" > /tmp/openapi_fresh.json
-              diff ../openapi.json /tmp/openapi_fresh.json
+              diff openapi.json /tmp/openapi_fresh.json
             displayName: 'Verify openapi.json is up to date'
             env:
               JWT_SECRET_KEY: test-secret-key
