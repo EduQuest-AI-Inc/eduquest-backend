@@ -85,12 +85,12 @@ def test_get_periods_by_owner():
 @pytest.mark.unit
 def test_get_period_by_id():
     svc = _svc()
-    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1"}
+    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "status": "draft"}
 
     result = svc.get_period_by_id("p1")
 
     svc.period_dao.get_period_by_id.assert_called_once_with("p1")
-    assert result == {"period_id": "p1"}
+    assert result == {"period_id": "p1", "status": "draft", "has_curriculum": True}
 
 
 @pytest.mark.unit
@@ -234,6 +234,7 @@ def test_delete_period_deletes_vector_store_and_s3_files(monkeypatch):
         "vector_store_id": "vs42",
         "file_urls": ["s3/key1", "s3/key2"],
     }
+    svc.period_dao.get_forks_by_period.return_value = []
 
     mock_delete_store = MagicMock()
     mock_delete_s3 = MagicMock()
@@ -257,6 +258,7 @@ def test_delete_period_skips_vector_store_when_none(monkeypatch):
         "vector_store_id": None,
         "file_urls": [],
     }
+    svc.period_dao.get_forks_by_period.return_value = []
 
     mock_delete_store = MagicMock()
     mock_delete_s3 = MagicMock()
@@ -281,6 +283,7 @@ def test_delete_period_skips_local_file_urls(monkeypatch):
         "vector_store_id": None,
         "file_urls": ["local/file.pdf", "s3/remote.pdf"],
     }
+    svc.period_dao.get_forks_by_period.return_value = []
 
     mock_delete_store = MagicMock()
     mock_delete_s3 = MagicMock()

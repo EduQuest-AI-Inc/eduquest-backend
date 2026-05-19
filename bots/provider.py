@@ -14,6 +14,8 @@ class BotProvider:
     """Returns real bot instances. All imports are lazy to avoid loading the
     OpenAI SDK at module import time when it isn't needed."""
 
+    is_mock: bool = False
+
     def create_hw_agent(self, student, period, schedule, conversation_id=None, previous_response_id=None):
         from bots.quests.quest_agent import HWAgent
         return HWAgent(
@@ -72,6 +74,10 @@ class BotProvider:
     def create_curriculum_only_quest_agent(self, period: dict, schedule: list):
         from bots.quests.curriculum_only_quest_agent import CurriculumOnlyQuestAgent
         return CurriculumOnlyQuestAgent(period=period, schedule=schedule)
+
+    def create_coverage_evaluator(self):
+        from bots.curriculum.coverage_evaluator import CoverageEvaluator
+        return CoverageEvaluator()
 
     def create_pptx_agent(self):
         from bots.slideshow.pptx_agent import PptxAgent
@@ -180,6 +186,14 @@ class BotProvider:
         from agents import Runner
         return Runner
 
+    def create_vector_store(self, name: str) -> str:
+        from integrations import openai_vector_store
+        return openai_vector_store.create_empty(name)
+
+    def ingest_files_to_vector_store(self, vector_store_id: str, file_paths: list) -> list:
+        from services.period.period_file_service import PeriodFileService
+        return PeriodFileService().ingest_to_openai(vector_store_id, file_paths)
+
 
 class MockBotProvider(BotProvider):
     """Returns fast mock implementations. Real Agent objects are still created
@@ -220,12 +234,14 @@ class MockBotProvider(BotProvider):
         )
 
     def create_profile_agent(self):
-        from bots.profile_agent import create_profile_agent
-        return create_profile_agent()
+        from bots.profile_agent import ProfileResponse
+        from bots._mocks import _MockAgent
+        return _MockAgent(ProfileResponse)
 
     def create_ltg_agent(self, vector_store_id: str, curriculum: dict):
-        from bots.ltg_agent import create_ltg_agent
-        return create_ltg_agent(vector_store_id, curriculum)
+        from bots.ltg_agent import LTGResponse
+        from bots._mocks import _MockAgent
+        return _MockAgent(LTGResponse)
 
     def create_schedule_agent(self, student, period, schedule, goal_text, previous_response_id=None):
         from bots._mocks import MockLTGScheduleAgent
@@ -238,6 +254,10 @@ class MockBotProvider(BotProvider):
     def create_curriculum_only_quest_agent(self, period: dict, schedule: list):
         from bots._mocks import MockCurriculumOnlyQuestAgent
         return MockCurriculumOnlyQuestAgent(period=period, schedule=schedule)
+
+    def create_coverage_evaluator(self):
+        from bots._mocks import MockCoverageEvaluator
+        return MockCoverageEvaluator()
 
     def create_pptx_agent(self):
         from bots._mocks import MockPptxAgent
@@ -264,3 +284,9 @@ class MockBotProvider(BotProvider):
     def runner(self):
         from bots._mocks import MockRunner
         return MockRunner
+
+    def create_vector_store(self, name: str) -> str:
+        return "mock-vs-id"
+
+    def ingest_files_to_vector_store(self, vector_store_id: str, file_paths: list) -> list:
+        return []

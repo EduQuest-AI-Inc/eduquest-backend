@@ -249,7 +249,7 @@ def test_start_update_assistant_no_period_id_in_quest():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-@patch("services.quest.quest_service.QuestService")
+@patch("services.quest.quest_retrieval_service.QuestRetrievalService")
 @patch("services.conversation.conversation_service.initiate_teacher_feedback",
        return_value={"conversation_id": "cid1", "response": "Feedback!"})
 def test_start_update_assistant_teacher_happy_path(mock_feedback, mock_qs_cls):
@@ -269,7 +269,7 @@ def test_start_update_assistant_teacher_happy_path(mock_feedback, mock_qs_cls):
 
 
 @pytest.mark.unit
-@patch("services.quest.quest_service.QuestService")
+@patch("services.quest.quest_retrieval_service.QuestRetrievalService")
 @patch("services.conversation.conversation_service.initiate_teacher_feedback",
        return_value={"conversation_id": "cid1", "response": "X"})
 def test_start_update_assistant_teacher_not_found(mock_feedback, mock_qs_cls):
@@ -283,7 +283,7 @@ def test_start_update_assistant_teacher_not_found(mock_feedback, mock_qs_cls):
 
 
 @pytest.mark.unit
-@patch("services.quest.quest_service.QuestService")
+@patch("services.quest.quest_retrieval_service.QuestRetrievalService")
 @patch("services.conversation.conversation_service.initiate_teacher_feedback",
        return_value={"conversation_id": "cid1", "response": "X"})
 def test_start_update_assistant_target_student_not_found(mock_feedback, mock_qs_cls):

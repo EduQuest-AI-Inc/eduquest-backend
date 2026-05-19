@@ -44,6 +44,22 @@ class StudentDAO(SupabaseBaseDAO):
     def get_student_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         return self._join_user('user_id', user_id)
 
+    def get_students_by_ids(self, user_ids: list) -> list:
+        if not user_ids:
+            return []
+        response = self._execute(
+            self.client.table(self.table_name)
+            .select('*, user!inner(*)')
+            .in_('user_id', user_ids)
+        )
+        results = []
+        for row in (response.data or []):
+            row = dict(row)
+            user_data = row.pop('user', {})
+            row.update(user_data)
+            results.append(row)
+        return results
+
     def get_student_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         user = self._user_dao.get_by_email(email)
         if not user:

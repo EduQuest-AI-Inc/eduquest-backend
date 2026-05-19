@@ -5,6 +5,15 @@ from fastapi.testclient import TestClient
 from main import app
 from routers.deps import get_auth, AuthPayload
 
+_PERIOD = {
+    "period_id": "P1",
+    "name": "Math",
+    "status": "draft",
+    "processing_status": "idle",
+    "owner_id": "teacher-1",
+    "is_summer_quest": False,
+}
+
 
 def _teacher_auth():
     return AuthPayload(sub="teacher-1", role="teacher", token="fake-token")
@@ -28,8 +37,8 @@ class TestGetTeacherPeriods:
     @patch("routers.teacher.period_management_service")
     def test_get_periods_success(self, mock_svc, client):
         mock_svc.get_periods_by_owner.return_value = [
-            {"period_id": "P1", "name": "Math"},
-            {"period_id": "P2", "name": "Science"},
+            _PERIOD,
+            {**_PERIOD, "period_id": "P2", "name": "Science"},
         ]
         resp = client.get("/teacher/periods")
         assert resp.status_code == 200

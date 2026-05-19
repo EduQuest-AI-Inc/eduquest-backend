@@ -4,6 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from routers.deps import AuthPayload, Role, require_active_membership, require_roles
+from responses.parent import (
+    CreateStudentProfileResponse,
+    EnrollStudentResponse,
+    GenerateInviteResponse,
+    ParentMyPeriodsResponse,
+    StudentsResponse,
+)
 from models.parent import CreateStudentProfileRequest
 from services.billing.membership_service import MembershipRequiredError, MembershipService, PlanLimitExceededError
 from services.enrollment.enrollment_service import EnrollmentService
@@ -25,20 +32,20 @@ def _ensure_parent(auth: AuthPayload) -> None:
         raise HTTPException(status_code=403, detail="Requires parent role")
 
 
-@router.get("/my-periods")
+@router.get("/my-periods", response_model=ParentMyPeriodsResponse)
 def my_periods(auth: AuthPayload = Depends(require_roles(Role.PARENT))):
     # Listing remains open even if membership lapses; gate is on management.
     periods = period_management_service.get_periods_by_owner(auth.sub)
     return {"periods": periods}
 
 
-@router.post("/generate-invite", status_code=201)
+@router.post("/generate-invite", status_code=201, response_model=GenerateInviteResponse)
 def generate_invite(auth: AuthPayload = Depends(require_active_membership)):
     _ensure_parent(auth)
     return parent_service.generate_invite(auth.sub)
 
 
-@router.get("/students")
+@router.get("/students", response_model=StudentsResponse)
 def get_students(auth: AuthPayload = Depends(require_active_membership)):
     _ensure_parent(auth)
     students = parent_service.get_linked_students(auth.sub)
@@ -50,7 +57,7 @@ class EnrollStudentRequest(BaseModel):
     period_id: str
 
 
-@router.post("/enroll-student", status_code=200)
+@router.post("/enroll-student", status_code=200, response_model=EnrollStudentResponse)
 def enroll_student(
     body: EnrollStudentRequest,
     auth: AuthPayload = Depends(require_active_membership),
@@ -94,7 +101,7 @@ def enroll_student(
     return {"message": "Student enrolled in class", "period": result}
 
 
-@router.post("/create-student-profile", status_code=201)
+@router.post("/create-student-profile", status_code=201, response_model=CreateStudentProfileResponse)
 def create_student_profile(
     payload: CreateStudentProfileRequest,
     auth: AuthPayload = Depends(require_active_membership),

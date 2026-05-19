@@ -8,9 +8,10 @@ from exceptions.not_found_error import NotFoundError
 from exceptions.permission_error import PermissionError
 from exceptions.validation_error import ValidationError
 from services.curriculum.curriculum_service import CurriculumService
-from services.quest.quest_service import QuestService
+from services.quest.quest_grading_service import QuestGradingService
 
 logger = logging.getLogger(__name__)
+
 
 
 def _build_schedule(curriculum: dict[str, Any]) -> list[dict[str, Any]]:
@@ -54,7 +55,7 @@ class PeriodSummerQuestService:
         self.period_dao = PeriodDAO()
         self.curriculum_service = CurriculumService(bot_provider=bot_provider)
         self.ltg_goal_dao = StudentLongTermGoalDAO()
-        self.quest_service = QuestService()
+        self.quest_service = QuestGradingService()
 
     def generate_summer_quests(self, owner_id: str, period_id: str) -> dict[str, Any]:
         period = self.period_dao.get_period_by_id(period_id)
@@ -134,3 +135,11 @@ class PeriodSummerQuestService:
             "goal_text": goal_text,
             "saved_quests": save_result,
         }
+
+    def run_as_background_task(self, owner_id: str, period_id: str) -> None:
+        try:
+            self.generate_summer_quests(owner_id=owner_id, period_id=period_id)
+        except Exception as exc:
+            logger.error(
+                "Summer quest generation failed for period %s: %s", period_id, exc, exc_info=True
+            )

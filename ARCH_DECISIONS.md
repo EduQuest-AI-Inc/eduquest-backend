@@ -21,6 +21,8 @@ Role enforcement lives exclusively at the **router layer** via FastAPI `Depends(
 
 Enrollment checks — verifying a user is a member of a specific period — are also an authorization concern, not business logic. They belong at the router layer. Since `period_id` always arrives from the request body, call `EnrollmentService().check_enrolled(user_id, period_id)` at the top of the handler, before any service call. Service methods must not perform enrollment checks.
 
+**Exception:** `PeriodQuestService._check_enrolled` in `services/period/period_quest_service.py`. The `period_id` here is resolved from quest data fetched *inside* `ConversationService` — it is not present in the request body at router time, so the router cannot perform the check up front. The method is marked `# arch-ok` at its call site.
+
 Three roles: `Role.STUDENT`, `Role.TEACHER`, `Role.PARENT` — defined as a `str, Enum` in `api/deps.py` alongside `AuthPayload` and `get_auth()`.
 
 Canonical dependencies (all in `api/deps.py`):
@@ -32,6 +34,14 @@ Canonical dependencies (all in `api/deps.py`):
 Supabase RLS is the secondary enforcement layer. Do not duplicate RLS logic in Python.
 
 Audit: `pytest tests/unit/routes/test_rbac_audit.py` verifies every route either has an auth dependency or is listed in `EXPLICITLY_PUBLIC_ROUTES`.
+
+### Shared resource fetching — fetch once at the router, pass the object down
+
+When multiple services in a single request need the same database row, fetch it once in a router-level `Depends()` and pass the object as a parameter to every service that needs it. Services must not re-query a resource they have already been given.
+
+The canonical example is `period`: routes that call several sub-services all operating on the same period should declare a `get_period(period_id, auth)` dependency in `deps.py` that fetches the row once and raises `NotFoundError` if missing. Each service method then accepts a `Period` parameter instead of a `period_id` and never calls the DAO itself.
+
+This is the inverse of the ownership-check rule above: ownership checks stay in the service because the service is the first to fetch the resource; shared-resource fetching moves to the router because the resource is needed before any service is called and would otherwise be fetched redundantly by each one.
 
 ### The frontend never calls Supabase for data reads or writes — all domain data goes through FastAPI
 
@@ -52,6 +62,8 @@ Individual bot classes (`HWAgent`, `GradingOrchestrator`, `CurriculumAgent`, etc
 A `@function_tool` body must do nothing except call a named public function and return its result. All business logic belongs in that extracted function, which accepts its dependencies as parameters. No module-level instantiation in `bots/tools/` files; use lazy initialisation (`_x: T | None = None`, set on first call) for any singleton that the thin wrapper needs to supply as a default.
 
 This is the agent-layer equivalent of "Routers are HTTP-boundary-only." The extracted function lives in `utils/` if it is pure control flow with injected dependencies, or in a dedicated service if it needs its own DAO/provider wiring.
+
+**`@function_tool` → sub-agent pattern:** `SLIDE_TOOLS` in `bots/tools/` call `ContentWriterAgent` and `VisualReviewAgent` as sub-agents. This is the intended multi-agent design and is **not** a violation of the "individual bot classes never imported outside `bots/provider.py`" rule. The full call chain is `PptxAgent (provider entry point) → OrchestratorAgent → SLIDE_TOOLS (@function_tool) → ContentWriterAgent / VisualReviewAgent`. When `MockBotProvider` is active, `MockPptxAgent` replaces the entire `PptxAgent` entry point, so `OrchestratorAgent` and its `SLIDE_TOOLS` never execute — the mock boundary is correct. Additionally, `bots/slideshow/pptx_agent.py` imports `OrchestratorAgent` directly; this is intra-`bots/` composition between the public entry point and its private implementation detail, not a service-layer violation.
 
 ### Services receive their dependencies — they never instantiate DAOs, services, integration modules, or the bot provider inline
 
@@ -81,6 +93,14 @@ The distinction between these two directories is whether the code needs a networ
 
 Renderers (PPTX, HTML, chart generation) belong in `utils/rendering/` because they are local library calls using matplotlib, python-pptx, and Jinja2 — no API keys, no network. They must not live under `services/` or `integrations/`.
 
+### Every route handler must declare `response_model=` pointing to a DTO in `responses/`
+
+All route handlers must declare `response_model=` pointing to a Pydantic DTO in `eduquest-backend/responses/`. No handler may return an untyped dict without a corresponding response model. DTOs live in `responses/[router_name].py` and use `model_config = ConfigDict(extra="ignore")` so extra fields from Supabase dicts are stripped rather than causing validation errors.
+
+When a router or response file changes, `openapi.json` must be regenerated (via the `export-openapi` pre-commit hook or manually) and committed alongside the change. This keeps FastAPI's OpenAPI schema accurate and allows `openapi-typescript` to generate correct frontend types automatically. Bypassing this with `--no-verify` is a policy violation, not just a hook skip.
+
+Agent and conversation endpoints where output structure is not yet stable may use `response_model=dict[str, Any]` as a placeholder so they appear in the schema.
+
 ---
 
 ## Testing Decisions
@@ -102,3 +122,15 @@ Tests that need a mock bot provider pass `MockBotProvider()` directly to the ser
 ### Private methods are tested through the public API, not directly
 
 Test files must not call underscore-prefixed methods (`_check_profile`, `_extract_conversation_id`, etc.) directly. If the public-facing method covers all branches of a private method, the private tests are redundant and create rename-friction. If a private method is complex enough that the public path cannot reach all its branches in isolation, the right fix is to make it a standalone public function in a utility module — not to test it directly while leaving it private.
+
+### Response model field types must match the database column types
+
+`responses/` Pydantic fields must use the Python type the database actually returns — pay particular attention to `integer → int`, `boolean → bool`, and `text[] → list[str]`. A mismatch raises a `ResponseValidationError` (500) the first time that endpoint is hit with real data, not at startup. Mock data in route tests must use the same types, or the test will pass against the wrong declaration and hide the bug. `tests/unit/routes/test_response_model_types.py` enforces compatibility between domain models and response models automatically.
+
+### No `PYTEST_CURRENT_TEST` guards in production code
+
+Production code must never contain `if os.getenv("PYTEST_CURRENT_TEST"): raise`. This pattern hides failure paths from tests rather than fixing them — it makes a broad `except` behave differently in tests and in production, which defeats the purpose of testing. If a broad `except` makes a failure mode untestable, split the `try` block into narrower scopes instead (one for the agent/external-call result, one for the S3 upload, etc.) so each can be exercised independently by injecting a mock that raises.
+
+### External service calls in services must be wrapped in `try/except`
+
+Every call to S3, Stripe, SES, Canvas, Perplexity, or any other external service inside a service method must be wrapped in `try/except`. For non-critical side-effects (audit uploads, analytics, fire-and-forget notifications) log-and-swallow with `exc_info=True` and continue. For operations that are critical to the caller's primary flow, re-raise as `ValidationError` (400) with a user-facing message. Bare unhandled exceptions from external clients produce opaque 500s that are invisible in monitoring until a user reports them and block all preceding work (e.g. a grading result already computed) from reaching the user.

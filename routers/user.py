@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from routers.deps import AuthPayload, get_auth, require_student_viewer
+from responses.user import TutorialStatusResponse, UpdateTutorialResponse, UserProfileResponse
 from services.user.user_service import UserService
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ def _fetch_user_profile(user_id: str) -> Optional[dict]:
     return profile
 
 
-@router.get("/profile")
+@router.get("/profile", response_model=UserProfileResponse)
 def get_profile(
     user_id: Optional[str] = None,
     auth: AuthPayload = Depends(require_student_viewer("user_id")),
@@ -74,13 +75,13 @@ class UpdateTutorialRequest(BaseModel):
     completed_tutorial: bool = False
 
 
-@router.post("/update-tutorial")
+@router.post("/update-tutorial", response_model=UpdateTutorialResponse)
 def update_tutorial(body: UpdateTutorialRequest, auth: AuthPayload = Depends(get_auth)):
     user_service.update_tutorial_status(auth.sub, body.completed_tutorial)
     return {"message": "Tutorial status updated successfully"}
 
 
-@router.get("/tutorial-status")
+@router.get("/tutorial-status", response_model=TutorialStatusResponse)
 def get_tutorial_status(auth: AuthPayload = Depends(get_auth)):
     status = user_service.get_tutorial_status(auth.sub)
     return {"completed_tutorial": status}

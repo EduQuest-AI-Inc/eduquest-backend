@@ -8,6 +8,7 @@ class LessonPptx(BaseModel):
     status: str = 'pending'
     s3_key: Optional[str] = None
     html_key: Optional[str] = None
+    attempt_count: int = 0
     pptx_id: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None

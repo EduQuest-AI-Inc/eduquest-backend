@@ -27,6 +27,25 @@ else
     echo "SSM agent already running"
 fi
 
+echo "Configuring systemd journal log cap..."
+sudo sed -i '/^SystemMaxUse=/d' /etc/systemd/journald.conf
+echo "SystemMaxUse=100M" | sudo tee -a /etc/systemd/journald.conf > /dev/null
+sudo systemctl restart systemd-journald
+echo "Journal capped at 100MB"
+
+echo "Configuring snap to retain only 2 revisions..."
+sudo snap set system refresh.retain=2
+echo "Snap revision retention set to 2"
+
+echo "Setting up weekly apt autoremove..."
+sudo tee /etc/cron.weekly/apt-autoremove > /dev/null <<'EOF'
+#!/bin/bash
+apt-get autoremove -y
+apt-get clean
+EOF
+sudo chmod +x /etc/cron.weekly/apt-autoremove
+echo "Weekly apt autoremove configured"
+
 echo "Creating application directory..."
 mkdir -p /home/ubuntu/eduquest-backend
 cd /home/ubuntu/eduquest-backend

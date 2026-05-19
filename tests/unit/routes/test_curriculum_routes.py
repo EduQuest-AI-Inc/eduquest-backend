@@ -1,9 +1,9 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from main import app
-from routers.deps import get_auth, AuthPayload, Role
+from routers.deps import get_auth, get_period, AuthPayload, Role
 from routers.curriculum import _get_curriculum_service, _get_slides_service, _membership_or_summer
 from exceptions.not_found_error import NotFoundError
 
@@ -20,10 +20,15 @@ def _deny_membership():
     )
 
 
+def _period_not_found():
+    raise HTTPException(status_code=404, detail=f"Period '{_PERIOD_ID}' not found")
+
+
 @pytest.fixture
 def client():
     app.dependency_overrides[get_auth] = lambda: _TEACHER_AUTH
     app.dependency_overrides[_membership_or_summer] = lambda: _TEACHER_AUTH
+    app.dependency_overrides[get_period] = lambda: _OWNED_PERIOD
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
@@ -45,9 +50,7 @@ class TestGenerateCurriculum:
         mock_cs = MagicMock()
         mock_cs.trigger_generation.return_value = None
         app.dependency_overrides[_get_curriculum_service] = lambda: mock_cs
-        with patch("routers.curriculum._period_management_svc") as mock_dao:
-            mock_dao.get_period_by_id.return_value = _OWNED_PERIOD
-            resp = client.post(f"/curriculum/{_PERIOD_ID}/generate")
+        resp = client.post(f"/curriculum/{_PERIOD_ID}/generate")
         app.dependency_overrides.pop(_get_curriculum_service, None)
         assert resp.status_code == 202
         assert "message" in resp.json()
@@ -59,9 +62,9 @@ class TestGenerateCurriculum:
 
     @pytest.mark.api
     def test_generate_period_not_found_returns_404(self, client):
-        with patch("routers.curriculum._period_management_svc") as mock_dao:
-            mock_dao.get_period_by_id.return_value = None
-            resp = client.post(f"/curriculum/{_PERIOD_ID}/generate")
+        app.dependency_overrides[get_period] = _period_not_found
+        resp = client.post(f"/curriculum/{_PERIOD_ID}/generate")
+        app.dependency_overrides[get_period] = lambda: _OWNED_PERIOD
         assert resp.status_code == 404
 
 
@@ -73,9 +76,7 @@ class TestGetCurriculum:
         mock_cs = MagicMock()
         mock_cs.get_curriculum.return_value = curriculum_data
         app.dependency_overrides[_get_curriculum_service] = lambda: mock_cs
-        with patch("routers.curriculum._period_management_svc") as mock_dao:
-            mock_dao.get_period_by_id.return_value = _OWNED_PERIOD
-            resp = client.get(f"/curriculum/{_PERIOD_ID}")
+        resp = client.get(f"/curriculum/{_PERIOD_ID}")
         app.dependency_overrides.pop(_get_curriculum_service, None)
         assert resp.status_code == 200
         body = resp.json()
@@ -86,9 +87,7 @@ class TestGetCurriculum:
         mock_cs = MagicMock()
         mock_cs.get_curriculum.side_effect = NotFoundError("not found")
         app.dependency_overrides[_get_curriculum_service] = lambda: mock_cs
-        with patch("routers.curriculum._period_management_svc") as mock_dao:
-            mock_dao.get_period_by_id.return_value = _OWNED_PERIOD
-            resp = client.get(f"/curriculum/{_PERIOD_ID}")
+        resp = client.get(f"/curriculum/{_PERIOD_ID}")
         app.dependency_overrides.pop(_get_curriculum_service, None)
         assert resp.status_code == 404
 
@@ -100,12 +99,10 @@ class TestSaveCurriculum:
         mock_cs = MagicMock()
         mock_cs.save_curriculum.return_value = None
         app.dependency_overrides[_get_curriculum_service] = lambda: mock_cs
-        with patch("routers.curriculum._period_management_svc") as mock_dao:
-            mock_dao.get_period_by_id.return_value = _OWNED_PERIOD
-            resp = client.patch(
-                f"/curriculum/{_PERIOD_ID}",
-                json={"weeks": [], "lessons": [], "concepts": [], "skills": [], "concept_skills": []},
-            )
+        resp = client.patch(
+            f"/curriculum/{_PERIOD_ID}",
+            json={"weeks": [], "lessons": [], "concepts": [], "skills": [], "concept_skills": []},
+        )
         app.dependency_overrides.pop(_get_curriculum_service, None)
         assert resp.status_code == 200
         assert "message" in resp.json()
@@ -118,12 +115,10 @@ class TestUpdateConcept:
         mock_cs = MagicMock()
         mock_cs.update_concept.return_value = None
         app.dependency_overrides[_get_curriculum_service] = lambda: mock_cs
-        with patch("routers.curriculum._period_management_svc") as mock_dao:
-            mock_dao.get_period_by_id.return_value = _OWNED_PERIOD
-            resp = client.patch(
-                f"/curriculum/{_PERIOD_ID}/concepts/algebra",
-                json={"description": "Updated description"},
-            )
+        resp = client.patch(
+            f"/curriculum/{_PERIOD_ID}/concepts/algebra",
+            json={"description": "Updated description"},
+        )
         app.dependency_overrides.pop(_get_curriculum_service, None)
         assert resp.status_code == 200
         assert "message" in resp.json()
@@ -133,12 +128,10 @@ class TestUpdateConcept:
         mock_cs = MagicMock()
         mock_cs.update_concept.side_effect = NotFoundError("concept not found")
         app.dependency_overrides[_get_curriculum_service] = lambda: mock_cs
-        with patch("routers.curriculum._period_management_svc") as mock_dao:
-            mock_dao.get_period_by_id.return_value = _OWNED_PERIOD
-            resp = client.patch(
-                f"/curriculum/{_PERIOD_ID}/concepts/nonexistent",
-                json={},
-            )
+        resp = client.patch(
+            f"/curriculum/{_PERIOD_ID}/concepts/nonexistent",
+            json={},
+        )
         app.dependency_overrides.pop(_get_curriculum_service, None)
         assert resp.status_code == 404
 
@@ -150,12 +143,10 @@ class TestUpdateSkill:
         mock_cs = MagicMock()
         mock_cs.update_skill.return_value = None
         app.dependency_overrides[_get_curriculum_service] = lambda: mock_cs
-        with patch("routers.curriculum._period_management_svc") as mock_dao:
-            mock_dao.get_period_by_id.return_value = _OWNED_PERIOD
-            resp = client.patch(
-                f"/curriculum/{_PERIOD_ID}/skills/multiplication",
-                json={"description": "Updated skill"},
-            )
+        resp = client.patch(
+            f"/curriculum/{_PERIOD_ID}/skills/multiplication",
+            json={"description": "Updated skill"},
+        )
         app.dependency_overrides.pop(_get_curriculum_service, None)
         assert resp.status_code == 200
         assert "message" in resp.json()
@@ -165,12 +156,10 @@ class TestUpdateSkill:
         mock_cs = MagicMock()
         mock_cs.update_skill.side_effect = NotFoundError("skill not found")
         app.dependency_overrides[_get_curriculum_service] = lambda: mock_cs
-        with patch("routers.curriculum._period_management_svc") as mock_dao:
-            mock_dao.get_period_by_id.return_value = _OWNED_PERIOD
-            resp = client.patch(
-                f"/curriculum/{_PERIOD_ID}/skills/nonexistent",
-                json={},
-            )
+        resp = client.patch(
+            f"/curriculum/{_PERIOD_ID}/skills/nonexistent",
+            json={},
+        )
         app.dependency_overrides.pop(_get_curriculum_service, None)
         assert resp.status_code == 404
 
@@ -184,9 +173,7 @@ class TestApprovePeriod:
         mock_ss = MagicMock()
         app.dependency_overrides[_get_curriculum_service] = lambda: mock_cs
         app.dependency_overrides[_get_slides_service] = lambda: mock_ss
-        with patch("routers.curriculum._period_management_svc") as mock_dao:
-            mock_dao.get_period_by_id.return_value = _OWNED_PERIOD
-            resp = client.post(f"/curriculum/{_PERIOD_ID}/approve")
+        resp = client.post(f"/curriculum/{_PERIOD_ID}/approve")
         app.dependency_overrides.pop(_get_curriculum_service, None)
         app.dependency_overrides.pop(_get_slides_service, None)
         assert resp.status_code == 202

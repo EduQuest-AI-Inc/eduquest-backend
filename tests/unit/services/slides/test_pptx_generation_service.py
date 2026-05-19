@@ -195,10 +195,10 @@ def test_run_batch_partial_failure():
     assert "failed" in statuses
 
 
-# ── run_batch — agent raises (pytest mode re-raises) ─────────────────────────
+# ── run_batch — agent raises → status written as "failed" ────────────────────
 
 @pytest.mark.unit
-def test_run_batch_agent_raises_in_pytest_mode():
+def test_run_batch_agent_raises_writes_failed():
     svc = _svc(agent=_mock_agent(raises=RuntimeError("agent exploded")))
     svc.period_dao.get_period_by_id.return_value = _period_row()
     svc.lesson_pptx_dao.get_by_period.return_value = [_pptx_row()]
@@ -207,20 +207,18 @@ def test_run_batch_agent_raises_in_pytest_mode():
     svc.skill_dao.get_skills_by_period.return_value = _curriculum()["skills"]
     svc.concept_skill_dao.get_all_for_period.return_value = _curriculum()["concept_skills"]
 
-    with pytest.raises(RuntimeError, match="agent exploded"):
-        svc.run_batch("p1")
+    svc.run_batch("p1")  # must not propagate
 
     statuses = [c[0][1].get("status") for c in svc.lesson_pptx_dao.update_status.call_args_list]
-    assert statuses[0] == "generating"
-    assert len(statuses) == 1  # exception before "failed" could be written
+    assert statuses == ["generating", "failed"]
 
 
-# ── run_batch — agent raises (production path writes "failed") ────────────────
+# ── run_batch — agent timeout → status written as "failed" ───────────────────
 
 @pytest.mark.unit
-def test_run_batch_agent_raises_writes_failed_in_prod(monkeypatch):
-    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-    svc = _svc(agent=_mock_agent(raises=RuntimeError("agent exploded")))
+def test_run_batch_agent_timeout_writes_failed():
+    import asyncio
+    svc = _svc(agent=_mock_agent(raises=asyncio.TimeoutError()))
     svc.period_dao.get_period_by_id.return_value = _period_row()
     svc.lesson_pptx_dao.get_by_period.return_value = [_pptx_row()]
     svc.lesson_dao.get_lessons_by_period.return_value = _curriculum()["lessons"]
@@ -228,7 +226,7 @@ def test_run_batch_agent_raises_writes_failed_in_prod(monkeypatch):
     svc.skill_dao.get_skills_by_period.return_value = _curriculum()["skills"]
     svc.concept_skill_dao.get_all_for_period.return_value = _curriculum()["concept_skills"]
 
-    svc.run_batch("p1")
+    svc.run_batch("p1")  # must not propagate
 
     statuses = [c[0][1].get("status") for c in svc.lesson_pptx_dao.update_status.call_args_list]
     assert statuses == ["generating", "failed"]

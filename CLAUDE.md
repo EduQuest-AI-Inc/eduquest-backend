@@ -15,8 +15,10 @@ eduquest-backend/
 │   ├── conversation.py             # /conversation — profile assistant, update assistant
 │   ├── curriculum.py               # /curriculum — per-period curriculum generation/approval
 │   ├── enrollment.py               # /enrollment — enroll/unenroll students
+│   ├── feedback.py                 # /feedback — student/teacher feedback submission and retrieval
 │   ├── lessons.py                  # /lessons — presigned URLs for lesson PPTX and HTML
 │   ├── ltg.py                      # /period — LTG conversation routes (mounted under /period)
+│   ├── marketplace.py              # /marketplace — resource marketplace operations
 │   ├── parent.py                   # /parent — parent invite, child lookup
 │   ├── period.py                   # /period — period CRUD, homework agent, file uploads
 │   ├── quest.py                    # /quest — quest retrieval, submission
@@ -33,9 +35,13 @@ eduquest-backend/
 │   ├── curriculum/                 # curriculum_service.py
 │   ├── enrollment/                 # enrollment_service.py (CRUD, verify_and_enroll, unenroll,
 │   │                               #   get_my_periods, assert_enrolled)
+│   ├── feedback/                   # feedback_service.py
 │   ├── knowledge_graph/            # knowledge_graph_service.py
+│   ├── lessons/                    # lessons_service.py
+│   ├── marketplace/                # marketplace_service.py
 │   ├── period/                     # period_service.py, period_quest_service.py,
-│   │                               #   period_management_service.py, period_file_service.py
+│   │                               #   period_management_service.py, period_file_service.py,
+│   │                               #   period_summer_quest_service.py
 │   ├── quest/                      # quest_service.py, quest_creation_service.py,
 │   │                               #   quest_retrieval_service.py, quest_grading_service.py
 │   ├── tracking/                   # PostHog server-side analytics (posthog_client.py,
@@ -60,7 +66,15 @@ eduquest-backend/
 │   ├── conversation.py             # Conversation — chat session record
 │   ├── session.py                  # Session — JWT session record
 │   ├── parent_invite.py            # ParentInvite — invite token for parent signup
-│   └── password_reset_token.py     # PasswordResetToken — reset link token
+│   ├── password_reset_token.py     # PasswordResetToken — reset link token
+│   ├── week.py                     # Week — weekly division within a period
+│   ├── lesson.py                   # Lesson — lesson unit within a week
+│   ├── lesson_pptx.py              # LessonPptx — per-lesson PPTX generation state & S3 reference
+│   ├── slide_plan.py               # SlidePlan — PPTX generation plan
+│   ├── concept.py                  # Concept — concept taught in a lesson
+│   ├── skill.py                    # Skill — measurable skill with mastery config
+│   ├── concept_skill.py            # ConceptSkill — concept ↔ skill junction
+│   └── marketplace_listing.py      # MarketplaceListing — resource marketplace entry
 ├── bots/                           # All AI agent code (subdirectory-organized)
 │   ├── grading_agent.py            # Multi-agent grading orchestrator
 │   ├── ltg_agent.py                # Long-term goal agent
@@ -120,6 +134,8 @@ eduquest-backend/
 - `/teacher` — Canvas courses, skill-mastery analytics
 - `/user` — user profile, tutorial state
 - `/pilot-waitlist` — status, join
+- `/feedback` — student/teacher feedback submission and retrieval
+- `/marketplace` — resource marketplace: browse, fork, publish
 
 ## Membership / Trial Lifecycle
 
@@ -239,11 +255,10 @@ uvicorn main:app --reload
 # Load .env before running one-off Python tests (venv doesn't auto-load it):
 set -a && source .env && set +a && python -c "..."
 
-# All pytest runs fail with ModuleNotFoundError: No module named 'supabase' in local dev
-# — supabase is not installed in the venv. Tests requiring DAO access cannot be run locally.
-# Use standalone python -c scripts for agent/integration layer testing.
+# Unit tests run fully offline — all external services (OpenAI, boto3, Supabase) are mocked.
+# Integration tests require a live Supabase connection (.env with real credentials).
 
-pytest
+eduquest-backend/venv/bin/pytest eduquest-backend/tests/unit/   # offline, no .env needed
 pytest -m unit
 pytest -m integration
 pytest -m auth

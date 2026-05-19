@@ -32,7 +32,7 @@ def test_trigger_generation_enqueues_background_task():
     svc.trigger_generation("p1", bg)
     bg.add_task.assert_called_once()
     args = bg.add_task.call_args[0]
-    assert args[0] == svc._run_generation
+    assert args[0] == svc.run_generation
     assert args[1] == "p1"
 
 

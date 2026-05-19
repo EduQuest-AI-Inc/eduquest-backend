@@ -10,6 +10,12 @@ from datetime import date
 from typing import Any
 
 
+class _MockAgent:
+    """Minimal stand-in for an OpenAI Agent — carries output_type so MockRunner can dispatch."""
+    def __init__(self, output_type):
+        self.output_type = output_type
+
+
 class MockRunResult:
     """Duck-typed stand-in for the result returned by agents.Runner.run()."""
 
@@ -360,6 +366,14 @@ class MockCurriculumAgent:
 
     async def run_and_get_json_async(self) -> dict:
         return self.run().model_dump()
+
+
+class MockCoverageEvaluator:
+    """Fast replacement for CoverageEvaluator — always reports sufficient coverage."""
+
+    def evaluate(self, course_name, course_description, has_files, grade_level=None):
+        from bots.curriculum.coverage_evaluator import CoverageResult
+        return CoverageResult(sufficient=True, gaps=[], research_queries=[])
 
 
 class MockConversationsSession:

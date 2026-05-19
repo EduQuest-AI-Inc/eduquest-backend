@@ -10,13 +10,23 @@ from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_active_membership, require_roles
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period as _get_period_dep, get_period_file_service, require_active_membership, require_roles
+from responses.period import (
+    AddFilesResponse,
+    CreatePeriodResponse,
+    ForkMetadataResponse,
+    GetPeriodResponse,
+    MultipartCompleteResponse,
+    MultipartInitResponse,
+    PeriodListResponse,
+    PresignedFileResponse,
+    SummerQuestGenerateResponse,
+    UpdatePeriodResponse,
+)
 from bots.protocol import BotProviderProtocol
-from integrations import openai_vector_store
 from integrations.s3_service import (
     complete_multipart_upload,
     create_multipart_upload,
-    download_file_from_s3,
     generate_presigned_part_url,
     get_file_presigned_url,
 )
@@ -25,84 +35,16 @@ from services.billing.membership_service import (
     MembershipService,
     PlanLimitExceededError,
 )
-from services.period.period_file_service import PeriodFileService
+from services.period.period_summer_quest_service import PeriodSummerQuestService
 from models.period import CourseMetadata
-from services.curriculum.curriculum_service import CurriculumService
 from services.period.period_management_service import PeriodManagementService
 from services.user.teacher_service import TeacherService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 period_management_service = PeriodManagementService()
-period_file_service = PeriodFileService()
 _teacher_service = TeacherService()
 membership_service = MembershipService()
-
-
-# ─── Private helpers ──────────────────────────────────────────────────────────
-
-def _process_period_files(
-    period_id: str,
-    course_name: str,
-    file_paths: list,
-    temp_dir: str,
-    user_id: str,
-    bot_provider: BotProviderProtocol,
-    file_keys: list = [],
-    canvas_api_url: str | None = None,
-    canvas_api_key: str | None = None,
-    canvas_course_id: str | None = None,
-):
-    try:
-        period_file_service.append_canvas_data(
-            temp_dir, file_paths, canvas_api_url, canvas_api_key, canvas_course_id
-        )
-
-        vector_store_id = openai_vector_store.create_empty(course_name)
-        period_management_service.update_vector_store_id(period_id, vector_store_id)
-
-        # Download presigned-uploaded files from S3 into temp_dir for local processing
-        s3_local_paths = []
-        for key in file_keys:
-            filename = key.split("/")[-1]
-            dest = os.path.join(temp_dir, filename)
-            if download_file_from_s3(key, dest):
-                s3_local_paths.append(dest)
-            else:
-                logger.warning("Skipping key %s — S3 download failed", key)
-
-        all_local_paths = file_paths + s3_local_paths
-
-        # Archive only server-generated files (e.g. Canvas JSON); presigned files already in S3
-        archived_keys = period_file_service.archive_to_s3(file_paths, period_id)
-        all_s3_keys = [k for k in archived_keys if k] + file_keys
-        period_management_service.update_file_urls(period_id, all_s3_keys)
-
-        try:
-            file_vs_ids = period_file_service.ingest_to_openai(vector_store_id, all_local_paths)
-        except Exception as e:
-            logger.error("ingest_to_openai failed for period %s: %s", period_id, e, exc_info=True)
-            raise
-        period_management_service.update_file_vector_store_ids(period_id, file_vs_ids)
-
-        period_management_service.update_processing_status(period_id, "ready")
-
-        try:
-            current_period = period_management_service.get_period_by_id(period_id)
-            if current_period and current_period.get("status") not in {"generating", "draft", "approved"}:
-                CurriculumService(bot_provider=bot_provider)._run_generation(period_id)
-            else:
-                logger.info(
-                    "Auto curriculum generation skipped for period %s: status=%s",
-                    period_id, (current_period or {}).get("status"),
-                )
-        except Exception as exc:
-            logger.error("Auto curriculum generation failed for period %s: %s", period_id, exc, exc_info=True)
-    except Exception as e:
-        logger.error("Background processing failed for period %s: %s", period_id, e, exc_info=True)
-        period_management_service.update_processing_status(period_id, "failed")
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def _membership_required_response(err: MembershipRequiredError) -> HTTPException:
@@ -144,7 +86,7 @@ def _safe_filename(filename: str) -> str:
     return re.sub(r"[^\w.\-]", "_", name) or "upload"
 
 
-@router.post("/multipart-init")
+@router.post("/multipart-init", response_model=MultipartInitResponse)
 def multipart_init(payload: _MultipartInitRequest, auth: AuthPayload = Depends(get_auth)):
     """Create a multipart upload and return presigned PUT URLs for all parts."""
     safe_name = _safe_filename(payload.filename)
@@ -155,14 +97,14 @@ def multipart_init(payload: _MultipartInitRequest, auth: AuthPayload = Depends(g
     return {"key": key, "upload_id": upload_id, "part_urls": part_urls}
 
 
-@router.post("/multipart-complete")
+@router.post("/multipart-complete", response_model=MultipartCompleteResponse)
 def multipart_complete(payload: _MultipartCompleteRequest, auth: AuthPayload = Depends(get_auth)):
     parts = [{"PartNumber": p.part_number, "ETag": p.etag} for p in payload.parts]
     key = complete_multipart_upload(payload.key, payload.upload_id, parts)
     return {"key": key}
 
 
-@router.get("/periods")
+@router.get("/periods", response_model=PeriodListResponse)
 def list_periods(auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT))):
     # Listing is allowed regardless of membership so paying users can see their
     # classes and lapsed users still see what they have but cannot manage them.
@@ -170,7 +112,7 @@ def list_periods(auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PA
     return {"periods": result}
 
 
-@router.post("/create-period", status_code=201)
+@router.post("/create-period", status_code=201, response_model=CreatePeriodResponse)
 def create_period(
     background_tasks: BackgroundTasks,
     name: str = Form(...),
@@ -192,7 +134,7 @@ def create_period(
     status: Optional[str] = Form(default="pending"),
     is_summer_quest: bool = Form(default=False),
     auth: AuthPayload = Depends(get_auth),
-    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+    period_file_svc=Depends(get_period_file_service),
 ):
     if status not in ("pending", "setup_draft"):
         raise HTTPException(status_code=400, detail="Invalid status value")
@@ -256,13 +198,11 @@ def create_period(
             shutil.rmtree(temp_dir, ignore_errors=True)
         else:
             background_tasks.add_task(
-                _process_period_files,
+                period_file_svc.process_background,
                 period_id=period_id,
                 course_name=name,
                 file_paths=file_paths,
                 temp_dir=temp_dir,
-                user_id=auth.sub,
-                bot_provider=bot_provider,
                 file_keys=file_keys,
                 canvas_api_url=canvas_api_url if auth.role == Role.TEACHER else None,
                 canvas_api_key=canvas_api_key if auth.role == Role.TEACHER else None,
@@ -280,7 +220,7 @@ def create_period(
         raise
 
 
-@router.patch("/period/{period_id}/setup")
+@router.patch("/period/{period_id}/setup", response_model=UpdatePeriodResponse)
 def update_period_setup(
     period_id: str,
     background_tasks: BackgroundTasks,
@@ -302,7 +242,7 @@ def update_period_setup(
     specific_standard_codes: Optional[str] = Form(default=None),
     status: Optional[str] = Form(default="setup_draft"),
     auth: AuthPayload = Depends(require_active_membership),
-    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+    period_file_svc=Depends(get_period_file_service),
 ):
     if status not in ("pending", "setup_draft"):
         raise HTTPException(status_code=400, detail="Invalid status value")
@@ -372,13 +312,11 @@ def update_period_setup(
 
         if is_finalizing:
             background_tasks.add_task(
-                _process_period_files,
+                period_file_svc.process_background,
                 period_id=period_id,
                 course_name=name or period.get("name", ""),
                 file_paths=file_paths,
                 temp_dir=temp_dir,
-                user_id=auth.sub,
-                bot_provider=bot_provider,
                 file_keys=all_file_keys,
                 canvas_api_url=canvas_api_url if auth.role == Role.TEACHER else None,
                 canvas_api_key=canvas_api_key if auth.role == Role.TEACHER else None,
@@ -401,7 +339,7 @@ class _AddFilesRequest(BaseModel):
     file_keys: List[str]
 
 
-@router.post("/add-files-to-period")
+@router.post("/add-files-to-period", response_model=AddFilesResponse)
 def add_files_to_period(
     payload: _AddFilesRequest,
     auth: AuthPayload = Depends(require_active_membership),
@@ -419,26 +357,25 @@ def add_files_to_period(
     return {"message": f"Successfully added {len(payload.file_keys)} files to period", "added_files": payload.file_keys}
 
 
-@router.get("/period/{period_id}")
+@router.get("/period/{period_id}", response_model=GetPeriodResponse)
 def get_period(
     period_id: str,
     auth: AuthPayload = Depends(require_active_membership),
+    period: dict = Depends(_get_period_dep),
 ):
-    period = period_management_service.get_period_by_id(period_id)
-    if not period:
-        raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
         raise HTTPException(status_code=403, detail="Unauthorized")
     return {"period": period}
 
 
-@router.delete("/period/{period_id}", status_code=204)
+@router.delete("/period/{period_id}", status_code=204, response_model=None)
 def delete_period(
     period_id: str,
     auth: AuthPayload = Depends(require_active_membership),
+    period: dict = Depends(_get_period_dep),
 ):
     try:
-        period_management_service.delete_period(period_id, auth.sub)
+        period_management_service.delete_period(period_id, auth.sub, period=period)
     except ValueError as ve:
         raise HTTPException(status_code=404, detail=str(ve))
     except PermissionError:
@@ -455,7 +392,7 @@ class _ForkMetadataUpdate(BaseModel):
     mastery_threshold: Optional[float] = None
 
 
-@router.patch("/period/{period_id}/fork-metadata")
+@router.patch("/period/{period_id}/fork-metadata", response_model=ForkMetadataResponse)
 def update_fork_metadata(
     period_id: str,
     body: _ForkMetadataUpdate,
@@ -482,48 +419,27 @@ def update_fork_metadata(
 # ─── Summer side quests ───────────────────────────────────────────────────────
 
 
-def _run_summer_quest_generation(
-    period_id: str,
-    owner_id: str,
-    bot_provider: BotProviderProtocol,
-) -> None:
-    from services.period.period_summer_quest_service import PeriodSummerQuestService
-    try:
-        service = PeriodSummerQuestService(bot_provider=bot_provider)
-        service.generate_summer_quests(owner_id=owner_id, period_id=period_id)
-    except Exception as exc:
-        logger.error(
-            "Summer quest generation failed for period %s: %s", period_id, exc, exc_info=True
-        )
-
-
-@router.post("/period/{period_id}/summer-quests/generate", status_code=202)
+@router.post("/period/{period_id}/summer-quests/generate", status_code=202, response_model=SummerQuestGenerateResponse)
 def generate_summer_quests(
     period_id: str,
     background_tasks: BackgroundTasks,
     auth: AuthPayload = Depends(get_auth),
     bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+    period: dict = Depends(_get_period_dep),
 ):
-    period = period_management_service.get_period_by_id(period_id)
-    if not period:
-        raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
         raise HTTPException(status_code=403, detail="Unauthorized")
     if not period.get("is_summer_quest"):
         raise HTTPException(status_code=400, detail="This endpoint is only for summer side quests")
 
-    background_tasks.add_task(
-        _run_summer_quest_generation,
-        period_id=period_id,
-        owner_id=auth.sub,
-        bot_provider=bot_provider,
-    )
+    svc = PeriodSummerQuestService(bot_provider=bot_provider)
+    background_tasks.add_task(svc.run_as_background_task, owner_id=auth.sub, period_id=period_id)
     return {"message": "Summer quest generation started"}
 
 
 # ─── Files ────────────────────────────────────────────────────────────────────
 
-@router.get("/get-file/{key:path}")
+@router.get("/get-file/{key:path}", response_model=PresignedFileResponse)
 def get_file_presigned(key: str, auth: AuthPayload = Depends(get_auth)):
     url = get_file_presigned_url(key)
     return {"url": url}

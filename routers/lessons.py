@@ -1,12 +1,17 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
-from routers.deps import AuthPayload, Role, get_auth
+from responses.lessons import LessonHtmlResponse, LessonPptxResponse, RegenerateLessonResponse
+
+from bots.protocol import BotProviderProtocol
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_roles
 from integrations import s3_service
 from services.enrollment.enrollment_service import EnrollmentService
 from services.lessons.lessons_service import LessonsService
 from services.period.period_management_service import PeriodManagementService
+from services.slides.pptx_generation_service import PptxGenerationService
+from exceptions.not_found_error import NotFoundError
 from exceptions.validation_error import ValidationError
 
 logger = logging.getLogger(__name__)
@@ -15,6 +20,12 @@ router = APIRouter()
 _lessons_service = LessonsService()
 _period_management_svc = PeriodManagementService()
 _enrollment_service = EnrollmentService()
+
+
+def _get_slides_service(
+    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+) -> PptxGenerationService:
+    return PptxGenerationService(bot_provider=bot_provider)
 
 
 def _assert_lesson_access(period_id: str, auth: AuthPayload) -> None:
@@ -31,7 +42,7 @@ def _assert_lesson_access(period_id: str, auth: AuthPayload) -> None:
             raise HTTPException(status_code=403, detail="Unauthorized")
 
 
-@router.get("/{lesson_id}/pptx")
+@router.get("/{lesson_id}/pptx", response_model=LessonPptxResponse)
 def get_lesson_pptx(
     lesson_id: str,
     auth: AuthPayload = Depends(get_auth),
@@ -52,7 +63,29 @@ def get_lesson_pptx(
     }
 
 
-@router.get("/{lesson_id}/html")
+@router.post("/{lesson_id}/pptx/regenerate", status_code=202, response_model=RegenerateLessonResponse)
+def regenerate_lesson_pptx(
+    lesson_id: str,
+    background_tasks: BackgroundTasks,
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
+    slides_svc: PptxGenerationService = Depends(_get_slides_service),
+):
+    pptx_row = (
+        _lessons_service.get_pptx_by_lesson_id(lesson_id)
+        or _lessons_service.get_latest_done_pptx(lesson_id)
+    )
+    if not pptx_row:
+        raise HTTPException(status_code=404, detail="No PowerPoint record for this lesson")
+    _assert_lesson_access(pptx_row["period_id"], auth)
+    try:
+        return slides_svc.regenerate_lesson(lesson_id, background_tasks)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/{lesson_id}/html", response_model=LessonHtmlResponse)
 def get_lesson_html(
     lesson_id: str,
     auth: AuthPayload = Depends(get_auth),

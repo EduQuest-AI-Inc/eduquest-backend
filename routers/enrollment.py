@@ -5,6 +5,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from routers.deps import AuthPayload, Role, get_auth, require_active_membership, require_roles, require_student_viewer
+from responses.enrollment import (
+    AcceptInviteResponse,
+    EnrollmentsResponse,
+    EnrollResponse,
+    MyPeriodItem,
+    StudentProfileResponse,
+    UnenrollResponse,
+    VerifyPeriodResponse,
+)
+from responses.period import PeriodOut
 from services.billing.membership_service import (
     MembershipRequiredError,
     MembershipService,
@@ -47,12 +57,12 @@ class AcceptInviteRequest(BaseModel):
 
 # ─── Teacher-facing enrollment management ────────────────────────────────────
 
-@router.post("/enroll")
+@router.post("/enroll", response_model=EnrollResponse)
 def enroll(body: EnrollRequest, auth: AuthPayload = Depends(get_auth)):
     return service.enroll_student(auth.sub, body.period_id, body.semester)
 
 
-@router.get("/enrollments/{period_id}")
+@router.get("/enrollments/{period_id}", response_model=EnrollmentsResponse)
 def get_enrollments(period_id: str, auth: AuthPayload = Depends(require_active_membership)):
     period = _period_management_svc.get_period_by_id(period_id)
     if not period:
@@ -62,7 +72,7 @@ def get_enrollments(period_id: str, auth: AuthPayload = Depends(require_active_m
     return service.get_enrollments_for_period(period_id)
 
 
-@router.get("/student-profile/{period_id}/{user_id}")
+@router.get("/student-profile/{period_id}/{user_id}", response_model=StudentProfileResponse)
 def get_student_profile(period_id: str, user_id: str, auth: AuthPayload = Depends(require_active_membership)):
     period = _period_management_svc.get_period_by_id(period_id)
     if not period:
@@ -77,7 +87,7 @@ def get_student_profile(period_id: str, user_id: str, auth: AuthPayload = Depend
 
 # ─── Student enrollment ───────────────────────────────────────────────────────
 
-@router.get("/my-periods")
+@router.get("/my-periods", response_model=list[MyPeriodItem])
 def my_periods(
     user_id: Optional[str] = Query(None),
     auth: AuthPayload = Depends(require_student_viewer("user_id")),
@@ -85,7 +95,7 @@ def my_periods(
     return service.get_my_periods(user_id or auth.sub)
 
 
-@router.post("/verify-period")
+@router.post("/verify-period", response_model=VerifyPeriodResponse)
 def verify_period(body: VerifyPeriodRequest, auth: AuthPayload = Depends(get_auth)):
     # Enforce the OWNER's plan student-per-class limit at enrollment time.
     # This protects the owner from over-quota even though students aren't
@@ -119,19 +129,19 @@ def verify_period(body: VerifyPeriodRequest, auth: AuthPayload = Depends(get_aut
     return {"message": "Period verified and added to enrollments", "period": period}
 
 
-@router.post("/unenroll")
+@router.post("/unenroll", response_model=UnenrollResponse)
 def unenroll(body: UnenrollRequest, auth: AuthPayload = Depends(get_auth)):
     return service.unenroll_from_period(auth.sub, body.period_id)
 
 
-@router.get("/student/parent-periods")
+@router.get("/student/parent-periods", response_model=list[PeriodOut])
 def get_parent_periods(auth: AuthPayload = Depends(require_roles(Role.STUDENT))):
     return service.get_parent_periods_for_student(auth.sub)
 
 
 # ─── Parent ───────────────────────────────────────────────────────────────────
 
-@router.post("/accept-parent-invite")
+@router.post("/accept-parent-invite", response_model=AcceptInviteResponse)
 def accept_parent_invite(body: AcceptInviteRequest, auth: AuthPayload = Depends(require_roles(Role.STUDENT))):
     code = body.code.strip().upper()
     if not code:
