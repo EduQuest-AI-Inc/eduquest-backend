@@ -32,13 +32,20 @@ class TestGetProfile:
             "user_id": "stu-1",
             "first_name": "Jane",
             "last_name": "Doe",
-            "grade": "10",
+            "grade": 10,
+            "strength": ["math", "science"],
+            "weakness": ["writing"],
+            "interest": ["robotics"],
+            "learning_style": ["visual"],
+            "completed_tutorial": False,
         }
         resp = client.get("/user/profile")
         assert resp.status_code == 200
         data = resp.json()
         assert data["user_id"] == "stu-1"
         assert data["role"] == "student"
+        assert data["grade"] == 10
+        assert data["strength"] == ["math", "science"]
 
     @pytest.mark.api
     @patch("routers.user.user_service")

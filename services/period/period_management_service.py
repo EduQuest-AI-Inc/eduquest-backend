@@ -107,12 +107,16 @@ class PeriodManagementService:
 
     def get_periods_by_owner(self, user_id: str) -> list:
         periods = self.period_dao.get_periods_by_owner_id(user_id)
-        for period in periods:
-            period['has_curriculum'] = period.get('status') in ('draft', 'approved')
-        return periods
+        return [self._enrich_period(p) for p in periods]
 
     def get_period_by_id(self, period_id: str) -> Optional[dict]:
-        return self.period_dao.get_period_by_id(period_id)
+        period = self.period_dao.get_period_by_id(period_id)
+        return self._enrich_period(period) if period else None
+
+    @staticmethod
+    def _enrich_period(period: dict) -> dict:
+        period['has_curriculum'] = period.get('status') in ('draft', 'approved')
+        return period
 
     def get_vector_store_id(self, period_id: str) -> str:
         period = self.period_dao.get_period_by_id(period_id)

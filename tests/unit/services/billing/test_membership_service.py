@@ -245,3 +245,21 @@ def test_apply_stripe_subscription_past_due_status():
     args = svc.dao.update.call_args.args
     assert args[1]["status"] == "past_due"
     assert args[1]["plan"] is None  # unknown price → no plan
+
+
+# ── Membership model serialization regression ──────────────────────────────────
+
+
+@pytest.mark.unit
+def test_membership_to_item_updated_at_is_never_none():
+    """Regression guard: updated_at=None caused PostgREST error 23502 on upsert.
+
+    The fix: updated_at uses default_factory so it is always a non-None ISO
+    string. If reverted to Optional[str] = None this test fails before the
+    silent Supabase error can surface.
+    """
+    from models.membership import Membership
+    membership = Membership(user_id="u1", role="teacher")
+    item = membership.to_item()
+    assert item.get("updated_at") is not None, "updated_at must not be None — Supabase NOT NULL constraint"
+    assert isinstance(item["updated_at"], str)

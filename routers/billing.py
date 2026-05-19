@@ -24,6 +24,12 @@ from pydantic import BaseModel
 
 from integrations import stripe_service
 from models.membership import MembershipPlan
+from responses.billing import (
+    CheckoutSessionResponse,
+    MembershipResponse,
+    PortalSessionResponse,
+    WebhookResponse,
+)
 from routers.deps import AuthPayload, Role, require_roles
 from services.billing.membership_service import MembershipService
 from services.user.user_service import UserService
@@ -41,7 +47,7 @@ def _require_role_value(auth: AuthPayload) -> str:
 
 # ── Status ─────────────────────────────────────────────────────────────────────
 
-@router.get("/membership")
+@router.get("/membership", response_model=MembershipResponse)
 def get_membership(
     auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
 ):
@@ -54,7 +60,7 @@ class _CheckoutRequest(BaseModel):
     plan: str  # "starter" | "growth" | "pro"
 
 
-@router.post("/checkout-session")
+@router.post("/checkout-session", response_model=CheckoutSessionResponse)
 def create_checkout_session(
     body: _CheckoutRequest,
     auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
@@ -108,7 +114,7 @@ def create_checkout_session(
 
 # ── Billing portal ─────────────────────────────────────────────────────────────
 
-@router.post("/portal-session")
+@router.post("/portal-session", response_model=PortalSessionResponse)
 def create_portal_session(
     auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
 ):
@@ -134,7 +140,7 @@ def create_portal_session(
 
 # ── Webhook ────────────────────────────────────────────────────────────────────
 
-@router.post("/webhook")
+@router.post("/webhook", response_model=WebhookResponse)
 async def stripe_webhook(request: Request):
     secret = os.getenv("STRIPE_WEBHOOK_SECRET")
     if not secret:

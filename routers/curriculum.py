@@ -5,6 +5,8 @@ from typing import Any, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
+from responses.curriculum import ApprovePeriodResponse, CurriculumStatusResponse, MessageResponse
+
 from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period
 from bots.protocol import BotProviderProtocol
 from services.curriculum.curriculum_service import CurriculumService
@@ -160,7 +162,7 @@ def _membership_or_summer(
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
-@router.post("/{period_id}/generate", status_code=202)
+@router.post("/{period_id}/generate", status_code=202, response_model=MessageResponse)
 def trigger_generation(
     period_id: str,
     background_tasks: BackgroundTasks,
@@ -178,7 +180,7 @@ def trigger_generation(
     return {"message": "Curriculum generation started"}
 
 
-@router.get("/{period_id}/status")
+@router.get("/{period_id}/status", response_model=CurriculumStatusResponse)
 def get_curriculum_status(
     period_id: str,
     auth: AuthPayload = Depends(_membership_or_summer),
@@ -194,7 +196,7 @@ def get_curriculum_status(
     return {"period_status": period["status"]}
 
 
-@router.get("/{period_id}")
+@router.get("/{period_id}", response_model=dict[str, Any])
 def get_curriculum(
     period_id: str,
     auth: AuthPayload = Depends(_membership_or_summer),
@@ -214,7 +216,7 @@ def get_curriculum(
         raise HTTPException(status_code=404, detail=str(exc))
 
 
-@router.patch("/{period_id}")
+@router.patch("/{period_id}", response_model=MessageResponse)
 def save_curriculum(
     period_id: str,
     payload: _SavePayload,
@@ -232,7 +234,7 @@ def save_curriculum(
     return {"message": "Curriculum saved"}
 
 
-@router.patch("/{period_id}/concepts/{concept_name}")
+@router.patch("/{period_id}/concepts/{concept_name}", response_model=MessageResponse)
 def update_concept(
     period_id: str,
     concept_name: str,
@@ -250,7 +252,7 @@ def update_concept(
     return {"message": "Concept updated"}
 
 
-@router.patch("/{period_id}/skills/{skill_name}")
+@router.patch("/{period_id}/skills/{skill_name}", response_model=MessageResponse)
 def update_skill(
     period_id: str,
     skill_name: str,
@@ -268,7 +270,7 @@ def update_skill(
     return {"message": "Skill updated"}
 
 
-@router.post("/{period_id}/approve", status_code=202)
+@router.post("/{period_id}/approve", status_code=202, response_model=ApprovePeriodResponse)
 def approve_period(
     period_id: str,
     background_tasks: BackgroundTasks,

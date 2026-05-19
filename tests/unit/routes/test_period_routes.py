@@ -33,7 +33,11 @@ class TestPeriodListing:
     @pytest.mark.api
     def test_list_periods_success(self, client):
         with patch("routers.period.period_management_service") as mock_pms:
-            mock_pms.get_periods_by_owner.return_value = [{"period_id": "p1"}]
+            mock_pms.get_periods_by_owner.return_value = [{
+                "period_id": "p1", "name": "Math", "status": "approved",
+                "processing_status": "ready", "owner_id": "user-1",
+                "is_summer_quest": False, "file_urls": [],
+            }]
             resp = client.get("/period/periods")
         assert resp.status_code == 200
         assert "periods" in resp.json()
@@ -53,7 +57,11 @@ class TestCreatePeriod:
         with patch("routers.period.membership_service") as mock_ms, \
              patch("routers.period.period_management_service") as mock_pms:
             mock_ms.check_can_create_class.return_value = None
-            mock_pms.create_period.return_value = {"period_id": "P1-ABCD-1234", "name": "Math 101"}
+            mock_pms.create_period.return_value = {
+                "period_id": "P1-ABCD-1234", "name": "Math 101", "status": "pending",
+                "processing_status": "pending", "owner_id": "user-1",
+                "is_summer_quest": False, "file_urls": [],
+            }
             resp = client.post("/period/create-period", data=VALID_CREATE_PERIOD_PAYLOAD, files=[])
         assert resp.status_code == 201
         assert "message" in resp.json()
@@ -86,7 +94,11 @@ class TestCreatePeriod:
     def test_create_period_summer_quest_skips_membership_gate(self, client):
         with patch("routers.period.membership_service") as mock_ms, \
              patch("routers.period.period_management_service") as mock_pms:
-            mock_pms.create_period.return_value = {"period_id": "SQ-ABCD-1234", "name": "My Quest", "is_summer_quest": True}
+            mock_pms.create_period.return_value = {
+                "period_id": "SQ-ABCD-1234", "name": "My Quest", "status": "pending",
+                "processing_status": "pending", "owner_id": "user-1",
+                "is_summer_quest": True, "file_urls": [],
+            }
             payload = {k: v for k, v in VALID_CREATE_PERIOD_PAYLOAD.items() if k != "grade_level"}
             payload["is_summer_quest"] = "true"
             resp = client.post("/period/create-period", data=payload, files=[])

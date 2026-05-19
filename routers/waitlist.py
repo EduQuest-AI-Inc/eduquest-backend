@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from routers.deps import AuthPayload, Role, get_auth, require_roles
+from responses.waitlist import WaitlistApproveResponse, WaitlistJoinResponse, WaitlistStatusResponse
 from services.waitlist.waitlist_service import WaitlistService
 
 router = APIRouter()
@@ -13,7 +14,7 @@ svc = WaitlistService()
 ADMIN_IDS = set(filter(None, os.getenv("ADMIN_USER_IDS", "").split(",")))
 
 
-@router.get("/status")
+@router.get("/status", response_model=WaitlistStatusResponse)
 def get_waitlist_status(auth: AuthPayload = Depends(get_auth)):
     return svc.get_status(auth.sub)
 
@@ -23,7 +24,7 @@ class JoinRequest(BaseModel):
     referral_code: Optional[str] = None
 
 
-@router.post("/join")
+@router.post("/join", response_model=WaitlistJoinResponse)
 def join_pilot_waitlist(
     body: JoinRequest,
     auth: AuthPayload = Depends(get_auth),
@@ -35,7 +36,7 @@ def join_pilot_waitlist(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/approve/{user_id}")
+@router.post("/approve/{user_id}", response_model=WaitlistApproveResponse)
 def approve_teacher(
     user_id: str,
     auth: AuthPayload = Depends(require_roles(Role.TEACHER)),

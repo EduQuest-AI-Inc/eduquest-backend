@@ -8,6 +8,8 @@ class PptxAgentProtocol(Protocol):
 
 @runtime_checkable
 class BotProviderProtocol(Protocol):
+    is_mock: bool
+
     def create_hw_agent(
         self,
         student,
@@ -65,3 +67,7 @@ class BotProviderProtocol(Protocol):
     ) -> Any: ...
 
     async def grade_submission(self, quest_data: dict, submission_text: str) -> dict: ...
+
+    def create_vector_store(self, name: str) -> str: ...
+
+    def ingest_files_to_vector_store(self, vector_store_id: str, file_paths: list) -> list: ...

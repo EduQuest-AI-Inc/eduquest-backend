@@ -112,8 +112,8 @@ BEGIN
   WHERE c.period_id = v_orig_period_id;
 
   -- Clone skills
-  INSERT INTO skill (period_id, skill_name, description, week_number, lesson_name)
-  SELECT p_new_period_id, skill_name, description, week_number, lesson_name
+  INSERT INTO skill (period_id, skill_name, description, bloom_level, difficulty, mastery_threshold, mastery_criteria, metadata)
+  SELECT p_new_period_id, skill_name, description, bloom_level, difficulty, mastery_threshold, mastery_criteria, metadata
     FROM skill WHERE period_id = v_orig_period_id;
 
   -- Clone concept_skill mappings

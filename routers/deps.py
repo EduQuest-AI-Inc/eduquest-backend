@@ -111,9 +111,21 @@ def get_bot_provider(request: Request):
     return request.app.state.bot_provider
 
 
+def get_period_file_service(bot_provider=Depends(get_bot_provider)):
+    """FastAPI dependency — wires PeriodFileService with all orchestration deps."""
+    from services.period.period_file_service import PeriodFileService
+    from services.period.period_management_service import PeriodManagementService
+    from services.curriculum.curriculum_service import CurriculumService
+    return PeriodFileService(
+        bot_provider=bot_provider,
+        period_management_service=PeriodManagementService(),
+        curriculum_service=CurriculumService(bot_provider=bot_provider),
+    )
+
+
 def get_period(period_id: str = Path(...)) -> dict:
-    from data_access.period_dao import PeriodDAO
-    period = PeriodDAO().get_period_by_id(period_id)
+    from services.period.period_management_service import PeriodManagementService
+    period = PeriodManagementService().get_period_by_id(period_id)
     if not period:
         raise HTTPException(status_code=404, detail=f"Period '{period_id}' not found")
     return period

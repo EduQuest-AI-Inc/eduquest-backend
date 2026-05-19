@@ -9,6 +9,12 @@ from pydantic import BaseModel
 
 from constants.timeouts import JWT_EXPIRY_HOURS
 from models.session import Session
+from responses.auth import (
+    LoginResponse,
+    PasswordResetConfirmResponse,
+    PasswordResetRequestResponse,
+    SignupResponse,
+)
 from services.auth.auth_service import (
     add_session,
     authenticate_user,
@@ -60,7 +66,7 @@ class SignupRequest(BaseModel):
     trial_confirmed: Optional[bool] = None
 
 
-@router.post("/signup", status_code=201)
+@router.post("/signup", status_code=201, response_model=SignupResponse)
 def signup(body: SignupRequest):
     valid_roles = {"student", "teacher", "parent"}
     if body.role not in valid_roles:
@@ -123,7 +129,7 @@ class LoginRequest(BaseModel):
     role: str
 
 
-@router.post("/login")
+@router.post("/login", response_model=LoginResponse)
 def login(body: LoginRequest, response: Response):
     if not authenticate_user(body.username, body.password, body.role):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -170,7 +176,7 @@ class PasswordResetConfirmBody(BaseModel):
     new_password: str
 
 
-@router.post("/password-reset/request")
+@router.post("/password-reset/request", response_model=PasswordResetRequestResponse)
 async def password_reset_request(body: PasswordResetRequestBody, request: Request):
     if not body.email.strip():
         raise HTTPException(status_code=400, detail="Email is required")
@@ -184,7 +190,7 @@ async def password_reset_request(body: PasswordResetRequestBody, request: Reques
     return {"message": result["message"]}
 
 
-@router.post("/password-reset/confirm")
+@router.post("/password-reset/confirm", response_model=PasswordResetConfirmResponse)
 async def password_reset_confirm(body: PasswordResetConfirmBody, request: Request):
     if not body.token.strip():
         raise HTTPException(status_code=400, detail="Reset token is required")

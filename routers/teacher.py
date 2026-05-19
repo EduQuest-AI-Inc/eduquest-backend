@@ -4,6 +4,8 @@ from canvasapi import Canvas
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from responses.teacher import CanvasCoursesResponse, SkillMasteryOut, TeacherPeriodsResponse
+
 from routers.deps import AuthPayload, Role, require_roles
 from services.period.period_management_service import PeriodManagementService
 from services.user.teacher_service import TeacherService
@@ -19,7 +21,7 @@ _teacher_service = TeacherService()
 # Get teacher periods
 # ---------------------------------------------------------------------------
 
-@router.get("/periods")
+@router.get("/periods", response_model=TeacherPeriodsResponse)
 def get_teacher_periods(auth: AuthPayload = Depends(require_roles(Role.TEACHER))):
     result = period_management_service.get_periods_by_owner(auth.sub)
     return {"periods": result}
@@ -34,7 +36,7 @@ class CanvasCoursesRequest(BaseModel):
     api_key: str
 
 
-@router.post("/canvas/courses")
+@router.post("/canvas/courses", response_model=CanvasCoursesResponse)
 def list_canvas_courses(
     body: CanvasCoursesRequest,
     auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
@@ -66,7 +68,7 @@ def list_canvas_courses(
 # Skill mastery metrics
 # ---------------------------------------------------------------------------
 
-@router.get("/skill-mastery")
+@router.get("/skill-mastery", response_model=list[SkillMasteryOut])
 def get_skill_mastery(
     period_id: str = Query(...),
     auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
