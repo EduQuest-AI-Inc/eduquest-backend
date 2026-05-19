@@ -1,11 +1,17 @@
 import logging
 import os
 import shutil
+from typing import TYPE_CHECKING, Optional
 
 from integrations.canvas_service import Course as CanvasCourse, course_to_json
 from integrations.s3_service import upload_file_to_s3, download_file_from_s3
 from integrations import openai_vector_store
 from utils.pdf_utils import preprocess_pdf
+
+if TYPE_CHECKING:
+    from bots.protocol import BotProviderProtocol
+    from services.period.period_management_service import PeriodManagementService
+    from services.curriculum.curriculum_service import CurriculumService
 
 logger = logging.getLogger(__name__)
 
@@ -14,15 +20,15 @@ class PeriodFileService:
     def __init__(
         self,
         material_files_dao=None,
-        bot_provider=None,
-        period_management_service=None,
-        curriculum_service=None,
+        bot_provider: Optional["BotProviderProtocol"] = None,
+        period_management_service: Optional["PeriodManagementService"] = None,
+        curriculum_service: Optional["CurriculumService"] = None,
     ) -> None:
         from data_access.material_files_dao import MaterialFilesDAO
         self._material_files_dao = material_files_dao or MaterialFilesDAO()
-        self._bot_provider = bot_provider
-        self._period_mgmt = period_management_service
-        self._curriculum_svc = curriculum_service
+        self._bot_provider: Optional["BotProviderProtocol"] = bot_provider
+        self._period_mgmt: Optional["PeriodManagementService"] = period_management_service
+        self._curriculum_svc: Optional["CurriculumService"] = curriculum_service
 
     def append_canvas_data(
         self,
@@ -105,6 +111,9 @@ class PeriodFileService:
         canvas_course_id: str | None = None,
     ) -> None:
         """Background task: ingest files, create vector store, trigger curriculum generation."""
+        assert self._bot_provider is not None, "bot_provider is required for process_background"
+        assert self._period_mgmt is not None, "period_management_service is required for process_background"
+        assert self._curriculum_svc is not None, "curriculum_service is required for process_background"
         file_keys = file_keys or []
         try:
             self.append_canvas_data(
