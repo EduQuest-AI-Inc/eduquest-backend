@@ -383,6 +383,24 @@ class MockConversationsSession:
         self._session_id = conversation_id or "mock-conversation-id-001"
 
 
+class MockDemoLTGAgent:
+    """Hardcoded stand-in for DemoLTGAgent — no OpenAI calls."""
+
+    async def run(self, *args, **kwargs):
+        from bots.quests.demo_ltg_agent import DemoLTGOutput, DemoQuestItem
+        return MockRunResult(
+            DemoLTGOutput(
+                ltg="Design a working Minecraft mod that simulates real orbital mechanics — then teach another kid how it works.",
+                quests=[
+                    DemoQuestItem(week=1, title="Pick Your Target", description="Research 3 real orbital concepts (gravity, velocity, mass) and sketch how they'd apply inside Minecraft."),
+                    DemoQuestItem(week=2, title="Blueprint the Mod", description="Write a design doc describing each mechanic, the data structures, and one screenshot of the UI you plan to build."),
+                    DemoQuestItem(week=3, title="Build & Test", description="Implement the gravity simulation and test it with three different planet sizes — log what breaks and why."),
+                    DemoQuestItem(week=4, title="Teach Someone Else", description="Record a 5-minute walkthrough of your mod for a friend who hasn't seen it, then write one paragraph on what you'd change next."),
+                ],
+            )
+        )
+
+
 class MockPptxAgent:
     """
     Deterministic replacement for PptxAgent. Returns a minimal but real

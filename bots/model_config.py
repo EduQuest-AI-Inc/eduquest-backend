@@ -28,6 +28,9 @@ CURRICULUM_ONLY_QUEST_NAME_MODEL = "gpt-5.4-mini"
 CURRICULUM_ONLY_INSTRUCTION_MODEL = "gpt-5.4-mini"
 CURRICULUM_ONLY_RUBRIC_MODEL = "gpt-5.4"
 
+# Landing page demo (no auth, single call)
+DEMO_LTG_MODEL = "gpt-5.4-mini"
+
 # Slide generation
 SLIDE_ORCHESTRATOR_MODEL = "gpt-5.4"
 SLIDE_CONTENT_WRITER_MODEL = "gpt-5.4-mini"
