@@ -79,6 +79,10 @@ class BotProvider:
         from bots.curriculum.coverage_evaluator import CoverageEvaluator
         return CoverageEvaluator()
 
+    def create_demo_ltg_agent(self, grade: str, interests: list[str], subject: str):
+        from bots.quests.demo_ltg_agent import create_demo_ltg_agent
+        return create_demo_ltg_agent(grade, interests, subject)
+
     def create_pptx_agent(self):
         from bots.slideshow.pptx_agent import PptxAgent
         return PptxAgent()
@@ -258,6 +262,10 @@ class MockBotProvider(BotProvider):
     def create_coverage_evaluator(self):
         from bots._mocks import MockCoverageEvaluator
         return MockCoverageEvaluator()
+
+    def create_demo_ltg_agent(self, grade: str, interests: list[str], subject: str):
+        from bots._mocks import MockDemoLTGAgent
+        return MockDemoLTGAgent()
 
     def create_pptx_agent(self):
         from bots._mocks import MockPptxAgent
