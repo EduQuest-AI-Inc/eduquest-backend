@@ -34,11 +34,11 @@ class UserProfileResponse(BaseModel):
     created_at: Optional[str] = None
 
     # Student-specific
-    grade: Optional[str] = None
-    strength: Optional[str] = None
-    weakness: Optional[str] = None
-    interest: Optional[str] = None
-    learning_style: Optional[str] = None
+    grade: Optional[int] = None
+    strength: Optional[list[str]] = None
+    weakness: Optional[list[str]] = None
+    interest: Optional[list[str]] = None
+    learning_style: Optional[list[str]] = None
     completed_tutorial: Optional[bool] = None
 
     # Teacher-specific

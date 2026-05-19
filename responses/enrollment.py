@@ -31,10 +31,10 @@ class EnrollmentsResponse(BaseModel):
 class StudentProfileResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    interest: Optional[str] = None
-    strength: Optional[str] = None
-    weakness: Optional[str] = None
-    learning_style: Optional[str] = None
+    interest: Optional[list[str]] = None
+    strength: Optional[list[str]] = None
+    weakness: Optional[list[str]] = None
+    learning_style: Optional[list[str]] = None
 
 
 class MyPeriodItem(BaseModel):

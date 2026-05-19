@@ -85,12 +85,12 @@ def test_get_periods_by_owner():
 @pytest.mark.unit
 def test_get_period_by_id():
     svc = _svc()
-    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1"}
+    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "status": "draft"}
 
     result = svc.get_period_by_id("p1")
 
     svc.period_dao.get_period_by_id.assert_called_once_with("p1")
-    assert result == {"period_id": "p1"}
+    assert result == {"period_id": "p1", "status": "draft", "has_curriculum": True}
 
 
 @pytest.mark.unit

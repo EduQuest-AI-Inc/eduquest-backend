@@ -10,7 +10,7 @@ from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period as _get_period_dep, require_active_membership, require_roles
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period as _get_period_dep, get_period_file_service, require_active_membership, require_roles
 from responses.period import (
     AddFilesResponse,
     CreatePeriodResponse,
@@ -27,7 +27,6 @@ from bots.protocol import BotProviderProtocol
 from integrations.s3_service import (
     complete_multipart_upload,
     create_multipart_upload,
-    download_file_from_s3,
     generate_presigned_part_url,
     get_file_presigned_url,
 )
@@ -36,85 +35,16 @@ from services.billing.membership_service import (
     MembershipService,
     PlanLimitExceededError,
 )
-from services.period.period_file_service import PeriodFileService
 from services.period.period_summer_quest_service import PeriodSummerQuestService
 from models.period import CourseMetadata
-from services.curriculum.curriculum_service import CurriculumService
 from services.period.period_management_service import PeriodManagementService
 from services.user.teacher_service import TeacherService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 period_management_service = PeriodManagementService()
-period_file_service = PeriodFileService()
 _teacher_service = TeacherService()
 membership_service = MembershipService()
-
-
-# ─── Private helpers ──────────────────────────────────────────────────────────
-
-def _process_period_files(
-    period_id: str,
-    course_name: str,
-    file_paths: list,
-    temp_dir: str,
-    user_id: str,
-    bot_provider: BotProviderProtocol,
-    file_keys: list = [],
-    canvas_api_url: str | None = None,
-    canvas_api_key: str | None = None,
-    canvas_course_id: str | None = None,
-):
-    try:
-        period_file_service.append_canvas_data(
-            temp_dir, file_paths, canvas_api_url, canvas_api_key, canvas_course_id
-        )
-
-        vector_store_id = bot_provider.create_vector_store(course_name)
-        period_management_service.update_vector_store_id(period_id, vector_store_id)
-
-        # Download presigned-uploaded files from S3 into temp_dir for local processing
-        s3_local_paths = []
-        for key in file_keys:
-            filename = key.split("/")[-1]
-            dest = os.path.join(temp_dir, filename)
-            if download_file_from_s3(key, dest):
-                s3_local_paths.append(dest)
-            else:
-                logger.warning("Skipping key %s — S3 download failed", key)
-
-        all_local_paths = file_paths + s3_local_paths
-
-        # Archive only server-generated files (e.g. Canvas JSON); presigned files already in S3
-        archived_keys = period_file_service.archive_to_s3(file_paths, period_id)
-        all_s3_keys = [k for k in archived_keys if k] + file_keys
-        period_management_service.update_file_urls(period_id, all_s3_keys)
-
-        try:
-            file_vs_ids = bot_provider.ingest_files_to_vector_store(vector_store_id, all_local_paths)
-        except Exception as e:
-            logger.error("ingest_files_to_vector_store failed for period %s: %s", period_id, e, exc_info=True)
-            raise
-        period_management_service.update_file_vector_store_ids(period_id, file_vs_ids)
-
-        period_management_service.update_processing_status(period_id, "ready")
-
-        try:
-            current_period = period_management_service.get_period_by_id(period_id)
-            if current_period and current_period.get("status") not in {"generating", "draft", "approved"}:
-                CurriculumService(bot_provider=bot_provider)._run_generation(period_id)
-            else:
-                logger.info(
-                    "Auto curriculum generation skipped for period %s: status=%s",
-                    period_id, (current_period or {}).get("status"),
-                )
-        except Exception as exc:
-            logger.error("Auto curriculum generation failed for period %s: %s", period_id, exc, exc_info=True)
-    except Exception as e:
-        logger.error("Background processing failed for period %s: %s", period_id, e, exc_info=True)
-        period_management_service.update_processing_status(period_id, "failed")
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def _membership_required_response(err: MembershipRequiredError) -> HTTPException:
@@ -204,7 +134,7 @@ def create_period(
     status: Optional[str] = Form(default="pending"),
     is_summer_quest: bool = Form(default=False),
     auth: AuthPayload = Depends(get_auth),
-    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+    period_file_svc=Depends(get_period_file_service),
 ):
     if status not in ("pending", "setup_draft"):
         raise HTTPException(status_code=400, detail="Invalid status value")
@@ -268,13 +198,11 @@ def create_period(
             shutil.rmtree(temp_dir, ignore_errors=True)
         else:
             background_tasks.add_task(
-                _process_period_files,
+                period_file_svc.process_background,
                 period_id=period_id,
                 course_name=name,
                 file_paths=file_paths,
                 temp_dir=temp_dir,
-                user_id=auth.sub,
-                bot_provider=bot_provider,
                 file_keys=file_keys,
                 canvas_api_url=canvas_api_url if auth.role == Role.TEACHER else None,
                 canvas_api_key=canvas_api_key if auth.role == Role.TEACHER else None,
@@ -314,7 +242,7 @@ def update_period_setup(
     specific_standard_codes: Optional[str] = Form(default=None),
     status: Optional[str] = Form(default="setup_draft"),
     auth: AuthPayload = Depends(require_active_membership),
-    bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+    period_file_svc=Depends(get_period_file_service),
 ):
     if status not in ("pending", "setup_draft"):
         raise HTTPException(status_code=400, detail="Invalid status value")
@@ -384,13 +312,11 @@ def update_period_setup(
 
         if is_finalizing:
             background_tasks.add_task(
-                _process_period_files,
+                period_file_svc.process_background,
                 period_id=period_id,
                 course_name=name or period.get("name", ""),
                 file_paths=file_paths,
                 temp_dir=temp_dir,
-                user_id=auth.sub,
-                bot_provider=bot_provider,
                 file_keys=all_file_keys,
                 canvas_api_url=canvas_api_url if auth.role == Role.TEACHER else None,
                 canvas_api_key=canvas_api_key if auth.role == Role.TEACHER else None,

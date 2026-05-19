@@ -234,12 +234,14 @@ class MockBotProvider(BotProvider):
         )
 
     def create_profile_agent(self):
-        from bots.profile_agent import create_profile_agent
-        return create_profile_agent()
+        from bots.profile_agent import ProfileResponse
+        from bots._mocks import _MockAgent
+        return _MockAgent(ProfileResponse)
 
     def create_ltg_agent(self, vector_store_id: str, curriculum: dict):
-        from bots.ltg_agent import create_ltg_agent
-        return create_ltg_agent(vector_store_id, curriculum)
+        from bots.ltg_agent import LTGResponse
+        from bots._mocks import _MockAgent
+        return _MockAgent(LTGResponse)
 
     def create_schedule_agent(self, student, period, schedule, goal_text, previous_response_id=None):
         from bots._mocks import MockLTGScheduleAgent

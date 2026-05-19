@@ -61,7 +61,7 @@ class CurriculumService:
                 f"Cannot generate curriculum: period is already in '{period['status']}' status"
             )
         self.period_dao.update_status(period_id, "generating")
-        background_tasks.add_task(self._run_generation, period_id)
+        background_tasks.add_task(self.run_generation, period_id)
 
     def get_curriculum(self, period_id: str, period: dict | None = None) -> dict[str, Any]:
         period = period or self._get_period_or_raise(period_id)
@@ -120,13 +120,13 @@ class CurriculumService:
         if period.get("forked_from_period_id"):
             raise PermissionError("Curriculum cannot be modified on a forked class")
 
-    def _run_generation(self, period_id: str) -> None:
+    def run_generation(self, period_id: str) -> None:
         t0 = time.monotonic()
         mode = "unknown"
         try:
             period = self.period_dao.get_period_by_id(period_id)
             if not period:
-                logger.error("_run_generation: period %s not found", period_id)
+                logger.error("run_generation: period %s not found", period_id)
                 return
 
             self.period_dao.update_status(period_id, "generating")

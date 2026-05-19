@@ -123,6 +123,10 @@ Tests that need a mock bot provider pass `MockBotProvider()` directly to the ser
 
 Test files must not call underscore-prefixed methods (`_check_profile`, `_extract_conversation_id`, etc.) directly. If the public-facing method covers all branches of a private method, the private tests are redundant and create rename-friction. If a private method is complex enough that the public path cannot reach all its branches in isolation, the right fix is to make it a standalone public function in a utility module — not to test it directly while leaving it private.
 
+### Response model field types must match the database column types
+
+`responses/` Pydantic fields must use the Python type the database actually returns — pay particular attention to `integer → int`, `boolean → bool`, and `text[] → list[str]`. A mismatch raises a `ResponseValidationError` (500) the first time that endpoint is hit with real data, not at startup. Mock data in route tests must use the same types, or the test will pass against the wrong declaration and hide the bug. `tests/unit/routes/test_response_model_types.py` enforces compatibility between domain models and response models automatically.
+
 ### No `PYTEST_CURRENT_TEST` guards in production code
 
 Production code must never contain `if os.getenv("PYTEST_CURRENT_TEST"): raise`. This pattern hides failure paths from tests rather than fixing them — it makes a broad `except` behave differently in tests and in production, which defeats the purpose of testing. If a broad `except` makes a failure mode untestable, split the `try` block into narrower scopes instead (one for the agent/external-call result, one for the S3 upload, etc.) so each can be exercised independently by injecting a mock that raises.

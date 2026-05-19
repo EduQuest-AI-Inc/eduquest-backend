@@ -1,8 +1,9 @@
 import logging
 import os
+import shutil
 
 from integrations.canvas_service import Course as CanvasCourse, course_to_json
-from integrations.s3_service import upload_file_to_s3
+from integrations.s3_service import upload_file_to_s3, download_file_from_s3
 from integrations import openai_vector_store
 from utils.pdf_utils import preprocess_pdf
 
@@ -10,9 +11,18 @@ logger = logging.getLogger(__name__)
 
 
 class PeriodFileService:
-    def __init__(self, material_files_dao=None) -> None:
+    def __init__(
+        self,
+        material_files_dao=None,
+        bot_provider=None,
+        period_management_service=None,
+        curriculum_service=None,
+    ) -> None:
         from data_access.material_files_dao import MaterialFilesDAO
         self._material_files_dao = material_files_dao or MaterialFilesDAO()
+        self._bot_provider = bot_provider
+        self._period_mgmt = period_management_service
+        self._curriculum_svc = curriculum_service
 
     def append_canvas_data(
         self,
@@ -83,3 +93,65 @@ class PeriodFileService:
 
         return file_vs_ids
 
+    def process_background(
+        self,
+        period_id: str,
+        course_name: str,
+        file_paths: list,
+        temp_dir: str,
+        file_keys: list | None = None,
+        canvas_api_url: str | None = None,
+        canvas_api_key: str | None = None,
+        canvas_course_id: str | None = None,
+    ) -> None:
+        """Background task: ingest files, create vector store, trigger curriculum generation."""
+        file_keys = file_keys or []
+        try:
+            self.append_canvas_data(
+                temp_dir, file_paths, canvas_api_url, canvas_api_key, canvas_course_id
+            )
+
+            vector_store_id = self._bot_provider.create_vector_store(course_name)
+            self._period_mgmt.update_vector_store_id(period_id, vector_store_id)
+
+            s3_local_paths = []
+            for key in file_keys:
+                filename = key.split("/")[-1]
+                dest = os.path.join(temp_dir, filename)
+                if download_file_from_s3(key, dest):
+                    s3_local_paths.append(dest)
+                else:
+                    logger.warning("Skipping key %s — S3 download failed", key)
+
+            all_local_paths = file_paths + s3_local_paths
+
+            # Archive only server-generated files (e.g. Canvas JSON); presigned files already in S3
+            archived_keys = self.archive_to_s3(file_paths, period_id)
+            all_s3_keys = [k for k in archived_keys if k] + file_keys
+            self._period_mgmt.update_file_urls(period_id, all_s3_keys)
+
+            try:
+                file_vs_ids = self._bot_provider.ingest_files_to_vector_store(vector_store_id, all_local_paths)
+            except Exception as exc:
+                logger.error("ingest_files_to_vector_store failed for period %s: %s", period_id, exc, exc_info=True)
+                raise
+            self._period_mgmt.update_file_vector_store_ids(period_id, file_vs_ids)
+
+            self._period_mgmt.update_processing_status(period_id, "ready")
+
+            try:
+                current_period = self._period_mgmt.get_period_by_id(period_id)
+                if current_period and current_period.get("status") not in {"generating", "draft", "approved"}:
+                    self._curriculum_svc.run_generation(period_id)
+                else:
+                    logger.info(
+                        "Auto curriculum generation skipped for period %s: status=%s",
+                        period_id, (current_period or {}).get("status"),
+                    )
+            except Exception as exc:
+                logger.error("Auto curriculum generation failed for period %s: %s", period_id, exc, exc_info=True)
+        except Exception as exc:
+            logger.error("Background processing failed for period %s: %s", period_id, exc, exc_info=True)
+            self._period_mgmt.update_processing_status(period_id, "failed")
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
