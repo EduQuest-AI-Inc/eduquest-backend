@@ -19,6 +19,8 @@ class StudentItem(BaseModel):
     semester: Optional[str] = None
     enrolled_at: Optional[str] = None
     enrollment_id: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
 
 
 class EnrollmentsResponse(BaseModel):
