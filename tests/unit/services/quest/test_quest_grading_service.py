@@ -84,3 +84,58 @@ def test_update_quests_preserving_completed_data_new_week_created():
 
     assert result["created_quests"] == 1
     svc.quest_dao.add_quest.assert_called_once()
+
+
+@pytest.mark.unit
+def test_in_progress_quest_is_preserved():
+    """status='in_progress' should lock a quest even when grade is None."""
+    svc = _svc()
+    svc.quest_dao.get_quests_by_student_and_period.side_effect = [
+        [{"quest_id": "q1", "week": 2, "grade": None, "status": "in_progress", "skills": "calculus"}],
+        [{"quest_id": "q1"}],
+    ]
+
+    schedule_data = {"list_of_quests": [{"Week": 2, "Name": "Renamed", "Skills": "calculus"}]}
+    homework_data = {"list_of_quests": []}
+
+    result = svc.update_quests_preserving_completed_data(schedule_data, homework_data, "u1", "p1")
+
+    assert result["preserved_quests"] == 1
+    assert result["updated_quests"] == 0
+    # update_quest must not be called for a locked quest with unchanged skills
+    svc.quest_dao.update_quest.assert_not_called()
+
+
+@pytest.mark.unit
+def test_skills_diff_skips_update_when_unchanged():
+    """Locked quest with identical new skills — update_quest must not be called."""
+    svc = _svc()
+    svc.quest_dao.get_quests_by_student_and_period.side_effect = [
+        [{"quest_id": "q1", "week": 1, "grade": {"overall_score": "90"}, "status": "completed", "skills": "algebra"}],
+        [{"quest_id": "q1"}],
+    ]
+
+    schedule_data = {"list_of_quests": [{"Week": 1, "Name": "Same", "Skills": "algebra"}]}
+    homework_data = {"list_of_quests": []}
+
+    svc.update_quests_preserving_completed_data(schedule_data, homework_data, "u1", "p1")
+
+    svc.quest_dao.update_quest.assert_not_called()
+
+
+@pytest.mark.unit
+def test_due_date_propagated_to_new_quest():
+    """DueDate in schedule_data should be stored on newly created Quest objects."""
+    svc = _svc()
+    svc.quest_dao.get_quests_by_student_and_period.side_effect = [
+        [],
+        [{"quest_id": "qnew"}],
+    ]
+
+    schedule_data = {"list_of_quests": [{"Week": 3, "Name": "Essay", "Skills": "writing", "DueDate": "2025-10-01"}]}
+    homework_data = {"list_of_quests": []}
+
+    svc.update_quests_preserving_completed_data(schedule_data, homework_data, "u1", "p1")
+
+    quest_arg = svc.quest_dao.add_quest.call_args.args[0]
+    assert quest_arg.due_date == "2025-10-01"

@@ -128,7 +128,7 @@ class TestApproveTeacher:
     def test_approve_uses_path_param_user_id(self, client):
         with patch("routers.waitlist.ADMIN_IDS", {"teacher-1"}), \
              patch("routers.waitlist.svc") as mock_svc:
-            mock_svc.approve.return_value = {"success": True}
+            mock_svc.approve.return_value = {"success": True, "waitlist_updated": True, "teacher_updated": True}
             resp = client.post("/pilot-waitlist/approve/completely-different-user")
         assert resp.status_code == 200
         mock_svc.approve.assert_called_once_with("completely-different-user")

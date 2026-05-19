@@ -53,8 +53,16 @@ class EnrollmentService:
     def get_enrollments_for_period(self, period_id: str):
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
         period = self.period_dao.get_period_by_id(period_id)
+        enriched = []
+        for enrollment in enrollments:
+            user = self.user_dao.get_by_id(enrollment["user_id"]) if enrollment.get("user_id") else None
+            enriched.append({
+                **enrollment,
+                "first_name": user.get("first_name") if user else None,
+                "last_name": user.get("last_name") if user else None,
+            })
         return {
-            "students": enrollments,
+            "students": enriched,
             "file_urls": period.get("file_urls", []) if period else []
         }
 
@@ -97,7 +105,7 @@ class EnrollmentService:
         return [
             {
                 'period_id': pid,
-                'course_name': periods[pid].get('name', pid),
+                'name': periods[pid].get('name', pid),
                 'file_urls': periods[pid].get('file_urls', []),
                 'long_term_goal': ltg_map.get(pid),
                 'is_summer_quest': periods[pid].get('is_summer_quest', False),
@@ -134,16 +142,26 @@ class EnrollmentService:
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
+            logger.warning("verify_period_id: period %s not found (user=%s)", period_id, user_id)
             raise NotFoundError("Invalid period ID")
 
         owner = self.user_dao.get_by_id(period["owner_id"])
         if not owner:
+            logger.warning("verify_period_id: owner not found for period %s", period_id)
             raise NotFoundError("Invalid period ID")
         if owner["role"] != "teacher" and not allow_parent_period:
+            logger.warning(
+                "verify_period_id: period %s has owner role %s, not teacher (user=%s)",
+                period_id, owner["role"], user_id,
+            )
             raise NotFoundError("Invalid period ID")
 
         if period.get('status') != 'approved':
-            raise NotFoundError("Invalid period ID")
+            logger.warning(
+                "verify_period_id: period %s has status=%r, expected 'approved' (user=%s)",
+                period_id, period.get('status'), user_id,
+            )
+            raise NotFoundError("This class is not yet available for enrollment")
 
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
@@ -159,7 +177,7 @@ class EnrollmentService:
         self.enrollment_dao.add_enrollment(enrollment)
 
         if period_id != TUTORIAL_PERIOD_ID:
-            self._cleanup_tutorial_periods(user_id)
+            self.cleanup_tutorial_periods(user_id)
 
         return period
 
@@ -221,7 +239,7 @@ class EnrollmentService:
         if any(e["period_id"] == period_id for e in existing):
             raise ValidationError("Student is already enrolled in this class")
 
-    def _cleanup_tutorial_periods(self, user_id: str) -> None:
+    def cleanup_tutorial_periods(self, user_id: str) -> None:
         existing_enrollments = self.enrollment_dao.get_enrollments_by_student(user_id)
         enrolled_period_ids = [e['period_id'] for e in existing_enrollments]
         if TUTORIAL_PERIOD_ID in enrolled_period_ids:

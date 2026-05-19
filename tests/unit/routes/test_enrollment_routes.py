@@ -20,7 +20,7 @@ class TestMyPeriods:
     @pytest.mark.api
     def test_my_periods_returns_list(self, client):
         with patch("routers.enrollment.service") as mock_ps:
-            mock_ps.get_my_periods.return_value = [{"period_id": "p1"}]
+            mock_ps.get_my_periods.return_value = [{"period_id": "p1", "name": "Math", "is_summer_quest": False, "file_urls": []}]
             resp = client.get("/enrollment/my-periods")
         assert resp.status_code == 200
         mock_ps.get_my_periods.assert_called_once_with("user-1")
@@ -41,7 +41,11 @@ class TestVerifyPeriod:
         with patch("routers.enrollment._period_management_svc") as mock_pd, \
              patch("routers.enrollment.service") as mock_ps:
             mock_pd.get_period_by_id.return_value = None  # skip owner membership check
-            mock_ps.verify_period_id.return_value = {"period_id": "p1", "name": "Math"}
+            mock_ps.verify_period_id.return_value = {
+                "period_id": "p1", "name": "Math", "status": "approved",
+                "processing_status": "ready", "owner_id": "teacher-1",
+                "is_summer_quest": False, "file_urls": [],
+            }
             resp = client.post("/enrollment/verify-period", json={"period_id": "p1"})
         assert resp.status_code == 200
         assert resp.json()["period"]["period_id"] == "p1"

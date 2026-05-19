@@ -6,10 +6,10 @@ from models.user import User
 class Student(User):
     role: str = 'student'
     grade: Optional[int] = None
-    strength: Optional[list] = None
-    weakness: Optional[list] = None
-    interest: Optional[list] = None
-    learning_style: Optional[str] = None
+    strength: Optional[list[str]] = None
+    weakness: Optional[list[str]] = None
+    interest: Optional[list[str]] = None
+    learning_style: Optional[list[str]] = None
     completed_tutorial: bool = False
     school_name: Optional[str] = None
     account_status: str = 'active'

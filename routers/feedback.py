@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, field_validator
 
 from routers.deps import AuthPayload, get_auth
+from responses.feedback import FeedbackResponse
 from services.feedback.feedback_service import FeedbackService
 
 router = APIRouter()
@@ -25,7 +26,7 @@ class FeedbackRequest(BaseModel):
         return stripped
 
 
-@router.post("/submit")
+@router.post("/submit", response_model=FeedbackResponse)
 def submit_feedback(
     body: FeedbackRequest,
     auth: AuthPayload = Depends(get_auth),

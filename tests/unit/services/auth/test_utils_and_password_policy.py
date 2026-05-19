@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 from utils.token_utils import extract_auth_token, get_user_id_from_token, set_auth_cookie
 from utils.validation_utils import validate_required_fields, normalize_email, get_client_ip
 from services.auth.password_policy import validate_password, get_password_requirements
+from services.auth.auth_service import check_werkzeug_pbkdf2
 from exceptions.auth_error import AuthError
 
 
@@ -325,3 +326,31 @@ def test_get_password_requirements_structure():
 def test_get_password_requirements_mentions_min_length_in_requirements():
     reqs = get_password_requirements()["requirements"]
     assert any("10" in r for r in reqs)
+
+
+# ── check_werkzeug_pbkdf2 ─────────────────────────────────────────────────────
+# Hash produced by: pbkdf2:sha256:260000$abcd1234$<hex-dk> for password "testpassword123"
+_WERKZEUG_HASH = (
+    "pbkdf2:sha256:260000$abcd1234$"
+    "400ca1ae2bc0cca274614c723e5c3a64d36b43530115851a0f45e659c6575110"
+)
+
+
+@pytest.mark.unit
+def test_check_werkzeug_pbkdf2_correct_password():
+    assert check_werkzeug_pbkdf2(_WERKZEUG_HASH, "testpassword123") is True
+
+
+@pytest.mark.unit
+def test_check_werkzeug_pbkdf2_wrong_password():
+    assert check_werkzeug_pbkdf2(_WERKZEUG_HASH, "wrongpassword") is False
+
+
+@pytest.mark.unit
+def test_check_werkzeug_pbkdf2_malformed_hash_returns_false():
+    assert check_werkzeug_pbkdf2("not-a-valid-hash", "any") is False
+
+
+@pytest.mark.unit
+def test_check_werkzeug_pbkdf2_missing_dollar_separator_returns_false():
+    assert check_werkzeug_pbkdf2("pbkdf2:sha256:260000noseparator", "any") is False

@@ -2,6 +2,8 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
+from responses.slides import PptxStatusItemOut, RestartResponse
+
 from bots.protocol import BotProviderProtocol
 from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period, require_roles
 from exceptions.validation_error import ValidationError
@@ -24,7 +26,7 @@ def _get_slides_service(
     return PptxGenerationService(bot_provider=bot_provider)
 
 
-@router.get("/{period_id}/pptx/status")
+@router.get("/{period_id}/pptx/status", response_model=list[PptxStatusItemOut])
 def get_pptx_status(
     period_id: str,
     auth: AuthPayload = Depends(get_auth),
@@ -60,16 +62,17 @@ def get_pptx_status(
             "lesson_name": lessons.get(row["lesson_id"], {}).get("lesson_name"),
             "week_number": lessons.get(row["lesson_id"], {}).get("week_number"),
             "pptx_status": row["status"],
+            "attempt_count": row.get("attempt_count", 0),
         }
         for row in pptx_rows
     ]
 
 
-@router.post("/{period_id}/pptx/restart", status_code=202)
+@router.post("/{period_id}/pptx/restart", status_code=202, response_model=RestartResponse)
 def restart_pptx_generation(
     period_id: str,
     background_tasks: BackgroundTasks,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER)),
+    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
     slides_svc: PptxGenerationService = Depends(_get_slides_service),
     period: dict = Depends(get_period),
 ):

@@ -21,10 +21,15 @@ class TestMyPeriods:
     @pytest.mark.api
     def test_my_periods_returns_list(self, client):
         with patch("routers.parent.period_management_service") as mock_pms:
-            mock_pms.get_periods_by_owner.return_value = [{"period_id": "p1", "name": "Math"}]
+            mock_pms.get_periods_by_owner.return_value = [{
+                "period_id": "p1", "name": "Math", "status": "approved",
+                "processing_status": "ready", "owner_id": "parent-1",
+                "is_summer_quest": False, "file_urls": [],
+            }]
             resp = client.get("/parent/my-periods")
         assert resp.status_code == 200
-        assert resp.json()["periods"] == [{"period_id": "p1", "name": "Math"}]
+        assert resp.json()["periods"][0]["period_id"] == "p1"
+        assert resp.json()["periods"][0]["name"] == "Math"
         mock_pms.get_periods_by_owner.assert_called_once_with("parent-1")
 
     @pytest.mark.api
@@ -109,7 +114,11 @@ class TestEnrollStudent:
             mock_pms.get_period_by_id.return_value = {"owner_id": "owner-1", "name": "Math"}
             mock_us.get_by_id.return_value = {"role": "parent"}
             mock_ms.check_can_add_student_to_period.return_value = None
-            mock_es.verify_period_id.return_value = {"period_id": "p1", "name": "Math"}
+            mock_es.verify_period_id.return_value = {
+                "period_id": "p1", "name": "Math", "status": "approved",
+                "processing_status": "ready", "owner_id": "owner-1",
+                "is_summer_quest": False, "file_urls": [],
+            }
 
             resp = client.post(
                 "/parent/enroll-student",

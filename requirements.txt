@@ -17,6 +17,7 @@ posthog>=4.0.0
 stripe>=11.0.0
 pytest
 pytest-cov
+pytest-asyncio
 ruff
 pyright
 pypdf

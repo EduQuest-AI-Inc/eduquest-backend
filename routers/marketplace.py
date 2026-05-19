@@ -3,6 +3,13 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from responses.marketplace import (
+    ForkResponse,
+    MarketplaceListingDetailOut,
+    MarketplaceListingOut,
+    MessageResponse,
+)
+
 from routers.deps import AuthPayload, get_auth, require_active_membership
 from services.marketplace.marketplace_service import MarketplaceService
 
@@ -15,7 +22,7 @@ class PublishRequest(BaseModel):
     tags: List[str] = []
 
 
-@router.get("")
+@router.get("", response_model=list[MarketplaceListingOut])
 def list_marketplace(
     grade_level: Optional[str] = None,
     tags: Optional[str] = None,  # comma-separated
@@ -29,7 +36,7 @@ def list_marketplace(
     )
 
 
-@router.get("/{listing_id}")
+@router.get("/{listing_id}", response_model=MarketplaceListingDetailOut)
 def get_listing(
     listing_id: str,
     auth: AuthPayload = Depends(get_auth),
@@ -37,7 +44,7 @@ def get_listing(
     return _marketplace_service.get_listing(listing_id)
 
 
-@router.post("")
+@router.post("", response_model=MarketplaceListingOut)
 def publish_class(
     body: PublishRequest,
     auth: AuthPayload = Depends(require_active_membership),
@@ -45,7 +52,7 @@ def publish_class(
     return _marketplace_service.publish(body.period_id, auth.sub, body.tags)
 
 
-@router.delete("/{listing_id}")
+@router.delete("/{listing_id}", response_model=MessageResponse)
 def unpublish_class(
     listing_id: str,
     auth: AuthPayload = Depends(require_active_membership),
@@ -54,7 +61,7 @@ def unpublish_class(
     return {"message": "Listing unpublished"}
 
 
-@router.post("/{listing_id}/fork")
+@router.post("/{listing_id}/fork", response_model=ForkResponse)
 def fork_class(
     listing_id: str,
     auth: AuthPayload = Depends(require_active_membership),

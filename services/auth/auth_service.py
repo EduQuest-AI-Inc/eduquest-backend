@@ -6,13 +6,14 @@ from typing import Optional
 _LEGACY_PREFIXES = ("pbkdf2:", "scrypt:")
 
 
-def _check_werkzeug_pbkdf2(hashed: str, password: str) -> bool:
+def check_werkzeug_pbkdf2(hashed: str, password: str) -> bool:
     # werkzeug pbkdf2 format: pbkdf2:<method>:<iterations>$<salt>$<hash>
     try:
-        _, method_iter, salt_hash = hashed.split(":", 2)
-        method, iterations = method_iter.rsplit(":", 1)
-        salt, expected = salt_hash.split("$", 1)
-        dk = hashlib.pbkdf2_hmac(method, password.encode(), salt.encode(), int(iterations))
+        # Split on "$" first to separate the metadata header from salt and hash
+        meta, salt, expected = hashed.split("$", 2)
+        # meta = "pbkdf2:<method>:<iterations>"
+        _, method, iterations_str = meta.split(":", 2)
+        dk = hashlib.pbkdf2_hmac(method, password.encode(), salt.encode(), int(iterations_str))
         return hmac.compare_digest(dk.hex(), expected)
     except Exception:
         return False
@@ -24,7 +25,7 @@ def generate_password_hash(password: str) -> str:
 
 def check_password_hash(hashed: str, password: str) -> bool:
     if hashed.startswith(_LEGACY_PREFIXES):
-        return _check_werkzeug_pbkdf2(hashed, password)
+        return check_werkzeug_pbkdf2(hashed, password)
     return bcrypt.checkpw(password.encode(), hashed.encode())
 
 

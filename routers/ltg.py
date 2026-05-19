@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
@@ -35,6 +35,7 @@ class ContinueLTGRequest(BaseModel):
     conversation_id: str
     message: str
     period_id: Optional[str] = None
+    student_id: Optional[str] = None
 
 
 class InitiateHomeworkRequest(BaseModel):
@@ -44,7 +45,7 @@ class InitiateHomeworkRequest(BaseModel):
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
-@router.post("/initiate-ltg-conversation")
+@router.post("/initiate-ltg-conversation", response_model=dict[str, Any])
 def initiate_ltg_conversation(
     body: InitiateLTGRequest,
     auth: AuthPayload = Depends(get_auth),
@@ -72,15 +73,27 @@ def initiate_ltg_conversation(
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
-@router.post("/continue-ltg-conversation")
+@router.post("/continue-ltg-conversation", response_model=dict[str, Any])
 def continue_ltg_conversation(
     body: ContinueLTGRequest,
     auth: AuthPayload = Depends(get_auth),
     period_service: PeriodService = Depends(_get_period_service),
 ):
     try:
+        if body.student_id and body.student_id != auth.sub:
+            if not body.period_id:
+                return JSONResponse(status_code=400, content={"detail": "period_id is required when student_id is provided"})
+            period = _period_mgmt.get_period_by_id(body.period_id)
+            if not period or period.get("owner_id") != auth.sub:
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Not authorized to continue LTG for this student"},
+                )
+            effective_user_id = body.student_id
+        else:
+            effective_user_id = auth.sub
         return period_service.continue_ltg_conversation(
-            auth.sub,
+            effective_user_id,
             body.conversation_type,
             body.conversation_id,
             body.message,
@@ -92,7 +105,7 @@ def continue_ltg_conversation(
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
-@router.post("/initiate-homework-agent")
+@router.post("/initiate-homework-agent", response_model=dict[str, Any])
 def initiate_homework_agent(
     body: InitiateHomeworkRequest,
     auth: AuthPayload = Depends(get_auth),

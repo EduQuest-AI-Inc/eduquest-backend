@@ -19,7 +19,8 @@ def _svc(provider=None):
     svc.curriculum_service = MagicMock()
     svc.ltg_conversation_dao = MagicMock()
     svc.ltg_goal_dao = MagicMock()
-    svc.quest_service = MagicMock()
+    svc.quest_retrieval_service = MagicMock()
+    svc.quest_grading_service = MagicMock()
     return svc
 
 
@@ -103,7 +104,7 @@ def test_start_homework_agent_happy_path_with_goal():
     svc.ltg_conversation_dao.get_conversation_id.return_value = "conv-1"
     svc.ltg_conversation_dao.get_last_response_id.return_value = "resp-1"
     svc.ltg_goal_dao.get_by_student_and_period.return_value = "Build a capstone project"
-    svc.quest_service.update_quests_preserving_completed_data.return_value = {"saved": True}
+    svc.quest_grading_service.update_quests_preserving_completed_data.return_value = {"saved": True}
     result = svc.start_homework_agent(STUDENT_ID, PERIOD_ID)
 
     assert "homework" in result
@@ -124,7 +125,7 @@ def test_start_homework_agent_happy_path_no_goal():
     svc.ltg_conversation_dao.get_conversation_id.return_value = "conv-1"
     svc.ltg_conversation_dao.get_last_response_id.return_value = "resp-1"
     svc.ltg_goal_dao.get_by_student_and_period.return_value = None
-    svc.quest_service.update_quests_preserving_completed_data.return_value = {}
+    svc.quest_grading_service.update_quests_preserving_completed_data.return_value = {}
 
     result = svc.start_homework_agent(STUDENT_ID, PERIOD_ID)
 
@@ -148,7 +149,7 @@ def test_start_homework_agent_schedule_agent_failure_falls_back():
     svc.ltg_conversation_dao.get_conversation_id.return_value = "conv-1"
     svc.ltg_conversation_dao.get_last_response_id.return_value = "resp-1"
     svc.ltg_goal_dao.get_by_student_and_period.return_value = "Build something"
-    svc.quest_service.update_quests_preserving_completed_data.return_value = {}
+    svc.quest_grading_service.update_quests_preserving_completed_data.return_value = {}
     result = svc.start_homework_agent(STUDENT_ID, PERIOD_ID)
 
     assert "homework" in result
@@ -190,7 +191,7 @@ def test_update_quests_no_existing_quests():
     svc = _enrolled_svc()
     svc.student_dao.get_student_by_id.return_value = {"user_id": STUDENT_ID}
     svc.period_dao.get_period_by_id.return_value = {"period_id": PERIOD_ID}
-    svc.quest_service.get_quests_for_student_and_period.return_value = []
+    svc.quest_retrieval_service.get_quests_for_student_and_period.return_value = []
 
     with pytest.raises(NotFoundError):
         svc.update_quests_with_recommended_change(STUDENT_ID, "student", PERIOD_ID, "add more math")
@@ -201,7 +202,7 @@ def test_update_quests_all_completed_is_noop():
     svc = _enrolled_svc()
     svc.student_dao.get_student_by_id.return_value = {"user_id": STUDENT_ID}
     svc.period_dao.get_period_by_id.return_value = {"period_id": PERIOD_ID}
-    svc.quest_service.get_quests_for_student_and_period.return_value = [
+    svc.quest_retrieval_service.get_quests_for_student_and_period.return_value = [
         {"description": "Q1", "skills": "s1", "week": 1, "grade": 4.5, "status": "completed"},
         {"description": "Q2", "skills": "s2", "week": 2, "grade": None, "status": "completed"},
     ]
@@ -210,7 +211,7 @@ def test_update_quests_all_completed_is_noop():
 
     assert result["affected_quests"] == 0
     assert result["preserved_quests"] == 2
-    svc.quest_service.update_quests_preserving_completed_data.assert_not_called()
+    svc.quest_grading_service.update_quests_preserving_completed_data.assert_not_called()
 
 
 @pytest.mark.unit
@@ -220,12 +221,12 @@ def test_update_quests_happy_path():
     svc.enrollment_dao.get_enrollments_by_period.return_value = [{"user_id": STUDENT_ID}]
     svc.student_dao.get_student_by_id.return_value = {"user_id": STUDENT_ID}
     svc.period_dao.get_period_by_id.return_value = {"period_id": PERIOD_ID}
-    svc.quest_service.get_quests_for_student_and_period.return_value = [
+    svc.quest_retrieval_service.get_quests_for_student_and_period.return_value = [
         {"description": "Q1", "skills": "Reading", "week": 1, "grade": None, "status": "pending"},
         {"description": "Q2", "skills": "Writing", "week": 2, "grade": 5.0, "status": "completed"},
     ]
     svc.ltg_conversation_dao.get_last_response_id.return_value = "resp-1"
-    svc.quest_service.update_quests_preserving_completed_data.return_value = {"updated": True}
+    svc.quest_grading_service.update_quests_preserving_completed_data.return_value = {"updated": True}
 
     result = svc.update_quests_with_recommended_change(STUDENT_ID, "student", PERIOD_ID, "add more math")
 
