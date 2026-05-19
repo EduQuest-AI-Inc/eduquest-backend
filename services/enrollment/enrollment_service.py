@@ -53,8 +53,16 @@ class EnrollmentService:
     def get_enrollments_for_period(self, period_id: str):
         enrollments = self.enrollment_dao.get_enrollments_by_period(period_id)
         period = self.period_dao.get_period_by_id(period_id)
+        enriched = []
+        for enrollment in enrollments:
+            user = self.user_dao.get_by_id(enrollment["user_id"]) if enrollment.get("user_id") else None
+            enriched.append({
+                **enrollment,
+                "first_name": user.get("first_name") if user else None,
+                "last_name": user.get("last_name") if user else None,
+            })
         return {
-            "students": enrollments,
+            "students": enriched,
             "file_urls": period.get("file_urls", []) if period else []
         }
 
