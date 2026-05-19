@@ -2,6 +2,8 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
+from responses.lessons import LessonHtmlResponse, LessonPptxResponse, RegenerateLessonResponse
+
 from bots.protocol import BotProviderProtocol
 from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_roles
 from integrations import s3_service
@@ -40,7 +42,7 @@ def _assert_lesson_access(period_id: str, auth: AuthPayload) -> None:
             raise HTTPException(status_code=403, detail="Unauthorized")
 
 
-@router.get("/{lesson_id}/pptx")
+@router.get("/{lesson_id}/pptx", response_model=LessonPptxResponse)
 def get_lesson_pptx(
     lesson_id: str,
     auth: AuthPayload = Depends(get_auth),
@@ -61,7 +63,7 @@ def get_lesson_pptx(
     }
 
 
-@router.post("/{lesson_id}/pptx/regenerate", status_code=202)
+@router.post("/{lesson_id}/pptx/regenerate", status_code=202, response_model=RegenerateLessonResponse)
 def regenerate_lesson_pptx(
     lesson_id: str,
     background_tasks: BackgroundTasks,
@@ -83,7 +85,7 @@ def regenerate_lesson_pptx(
         raise HTTPException(status_code=400, detail=str(exc))
 
 
-@router.get("/{lesson_id}/html")
+@router.get("/{lesson_id}/html", response_model=LessonHtmlResponse)
 def get_lesson_html(
     lesson_id: str,
     auth: AuthPayload = Depends(get_auth),

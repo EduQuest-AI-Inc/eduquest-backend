@@ -93,6 +93,14 @@ The distinction between these two directories is whether the code needs a networ
 
 Renderers (PPTX, HTML, chart generation) belong in `utils/rendering/` because they are local library calls using matplotlib, python-pptx, and Jinja2 — no API keys, no network. They must not live under `services/` or `integrations/`.
 
+### Every route handler must declare `response_model=` pointing to a DTO in `responses/`
+
+All route handlers must declare `response_model=` pointing to a Pydantic DTO in `eduquest-backend/responses/`. No handler may return an untyped dict without a corresponding response model. DTOs live in `responses/[router_name].py` and use `model_config = ConfigDict(extra="ignore")` so extra fields from Supabase dicts are stripped rather than causing validation errors.
+
+When a router or response file changes, `openapi.json` must be regenerated (via the `export-openapi` pre-commit hook or manually) and committed alongside the change. This keeps FastAPI's OpenAPI schema accurate and allows `openapi-typescript` to generate correct frontend types automatically. Bypassing this with `--no-verify` is a policy violation, not just a hook skip.
+
+Agent and conversation endpoints where output structure is not yet stable may use `response_model=dict[str, Any]` as a placeholder so they appear in the schema.
+
 ---
 
 ## Testing Decisions

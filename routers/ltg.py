@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
@@ -45,7 +45,7 @@ class InitiateHomeworkRequest(BaseModel):
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
-@router.post("/initiate-ltg-conversation")
+@router.post("/initiate-ltg-conversation", response_model=dict[str, Any])
 def initiate_ltg_conversation(
     body: InitiateLTGRequest,
     auth: AuthPayload = Depends(get_auth),
@@ -73,7 +73,7 @@ def initiate_ltg_conversation(
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
-@router.post("/continue-ltg-conversation")
+@router.post("/continue-ltg-conversation", response_model=dict[str, Any])
 def continue_ltg_conversation(
     body: ContinueLTGRequest,
     auth: AuthPayload = Depends(get_auth),
@@ -103,7 +103,7 @@ def continue_ltg_conversation(
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
-@router.post("/initiate-homework-agent")
+@router.post("/initiate-homework-agent", response_model=dict[str, Any])
 def initiate_homework_agent(
     body: InitiateHomeworkRequest,
     auth: AuthPayload = Depends(get_auth),

@@ -3,7 +3,7 @@ import json
 import logging
 import os
 import tempfile
-from typing import Optional, cast
+from typing import Any, Optional, cast
 
 from fastapi import UploadFile
 
@@ -30,7 +30,7 @@ def _get_conversation_service(
 # Profile assistant
 # ---------------------------------------------------------------------------
 
-@router.post("/initiate-profile-assistant")
+@router.post("/initiate-profile-assistant", response_model=dict[str, Any])
 def initiate_profile_assistant(
     auth: AuthPayload = Depends(require_roles(Role.STUDENT)),
     svc: ConversationService = Depends(_get_conversation_service),
@@ -44,7 +44,7 @@ class ContinueProfileRequest(BaseModel):
     message: str
 
 
-@router.post("/continue-profile-assistant")
+@router.post("/continue-profile-assistant", response_model=dict[str, Any])
 def continue_profile_assistant(
     body: ContinueProfileRequest,
     auth: AuthPayload = Depends(get_auth),
@@ -69,7 +69,7 @@ def continue_profile_assistant(
 # the sync service call via run_in_executor to avoid asyncio.run() conflicts.
 # ---------------------------------------------------------------------------
 
-@router.post("/initiate-update-assistant")
+@router.post("/initiate-update-assistant", response_model=dict[str, Any])
 async def initiate_update_assistant(
     request: Request,
     auth: AuthPayload = Depends(get_auth),
@@ -203,7 +203,7 @@ class ContinueUpdateRequest(BaseModel):
     user_id: Optional[str] = None
 
 
-@router.post("/continue-update-assistant")
+@router.post("/continue-update-assistant", response_model=dict[str, Any])
 def continue_update_assistant(
     body: ContinueUpdateRequest,
     auth: AuthPayload = Depends(get_auth),

@@ -11,6 +11,18 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from pydantic import BaseModel
 
 from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period as _get_period_dep, require_active_membership, require_roles
+from responses.period import (
+    AddFilesResponse,
+    CreatePeriodResponse,
+    ForkMetadataResponse,
+    GetPeriodResponse,
+    MultipartCompleteResponse,
+    MultipartInitResponse,
+    PeriodListResponse,
+    PresignedFileResponse,
+    SummerQuestGenerateResponse,
+    UpdatePeriodResponse,
+)
 from bots.protocol import BotProviderProtocol
 from integrations import openai_vector_store
 from integrations.s3_service import (
@@ -145,7 +157,7 @@ def _safe_filename(filename: str) -> str:
     return re.sub(r"[^\w.\-]", "_", name) or "upload"
 
 
-@router.post("/multipart-init")
+@router.post("/multipart-init", response_model=MultipartInitResponse)
 def multipart_init(payload: _MultipartInitRequest, auth: AuthPayload = Depends(get_auth)):
     """Create a multipart upload and return presigned PUT URLs for all parts."""
     safe_name = _safe_filename(payload.filename)
@@ -156,14 +168,14 @@ def multipart_init(payload: _MultipartInitRequest, auth: AuthPayload = Depends(g
     return {"key": key, "upload_id": upload_id, "part_urls": part_urls}
 
 
-@router.post("/multipart-complete")
+@router.post("/multipart-complete", response_model=MultipartCompleteResponse)
 def multipart_complete(payload: _MultipartCompleteRequest, auth: AuthPayload = Depends(get_auth)):
     parts = [{"PartNumber": p.part_number, "ETag": p.etag} for p in payload.parts]
     key = complete_multipart_upload(payload.key, payload.upload_id, parts)
     return {"key": key}
 
 
-@router.get("/periods")
+@router.get("/periods", response_model=PeriodListResponse)
 def list_periods(auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT))):
     # Listing is allowed regardless of membership so paying users can see their
     # classes and lapsed users still see what they have but cannot manage them.
@@ -171,7 +183,7 @@ def list_periods(auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PA
     return {"periods": result}
 
 
-@router.post("/create-period", status_code=201)
+@router.post("/create-period", status_code=201, response_model=CreatePeriodResponse)
 def create_period(
     background_tasks: BackgroundTasks,
     name: str = Form(...),
@@ -281,7 +293,7 @@ def create_period(
         raise
 
 
-@router.patch("/period/{period_id}/setup")
+@router.patch("/period/{period_id}/setup", response_model=UpdatePeriodResponse)
 def update_period_setup(
     period_id: str,
     background_tasks: BackgroundTasks,
@@ -402,7 +414,7 @@ class _AddFilesRequest(BaseModel):
     file_keys: List[str]
 
 
-@router.post("/add-files-to-period")
+@router.post("/add-files-to-period", response_model=AddFilesResponse)
 def add_files_to_period(
     payload: _AddFilesRequest,
     auth: AuthPayload = Depends(require_active_membership),
@@ -420,7 +432,7 @@ def add_files_to_period(
     return {"message": f"Successfully added {len(payload.file_keys)} files to period", "added_files": payload.file_keys}
 
 
-@router.get("/period/{period_id}")
+@router.get("/period/{period_id}", response_model=GetPeriodResponse)
 def get_period(
     period_id: str,
     auth: AuthPayload = Depends(require_active_membership),
@@ -455,7 +467,7 @@ class _ForkMetadataUpdate(BaseModel):
     mastery_threshold: Optional[float] = None
 
 
-@router.patch("/period/{period_id}/fork-metadata")
+@router.patch("/period/{period_id}/fork-metadata", response_model=ForkMetadataResponse)
 def update_fork_metadata(
     period_id: str,
     body: _ForkMetadataUpdate,
@@ -482,7 +494,7 @@ def update_fork_metadata(
 # ─── Summer side quests ───────────────────────────────────────────────────────
 
 
-@router.post("/period/{period_id}/summer-quests/generate", status_code=202)
+@router.post("/period/{period_id}/summer-quests/generate", status_code=202, response_model=SummerQuestGenerateResponse)
 def generate_summer_quests(
     period_id: str,
     background_tasks: BackgroundTasks,
@@ -502,7 +514,7 @@ def generate_summer_quests(
 
 # ─── Files ────────────────────────────────────────────────────────────────────
 
-@router.get("/get-file/{key:path}")
+@router.get("/get-file/{key:path}", response_model=PresignedFileResponse)
 def get_file_presigned(key: str, auth: AuthPayload = Depends(get_auth)):
     url = get_file_presigned_url(key)
     return {"url": url}

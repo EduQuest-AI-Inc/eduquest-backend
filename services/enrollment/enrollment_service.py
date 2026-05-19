@@ -134,16 +134,26 @@ class EnrollmentService:
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
+            logger.warning("verify_period_id: period %s not found (user=%s)", period_id, user_id)
             raise NotFoundError("Invalid period ID")
 
         owner = self.user_dao.get_by_id(period["owner_id"])
         if not owner:
+            logger.warning("verify_period_id: owner not found for period %s", period_id)
             raise NotFoundError("Invalid period ID")
         if owner["role"] != "teacher" and not allow_parent_period:
+            logger.warning(
+                "verify_period_id: period %s has owner role %s, not teacher (user=%s)",
+                period_id, owner["role"], user_id,
+            )
             raise NotFoundError("Invalid period ID")
 
         if period.get('status') != 'approved':
-            raise NotFoundError("Invalid period ID")
+            logger.warning(
+                "verify_period_id: period %s has status=%r, expected 'approved' (user=%s)",
+                period_id, period.get('status'), user_id,
+            )
+            raise NotFoundError("This class is not yet available for enrollment")
 
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
