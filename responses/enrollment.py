@@ -12,12 +12,13 @@ class EnrollResponse(BaseModel):
 
 
 class StudentItem(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="ignore")
 
     user_id: Optional[str] = None
     period_id: Optional[str] = None
     semester: Optional[str] = None
     enrolled_at: Optional[str] = None
+    enrollment_id: Optional[str] = None
 
 
 class EnrollmentsResponse(BaseModel):

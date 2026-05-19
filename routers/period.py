@@ -443,7 +443,7 @@ def get_period(
     return {"period": period}
 
 
-@router.delete("/period/{period_id}", status_code=204)
+@router.delete("/period/{period_id}", status_code=204, response_model=None)
 def delete_period(
     period_id: str,
     auth: AuthPayload = Depends(require_active_membership),
