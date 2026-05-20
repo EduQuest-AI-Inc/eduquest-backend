@@ -5,8 +5,11 @@ from typing import FrozenSet, Optional
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException, Path, Request
 
+# Dead code until Phase 6 — kept to avoid breaking any callers during rollout.
 JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret")
 JWT_ALGORITHM = "HS256"
+
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
 
 
 class Role(str, Enum):
@@ -26,6 +29,9 @@ def get_auth(
     authorization: Optional[str] = Header(default=None),
     auth_token: Optional[str] = Cookie(default=None),
 ) -> AuthPayload:
+    if not SUPABASE_JWT_SECRET:
+        raise RuntimeError("SUPABASE_JWT_SECRET must be set")
+
     token: Optional[str] = None
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1].strip()
@@ -36,18 +42,33 @@ def get_auth(
         raise HTTPException(status_code=401, detail="Missing auth token")
 
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return AuthPayload(
-            sub=payload["sub"],
-            role=Role(payload.get("role", Role.STUDENT)),
-            token=token,
+        payload = jwt.decode(
+            token,
+            SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            audience="authenticated",
         )
-    except (ValueError, KeyError):
-        raise HTTPException(status_code=401, detail="Invalid token claims")
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+    app_meta = payload.get("app_metadata") or {}
+    username = app_meta.get("username")
+    role_str = app_meta.get("role")
+
+    if not username or not role_str:
+        raise HTTPException(
+            status_code=401,
+            detail="User not provisioned in Supabase Auth — run Phase 1 migration",
+        )
+
+    try:
+        role = Role(role_str)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid token claims")
+
+    return AuthPayload(sub=username, role=role, token=token)
 
 
 def require_roles(*roles: Role):

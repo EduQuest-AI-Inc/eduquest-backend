@@ -1,16 +1,33 @@
 """
-Unit tests for routers/deps.py — require_student_viewer dependency.
+Unit tests for routers/deps.py — get_auth and require_student_viewer dependencies.
 
 A fresh minimal FastAPI app is built per test so that the ParentService /
 EnrollmentService instances captured inside the closure can be swapped out
 via patch before require_student_viewer() is called.
 """
+import time
 import pytest
+import jwt as pyjwt
 from unittest.mock import MagicMock, patch
 from fastapi import FastAPI, Depends
 from fastapi.testclient import TestClient
 
 from routers.deps import require_student_viewer, get_auth, AuthPayload, Role
+
+TEST_SECRET = "test-supabase-jwt-secret"
+
+
+def _make_token(app_metadata: dict, expired: bool = False) -> str:
+    """Build a minimal Supabase-shaped JWT signed with TEST_SECRET."""
+    now = int(time.time())
+    payload = {
+        "sub": "some-uuid",
+        "aud": "authenticated",
+        "iat": now,
+        "exp": now - 10 if expired else now + 3600,
+        "app_metadata": app_metadata,
+    }
+    return pyjwt.encode(payload, TEST_SECRET, algorithm="HS256")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -102,3 +119,67 @@ def test_student_role_with_foreign_user_id_returns_403():
     with _client(mini_app, Role.STUDENT) as client:
         resp = client.get("/probe?user_id=some-other-student")
     assert resp.status_code == 403
+
+
+# ── get_auth — Supabase JWT validation ───────────────────────────────────────
+
+def _auth_app() -> FastAPI:
+    mini = FastAPI()
+
+    @mini.get("/me")
+    def me(auth: AuthPayload = Depends(get_auth)):
+        return {"sub": auth.sub, "role": auth.role.value}
+
+    return mini
+
+
+@pytest.mark.unit
+@patch("routers.deps.SUPABASE_JWT_SECRET", TEST_SECRET)
+def test_get_auth_valid_token():
+    token = _make_token({"username": "testuser", "role": "student"})
+    app = _auth_app()
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+    assert resp.json() == {"sub": "testuser", "role": "student"}
+
+
+@pytest.mark.unit
+@patch("routers.deps.SUPABASE_JWT_SECRET", TEST_SECRET)
+def test_get_auth_expired_token_returns_401():
+    token = _make_token({"username": "testuser", "role": "student"}, expired=True)
+    app = _auth_app()
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+    assert "expired" in resp.json()["detail"].lower()
+
+
+@pytest.mark.unit
+@patch("routers.deps.SUPABASE_JWT_SECRET", TEST_SECRET)
+def test_get_auth_missing_username_returns_401():
+    token = _make_token({"role": "student"})  # no username
+    app = _auth_app()
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+    assert "provisioned" in resp.json()["detail"]
+
+
+@pytest.mark.unit
+@patch("routers.deps.SUPABASE_JWT_SECRET", TEST_SECRET)
+def test_get_auth_invalid_role_returns_401():
+    token = _make_token({"username": "testuser", "role": "superadmin"})
+    app = _auth_app()
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+
+@pytest.mark.unit
+@patch("routers.deps.SUPABASE_JWT_SECRET", TEST_SECRET)
+def test_get_auth_missing_token_returns_401():
+    app = _auth_app()
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get("/me")
+    assert resp.status_code == 401

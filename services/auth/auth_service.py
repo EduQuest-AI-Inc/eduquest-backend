@@ -127,6 +127,9 @@ class AuthService:
     def get_user_by_email(self, email: str):
         return self.user_dao.get_by_email(email)
 
+    def get_user_by_id(self, user_id: str):
+        return self.user_dao.get_by_id(user_id)
+
     def add_session(self, session) -> None:
         self.session_dao.add_session(session)
 
@@ -171,6 +174,10 @@ def register_user(username: str, password: str, role: str, first_name: str = '',
 
 def get_user_by_email(email: str):
     return _auth_service.get_user_by_email(email)
+
+
+def get_user_by_id(user_id: str):
+    return _auth_service.get_user_by_id(user_id)
 
 
 def add_session(session) -> None:
