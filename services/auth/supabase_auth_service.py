@@ -92,6 +92,13 @@ class SupabaseAuthService:
                 exc_info=True,
             )
 
+    def sign_in_with_password(self, email: str, password: str):
+        """
+        Sign in via Supabase Auth and return the AuthResponse.
+        Raises on failure — callers are responsible for handling exceptions.
+        """
+        return self._get_client().auth.sign_in_with_password({"email": email, "password": password})
+
     def sync_password(self, supabase_auth_uuid: str, new_plaintext_password: str) -> None:
         """
         Sync a changed password to Supabase Auth.

@@ -8,7 +8,6 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from constants.timeouts import JWT_EXPIRY_HOURS
-from data_access.config import get_admin_supabase_client as get_supabase_client
 from responses.auth import (
     LoginResponse,
     OAuthCompleteResponse,
@@ -39,6 +38,7 @@ JWT_ALGORITHM = "HS256"
 
 _parent_service = ParentService()
 _oauth_service = OAuthService()
+_supabase_auth_service = SupabaseAuthService()
 password_reset_service = get_password_reset_service()
 
 
@@ -152,18 +152,14 @@ def login(body: LoginRequest):
     email: str = user["email"]
 
     try:
-        sb_response = get_supabase_client().auth.sign_in_with_password(
-            {"email": email, "password": body.password}
-        )
+        sb_response = _supabase_auth_service.sign_in_with_password(email, body.password)
     except Exception as exc:
         # Password may have drifted if a previous sync_password call failed silently.
         # authenticate_user() already verified body.password against bcrypt — it's correct.
         if user.get("supabase_auth_id"):
             try:
-                SupabaseAuthService().sync_password(user["supabase_auth_id"], body.password)
-                sb_response = get_supabase_client().auth.sign_in_with_password(
-                    {"email": email, "password": body.password}
-                )
+                _supabase_auth_service.sync_password(user["supabase_auth_id"], body.password)
+                sb_response = _supabase_auth_service.sign_in_with_password(email, body.password)
             except Exception as retry_exc:
                 logger.error("Supabase sign_in retry failed for %s: %s", body.username, retry_exc, exc_info=True)
                 raise HTTPException(status_code=401, detail="Authentication failed")
