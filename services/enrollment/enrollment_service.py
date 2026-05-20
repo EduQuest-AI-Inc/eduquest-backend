@@ -21,16 +21,16 @@ TUTORIAL_PERIOD_ID = "PRECALC-58F9-88F5"
 
 
 class EnrollmentService:
-    def __init__(self) -> None:
-        self.enrollment_dao = EnrollmentDAO()
-        self.student_dao = StudentDAO()
-        self.period_dao = PeriodDAO()
-        self.parent_dao = ParentDAO()
-        self.user_dao = UserDAO()
-        self.quest_dao = QuestDAO()
-        self.ltg_conversation_dao = LtgConversationDAO()
-        self.conversation_dao = ConversationDAO()
-        self.ltg_goal_dao = StudentLongTermGoalDAO()
+    def __init__(self, enrollment_dao=None, student_dao=None, period_dao=None, parent_dao=None, user_dao=None, quest_dao=None, ltg_conversation_dao=None, conversation_dao=None, ltg_goal_dao=None, jwt: str | None = None) -> None:
+        self.enrollment_dao = enrollment_dao or EnrollmentDAO(jwt=jwt)
+        self.student_dao = student_dao or StudentDAO(jwt=jwt)
+        self.period_dao = period_dao or PeriodDAO(jwt=jwt)
+        self.parent_dao = parent_dao or ParentDAO(jwt=jwt)
+        self.user_dao = user_dao or UserDAO(jwt=jwt)
+        self.quest_dao = quest_dao or QuestDAO(jwt=jwt)
+        self.ltg_conversation_dao = ltg_conversation_dao or LtgConversationDAO(jwt=jwt)
+        self.conversation_dao = conversation_dao or ConversationDAO(jwt=jwt)
+        self.ltg_goal_dao = ltg_goal_dao or StudentLongTermGoalDAO(jwt=jwt)
 
     def enroll_student(self, user_id: str, period_id: str, semester: str = "Fall 2025") -> dict:
         student = self.student_dao.get_student_by_id(user_id)

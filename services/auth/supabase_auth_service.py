@@ -21,8 +21,8 @@ class SupabaseAuthService:
 
     def _get_client(self) -> "Client":
         if self._client is None:
-            from data_access.config import get_supabase_client
-            self._client = get_supabase_client()
+            from data_access.config import get_admin_supabase_client
+            self._client = get_admin_supabase_client()
         return self._client
 
     def _get_user_dao(self) -> "UserDAO":

@@ -78,11 +78,12 @@ sys.modules['botocore'] = MagicMock()
 sys.modules['botocore.config'] = MagicMock()
 sys.modules['botocore.exceptions'] = MagicMock()
 
-# Prevent RuntimeError from get_supabase_client() during unit test imports.
+# Prevent RuntimeError from get_admin/user_supabase_client() during unit test imports.
 # Without these, any module import chain that reaches SupabaseBaseDAO.__init__
 # will raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set").
 os.environ.setdefault('SUPABASE_URL', 'http://localhost:54321')
 os.environ.setdefault('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
+os.environ.setdefault('SUPABASE_ANON_KEY', 'test-anon-key')
 
 # Eagerly import main so all routers/services are cached in sys.modules while
 # mocks are active. Without this, tests/unit/bots/conftest.py removes bots mocks

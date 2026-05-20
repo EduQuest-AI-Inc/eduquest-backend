@@ -1,6 +1,6 @@
 from typing import Any, cast
 
-from data_access.config import get_supabase_client
+from data_access.config import get_admin_supabase_client, get_user_supabase_client
 from exceptions.validation_error import ValidationError
 from postgrest import APIError as PostgrestAPIError
 from postgrest._sync.request_builder import SyncRequestBuilder
@@ -8,14 +8,10 @@ from supabase import Client
 
 
 class SupabaseBaseDAO:
-    """Base class for all Supabase DAOs.
-
-    Provides thin wrappers around the PostgREST query builder so that
-    concrete DAOs stay concise.
-    """
-
-    def __init__(self, table_name: str) -> None:
-        self.client: Client = get_supabase_client()
+    def __init__(self, table_name: str, jwt: str | None = None) -> None:
+        self.client: Client = (
+            get_user_supabase_client(jwt) if jwt else get_admin_supabase_client()
+        )
         self.table_name = table_name
 
     # -- helpers ---------------------------------------------------------------

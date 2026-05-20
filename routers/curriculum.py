@@ -19,8 +19,6 @@ from exceptions.validation_error import ValidationError
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_enrollment_service = EnrollmentService()
-
 
 def _get_curriculum_service(
     bot_provider: BotProviderProtocol = Depends(get_bot_provider),
@@ -127,9 +125,9 @@ def _assert_period_owner(period: dict, user_id: str) -> None:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
 
-def _assert_student_enrolled(period_id: str, user_id: str) -> None:
+def _assert_student_enrolled(period_id: str, user_id: str, jwt: str) -> None:
     try:
-        _enrollment_service.check_enrolled(user_id, period_id)
+        EnrollmentService(jwt=jwt).check_enrolled(user_id, period_id)
     except ValidationError:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
@@ -148,7 +146,7 @@ def _membership_or_summer(
             detail={"error": "Forbidden", "code": "OWNER_ROLE_REQUIRED"},
         )
     from services.billing.membership_service import MembershipService
-    access = MembershipService().evaluate_access(auth.sub, auth.role.value)
+    access = MembershipService(jwt=auth.token).evaluate_access(auth.sub, auth.role.value)
     if not access.has_active_membership:
         raise HTTPException(
             status_code=403,
@@ -190,7 +188,7 @@ def get_curriculum_status(
         if period.get("is_summer_quest") and period.get("owner_id") == auth.sub:
             pass
         else:
-            _assert_student_enrolled(period_id, auth.sub)
+            _assert_student_enrolled(period_id, auth.sub, auth.token)
     else:
         _assert_period_owner(period, auth.sub)
     return {"period_status": period["status"]}
@@ -207,7 +205,7 @@ def get_curriculum(
         if period.get("is_summer_quest") and period.get("owner_id") == auth.sub:
             pass  # student owns this summer quest — allow through
         else:
-            _assert_student_enrolled(period_id, auth.sub)
+            _assert_student_enrolled(period_id, auth.sub, auth.token)
     else:
         _assert_period_owner(period, auth.sub)
     try:

@@ -5,8 +5,8 @@ from models.quest import Quest
 
 class QuestGradingService:
 
-    def __init__(self) -> None:
-        self.quest_dao = QuestDAO()
+    def __init__(self, quest_dao=None, jwt: str | None = None) -> None:
+        self.quest_dao = quest_dao or QuestDAO(jwt=jwt)
 
     def update_completed_steps(self, quest_id: str, completed_steps: list) -> None:
         self.quest_dao.update_completed_steps(quest_id, completed_steps)

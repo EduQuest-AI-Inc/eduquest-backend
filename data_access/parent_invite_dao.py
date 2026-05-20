@@ -4,8 +4,8 @@ from data_access.base_dao import SupabaseBaseDAO
 
 
 class ParentInviteDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('parent_invite')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('parent_invite', jwt=jwt)
 
     def create_invite(self, invite) -> None:
         self._insert(invite.to_item())

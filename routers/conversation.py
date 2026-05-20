@@ -17,13 +17,12 @@ from services.quest.quest_retrieval_service import QuestRetrievalService
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_quest_retrieval_service = QuestRetrievalService()
-
 
 def _get_conversation_service(
+    auth: AuthPayload = Depends(get_auth),
     bot_provider: BotProviderProtocol = Depends(get_bot_provider),
 ) -> ConversationService:
-    return ConversationService(bot_provider=bot_provider)
+    return ConversationService(bot_provider=bot_provider, jwt=auth.token)
 
 
 # ---------------------------------------------------------------------------
@@ -57,10 +56,10 @@ def continue_profile_assistant(
             body.conversation_id,
             body.message,
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ---------------------------------------------------------------------------
@@ -104,9 +103,9 @@ async def initiate_update_assistant(
                     detail="week is required for student submissions",
                 )
 
-            # Fetch quest data to build quests_file JSON
             try:
-                quest_data = _quest_retrieval_service.get_quest_by_id(individual_quest_id)
+                quest_retrieval_service = QuestRetrievalService(jwt=auth.token)
+                quest_data = quest_retrieval_service.get_quest_by_id(individual_quest_id)
                 if not quest_data:
                     raise HTTPException(status_code=404, detail="Quest not found")
                 if auth.role == Role.STUDENT and quest_data["user_id"] != auth.sub:
@@ -120,7 +119,6 @@ async def initiate_update_assistant(
             user_id = quest_data["user_id"]
             period_id = quest_data.get("period_id")
 
-            # Save uploaded file to a temp path synchronously via SpooledTemporaryFile
             upload_file = cast(UploadFile, upload_file)
             suffix = os.path.splitext(upload_file.filename)[1] if upload_file.filename else ""
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
@@ -151,7 +149,6 @@ async def initiate_update_assistant(
             return result
 
         else:
-            # JSON path
             data = await request.json()
             quests_file = data.get("quests_file")
             is_instructor = data.get("is_instructor", False)
@@ -191,10 +188,10 @@ async def initiate_update_assistant(
 
     except HTTPException:
         raise
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 class ContinueUpdateRequest(BaseModel):
@@ -216,7 +213,7 @@ def continue_update_assistant(
             conversation_id=body.conversation_id,
             message=body.message,
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))

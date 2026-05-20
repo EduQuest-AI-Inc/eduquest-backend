@@ -7,9 +7,9 @@ from exceptions.validation_error import ValidationError
 
 
 class StudentDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('student')
-        self._user_dao = UserDAO()
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('student', jwt=jwt)
+        self._user_dao = UserDAO(jwt=jwt)
 
     def add_student(self, student) -> None:
         """Insert into user table first, then student. Compensating delete on role insert failure."""

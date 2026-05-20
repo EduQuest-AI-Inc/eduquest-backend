@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from main import app
 from routers.deps import get_auth, require_active_membership, AuthPayload, Role
@@ -20,30 +20,33 @@ class TestMyPeriods:
 
     @pytest.mark.api
     def test_my_periods_returns_list(self, client):
-        with patch("routers.parent.period_management_service") as mock_pms:
-            mock_pms.get_periods_by_owner.return_value = [{
-                "period_id": "p1", "name": "Math", "status": "approved",
-                "processing_status": "ready", "owner_id": "parent-1",
-                "is_summer_quest": False, "file_urls": [],
-            }]
+        mock_svc = MagicMock()
+        mock_svc.get_periods_by_owner.return_value = [{
+            "period_id": "p1", "name": "Math", "status": "approved",
+            "processing_status": "ready", "owner_id": "parent-1",
+            "is_summer_quest": False, "file_urls": [],
+        }]
+        with patch("routers.parent.PeriodManagementService", return_value=mock_svc):
             resp = client.get("/parent/my-periods")
         assert resp.status_code == 200
         assert resp.json()["periods"][0]["period_id"] == "p1"
         assert resp.json()["periods"][0]["name"] == "Math"
-        mock_pms.get_periods_by_owner.assert_called_once_with("parent-1")
+        mock_svc.get_periods_by_owner.assert_called_once_with("parent-1")
 
     @pytest.mark.api
     def test_my_periods_empty_returns_empty_list(self, client):
-        with patch("routers.parent.period_management_service") as mock_pms:
-            mock_pms.get_periods_by_owner.return_value = []
+        mock_svc = MagicMock()
+        mock_svc.get_periods_by_owner.return_value = []
+        with patch("routers.parent.PeriodManagementService", return_value=mock_svc):
             resp = client.get("/parent/my-periods")
         assert resp.status_code == 200
         assert resp.json()["periods"] == []
 
     @pytest.mark.api
     def test_my_periods_service_error_returns_500(self, client):
-        with patch("routers.parent.period_management_service") as mock_pms:
-            mock_pms.get_periods_by_owner.side_effect = RuntimeError("db down")
+        mock_svc = MagicMock()
+        mock_svc.get_periods_by_owner.side_effect = RuntimeError("db down")
+        with patch("routers.parent.PeriodManagementService", return_value=mock_svc):
             resp = client.get("/parent/my-periods")
         assert resp.status_code == 500
 
@@ -52,10 +55,11 @@ class TestGenerateInvite:
 
     @pytest.mark.api
     def test_generate_invite_returns_201(self, client):
-        with patch("routers.parent.parent_service") as mock_ps:
-            mock_ps.generate_invite.return_value = {
-                "code": "ABCD1234", "expires_at": "2026-05-01T00:00:00+00:00"
-            }
+        mock_ps = MagicMock()
+        mock_ps.generate_invite.return_value = {
+            "code": "ABCD1234", "expires_at": "2026-05-01T00:00:00+00:00"
+        }
+        with patch("routers.parent.ParentService", return_value=mock_ps):
             resp = client.post("/parent/generate-invite")
         assert resp.status_code == 201
         assert resp.json()["code"] == "ABCD1234"
@@ -64,8 +68,9 @@ class TestGenerateInvite:
 
     @pytest.mark.api
     def test_generate_invite_service_error_returns_500(self, client):
-        with patch("routers.parent.parent_service") as mock_ps:
-            mock_ps.generate_invite.side_effect = RuntimeError("fail")
+        mock_ps = MagicMock()
+        mock_ps.generate_invite.side_effect = RuntimeError("fail")
+        with patch("routers.parent.ParentService", return_value=mock_ps):
             resp = client.post("/parent/generate-invite")
         assert resp.status_code == 500
 
@@ -74,11 +79,12 @@ class TestGetStudents:
 
     @pytest.mark.api
     def test_get_students_returns_list(self, client):
-        with patch("routers.parent.parent_service") as mock_ps:
-            mock_ps.get_linked_students.return_value = [
-                {"user_id": "s1", "first_name": "Alice", "last_name": "Smith",
-                 "grade": "10", "email": "alice@eduquestai.org"}
-            ]
+        mock_ps = MagicMock()
+        mock_ps.get_linked_students.return_value = [
+            {"user_id": "s1", "first_name": "Alice", "last_name": "Smith",
+             "grade": "10", "email": "alice@eduquestai.org"}
+        ]
+        with patch("routers.parent.ParentService", return_value=mock_ps):
             resp = client.get("/parent/students")
         assert resp.status_code == 200
         assert len(resp.json()["students"]) == 1
@@ -86,16 +92,18 @@ class TestGetStudents:
 
     @pytest.mark.api
     def test_get_students_empty_returns_empty_list(self, client):
-        with patch("routers.parent.parent_service") as mock_ps:
-            mock_ps.get_linked_students.return_value = []
+        mock_ps = MagicMock()
+        mock_ps.get_linked_students.return_value = []
+        with patch("routers.parent.ParentService", return_value=mock_ps):
             resp = client.get("/parent/students")
         assert resp.status_code == 200
         assert resp.json()["students"] == []
 
     @pytest.mark.api
     def test_get_students_service_error_returns_500(self, client):
-        with patch("routers.parent.parent_service") as mock_ps:
-            mock_ps.get_linked_students.side_effect = RuntimeError("fail")
+        mock_ps = MagicMock()
+        mock_ps.get_linked_students.side_effect = RuntimeError("fail")
+        with patch("routers.parent.ParentService", return_value=mock_ps):
             resp = client.get("/parent/students")
         assert resp.status_code == 500
 
@@ -104,22 +112,24 @@ class TestEnrollStudent:
 
     @pytest.mark.api
     def test_enroll_student_success(self, client):
-        with (
-            patch("routers.parent.enrollment_service") as mock_es,
-            patch("routers.parent.period_management_service") as mock_pms,
-            patch("routers.parent.user_service") as mock_us,
-            patch("routers.parent.membership_service") as mock_ms,
-        ):
-            mock_es.validate_parent_enrollment_preconditions.return_value = None
-            mock_pms.get_period_by_id.return_value = {"owner_id": "owner-1", "name": "Math"}
-            mock_us.get_by_id.return_value = {"role": "parent"}
-            mock_ms.check_can_add_student_to_period.return_value = None
-            mock_es.verify_period_id.return_value = {
-                "period_id": "p1", "name": "Math", "status": "approved",
-                "processing_status": "ready", "owner_id": "owner-1",
-                "is_summer_quest": False, "file_urls": [],
-            }
+        mock_enrollment = MagicMock()
+        mock_enrollment.validate_parent_enrollment_preconditions.return_value = None
+        mock_enrollment.verify_period_id.return_value = {
+            "period_id": "p1", "name": "Math", "status": "approved",
+            "processing_status": "ready", "owner_id": "owner-1",
+            "is_summer_quest": False, "file_urls": [],
+        }
+        mock_period_mgmt = MagicMock()
+        mock_period_mgmt.get_period_by_id.return_value = {"owner_id": "owner-1", "name": "Math"}
+        mock_user_svc = MagicMock()
+        mock_user_svc.get_by_id.return_value = {"role": "parent"}
+        mock_membership = MagicMock()
+        mock_membership.check_can_add_student_to_period.return_value = None
 
+        with patch("routers.parent.EnrollmentService", return_value=mock_enrollment), \
+             patch("routers.parent.PeriodManagementService", return_value=mock_period_mgmt), \
+             patch("routers.parent.UserService", return_value=mock_user_svc), \
+             patch("routers.parent.MembershipService", return_value=mock_membership):
             resp = client.post(
                 "/parent/enroll-student",
                 json={"student_id": "s1", "period_id": "p1"},
@@ -133,10 +143,11 @@ class TestEnrollStudent:
     @pytest.mark.api
     def test_enroll_student_not_linked_returns_400(self, client):
         from exceptions.validation_error import ValidationError as EQValidationError
-        with patch("routers.parent.enrollment_service") as mock_es:
-            mock_es.validate_parent_enrollment_preconditions.side_effect = EQValidationError(
-                "Student is not linked to this parent account"
-            )
+        mock_enrollment = MagicMock()
+        mock_enrollment.validate_parent_enrollment_preconditions.side_effect = EQValidationError(
+            "Student is not linked to this parent account"
+        )
+        with patch("routers.parent.EnrollmentService", return_value=mock_enrollment):
             resp = client.post(
                 "/parent/enroll-student",
                 json={"student_id": "s-other", "period_id": "p1"},
@@ -146,10 +157,11 @@ class TestEnrollStudent:
     @pytest.mark.api
     def test_enroll_student_already_enrolled_returns_400(self, client):
         from exceptions.validation_error import ValidationError as EQValidationError
-        with patch("routers.parent.enrollment_service") as mock_es:
-            mock_es.validate_parent_enrollment_preconditions.side_effect = EQValidationError(
-                "Student is already enrolled in this class"
-            )
+        mock_enrollment = MagicMock()
+        mock_enrollment.validate_parent_enrollment_preconditions.side_effect = EQValidationError(
+            "Student is already enrolled in this class"
+        )
+        with patch("routers.parent.EnrollmentService", return_value=mock_enrollment):
             resp = client.post(
                 "/parent/enroll-student",
                 json={"student_id": "s1", "period_id": "p1"},
@@ -159,17 +171,19 @@ class TestEnrollStudent:
     @pytest.mark.api
     def test_enroll_student_owner_inactive_returns_403(self, client):
         from services.billing.membership_service import MembershipRequiredError
-        with (
-            patch("routers.parent.enrollment_service") as mock_es,
-            patch("routers.parent.period_management_service") as mock_pms,
-            patch("routers.parent.user_service") as mock_us,
-            patch("routers.parent.membership_service") as mock_ms,
-        ):
-            mock_es.validate_parent_enrollment_preconditions.return_value = None
-            mock_pms.get_period_by_id.return_value = {"owner_id": "owner-1"}
-            mock_us.get_by_id.return_value = {"role": "teacher"}
-            mock_ms.check_can_add_student_to_period.side_effect = MembershipRequiredError("inactive")
+        mock_enrollment = MagicMock()
+        mock_enrollment.validate_parent_enrollment_preconditions.return_value = None
+        mock_period_mgmt = MagicMock()
+        mock_period_mgmt.get_period_by_id.return_value = {"owner_id": "owner-1"}
+        mock_user_svc = MagicMock()
+        mock_user_svc.get_by_id.return_value = {"role": "teacher"}
+        mock_membership = MagicMock()
+        mock_membership.check_can_add_student_to_period.side_effect = MembershipRequiredError("inactive")
 
+        with patch("routers.parent.EnrollmentService", return_value=mock_enrollment), \
+             patch("routers.parent.PeriodManagementService", return_value=mock_period_mgmt), \
+             patch("routers.parent.UserService", return_value=mock_user_svc), \
+             patch("routers.parent.MembershipService", return_value=mock_membership):
             resp = client.post(
                 "/parent/enroll-student",
                 json={"student_id": "s1", "period_id": "p1"},
@@ -181,17 +195,19 @@ class TestEnrollStudent:
     @pytest.mark.api
     def test_enroll_student_plan_limit_returns_403(self, client):
         from services.billing.membership_service import PlanLimitExceededError
-        with (
-            patch("routers.parent.enrollment_service") as mock_es,
-            patch("routers.parent.period_management_service") as mock_pms,
-            patch("routers.parent.user_service") as mock_us,
-            patch("routers.parent.membership_service") as mock_ms,
-        ):
-            mock_es.validate_parent_enrollment_preconditions.return_value = None
-            mock_pms.get_period_by_id.return_value = {"owner_id": "owner-1"}
-            mock_us.get_by_id.return_value = {"role": "teacher"}
-            mock_ms.check_can_add_student_to_period.side_effect = PlanLimitExceededError("limit hit")
+        mock_enrollment = MagicMock()
+        mock_enrollment.validate_parent_enrollment_preconditions.return_value = None
+        mock_period_mgmt = MagicMock()
+        mock_period_mgmt.get_period_by_id.return_value = {"owner_id": "owner-1"}
+        mock_user_svc = MagicMock()
+        mock_user_svc.get_by_id.return_value = {"role": "teacher"}
+        mock_membership = MagicMock()
+        mock_membership.check_can_add_student_to_period.side_effect = PlanLimitExceededError("limit hit")
 
+        with patch("routers.parent.EnrollmentService", return_value=mock_enrollment), \
+             patch("routers.parent.PeriodManagementService", return_value=mock_period_mgmt), \
+             patch("routers.parent.UserService", return_value=mock_user_svc), \
+             patch("routers.parent.MembershipService", return_value=mock_membership):
             resp = client.post(
                 "/parent/enroll-student",
                 json={"student_id": "s1", "period_id": "p1"},

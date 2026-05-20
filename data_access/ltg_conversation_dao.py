@@ -10,8 +10,8 @@ class LtgConversationDAO(SupabaseBaseDAO):
     Each row maps (user_id, period_id) → conversation_id (OpenAI).
     """
 
-    def __init__(self) -> None:
-        super().__init__('ltg_conversation')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('ltg_conversation', jwt=jwt)
 
     def get_conversation_id(self, user_id: str, period_id: str) -> Optional[str]:
         response = self._execute(

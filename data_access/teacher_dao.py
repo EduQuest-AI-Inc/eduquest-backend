@@ -5,9 +5,9 @@ from data_access.user_dao import UserDAO, SHARED_USER_FIELDS
 
 
 class TeacherDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('teacher')
-        self._user_dao = UserDAO()
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('teacher', jwt=jwt)
+        self._user_dao = UserDAO(jwt=jwt)
 
     def add_teacher(self, teacher) -> None:
         """Insert into user table first, then teacher. Compensating delete on role insert failure."""

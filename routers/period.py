@@ -42,9 +42,6 @@ from services.user.teacher_service import TeacherService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-period_management_service = PeriodManagementService()
-_teacher_service = TeacherService()
-membership_service = MembershipService()
 
 
 def _membership_required_response(err: MembershipRequiredError) -> HTTPException:
@@ -108,7 +105,8 @@ def multipart_complete(payload: _MultipartCompleteRequest, auth: AuthPayload = D
 def list_periods(auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT))):
     # Listing is allowed regardless of membership so paying users can see their
     # classes and lapsed users still see what they have but cannot manage them.
-    result = period_management_service.get_periods_by_owner(auth.sub)
+    svc = PeriodManagementService(jwt=auth.token)
+    result = svc.get_periods_by_owner(auth.sub)
     return {"periods": result}
 
 
@@ -142,7 +140,7 @@ def create_period(
     # Summer side quests are free — no membership check required.
     if not is_summer_quest:
         try:
-            membership_service.check_can_create_class(auth.sub, auth.role.value)
+            MembershipService(jwt=auth.token).check_can_create_class(auth.sub, auth.role.value)
         except MembershipRequiredError as e:
             raise _membership_required_response(e)
         except PlanLimitExceededError as e:
@@ -169,7 +167,8 @@ def create_period(
             file_paths.append(file_path)
 
         is_draft = status == "setup_draft"
-        period = period_management_service.create_period(
+        period_mgmt = PeriodManagementService(jwt=auth.token)
+        period = period_mgmt.create_period(
             course=name,
             user_id=auth.sub,
             vector_store_id="",
@@ -190,7 +189,7 @@ def create_period(
 
         if auth.role == Role.TEACHER and canvas_api_url and canvas_api_key:
             try:
-                _teacher_service.update_canvas_credentials(auth.sub, canvas_api_url, canvas_api_key)
+                TeacherService(jwt=auth.token).update_canvas_credentials(auth.sub, canvas_api_url, canvas_api_key)
             except Exception as e:
                 logger.warning("Failed to persist Canvas credentials for teacher %s: %s", auth.sub, e)
 
@@ -247,7 +246,8 @@ def update_period_setup(
     if status not in ("pending", "setup_draft"):
         raise HTTPException(status_code=400, detail="Invalid status value")
 
-    period = period_management_service.get_period_by_id(period_id)
+    period_mgmt = PeriodManagementService(jwt=auth.token)
+    period = period_mgmt.get_period_by_id(period_id)
     if not period:
         raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
@@ -302,11 +302,11 @@ def update_period_setup(
                 shutil.copyfileobj(upload.file, dest)
             file_paths.append(file_path)
 
-        updated = period_management_service.update_setup(period_id, updates)
+        updated = period_mgmt.update_setup(period_id, updates)
 
         if auth.role == Role.TEACHER and canvas_api_url and canvas_api_key:
             try:
-                _teacher_service.update_canvas_credentials(auth.sub, canvas_api_url, canvas_api_key)
+                TeacherService(jwt=auth.token).update_canvas_credentials(auth.sub, canvas_api_url, canvas_api_key)
             except Exception as e:
                 logger.warning("Failed to persist Canvas credentials for teacher %s: %s", auth.sub, e)
 
@@ -344,7 +344,8 @@ def add_files_to_period(
     payload: _AddFilesRequest,
     auth: AuthPayload = Depends(require_active_membership),
 ):
-    period = period_management_service.get_period_by_id(payload.period_id)
+    period_mgmt = PeriodManagementService(jwt=auth.token)
+    period = period_mgmt.get_period_by_id(payload.period_id)
     if not period:
         raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
@@ -353,7 +354,7 @@ def add_files_to_period(
         raise HTTPException(status_code=403, detail="Cannot add files to a forked class")
 
     existing = period.get("file_urls") or []
-    period_management_service.update_file_urls(payload.period_id, existing + payload.file_keys)
+    period_mgmt.update_file_urls(payload.period_id, existing + payload.file_keys)
     return {"message": f"Successfully added {len(payload.file_keys)} files to period", "added_files": payload.file_keys}
 
 
@@ -375,7 +376,7 @@ def delete_period(
     period: dict = Depends(_get_period_dep),
 ):
     try:
-        period_management_service.delete_period(period_id, auth.sub, period=period)
+        PeriodManagementService(jwt=auth.token).delete_period(period_id, auth.sub, period=period)
     except ValueError as ve:
         raise HTTPException(status_code=404, detail=str(ve))
     except PermissionError:
@@ -398,7 +399,8 @@ def update_fork_metadata(
     body: _ForkMetadataUpdate,
     auth: AuthPayload = Depends(require_active_membership),
 ):
-    period = period_management_service.get_period_by_id(period_id)
+    period_mgmt = PeriodManagementService(jwt=auth.token)
+    period = period_mgmt.get_period_by_id(period_id)
     if not period:
         raise HTTPException(status_code=404, detail="Period not found")
     if period.get("owner_id") != auth.sub:
@@ -412,7 +414,7 @@ def update_fork_metadata(
     updates = {k: v for k, v in body.model_dump(exclude_none=True).items() if k in _ALLOWED}
     if not updates:
         raise HTTPException(status_code=400, detail="No valid fields to update")
-    updated = period_management_service.update_setup(period_id, updates)
+    updated = period_mgmt.update_setup(period_id, updates)
     return {"message": "Fork settings updated", "period": updated}
 
 

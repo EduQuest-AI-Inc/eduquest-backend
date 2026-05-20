@@ -5,8 +5,8 @@ from models.quest import Quest
 
 class QuestCreationService:
 
-    def __init__(self) -> None:
-        self.quest_dao = QuestDAO()
+    def __init__(self, quest_dao=None, jwt: str | None = None) -> None:
+        self.quest_dao = quest_dao or QuestDAO(jwt=jwt)
 
     def save_quests_from_schedule(self, schedule_data: dict, user_id: str, period_id: str) -> dict:
         """Create Quest rows for each entry in a schedule. Returns summary dict."""

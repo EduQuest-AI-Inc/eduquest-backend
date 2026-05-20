@@ -4,8 +4,8 @@ from data_access.base_dao import SupabaseBaseDAO
 
 
 class EnrollmentDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('enrollment')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('enrollment', jwt=jwt)
 
     def add_enrollment(self, enrollment) -> None:
         self._insert({

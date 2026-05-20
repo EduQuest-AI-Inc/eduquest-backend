@@ -96,11 +96,11 @@ def _plan_for_price_id(price_id: Optional[str]) -> Optional[MembershipPlan]:
 
 
 class MembershipService:
-    def __init__(self) -> None:
-        self.dao = MembershipDAO()
-        self.user_dao = UserDAO()
-        self.period_dao = PeriodDAO()
-        self.enrollment_dao = EnrollmentDAO()
+    def __init__(self, dao=None, user_dao=None, period_dao=None, enrollment_dao=None, jwt: str | None = None) -> None:
+        self.dao = dao or MembershipDAO(jwt=jwt)
+        self.user_dao = user_dao or UserDAO(jwt=jwt)
+        self.period_dao = period_dao or PeriodDAO(jwt=jwt)
+        self.enrollment_dao = enrollment_dao or EnrollmentDAO(jwt=jwt)
 
     # ── Read ────────────────────────────────────────────────────────────────
 

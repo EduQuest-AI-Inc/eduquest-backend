@@ -5,9 +5,9 @@ from data_access.user_dao import UserDAO, SHARED_USER_FIELDS
 
 
 class ParentDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('parent')
-        self._user_dao = UserDAO()
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('parent', jwt=jwt)
+        self._user_dao = UserDAO(jwt=jwt)
 
     def add_parent(self, parent) -> None:
         """Insert into user table first, then parent. Compensating delete on role insert failure."""
