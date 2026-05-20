@@ -22,6 +22,7 @@ from services.auth.auth_service import (
     get_user_by_email,
     register_user,
 )
+from services.auth.oauth_service import OAuthService
 from services.parent.parent_service import ParentService
 from services.auth.password_reset_service import get_password_reset_service
 from utils.token_utils import set_auth_cookie
@@ -34,6 +35,7 @@ JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret")
 JWT_ALGORITHM = "HS256"
 
 _parent_service = ParentService()
+_oauth_service = OAuthService()
 password_reset_service = get_password_reset_service()
 
 
@@ -161,6 +163,46 @@ def login(body: LoginRequest, response: Response):
 
     set_auth_cookie(response, token)
     return response_data
+
+
+# ---------------------------------------------------------------------------
+# OAuth (Google / Apple / Microsoft via Supabase)
+# ---------------------------------------------------------------------------
+
+class OAuthCompleteRequest(BaseModel):
+    access_token: str
+    role: str
+    grade: Optional[str] = None
+    trial_confirmed: Optional[bool] = None
+
+
+@router.post("/oauth/complete", response_model=LoginResponse)
+def oauth_complete(body: OAuthCompleteRequest, response: Response):
+    valid_roles = {"student", "teacher", "parent"}
+    if body.role not in valid_roles:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}")
+
+    result = _oauth_service.complete_oauth(
+        access_token=body.access_token,
+        role=body.role,
+        grade=body.grade,
+        trial_confirmed=body.trial_confirmed,
+    )
+
+    username: str = result["username"]
+    token = _mint_token(username, body.role)
+    session = Session(auth_token=token, user_id=username, role=body.role)  # type: ignore[arg-type]
+    add_session(session)
+
+    if body.role in ("teacher", "parent"):
+        try:
+            from services.billing.membership_service import MembershipService
+            MembershipService().start_trial_if_eligible(username, body.role)
+        except Exception as exc:  # must not block login
+            logger.warning("Trial backfill failed for OAuth user %s on login: %s", username, exc)
+
+    set_auth_cookie(response, token)
+    return {"token": token, "needs_profile": result.get("needs_profile", False)}
 
 
 # ---------------------------------------------------------------------------
