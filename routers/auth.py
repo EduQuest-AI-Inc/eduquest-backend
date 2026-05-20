@@ -18,6 +18,7 @@ from responses.auth import (
 from services.auth.auth_service import (
     add_session,
     authenticate_user,
+    backfill_supabase_auth_id,
     get_student_by_id,
     get_user_by_email,
     register_user,
@@ -135,6 +136,12 @@ class LoginRequest(BaseModel):
 def login(body: LoginRequest, response: Response):
     if not authenticate_user(body.username, body.password, body.role):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Lazy backfill: provision Supabase Auth entry for pre-Phase-1 users.
+    try:
+        backfill_supabase_auth_id(body.username, body.password, body.role)
+    except Exception as exc:  # must not block login
+        logger.warning("Supabase Auth backfill failed for %s: %s", body.username, exc)
 
     token = _mint_token(body.username, body.role)
     session = Session(auth_token=token, user_id=body.username, role=body.role)  # type: ignore[arg-type]

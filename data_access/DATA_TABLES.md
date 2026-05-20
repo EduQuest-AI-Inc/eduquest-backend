@@ -94,6 +94,7 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `role`       | text        | NOT NULL | `"student"` \| `"teacher"` \| `"parent"` |
 | `created_at` | timestamptz | NOT NULL | Account creation time (DEFAULT now())    |
 | `login_disabled` | boolean | NOT NULL DEFAULT false | Set true to block login without deleting account |
+| `supabase_auth_id` | uuid | nullable, UNIQUE | Supabase Auth UUID; null until backfilled on first login after Phase 1 deploy |
 
 **RLS:** Enabled
 
