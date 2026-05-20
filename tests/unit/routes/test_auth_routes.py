@@ -152,8 +152,7 @@ class TestLoginRoute:
         assert resp.json().get("needs_profile") is True
 
     @pytest.mark.api
-    @patch("routers.auth.SupabaseAuthService")
-    @patch("routers.auth.get_supabase_client")
+    @patch("routers.auth._supabase_auth_service")
     @patch("routers.auth.backfill_supabase_auth_id")
     @patch("routers.auth.get_student_by_id", return_value={
         "strength": "math", "weakness": "reading",
@@ -161,9 +160,9 @@ class TestLoginRoute:
     })
     @patch("routers.auth.get_user_by_id", return_value={"email": "stu1@eduquestai.org", "supabase_auth_id": "uuid-001"})
     @patch("routers.auth.authenticate_user", return_value=True)
-    def test_login_supabase_failure_returns_401(self, mock_auth, mock_user, mock_student, mock_backfill, mock_supabase, mock_sas, client):
-        mock_supabase.return_value.auth.sign_in_with_password.side_effect = Exception("supabase down")
-        mock_sas.return_value.sync_password.side_effect = Exception("sync also failed")
+    def test_login_supabase_failure_returns_401(self, mock_auth, mock_user, mock_student, mock_backfill, mock_sas, client):
+        mock_sas.sign_in_with_password.side_effect = Exception("supabase down")
+        mock_sas.sync_password.side_effect = Exception("sync also failed")
         resp = client.post("/auth/login", json={
             "username": "stu1", "password": "SecurePass1", "role": "student"
         })
@@ -237,22 +236,22 @@ class TestPasswordResetConfirm:
 class TestSupabaseAuthProvisioning:
 
     @pytest.mark.api
-    @patch("routers.auth.get_supabase_client")
+    @patch("routers.auth._supabase_auth_service")
     @patch("routers.auth.backfill_supabase_auth_id")
     @patch("routers.auth.get_student_by_id", return_value={
         "strength": "math", "weakness": None, "interest": None, "learning_style": None,
     })
     @patch("routers.auth.get_user_by_id", return_value={"email": "stu1@eduquestai.org", "supabase_auth_id": "uuid-001"})
     @patch("routers.auth.authenticate_user", return_value=True)
-    def test_login_calls_backfill(self, mock_auth, mock_user, mock_student, mock_backfill, mock_supabase, client):
-        mock_supabase.return_value = _mock_supabase_session()
+    def test_login_calls_backfill(self, mock_auth, mock_user, mock_student, mock_backfill, mock_sas, client):
+        mock_sas.sign_in_with_password.return_value = _mock_supabase_session()
         client.post("/auth/login", json={
             "username": "stu1", "password": "SecurePass1", "role": "student"
         })
         mock_backfill.assert_called_once_with("stu1", "SecurePass1", "student")
 
     @pytest.mark.api
-    @patch("routers.auth.get_supabase_client")
+    @patch("routers.auth._supabase_auth_service")
     @patch("routers.auth.backfill_supabase_auth_id", side_effect=Exception("supabase down"))
     @patch("routers.auth.get_student_by_id", return_value={
         "strength": "math", "weakness": "reading",
@@ -260,8 +259,8 @@ class TestSupabaseAuthProvisioning:
     })
     @patch("routers.auth.get_user_by_id", return_value={"email": "stu1@eduquestai.org", "supabase_auth_id": "uuid-001"})
     @patch("routers.auth.authenticate_user", return_value=True)
-    def test_login_succeeds_when_backfill_raises(self, mock_auth, mock_user, mock_student, mock_backfill, mock_supabase, client):
-        mock_supabase.return_value = _mock_supabase_session()
+    def test_login_succeeds_when_backfill_raises(self, mock_auth, mock_user, mock_student, mock_backfill, mock_sas, client):
+        mock_sas.sign_in_with_password.return_value = _mock_supabase_session()
         resp = client.post("/auth/login", json={
             "username": "stu1", "password": "SecurePass1", "role": "student"
         })
