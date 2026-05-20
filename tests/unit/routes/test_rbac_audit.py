@@ -12,10 +12,12 @@ from routers.deps import get_auth
 EXPLICITLY_PUBLIC_ROUTES = {
     "/auth/signup",
     "/auth/login",
+    "/auth/oauth/complete",  # Supabase token verified inside the endpoint; no JWT yet
     "/auth/password-reset/request",
     "/auth/password-reset/confirm",
     "/helloworld",
     "/billing/webhook",  # verified by Stripe signature, not JWT
+    "/demo/quest",  # public demo endpoint — no account required
 }
 
 
