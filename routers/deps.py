@@ -3,6 +3,7 @@ from enum import Enum
 from typing import FrozenSet, Optional
 
 import jwt
+from jwt import PyJWKClient
 from fastapi import Cookie, Depends, Header, HTTPException, Path, Request
 
 # Dead code until Phase 6 — kept to avoid breaking any callers during rollout.
@@ -10,6 +11,16 @@ JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret")
 JWT_ALGORITHM = "HS256"
 
 SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+
+_jwks_client: Optional[PyJWKClient] = None
+
+
+def _get_jwks_client() -> PyJWKClient:
+    global _jwks_client
+    if _jwks_client is None:
+        _jwks_client = PyJWKClient(f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json")
+    return _jwks_client
 
 
 class Role(str, Enum):
@@ -29,8 +40,8 @@ def get_auth(
     authorization: Optional[str] = Header(default=None),
     auth_token: Optional[str] = Cookie(default=None),
 ) -> AuthPayload:
-    if not SUPABASE_JWT_SECRET:
-        raise RuntimeError("SUPABASE_JWT_SECRET must be set")
+    if not SUPABASE_URL:
+        raise RuntimeError("SUPABASE_URL must be set")
 
     token: Optional[str] = None
     if authorization and authorization.lower().startswith("bearer "):
@@ -42,12 +53,23 @@ def get_auth(
         raise HTTPException(status_code=401, detail="Missing auth token")
 
     try:
-        payload = jwt.decode(
-            token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
+        header = jwt.get_unverified_header(token)
+        alg = header.get("alg", "HS256")
+        if alg == "HS256":
+            payload = jwt.decode(
+                token,
+                SUPABASE_JWT_SECRET,
+                algorithms=["HS256"],
+                audience="authenticated",
+            )
+        else:
+            signing_key = _get_jwks_client().get_signing_key_from_jwt(token)
+            payload = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["ES256", "RS256"],
+                audience="authenticated",
+            )
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:

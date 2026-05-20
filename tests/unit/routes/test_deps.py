@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from routers.deps import require_student_viewer, get_auth, AuthPayload, Role
 
-TEST_SECRET = "test-supabase-jwt-secret"
+TEST_SECRET = "test-supabase-jwt-secret-key-32b!"
 
 
 def _make_token(app_metadata: dict, expired: bool = False) -> str:

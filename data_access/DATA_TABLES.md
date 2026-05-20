@@ -4,7 +4,7 @@ Quick reference for all 28 tables in the EduQuest Supabase database, grouped by 
 
 See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgREST `rpc/`.
 
-**RLS identity expression:** All policies use `(auth.jwt() ->> 'sub')` — reads the JWT `sub` claim as text, directly matching `user_id` values. Do **not** use `auth.uid()` — it casts to UUID and silently returns null for username-format IDs.
+**RLS identity expression:** All policies use `(auth.jwt() -> 'app_metadata' ->> 'username')` — reads the EduQuest username from the Supabase JWT's `app_metadata` object, directly matching `user_id` values. Do **not** use `auth.uid()` (casts to UUID, returns null for username IDs) or `(auth.jwt() ->> 'sub')` (sub is a UUID in Supabase native JWTs, not the username).
 
 ---
 
