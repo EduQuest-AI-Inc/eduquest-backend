@@ -16,6 +16,7 @@ EXPLICITLY_PUBLIC_ROUTES = {
     "/auth/password-reset/confirm",
     "/helloworld",
     "/billing/webhook",  # verified by Stripe signature, not JWT
+    "/demo/quest",  # public demo endpoint — no account required
 }
 
 
