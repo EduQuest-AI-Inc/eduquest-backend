@@ -149,12 +149,18 @@ class AuthService:
 
     def authenticate_user(self, username: str, password: str, role: str) -> bool:
         user = self.user_dao.get_by_id(username)
-        if not user or user.get('role') != role:
+        if not user:
+            logger.warning("authenticate_user: user not found: %s", username)
+            return False
+        if user.get('role') != role:
+            logger.warning("authenticate_user: role mismatch for %s: db=%r, got=%r", username, user.get('role'), role)
             return False
         if user.get('login_disabled'):
+            logger.warning("authenticate_user: login_disabled for %s", username)
             return False
         stored_hash = user['password']
         if not check_password_hash(stored_hash, password):
+            logger.warning("authenticate_user: password mismatch for %s (hash prefix: %s)", username, stored_hash[:10])
             return False
         if _is_legacy_hash(stored_hash):
             try:

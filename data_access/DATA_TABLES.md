@@ -213,7 +213,8 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | SELECT        | Owner (`owner_id = sub`) |
 | SELECT        | Enrolled student (EXISTS enrollment where `user_id = sub`) |
 | UPDATE        | Owner (`owner_id = sub`) |
-| INSERT/DELETE | FastAPI only |
+| INSERT        | Any authenticated user |
+| DELETE        | Owner (`owner_id = sub`) |
 
 ---
 

@@ -1,3 +1,4 @@
+import logging
 from typing import Any, cast
 
 from data_access.config import get_admin_supabase_client, get_user_supabase_client
@@ -5,6 +6,8 @@ from exceptions.validation_error import ValidationError
 from postgrest import APIError as PostgrestAPIError
 from postgrest._sync.request_builder import SyncRequestBuilder
 from supabase import Client
+
+_logger = logging.getLogger(__name__)
 
 
 class SupabaseBaseDAO:
@@ -23,6 +26,7 @@ class SupabaseBaseDAO:
         try:
             return query.execute()
         except PostgrestAPIError as e:
+            _logger.error("PostgREST error on table '%s': %s", self.table_name, e, exc_info=True)
             raise ValidationError(str(e)) from e
 
     def _insert(self, data: dict[str, Any]) -> dict[str, Any]:

@@ -97,27 +97,31 @@ async def log_requests(request: Request, call_next):
     return response
 
 
+_logger = logging.getLogger(__name__)
+
+
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request: Request, exc: ValidationError):
+    _logger.warning("ValidationError on %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(status_code=400, content={"error": str(exc)})
 
 
 @app.exception_handler(NotFoundError)
 async def not_found_error_handler(request: Request, exc: NotFoundError):
+    _logger.info("NotFoundError on %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(status_code=404, content={"error": str(exc)})
 
 
 @app.exception_handler(AuthError)
 async def auth_error_handler(request: Request, exc: AuthError):
+    _logger.warning("AuthError on %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(status_code=401, content={"error": str(exc)})
 
 
 @app.exception_handler(PermissionError)
 async def permission_error_handler(request: Request, exc: PermissionError):
+    _logger.info("PermissionError on %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(status_code=403, content={"error": str(exc)})
-
-
-_logger = logging.getLogger(__name__)
 
 
 @app.exception_handler(Exception)
