@@ -10,6 +10,8 @@ Items are roughly in priority order.
 - [x] Created swap file (1.2 GiB) — prevents OOM crashes
 - [x] Expanded root EBS volume from 8 GiB → 20 GiB
 - [x] Added `ec2.yaml` CloudFormation template for the instance
+- [x] Updated `ec2-parameters-prod.json` with real KeyPairName, VpcId, SubnetId
+- [x] Updated `parameters-prod.json` EC2PublicIP to Elastic IP `16.58.29.145`
 
 ---
 
@@ -21,7 +23,7 @@ Items are roughly in priority order.
 - `VpcId` — `vpc-04da0fb2c6d375e10` (visible on instance details page)
 - `SubnetId` — `subnet-030d2cbe175223a42` (visible on instance details page)
 
-### 2. Remove API Gateway and route all traffic through nginx
+### ~~2. Remove API Gateway and route all traffic through nginx~~ ✓ DONE
 API Gateway is redundant — nginx on the EC2 does the same job for free with less latency.
 The live stack (`eduquest-api-gateway-prod`) can be deleted once Vercel points at the nginx domain.
 
@@ -36,7 +38,7 @@ Steps (do in order):
 4. **Delete the CloudFormation stack** — in AWS Console: CloudFormation → `eduquest-api-gateway-prod` → Delete
 5. **Archive `api-gateway.yaml`** — keep it in the repo for reference but it no longer needs to be deployed
 
-### 3. Migrate from port 5000 → 8000
+### ~~3. Migrate from port 5000 → 8000~~ ✓ DONE
 The live server runs on port 5000 (leftover from Flask). All three of these must be changed together:
 
 1. **nginx** (`/etc/nginx/sites-available/eduquest`) — change `proxy_pass http://127.0.0.1:5000` → `proxy_pass http://127.0.0.1:8000`
@@ -50,17 +52,26 @@ sudo systemctl restart eduquest-backend
 sudo systemctl restart nginx
 ```
 
-### 4. Update parameters-prod.json with the Elastic IP
-`eduquest-backend/cloudformation/parameters-prod.json` still has the old dynamic IP.
-Change `EC2PublicIP` to `16.58.29.145`.
+### ~~4. Update parameters-prod.json with the Elastic IP~~ ✓ DONE
+`EC2PublicIP` is already `16.58.29.145` in `parameters-prod.json`.
 
-### 5. Add CloudWatch alarms
-Set up alarms in the AWS console (or add to a new `cloudwatch.yaml` template) for:
-- **Disk > 80%** — SNS email alert (the disk hit 99% unnoticed)
-- **Memory > 85%** — requires CloudWatch agent on the instance
-- **StatusCheckFailed** — alerts when the instance OS crashes (what happened today)
+### ~~5. Add CloudWatch alarms~~ ✓ DONE
+`cloudwatch.yaml` CloudFormation template created with three alarms:
+- **Disk > 80%** — SNS email alert (CWAgent metric — requires agent on instance)
+- **Memory > 85%** — SNS email alert (CWAgent metric — requires agent on instance)
+- **StatusCheckFailed** — built-in EC2 metric, no agent needed
 
-To install the CloudWatch agent on the instance:
+To deploy:
+```bash
+aws cloudformation deploy \
+  --template-file cloudformation/cloudwatch.yaml \
+  --stack-name eduquest-cloudwatch-prod \
+  --parameter-overrides \
+    InstanceId=<your-instance-id> \
+    AlertEmail=<your-email>
+```
+
+To install the CloudWatch agent on the instance (required for disk + memory alarms):
 ```bash
 sudo apt install -y amazon-cloudwatch-agent
 # Then configure via /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
@@ -78,20 +89,9 @@ It should contain `Restart=always` and `RestartSec=5`. If not, edit
 
 ## Medium Priority
 
-### 7. Run pending package updates
-80 security updates are pending on the instance:
-```bash
-sudo apt upgrade -y
-sudo reboot  # if a kernel update was applied
-```
+### ~~7. Run pending package updates~~ ✓ DONE
 
-### 8. Enable automatic security updates
-Prevent security patches from piling up silently:
-```bash
-sudo apt install -y unattended-upgrades
-sudo dpkg-reconfigure -plow unattended-upgrades
-# Choose "Yes" — this auto-applies security-only updates
-```
+### ~~8. Enable automatic security updates~~ ✓ DONE
 
 ### 9. Set up EBS snapshots
 No backups are currently configured (Snapshot summary shows 0/2 volumes backed up).
@@ -104,58 +104,40 @@ t2.micro has 1 GiB RAM. Running FastAPI + OpenAI agents is tight even with swap.
 t3.small (2 GiB RAM, ~$15/mo) would eliminate most OOM risk without swap being a crutch.
 To upgrade: stop instance → Actions > Instance settings > Change instance type → start.
 
-### 11. Move `setup-prod-instance.sh` config into `ec2.yaml` UserData
-A fresh CloudFormation-provisioned instance would be missing critical config that currently
-only lives in `scripts/setup-prod-instance.sh`. Add these to the `UserData` block in `ec2.yaml`:
+### ~~11. Move `setup-prod-instance.sh` config into `ec2.yaml` UserData~~ ✓ DONE
+All five items are now in the `UserData` block in `ec2.yaml`:
 - systemd journal cap (`SystemMaxUse=100M` in `/etc/systemd/journald.conf`)
 - snap revision retention (`snap set system refresh.retain=2`)
 - weekly apt autoremove cron (`/etc/cron.weekly/apt-autoremove`)
 - full systemd service file (`/etc/systemd/system/eduquest-backend.service`)
 - app directory creation (`mkdir -p /home/ubuntu/eduquest-backend`)
 
-Until this is done, reprovisioning from CloudFormation alone would produce a broken instance.
+A CloudFormation-provisioned instance is now self-contained; `setup-prod-instance.sh` is still useful for manual runs but is no longer the only source of truth.
 
-### 12. Fix `deploy-to-ec2.sh` to install into venv, not system Python
-`scripts/deploy-to-ec2.sh` line 65 runs `pip3 install -r requirements.txt`, which installs
-to system Python. The systemd service starts uvicorn from
-`/home/ubuntu/eduquest-backend/venv/bin/python`, so system-Python packages are invisible to it.
-Fix: replace the `pip3 install` line with:
-```bash
-python3 -m venv /home/ubuntu/eduquest-backend/venv
-/home/ubuntu/eduquest-backend/venv/bin/pip install -r requirements.txt
-```
+### ~~12. Fix `deploy-to-ec2.sh` to install into venv, not system Python~~ ✓ DONE
+`scripts/deploy-to-ec2.sh` now creates the venv and installs via the venv pip, matching
+the path the systemd service uses (`/home/ubuntu/eduquest-backend/venv/bin/python`).
 
 ---
 
 ## Low Priority / Nice to Have
 
-### 14. Add log rotation for the backend app
-If the FastAPI app writes its own log files, add a logrotate config to prevent them
-from filling the disk again:
-```bash
-# /etc/logrotate.d/eduquest-backend
-/home/ubuntu/eduquest-backend/*.log {
-    daily
-    rotate 7
-    compress
-    missingok
-    notifempty
-}
-```
+### ~~14. Add log rotation for the backend app~~ ✓ DONE
+`/etc/logrotate.d/eduquest-backend` added to `ec2.yaml` UserData and `setup-prod-instance.sh`.
+Rotates any `*.log` files in `/home/ubuntu/eduquest-backend/` daily, keeps 7 compressed copies.
+`missingok`/`notifempty` make it a no-op if the app never writes log files (uvicorn logs to journal).
 
-### 15. Increase swap to 2 GiB
-The swap file is only 1.2 GiB because the disk was nearly full when it was created.
-Now that the disk has 12 GiB free, expand it:
+### ~~15. Increase swap to 2 GiB~~ ✓ DONE
+`ec2.yaml` already provisions 2 GiB swap (`SwapSizeGB` default = 2). `setup-prod-instance.sh` updated to match.
+**Live instance still has 1.2 GiB** — run these once to expand it:
 ```bash
 sudo swapoff /swapfile
 sudo fallocate -l 2G /swapfile
 sudo mkswap /swapfile
 sudo swapon /swapfile
-free -h  # verify 2G swap
+free -h  # verify 2.0G swap
 ```
 
-### 16. Tag the EC2 instance properly
-Add tags in the AWS console for cost tracking and organization:
-- `Environment` = `prod`
-- `Service` = `eduquest-backend`
-- `ManagedBy` = `cloudformation` (once deployed via the ec2.yaml template)
+### ~~16. Tag the EC2 instance properly~~ ✓ DONE
+Tags added to `BackendInstance` in `ec2.yaml`: `Environment=prod`, `Service=eduquest-backend`, `ManagedBy=cloudformation`.
+**Live instance:** add these in the AWS Console (EC2 → instance → Tags) or via CLI until the stack is redeployed.

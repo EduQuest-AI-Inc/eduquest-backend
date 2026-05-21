@@ -64,7 +64,8 @@ COMMAND_ID=$(aws ssm send-command \
         cd app
 
         if [ -f requirements.txt ]; then
-            pip3 install -r requirements.txt
+            python3 -m venv /home/ubuntu/eduquest-backend/venv
+            /home/ubuntu/eduquest-backend/venv/bin/pip install -r requirements.txt
         fi
 
         export APP_ENV=${ENVIRONMENT}

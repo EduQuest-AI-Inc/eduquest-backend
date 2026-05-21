@@ -129,9 +129,72 @@ Resources:
           systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service || true
           systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service || true
 
+          # --- Journal cap (100 MB) ---
+          sed -i '/^SystemMaxUse=/d' /etc/systemd/journald.conf
+          echo "SystemMaxUse=100M" >> /etc/systemd/journald.conf
+          systemctl restart systemd-journald
+
+          # --- Snap revision retention ---
+          snap set system refresh.retain=2
+
+          # --- Weekly apt autoremove ---
+          cat > /etc/cron.weekly/apt-autoremove <<'EOF'
+          #!/bin/bash
+          apt-get autoremove -y
+          apt-get clean
+          EOF
+          chmod +x /etc/cron.weekly/apt-autoremove
+
+          # --- App directory ---
+          mkdir -p /home/ubuntu/eduquest-backend
+          chown ubuntu:ubuntu /home/ubuntu/eduquest-backend
+
+          # --- Systemd service ---
+          cat > /etc/systemd/system/eduquest-backend.service <<'EOF'
+          [Unit]
+          Description=EduQuest Backend FastAPI Application (prod)
+          After=network.target
+
+          [Service]
+          Type=simple
+          User=ubuntu
+          WorkingDirectory=/home/ubuntu/eduquest-backend
+          Environment="PATH=/home/ubuntu/eduquest-backend/venv/bin:/usr/local/bin:/usr/bin:/bin"
+          Environment="APP_ENV=production"
+          EnvironmentFile=/home/ubuntu/eduquest-backend/.env
+          ExecStart=/home/ubuntu/eduquest-backend/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000
+          Restart=always
+          RestartSec=10
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=eduquest-backend
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          systemctl daemon-reload
+
+          # --- Log rotation (safety net for any *.log files the app writes) ---
+          cat > /etc/logrotate.d/eduquest-backend <<'EOF'
+          /home/ubuntu/eduquest-backend/*.log {
+              daily
+              rotate 7
+              compress
+              missingok
+              notifempty
+          }
+          EOF
+
       Tags:
         - Key: Name
           Value: eduquest-backend
+        - Key: Environment
+          Value: prod
+        - Key: Service
+          Value: eduquest-backend
+        - Key: ManagedBy
+          Value: cloudformation
 
 Outputs:
   InstanceId:
