@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudWatch alarms for EduQuest backend EC2 instance'
+
+Parameters:
+  InstanceId:
+    Type: String
+    Description: 'EC2 instance ID (e.g. i-0abc123def456789)'
+
+  AlertEmail:
+    Type: String
+    Description: 'Email address to receive alarm notifications'
+
+  DiskPath:
+    Type: String
+    Default: '/'
+    Description: 'Filesystem path to monitor for disk usage'
+
+  DiskDevice:
+    Type: String
+    Default: 'xvda1'
+    Description: 'Disk device name as reported by CloudWatch agent (run: df -h to confirm)'
+
+  DiskFsType:
+    Type: String
+    Default: 'ext4'
+    Description: 'Filesystem type as reported by CloudWatch agent'
+
+Resources:
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-alerts'
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlertEmail
+
+  # Disk > 80% — requires CloudWatch agent installed and configured on the instance
+  DiskAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'eduquest-backend-disk-high-${InstanceId}'
+      AlarmDescription: 'Root disk usage exceeded 80% — risk of log/app failures'
+      Namespace: CWAgent
+      MetricName: disk_used_percent
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref InstanceId
+        - Name: path
+          Value: !Ref DiskPath
+        - Name: device
+          Value: !Ref DiskDevice
+        - Name: fstype
+          Value: !Ref DiskFsType
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: ignore
+      AlarmActions:
+        - !Ref AlarmTopic
+      OKActions:
+        - !Ref AlarmTopic
+
+  # Memory > 85% — requires CloudWatch agent installed and configured on the instance
+  MemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'eduquest-backend-memory-high-${InstanceId}'
+      AlarmDescription: 'Memory usage exceeded 85% — swap pressure risk on t2.micro'
+      Namespace: CWAgent
+      MetricName: mem_used_percent
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref InstanceId
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 85
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: ignore
+      AlarmActions:
+        - !Ref AlarmTopic
+      OKActions:
+        - !Ref AlarmTopic
+
+  # StatusCheckFailed — built-in EC2 metric, no agent needed
+  StatusCheckAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'eduquest-backend-status-check-failed-${InstanceId}'
+      AlarmDescription: 'EC2 status check failed — instance OS may have crashed'
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref InstanceId
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: ignore
+      AlarmActions:
+        - !Ref AlarmTopic
+      OKActions:
+        - !Ref AlarmTopic
+
+Outputs:
+  SnsTopicArn:
+    Description: 'SNS topic ARN for alarm notifications'
+    Value: !Ref AlarmTopic
