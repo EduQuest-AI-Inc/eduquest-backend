@@ -154,15 +154,18 @@ def get_bot_provider(request: Request):
     return request.app.state.bot_provider
 
 
-def get_period_file_service(bot_provider=Depends(get_bot_provider)):
+def get_period_file_service(
+    bot_provider=Depends(get_bot_provider),
+    auth: AuthPayload = Depends(get_auth),
+):
     """FastAPI dependency — wires PeriodFileService with all orchestration deps."""
     from services.period.period_file_service import PeriodFileService
     from services.period.period_management_service import PeriodManagementService
     from services.curriculum.curriculum_service import CurriculumService
     return PeriodFileService(
         bot_provider=bot_provider,
-        period_management_service=PeriodManagementService(),
-        curriculum_service=CurriculumService(bot_provider=bot_provider),
+        period_management_service=PeriodManagementService(jwt=auth.token),
+        curriculum_service=CurriculumService(bot_provider=bot_provider, jwt=auth.token),
     )
 
 

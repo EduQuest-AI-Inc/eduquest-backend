@@ -303,7 +303,9 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
 | SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
 | SELECT               | Parent (EXISTS parent where sub ∈ `linked_student_ids` AND student enrolled in period) |
-| INSERT/UPDATE/DELETE | FastAPI only |
+| INSERT               | Period owner (WITH CHECK EXISTS period where `owner_id = sub`) |
+| UPDATE               | Period owner (USING + WITH CHECK EXISTS period where `owner_id = sub`) |
+| DELETE               | Period owner (EXISTS period where `owner_id = sub`) |
 
 ---
 
@@ -324,7 +326,9 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | -------------------- | ---- |
 | SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
 | SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
-| INSERT/UPDATE/DELETE | FastAPI only |
+| INSERT               | Period owner (WITH CHECK EXISTS period where `owner_id = sub`) |
+| UPDATE               | Period owner (USING + WITH CHECK EXISTS period where `owner_id = sub`) |
+| DELETE               | Period owner (EXISTS period where `owner_id = sub`) |
 
 ---
 
@@ -379,7 +383,9 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | -------------------- | ---- |
 | SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
 | SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
-| INSERT/UPDATE/DELETE | FastAPI only |
+| INSERT               | Period owner (WITH CHECK EXISTS period where `owner_id = sub`) |
+| UPDATE               | Period owner (USING + WITH CHECK EXISTS period where `owner_id = sub`) |
+| DELETE               | Period owner (EXISTS period where `owner_id = sub`) |
 
 ---
 
@@ -404,7 +410,9 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | -------------------- | ---- |
 | SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
 | SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
-| INSERT/UPDATE/DELETE | FastAPI only |
+| INSERT               | Period owner (WITH CHECK EXISTS period where `owner_id = sub`) |
+| UPDATE               | Period owner (USING + WITH CHECK EXISTS period where `owner_id = sub`) |
+| DELETE               | Period owner (EXISTS period where `owner_id = sub`) |
 
 ---
 
@@ -424,7 +432,8 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | -------------------- | ---- |
 | SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
 | SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
-| INSERT/UPDATE/DELETE | FastAPI only |
+| INSERT               | Period owner (WITH CHECK EXISTS period where `owner_id = sub`) |
+| DELETE               | Period owner (EXISTS period where `owner_id = sub`) |
 
 ---
 

@@ -161,7 +161,7 @@ class LTGOrchestrationService:
         self.student_dao = student_dao or StudentDAO(jwt=jwt)
         self.ltg_conversation_dao = ltg_conversation_dao or LtgConversationDAO(jwt=jwt)
         self.student_long_term_goal_dao = student_long_term_goal_dao or StudentLongTermGoalDAO(jwt=jwt)
-        self.curriculum_service = curriculum_service or CurriculumService(bot_provider=bot_provider)
+        self.curriculum_service = curriculum_service or CurriculumService(bot_provider=bot_provider, jwt=jwt)
 
     def initiate(self, user_id: str, period_id: str) -> Dict[str, Any]:
         if not period_id:

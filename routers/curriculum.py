@@ -23,8 +23,9 @@ router = APIRouter()
 
 def _get_curriculum_service(
     bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+    auth: AuthPayload = Depends(get_auth),
 ) -> CurriculumService:
-    return CurriculumService(bot_provider=bot_provider)
+    return CurriculumService(bot_provider=bot_provider, jwt=auth.token)
 
 
 def _get_slides_service(
