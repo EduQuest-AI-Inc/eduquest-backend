@@ -51,6 +51,7 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-role'
@@ -128,6 +129,31 @@ Resources:
           snap install amazon-ssm-agent --classic || true
           systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service || true
           systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service || true
+
+          # --- CloudWatch agent (required for disk and memory alarms) ---
+          wget -q https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+          dpkg -i amazon-cloudwatch-agent.deb
+          rm amazon-cloudwatch-agent.deb
+          cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'EOF'
+          {
+            "metrics": {
+              "metrics_collected": {
+                "disk": {
+                  "measurement": ["disk_used_percent"],
+                  "metrics_collection_interval": 60,
+                  "resources": ["/"]
+                },
+                "mem": {
+                  "measurement": ["mem_used_percent"],
+                  "metrics_collection_interval": 60
+                }
+              }
+            }
+          }
+          EOF
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+            -a fetch-config -m ec2 -s \
+            -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
 
           # --- Journal cap (100 MB) ---
           sed -i '/^SystemMaxUse=/d' /etc/systemd/journald.conf

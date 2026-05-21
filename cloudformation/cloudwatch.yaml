@@ -85,7 +85,7 @@ Resources:
       OKActions:
         - !Ref AlarmTopic
 
-  # StatusCheckFailed — built-in EC2 metric, no agent needed
+  # StatusCheckFailed — built-in EC2 metric, no agent needed; auto-recovery migrates to healthy hardware
   StatusCheckAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -103,6 +103,7 @@ Resources:
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: ignore
       AlarmActions:
+        - !Sub 'arn:aws:automate:${AWS::Region}:ec2:recover'
         - !Ref AlarmTopic
       OKActions:
         - !Ref AlarmTopic
