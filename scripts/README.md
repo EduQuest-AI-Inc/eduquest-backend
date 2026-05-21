@@ -45,6 +45,4 @@ All shell scripts. Require AWS CLI configured with appropriate credentials.
 | `delete-api-gateway.sh [prod\|dev]` | Deletes the API Gateway CloudFormation stack. Prompts for confirmation. |
 | `deploy-to-ec2.sh <env> <instance-id>` | Packages the backend and deploys it to an EC2 instance via SSM. |
 | `remote_deploy.sh` | Runs **on the EC2 instance** (not locally). Pulls latest from `production` branch, installs dependencies, writes the systemd service file, and restarts the server. |
-| `setup-dev-instance.sh` | One-time bootstrap for a fresh dev EC2 instance: installs Python 3.11, SSM agent, creates the app directory. |
-| `setup-prod-instance.sh` | Same as above for the prod instance. |
-| `deploy_s3_cors.py` | Applies the CORS policy to the S3 uploads bucket. Re-run whenever allowed origins change. |
+| `deploy-s3.sh` | Deploys the S3 CloudFormation stack from `cloudformation/s3.yaml`. Requires `cloudformation/s3-parameters-prod.json` (copy from `s3-parameters-template.json`). For an existing bucket, use resource import — instructions are printed by the script. |
