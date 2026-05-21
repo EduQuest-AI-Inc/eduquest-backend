@@ -5,7 +5,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from responses.slides import PptxStatusItemOut, RestartResponse
 
 from bots.protocol import BotProviderProtocol
-from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period, require_roles
+from routers.curriculum import _assert_owner_or_parent_of_owner
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period
 from exceptions.validation_error import ValidationError
 from services.enrollment.enrollment_service import EnrollmentService
 from services.lessons.lessons_service import LessonsService
@@ -70,12 +71,11 @@ def get_pptx_status(
 def restart_pptx_generation(
     period_id: str,
     background_tasks: BackgroundTasks,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
+    auth: AuthPayload = Depends(get_auth),
     slides_svc: PptxGenerationService = Depends(_get_slides_service),
     period: dict = Depends(get_period),
 ):
-    if period["owner_id"] != auth.sub:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    _assert_owner_or_parent_of_owner(period, auth)
 
     try:
         count = slides_svc.restart_batch(period_id, background_tasks)

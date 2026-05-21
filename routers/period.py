@@ -35,6 +35,7 @@ from services.billing.membership_service import (
     MembershipService,
     PlanLimitExceededError,
 )
+from services.parent.parent_service import ParentService
 from services.period.period_summer_quest_service import PeriodSummerQuestService
 from models.period import CourseMetadata
 from services.period.period_management_service import PeriodManagementService
@@ -131,11 +132,22 @@ def create_period(
     specific_standard_codes: Optional[str] = Form(default=None),
     status: Optional[str] = Form(default="pending"),
     is_summer_quest: bool = Form(default=False),
+    student_id: Optional[str] = Form(default=None),
     auth: AuthPayload = Depends(get_auth),
     period_file_svc=Depends(get_period_file_service),
 ):
     if status not in ("pending", "setup_draft"):
         raise HTTPException(status_code=400, detail="Invalid status value")
+
+    if student_id:
+        if auth.role != Role.PARENT:
+            raise HTTPException(status_code=400, detail="Only parents can specify student_id")
+        linked = ParentService().get_linked_student_ids(auth.sub)
+        if student_id not in linked:
+            raise HTTPException(status_code=403, detail="student_id is not a linked child")
+        effective_owner_id = student_id
+    else:
+        effective_owner_id = auth.sub
 
     # Summer side quests are free — no membership check required.
     if not is_summer_quest:
@@ -170,7 +182,7 @@ def create_period(
         period_mgmt = PeriodManagementService(jwt=auth.token)
         period = period_mgmt.create_period(
             course=name,
-            user_id=auth.sub,
+            user_id=effective_owner_id,
             vector_store_id="",
             file_urls=file_keys if is_draft else [],
             canvas_course_id=int(canvas_course_id) if canvas_course_id else None,
@@ -430,12 +442,17 @@ def generate_summer_quests(
     period: dict = Depends(_get_period_dep),
 ):
     if period.get("owner_id") != auth.sub:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+        if auth.role == Role.PARENT:
+            linked = ParentService().get_linked_student_ids(auth.sub)
+            if period.get("owner_id") not in linked:
+                raise HTTPException(status_code=403, detail="Unauthorized")
+        else:
+            raise HTTPException(status_code=403, detail="Unauthorized")
     if not period.get("is_summer_quest"):
         raise HTTPException(status_code=400, detail="This endpoint is only for summer side quests")
 
     svc = PeriodSummerQuestService(bot_provider=bot_provider)
-    background_tasks.add_task(svc.run_as_background_task, owner_id=auth.sub, period_id=period_id)
+    background_tasks.add_task(svc.run_as_background_task, owner_id=period["owner_id"], period_id=period_id)
     return {"message": "Summer quest generation started"}
 
 
