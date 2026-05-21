@@ -166,7 +166,7 @@ class AuthService:
             try:
                 self.user_dao.update(username, {"password": generate_password_hash(password)})
             except Exception:
-                pass
+                logger.warning("legacy password hash upgrade failed", exc_info=True)
         return True
 
 
