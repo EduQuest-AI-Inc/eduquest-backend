@@ -99,6 +99,10 @@ class SupabaseAuthService:
         """
         return self._get_client().auth.sign_in_with_password({"email": email, "password": password})
 
+    def delete_user(self, supabase_auth_uuid: str) -> None:
+        """Delete a Supabase Auth user by UUID. Raises on failure."""
+        self._get_client().auth.admin.delete_user(supabase_auth_uuid)
+
     def sync_password(self, supabase_auth_uuid: str, new_plaintext_password: str) -> None:
         """
         Sync a changed password to Supabase Auth.

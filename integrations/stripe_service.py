@@ -86,6 +86,12 @@ def create_billing_portal_session(*, customer_id: str, return_url: str) -> str:
     return portal["url"]
 
 
+def cancel_subscription_immediately(subscription_id: str) -> None:
+    """Cancel a Stripe subscription immediately (no end-of-period grace)."""
+    s = get_stripe()
+    s.Subscription.cancel(subscription_id)
+
+
 def construct_webhook_event(payload: bytes, signature: str, secret: str):
     """Verify a Stripe webhook signature; raises stripe.error.SignatureVerificationError on bad sig."""
     s = get_stripe()

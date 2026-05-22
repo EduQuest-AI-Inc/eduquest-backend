@@ -55,6 +55,15 @@ class ParentDAO(SupabaseBaseDAO):
             return []
         return parent.get('linked_student_ids', [])
 
+    def remove_student_link(self, student_id: str) -> None:
+        """Remove student_id from linked_student_ids for all parents that reference it."""
+        self._execute(
+            self.client.rpc(
+                "array_remove_from_linked_students",
+                {"target_student_id": student_id},
+            )
+        )
+
     def get_parents_by_student_id(self, student_id: str) -> List[Dict[str, Any]]:
         response = self._execute(
             self._table()

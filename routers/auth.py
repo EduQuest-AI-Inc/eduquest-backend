@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from constants.timeouts import JWT_EXPIRY_HOURS
@@ -15,6 +15,8 @@ from responses.auth import (
     PasswordResetRequestResponse,
     SignupResponse,
 )
+from routers.deps import AuthPayload, require_roles, Role
+from services.auth.account_deletion_service import AccountDeletionService
 from services.auth.auth_service import (
     authenticate_user,
     backfill_supabase_auth_id,
@@ -260,6 +262,12 @@ async def password_reset_request(body: PasswordResetRequestBody, request: Reques
         user_agent=user_agent,
     )
     return {"message": result["message"]}
+
+
+@router.delete("/account", status_code=200)
+def delete_account(auth: AuthPayload = Depends(require_roles(Role.STUDENT, Role.TEACHER, Role.PARENT))):
+    AccountDeletionService().delete_account(auth.sub, auth.role.value)
+    return {"message": "Account deleted successfully."}
 
 
 @router.post("/password-reset/confirm", response_model=PasswordResetConfirmResponse)

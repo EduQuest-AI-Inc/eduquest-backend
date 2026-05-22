@@ -98,3 +98,10 @@ class StudentDAO(SupabaseBaseDAO):
     def needs_tutorial(self, user_id: str) -> bool:
         return not self.get_tutorial_status(user_id)
 
+    def nullify_created_by_parent(self, parent_id: str) -> None:
+        self._execute(
+            self._table()
+            .update({"created_by_parent_id": None})
+            .eq("created_by_parent_id", parent_id)
+        )
+
