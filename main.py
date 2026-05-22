@@ -61,8 +61,6 @@ def _validate_env() -> None:
     _log.info("Environment validation passed (%d required vars present)", len(required))
 
 
-_validate_env()
-
 _req_log = logging.getLogger("eduquest.request")
 
 from routers import conversation, period, ltg, teacher, waitlist
@@ -79,6 +77,8 @@ from exceptions.permission_error import PermissionError
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _log = logging.getLogger(__name__)
+
+    _validate_env()
 
     if os.getenv("MOCK_AI", "").lower() in ("true", "1", "yes"):
         from bots.provider import MockBotProvider
