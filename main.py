@@ -17,6 +17,52 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
 
+
+def _validate_env() -> None:
+    """Fail fast at startup if required environment variables are missing."""
+    _log = logging.getLogger(__name__)
+    mock_ai = os.getenv("MOCK_AI", "").lower() in ("true", "1", "yes")
+
+    required = [
+        "JWT_SECRET_KEY",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_JWT_SECRET",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "S3_BUCKET_NAME",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "STRIPE_PRICE_STARTER",
+        "STRIPE_PRICE_GROWTH",
+        "STRIPE_PRICE_PRO",
+    ]
+
+    # AI keys are only required when running live agents
+    if not mock_ai:
+        required += [
+            "OPENAI_API_KEY",
+            "PERPLEXITY_API_KEY",
+            "GEMINI_API_KEY",
+        ]
+
+    missing = [var for var in required if not os.getenv(var)]
+
+    if missing:
+        _log.critical(
+            "Missing required environment variables — server cannot start:\n  %s",
+            "\n  ".join(missing),
+        )
+        raise RuntimeError(
+            f"Missing required environment variables: {', '.join(missing)}"
+        )
+
+    _log.info("Environment validation passed (%d required vars present)", len(required))
+
+
+_validate_env()
+
 _req_log = logging.getLogger("eduquest.request")
 
 from routers import conversation, period, ltg, teacher, waitlist
