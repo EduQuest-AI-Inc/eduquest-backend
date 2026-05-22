@@ -96,8 +96,24 @@ class SupabaseAuthService:
         """
         Sign in via Supabase Auth and return the AuthResponse.
         Raises on failure — callers are responsible for handling exceptions.
+
+        Uses a fresh, throw-away client (anon key) so the shared admin client's
+        internal session is never overwritten by the returned user JWT. Without
+        this isolation, supabase-py would replace the admin client's
+        Authorization header with the user JWT on every login, causing all
+        subsequent DAO queries to run under that user's RLS context.
         """
-        return self._get_client().auth.sign_in_with_password({"email": email, "password": password})
+        import os
+        import httpx
+        from supabase import create_client
+        from supabase.lib.client_options import SyncClientOptions
+        url = os.environ["SUPABASE_URL"]
+        anon_key = os.environ["SUPABASE_ANON_KEY"]
+        fresh_client = create_client(
+            url, anon_key,
+            options=SyncClientOptions(httpx_client=httpx.Client()),
+        )
+        return fresh_client.auth.sign_in_with_password({"email": email, "password": password})
 
     def delete_user(self, supabase_auth_uuid: str) -> None:
         """Delete a Supabase Auth user by UUID. Raises on failure."""
