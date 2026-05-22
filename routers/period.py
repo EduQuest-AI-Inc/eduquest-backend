@@ -231,7 +231,7 @@ def create_period(
         raise
 
 
-@router.patch("/period/{period_id}/setup", response_model=UpdatePeriodResponse)
+@router.patch("/{period_id}/setup", response_model=UpdatePeriodResponse)
 def update_period_setup(
     period_id: str,
     background_tasks: BackgroundTasks,
@@ -370,7 +370,7 @@ def add_files_to_period(
     return {"message": f"Successfully added {len(payload.file_keys)} files to period", "added_files": payload.file_keys}
 
 
-@router.get("/period/{period_id}", response_model=GetPeriodResponse)
+@router.get("/{period_id}", response_model=GetPeriodResponse)
 def get_period(
     period_id: str,
     auth: AuthPayload = Depends(require_active_membership),
@@ -381,7 +381,7 @@ def get_period(
     return {"period": period}
 
 
-@router.delete("/period/{period_id}", status_code=204, response_model=None)
+@router.delete("/{period_id}", status_code=204, response_model=None)
 def delete_period(
     period_id: str,
     auth: AuthPayload = Depends(require_active_membership),
@@ -405,7 +405,7 @@ class _ForkMetadataUpdate(BaseModel):
     mastery_threshold: Optional[float] = None
 
 
-@router.patch("/period/{period_id}/fork-metadata", response_model=ForkMetadataResponse)
+@router.patch("/{period_id}/fork-metadata", response_model=ForkMetadataResponse)
 def update_fork_metadata(
     period_id: str,
     body: _ForkMetadataUpdate,
@@ -433,7 +433,7 @@ def update_fork_metadata(
 # ─── Summer side quests ───────────────────────────────────────────────────────
 
 
-@router.post("/period/{period_id}/summer-quests/generate", status_code=202, response_model=SummerQuestGenerateResponse)
+@router.post("/{period_id}/summer-quests/generate", status_code=202, response_model=SummerQuestGenerateResponse)
 def generate_summer_quests(
     period_id: str,
     background_tasks: BackgroundTasks,
