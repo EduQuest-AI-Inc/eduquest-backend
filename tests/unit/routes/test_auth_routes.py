@@ -1,6 +1,6 @@
 """API-level tests for /auth routes."""
 import pytest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from main import app
 
@@ -10,6 +10,17 @@ def client():
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+def _mock_supabase_session(access_token="mock_access_token", refresh_token="mock_refresh_token"):
+    """Return a mock response from SupabaseAuthService.sign_in_with_password."""
+    mock_session = MagicMock()
+    mock_session.access_token = access_token
+    mock_session.refresh_token = refresh_token
+
+    mock_response = MagicMock()
+    mock_response.session = mock_session
+    return mock_response
 
 
 # ---------------------------------------------------------------------------
@@ -97,18 +108,24 @@ class TestSignupRoute:
 class TestLoginRoute:
 
     @pytest.mark.api
+    @patch("routers.auth._supabase_auth_service")
+    @patch("routers.auth.backfill_supabase_auth_id")
     @patch("routers.auth.get_student_by_id", return_value={
         "strength": "math", "weakness": "reading",
         "interest": "science", "learning_style": "visual",
     })
-    @patch("routers.auth.add_session")
+    @patch("routers.auth.get_user_by_id", return_value={"email": "stu1@eduquestai.org", "supabase_auth_id": "uuid-001"})
     @patch("routers.auth.authenticate_user", return_value=True)
-    def test_login_success_returns_token(self, mock_auth, mock_add_session, mock_student, client):
+    def test_login_success_returns_tokens(self, mock_auth, mock_user, mock_student, mock_backfill, mock_sas, client):
+        mock_sas.sign_in_with_password.return_value = _mock_supabase_session()
         resp = client.post("/auth/login", json={
             "username": "stu1", "password": "SecurePass1", "role": "student"
         })
         assert resp.status_code == 200
-        assert "token" in resp.json()
+        data = resp.json()
+        assert "access_token" in data
+        assert "refresh_token" in data
+        assert "token" not in data
 
     @pytest.mark.api
     @patch("routers.auth.authenticate_user", return_value=False)
@@ -119,17 +136,37 @@ class TestLoginRoute:
         assert resp.status_code == 401
 
     @pytest.mark.api
+    @patch("routers.auth._supabase_auth_service")
+    @patch("routers.auth.backfill_supabase_auth_id")
     @patch("routers.auth.get_student_by_id", return_value={
         "strength": None, "weakness": None, "interest": None, "learning_style": None,
     })
-    @patch("routers.auth.add_session")
+    @patch("routers.auth.get_user_by_id", return_value={"email": "stu1@eduquestai.org", "supabase_auth_id": "uuid-001"})
     @patch("routers.auth.authenticate_user", return_value=True)
-    def test_login_incomplete_profile_sets_flag(self, mock_auth, mock_add_session, mock_student, client):
+    def test_login_incomplete_profile_sets_flag(self, mock_auth, mock_user, mock_student, mock_backfill, mock_sas, client):
+        mock_sas.sign_in_with_password.return_value = _mock_supabase_session()
         resp = client.post("/auth/login", json={
             "username": "stu1", "password": "SecurePass1", "role": "student"
         })
         assert resp.status_code == 200
         assert resp.json().get("needs_profile") is True
+
+    @pytest.mark.api
+    @patch("routers.auth._supabase_auth_service")
+    @patch("routers.auth.backfill_supabase_auth_id")
+    @patch("routers.auth.get_student_by_id", return_value={
+        "strength": "math", "weakness": "reading",
+        "interest": "science", "learning_style": "visual",
+    })
+    @patch("routers.auth.get_user_by_id", return_value={"email": "stu1@eduquestai.org", "supabase_auth_id": "uuid-001"})
+    @patch("routers.auth.authenticate_user", return_value=True)
+    def test_login_supabase_failure_returns_401(self, mock_auth, mock_user, mock_student, mock_backfill, mock_sas, client):
+        mock_sas.sign_in_with_password.side_effect = Exception("supabase down")
+        mock_sas.sync_password.side_effect = Exception("sync also failed")
+        resp = client.post("/auth/login", json={
+            "username": "stu1", "password": "SecurePass1", "role": "student"
+        })
+        assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------
@@ -190,3 +227,42 @@ class TestPasswordResetConfirm:
             "token": "   ", "new_password": "NewSecure1"
         })
         assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Supabase Auth provisioning during login
+# ---------------------------------------------------------------------------
+
+class TestSupabaseAuthProvisioning:
+
+    @pytest.mark.api
+    @patch("routers.auth._supabase_auth_service")
+    @patch("routers.auth.backfill_supabase_auth_id")
+    @patch("routers.auth.get_student_by_id", return_value={
+        "strength": "math", "weakness": None, "interest": None, "learning_style": None,
+    })
+    @patch("routers.auth.get_user_by_id", return_value={"email": "stu1@eduquestai.org", "supabase_auth_id": "uuid-001"})
+    @patch("routers.auth.authenticate_user", return_value=True)
+    def test_login_calls_backfill(self, mock_auth, mock_user, mock_student, mock_backfill, mock_sas, client):
+        mock_sas.sign_in_with_password.return_value = _mock_supabase_session()
+        client.post("/auth/login", json={
+            "username": "stu1", "password": "SecurePass1", "role": "student"
+        })
+        mock_backfill.assert_called_once_with("stu1", "SecurePass1", "student")
+
+    @pytest.mark.api
+    @patch("routers.auth._supabase_auth_service")
+    @patch("routers.auth.backfill_supabase_auth_id", side_effect=Exception("supabase down"))
+    @patch("routers.auth.get_student_by_id", return_value={
+        "strength": "math", "weakness": "reading",
+        "interest": "science", "learning_style": "visual",
+    })
+    @patch("routers.auth.get_user_by_id", return_value={"email": "stu1@eduquestai.org", "supabase_auth_id": "uuid-001"})
+    @patch("routers.auth.authenticate_user", return_value=True)
+    def test_login_succeeds_when_backfill_raises(self, mock_auth, mock_user, mock_student, mock_backfill, mock_sas, client):
+        mock_sas.sign_in_with_password.return_value = _mock_supabase_session()
+        resp = client.post("/auth/login", json={
+            "username": "stu1", "password": "SecurePass1", "role": "student"
+        })
+        assert resp.status_code == 200
+        assert "access_token" in resp.json()

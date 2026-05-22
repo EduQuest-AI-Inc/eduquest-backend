@@ -19,11 +19,6 @@ from services.quest.quest_retrieval_service import QuestRetrievalService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-_retrieval_service = QuestRetrievalService()
-_grading_service = QuestGradingService()
-_enrollment_service = EnrollmentService()
-_parent_service = ParentService()
-_period_management_svc = PeriodManagementService()
 
 
 @router.get("/quests", response_model=list[QuestOut])
@@ -31,10 +26,11 @@ def get_quests(
     period_id: Optional[str] = Query(default=None),
     auth: AuthPayload = Depends(get_auth),
 ):
+    retrieval_service = QuestRetrievalService(jwt=auth.token)
     if period_id:
-        quests = _retrieval_service.get_quests_for_student_and_period(auth.sub, period_id)
+        quests = retrieval_service.get_quests_for_student_and_period(auth.sub, period_id)
     else:
-        quests = _retrieval_service.get_quests_for_student(auth.sub)
+        quests = retrieval_service.get_quests_for_student(auth.sub)
     for quest in quests:
         QuestRetrievalService.attach_grade_display(quest)
     return quests
@@ -42,7 +38,8 @@ def get_quests(
 
 @router.get("/quests/{quest_id}", response_model=QuestOut)
 def get_quest(quest_id: str, auth: AuthPayload = Depends(get_auth)):
-    quest = _retrieval_service.get_quest_by_id(quest_id)
+    retrieval_service = QuestRetrievalService(jwt=auth.token)
+    quest = retrieval_service.get_quest_by_id(quest_id)
     if quest:
         QuestRetrievalService.attach_grade_display(quest)
         return quest
@@ -58,20 +55,24 @@ def get_student_quests(
     """Teacher/parent route: fetch quests for a specific student."""
     if auth.sub != user_id:
         if auth.role == Role.PARENT:
-            linked = _parent_service.get_linked_student_ids(auth.sub)
+            parent_service = ParentService(jwt=auth.token)
+            linked = parent_service.get_linked_student_ids(auth.sub)
             if user_id not in linked:
                 raise HTTPException(status_code=403, detail="Not authorized")
         else:
-            enrollments = _enrollment_service.get_enrollments_by_student(user_id)
+            enrollment_service = EnrollmentService(jwt=auth.token)
+            period_management_svc = PeriodManagementService(jwt=auth.token)
+            enrollments = enrollment_service.get_enrollments_by_student(user_id)
             period_ids = [e["period_id"] for e in enrollments]
-            caller_periods = _period_management_svc.get_periods_by_owner(auth.sub)
+            caller_periods = period_management_svc.get_periods_by_owner(auth.sub)
             caller_period_ids = {p["period_id"] for p in caller_periods}
             if not any(pid in caller_period_ids for pid in period_ids):
                 raise HTTPException(status_code=403, detail="Not authorized")
+    retrieval_service = QuestRetrievalService(jwt=auth.token)
     if period_id:
-        quests = _retrieval_service.get_quests_for_student_and_period(user_id, period_id)
+        quests = retrieval_service.get_quests_for_student_and_period(user_id, period_id)
     else:
-        quests = _retrieval_service.get_quests_for_student(user_id)
+        quests = retrieval_service.get_quests_for_student(user_id)
     for quest in quests:
         QuestRetrievalService.attach_grade_display(quest)
     return quests
@@ -87,7 +88,9 @@ def update_quest_steps(
     body: UpdateStepsRequest,
     auth: AuthPayload = Depends(get_auth),
 ):
-    _grading_service.update_completed_steps(quest_id, body.completed_steps)
+    # Quest writes stay admin (no user UPDATE policy on quest table)
+    grading_service = QuestGradingService()
+    grading_service.update_completed_steps(quest_id, body.completed_steps)
     return {"message": "Steps updated", "quest_id": quest_id, "completed_steps": body.completed_steps}
 
 
@@ -103,7 +106,8 @@ def update_quest_status(
 ):
     if body.status not in ("not_started", "in_progress", "completed"):
         raise HTTPException(status_code=400, detail="status must be one of: not_started, in_progress, completed")
-    return _grading_service.update_quest_status(quest_id, body.status)
+    grading_service = QuestGradingService()
+    return grading_service.update_quest_status(quest_id, body.status)
 
 
 class GradeQuestRequest(BaseModel):
@@ -117,10 +121,12 @@ def grade_quest(
     body: GradeQuestRequest,
     auth: AuthPayload = Depends(get_auth),
 ):
-    _grading_service.update_quest_grade_and_feedback(quest_id, body.grade, body.feedback)
+    grading_service = QuestGradingService()
+    grading_service.update_quest_grade_and_feedback(quest_id, body.grade, body.feedback)
     return {"message": "Grade and feedback submitted successfully", "quest_id": quest_id}
 
 
 @router.get("/verify-quest-structure/{period_id}", response_model=dict[str, Any])
 def verify_quest_structure(period_id: str, auth: AuthPayload = Depends(get_auth)):
-    return _retrieval_service.verify_quest_structure(auth.sub, period_id)
+    retrieval_service = QuestRetrievalService(jwt=auth.token)
+    return retrieval_service.verify_quest_structure(auth.sub, period_id)

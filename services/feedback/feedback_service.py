@@ -16,9 +16,10 @@ class FeedbackService:
         dao: Optional[FeedbackDAO] = None,
         user_dao: Optional[UserDAO] = None,
         email_service: Optional[EmailService] = None,
+        jwt: str | None = None,
     ) -> None:
-        self.dao = dao or FeedbackDAO()
-        self.user_dao = user_dao or UserDAO()
+        self.dao = dao or FeedbackDAO(jwt=jwt)
+        self.user_dao = user_dao or UserDAO(jwt=jwt)
         self.email_service = email_service or get_email_service()
 
     def submit(self, user_id: str, message: str, page: Optional[str] = None) -> None:

@@ -67,8 +67,9 @@ def test_membership_status_returns_view_for_teacher(teacher_client):
         "stripe_customer_id_present": False,
         "available_plans": [],
     }
-    with patch("routers.billing._membership_service") as svc:
-        svc.membership_view.return_value = fake_view
+    mock_svc = MagicMock()
+    mock_svc.membership_view.return_value = fake_view
+    with patch("routers.billing.MembershipService", return_value=mock_svc):
         resp = teacher_client.get("/billing/membership")
     assert resp.status_code == 200
     assert resp.json()["status"] == "trialing"
@@ -94,14 +95,17 @@ def test_checkout_requires_price_env(teacher_client, monkeypatch):
 def test_checkout_creates_stripe_session(teacher_client, monkeypatch):
     monkeypatch.setenv("STRIPE_PRICE_STARTER", "price_starter")
 
-    with patch("routers.billing._user_service") as user_svc, \
-         patch("routers.billing._membership_service") as svc, \
+    mock_user_svc = MagicMock()
+    mock_user_svc.get_by_id.return_value = {
+        "user_id": "teacher-1", "email": "t@eduquestai.org",
+        "first_name": "T", "last_name": "Acher",
+    }
+    mock_membership_svc = MagicMock()
+    mock_membership_svc.get_membership.return_value = None
+
+    with patch("routers.billing.UserService", return_value=mock_user_svc), \
+         patch("routers.billing.MembershipService", return_value=mock_membership_svc), \
          patch("routers.billing.stripe_service") as stripe:
-        user_svc.get_by_id.return_value = {
-            "user_id": "teacher-1", "email": "t@eduquestai.org",
-            "first_name": "T", "last_name": "Acher",
-        }
-        svc.get_membership.return_value = None
         stripe.get_or_create_customer.return_value = "cus_123"
         stripe.create_subscription_checkout_session.return_value = "https://checkout.stripe.com/abc"
 
@@ -110,7 +114,7 @@ def test_checkout_creates_stripe_session(teacher_client, monkeypatch):
     assert resp.status_code == 200
     assert resp.json()["url"].startswith("https://checkout.stripe.com/")
     stripe.get_or_create_customer.assert_called_once()
-    svc.attach_stripe_customer.assert_called_once_with("teacher-1", "cus_123")
+    mock_membership_svc.attach_stripe_customer.assert_called_once_with("teacher-1", "cus_123")
 
 
 # ── /billing/portal-session ────────────────────────────────────────────────────
@@ -118,17 +122,19 @@ def test_checkout_creates_stripe_session(teacher_client, monkeypatch):
 
 @pytest.mark.api
 def test_portal_rejects_when_no_customer(teacher_client):
-    with patch("routers.billing._membership_service") as svc:
-        svc.get_membership.return_value = None
+    mock_svc = MagicMock()
+    mock_svc.get_membership.return_value = None
+    with patch("routers.billing.MembershipService", return_value=mock_svc):
         resp = teacher_client.post("/billing/portal-session")
     assert resp.status_code == 400
 
 
 @pytest.mark.api
 def test_portal_returns_url(teacher_client):
-    with patch("routers.billing._membership_service") as svc, \
+    mock_svc = MagicMock()
+    mock_svc.get_membership.return_value = {"stripe_customer_id": "cus_123"}
+    with patch("routers.billing.MembershipService", return_value=mock_svc), \
          patch("routers.billing.stripe_service") as stripe:
-        svc.get_membership.return_value = {"stripe_customer_id": "cus_123"}
         stripe.create_billing_portal_session.return_value = "https://portal.stripe.com/abc"
         resp = teacher_client.post("/billing/portal-session")
     assert resp.status_code == 200
@@ -166,7 +172,7 @@ def test_webhook_routes_subscription_updated(monkeypatch):
     fake_event.type = "customer.subscription.updated"
     fake_event.data.object = fake_data_obj
     with patch("routers.billing.stripe_service") as stripe, \
-         patch("routers.billing._membership_service") as svc:
+         patch("routers.billing._webhook_membership_service") as svc:
         stripe.construct_webhook_event.return_value = fake_event
         with TestClient(app) as c:
             resp = c.post("/billing/webhook", content=b"{}", headers={"stripe-signature": "x"})
@@ -183,7 +189,7 @@ def test_webhook_subscription_deleted(monkeypatch):
     fake_event.type = "customer.subscription.deleted"
     fake_event.data.object = fake_data_obj
     with patch("routers.billing.stripe_service") as stripe, \
-         patch("routers.billing._membership_service") as svc:
+         patch("routers.billing._webhook_membership_service") as svc:
         stripe.construct_webhook_event.return_value = fake_event
         with TestClient(app) as c:
             resp = c.post("/billing/webhook", content=b"{}", headers={"stripe-signature": "x"})

@@ -5,9 +5,9 @@
   {% endif %}
   <div class="body" style="display: flex; flex-direction: column; height: calc(9in - 1.1in - 0.18in); padding-bottom: 0.4in;">
     <div style="flex: 1; min-height: 0;">
-      {% if slide.visual_status in ('approved', 'flagged') and slide.visual_path %}
+      {% if slide.visual_status in ('approved', 'flagged') and image_data_uris.get(slide.index) %}
         <div class="visual-frame">
-          <img src="file://{{ slide.visual_path }}" alt="Slide visual">
+          <img src="{{ image_data_uris[slide.index] }}" alt="Slide visual">
         </div>
       {% else %}
         <div class="visual-placeholder">No visual available</div>

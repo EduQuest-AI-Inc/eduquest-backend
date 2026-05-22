@@ -7,12 +7,12 @@ from data_access.user_dao import UserDAO
 
 class UserService:
 
-    def __init__(self) -> None:
-        self.session_dao = SessionDAO()
-        self.student_dao = StudentDAO()
-        self.teacher_dao = TeacherDAO()
-        self.parent_dao = ParentDAO()
-        self.user_dao = UserDAO()
+    def __init__(self, session_dao=None, student_dao=None, teacher_dao=None, parent_dao=None, user_dao=None, jwt: str | None = None) -> None:
+        self.session_dao = session_dao or SessionDAO()
+        self.student_dao = student_dao or StudentDAO(jwt=jwt)
+        self.teacher_dao = teacher_dao or TeacherDAO(jwt=jwt)
+        self.parent_dao = parent_dao or ParentDAO(jwt=jwt)
+        self.user_dao = user_dao or UserDAO(jwt=jwt)
 
     def get_user_profile(self, auth_token: str) -> Dict[str, Any]:
         sessions = self.session_dao.get_sessions_by_auth_token(auth_token)

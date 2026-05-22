@@ -25,10 +25,11 @@ class MarketplaceService:
         listing_dao: Optional[MarketplaceListingDAO] = None,
         period_dao: Optional[PeriodDAO] = None,
         period_management_service: Optional[PeriodManagementService] = None,
+        jwt: str | None = None,
     ) -> None:
-        self.listing_dao = listing_dao or MarketplaceListingDAO()
-        self.period_dao = period_dao or PeriodDAO()
-        self.period_management_service = period_management_service or PeriodManagementService()
+        self.listing_dao = listing_dao or MarketplaceListingDAO(jwt=jwt)
+        self.period_dao = period_dao or PeriodDAO(jwt=jwt)
+        self.period_management_service = period_management_service or PeriodManagementService(jwt=jwt)
 
     # ── publish ────────────────────────────────────────────────────────────────
 

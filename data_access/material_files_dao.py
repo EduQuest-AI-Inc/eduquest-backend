@@ -4,8 +4,8 @@ from data_access.base_dao import SupabaseBaseDAO
 
 
 class MaterialFilesDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('material_files')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('material_files', jwt=jwt)
 
     def get_by_hash(self, file_hash: str) -> Optional[dict]:
         rows = self._select_eq('file_hash', file_hash)

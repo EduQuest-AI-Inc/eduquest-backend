@@ -10,6 +10,7 @@ import uuid
 from typing import Optional, Tuple
 
 from services.auth.auth_service import generate_password_hash
+from services.auth.supabase_auth_service import SupabaseAuthService
 
 from data_access.user_dao import UserDAO
 from data_access.password_reset_token_dao import PasswordResetTokenDAO
@@ -31,11 +32,12 @@ INVALID_TOKEN_MESSAGE = "This link is invalid or expired. Please request a new o
 class PasswordResetService:
     """Service for handling password reset operations."""
     
-    def __init__(self) -> None:
+    def __init__(self, supabase_auth_service=None) -> None:
         self.user_dao = UserDAO()
         self.token_dao = PasswordResetTokenDAO()
         self.rate_limit_dao = PasswordResetRateLimitDAO()
         self.email_service = get_email_service()
+        self.supabase_auth_service = supabase_auth_service or SupabaseAuthService()
     
     def request_password_reset(
         self,
@@ -255,6 +257,13 @@ class PasswordResetService:
         try:
             hashed_password = generate_password_hash(new_password)
             self.user_dao.update(user_id, {"password": hashed_password})
+
+            try:
+                user = self.user_dao.get_by_id(user_id)
+                if user and user.get("supabase_auth_id"):
+                    self.supabase_auth_service.sync_password(user["supabase_auth_id"], new_password)
+            except Exception as exc:  # must not block password reset
+                logger.warning("Supabase password sync failed for %s: %s", user_id, exc)
 
             self._log_event(
                 "PASSWORD_RESET_SUCCESS",

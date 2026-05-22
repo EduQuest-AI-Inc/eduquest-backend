@@ -5,7 +5,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from responses.slides import PptxStatusItemOut, RestartResponse
 
 from bots.protocol import BotProviderProtocol
-from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period, require_roles
+from routers.curriculum import _assert_owner_or_parent_of_owner
+from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period
 from exceptions.validation_error import ValidationError
 from services.enrollment.enrollment_service import EnrollmentService
 from services.lessons.lessons_service import LessonsService
@@ -14,10 +15,6 @@ from services.slides.pptx_generation_service import PptxGenerationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-_lessons_svc = LessonsService()
-_enrollment_svc = EnrollmentService()
-_parent_svc = ParentService()
 
 
 def _get_slides_service(
@@ -33,27 +30,29 @@ def get_pptx_status(
     period: dict = Depends(get_period),
 ):
     is_owner = period["owner_id"] == auth.sub
+    enrollment_svc = EnrollmentService(jwt=auth.token)
     if not is_owner:
         # Student: must be enrolled in the period
         if auth.role == Role.STUDENT:
-            enrollments = _enrollment_svc.get_enrollments_by_student(auth.sub)
+            enrollments = enrollment_svc.get_enrollments_by_student(auth.sub)
             if not any(e["period_id"] == period_id for e in enrollments):
                 raise HTTPException(status_code=403, detail="Unauthorized")
         # Parent: must have a linked child enrolled in the period
         elif auth.role == Role.PARENT:
-            child_ids = _parent_svc.get_linked_student_ids(auth.sub)
+            child_ids = ParentService(jwt=auth.token).get_linked_student_ids(auth.sub)
             enrolled_period_ids = {
                 e["period_id"]
                 for child_id in child_ids
-                for e in _enrollment_svc.get_enrollments_by_student(child_id)
+                for e in enrollment_svc.get_enrollments_by_student(child_id)
             }
             if period_id not in enrolled_period_ids:
                 raise HTTPException(status_code=403, detail="Unauthorized")
         else:
             raise HTTPException(status_code=403, detail="Unauthorized")
 
-    pptx_rows = _lessons_svc.get_pptx_by_period(period_id)
-    lessons = {les["lesson_id"]: les for les in _lessons_svc.get_lessons_by_period(period_id)}
+    lessons_svc = LessonsService(jwt=auth.token)
+    pptx_rows = lessons_svc.get_pptx_by_period(period_id)
+    lessons = {les["lesson_id"]: les for les in lessons_svc.get_lessons_by_period(period_id)}
 
     return [
         {
@@ -72,12 +71,11 @@ def get_pptx_status(
 def restart_pptx_generation(
     period_id: str,
     background_tasks: BackgroundTasks,
-    auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
+    auth: AuthPayload = Depends(get_auth),
     slides_svc: PptxGenerationService = Depends(_get_slides_service),
     period: dict = Depends(get_period),
 ):
-    if period["owner_id"] != auth.sub:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    _assert_owner_or_parent_of_owner(period, auth)
 
     try:
         count = slides_svc.restart_batch(period_id, background_tasks)

@@ -4,8 +4,8 @@ from data_access.base_dao import SupabaseBaseDAO
 
 
 class ConversationDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('conversation')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('conversation', jwt=jwt)
 
     def add_conversation(self, conversation) -> None:
         self._insert({

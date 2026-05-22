@@ -10,6 +10,7 @@ _VALID_QUESTS_FILE = json.dumps([{"period_id": "p1", "week": 1}])
 def _svc():
     svc = ConversationService.__new__(ConversationService)
     svc._bot_provider = MagicMock()
+    svc._jwt = None
     svc.student_dao = MagicMock()
     svc.conversation_dao = MagicMock()
     svc.teacher_dao = MagicMock()

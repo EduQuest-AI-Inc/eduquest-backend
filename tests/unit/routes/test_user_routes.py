@@ -1,6 +1,6 @@
 """API-level tests for /user routes (profile, tutorial, canvas removal)."""
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from main import app
 from routers.deps import get_auth, AuthPayload
@@ -25,8 +25,8 @@ def client():
 class TestGetProfile:
 
     @pytest.mark.api
-    @patch("routers.user.user_service")
-    def test_get_profile_success(self, mock_svc, client):
+    def test_get_profile_success(self, client):
+        mock_svc = MagicMock()
         mock_svc.get_by_id.return_value = {"user_id": "stu-1", "role": "student"}
         mock_svc.get_student_by_id.return_value = {
             "user_id": "stu-1",
@@ -39,7 +39,8 @@ class TestGetProfile:
             "learning_style": ["visual"],
             "completed_tutorial": False,
         }
-        resp = client.get("/user/profile")
+        with patch("routers.user.UserService", return_value=mock_svc):
+            resp = client.get("/user/profile")
         assert resp.status_code == 200
         data = resp.json()
         assert data["user_id"] == "stu-1"
@@ -48,22 +49,24 @@ class TestGetProfile:
         assert data["strength"] == ["math", "science"]
 
     @pytest.mark.api
-    @patch("routers.user.user_service")
-    def test_get_profile_user_not_found(self, mock_svc, client):
+    def test_get_profile_user_not_found(self, client):
+        mock_svc = MagicMock()
         mock_svc.get_by_id.return_value = None
-        resp = client.get("/user/profile")
+        with patch("routers.user.UserService", return_value=mock_svc):
+            resp = client.get("/user/profile")
         assert resp.status_code == 404
 
     @pytest.mark.api
-    @patch("routers.user.user_service")
-    def test_get_profile_strips_teacher_canvas_key(self, mock_svc, client):
+    def test_get_profile_strips_teacher_canvas_key(self, client):
         app.dependency_overrides[get_auth] = lambda: AuthPayload(sub="tch-1", role="teacher", token="fake-token")
+        mock_svc = MagicMock()
         mock_svc.get_by_id.return_value = {"user_id": "tch-1", "role": "teacher"}
         mock_svc.get_teacher_by_id.return_value = {
             "user_id": "tch-1",
             "canvas_api_key": "secret",
         }
-        resp = client.get("/user/profile")
+        with patch("routers.user.UserService", return_value=mock_svc):
+            resp = client.get("/user/profile")
         app.dependency_overrides[get_auth] = _student_auth
         assert resp.status_code == 200
         assert "canvas_api_key" not in resp.json()
@@ -76,18 +79,20 @@ class TestGetProfile:
 class TestUpdateTutorial:
 
     @pytest.mark.api
-    @patch("routers.user.user_service")
-    def test_update_tutorial_success(self, mock_svc, client):
+    def test_update_tutorial_success(self, client):
+        mock_svc = MagicMock()
         mock_svc.update_tutorial_status.return_value = None
-        resp = client.post("/user/update-tutorial", json={"completed_tutorial": True})
+        with patch("routers.user.UserService", return_value=mock_svc):
+            resp = client.post("/user/update-tutorial", json={"completed_tutorial": True})
         assert resp.status_code == 200
         assert "updated" in resp.json()["message"]
 
     @pytest.mark.api
-    @patch("routers.user.user_service")
-    def test_update_tutorial_defaults_false(self, mock_svc, client):
+    def test_update_tutorial_defaults_false(self, client):
+        mock_svc = MagicMock()
         mock_svc.update_tutorial_status.return_value = None
-        resp = client.post("/user/update-tutorial", json={})
+        with patch("routers.user.UserService", return_value=mock_svc):
+            resp = client.post("/user/update-tutorial", json={})
         assert resp.status_code == 200
         mock_svc.update_tutorial_status.assert_called_with("stu-1", False)
 
@@ -99,18 +104,20 @@ class TestUpdateTutorial:
 class TestGetTutorialStatus:
 
     @pytest.mark.api
-    @patch("routers.user.user_service")
-    def test_tutorial_status_complete(self, mock_svc, client):
+    def test_tutorial_status_complete(self, client):
+        mock_svc = MagicMock()
         mock_svc.get_tutorial_status.return_value = True
-        resp = client.get("/user/tutorial-status")
+        with patch("routers.user.UserService", return_value=mock_svc):
+            resp = client.get("/user/tutorial-status")
         assert resp.status_code == 200
         assert resp.json()["completed_tutorial"] is True
 
     @pytest.mark.api
-    @patch("routers.user.user_service")
-    def test_tutorial_status_incomplete(self, mock_svc, client):
+    def test_tutorial_status_incomplete(self, client):
+        mock_svc = MagicMock()
         mock_svc.get_tutorial_status.return_value = False
-        resp = client.get("/user/tutorial-status")
+        with patch("routers.user.UserService", return_value=mock_svc):
+            resp = client.get("/user/tutorial-status")
         assert resp.status_code == 200
         assert resp.json()["completed_tutorial"] is False
 

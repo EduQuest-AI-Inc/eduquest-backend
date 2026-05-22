@@ -37,8 +37,8 @@ from services.user.user_service import UserService
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_membership_service = MembershipService()
-_user_service = UserService()
+# Admin singleton used only by the Stripe webhook (no user session available)
+_webhook_membership_service = MembershipService()
 
 
 def _require_role_value(auth: AuthPayload) -> str:
@@ -51,7 +51,8 @@ def _require_role_value(auth: AuthPayload) -> str:
 def get_membership(
     auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
 ):
-    return _membership_service.membership_view(auth.sub, _require_role_value(auth))
+    svc = MembershipService(jwt=auth.token)
+    return svc.membership_view(auth.sub, _require_role_value(auth))
 
 
 # ── Checkout ───────────────────────────────────────────────────────────────────
@@ -79,11 +80,13 @@ def create_checkout_session(
     if not price_id:
         raise HTTPException(status_code=500, detail="Plan price is not configured")
 
-    user = _user_service.get_by_id(auth.sub)
+    user_svc = UserService(jwt=auth.token)
+    membership_svc = MembershipService(jwt=auth.token)
+    user = user_svc.get_by_id(auth.sub)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    record = _membership_service.get_membership(auth.sub) or {}
+    record = membership_svc.get_membership(auth.sub) or {}
     customer_id = stripe_service.get_or_create_customer(
         user_id=auth.sub,
         email=user.get("email", ""),
@@ -91,7 +94,7 @@ def create_checkout_session(
         existing_id=record.get("stripe_customer_id"),
     )
     if record.get("stripe_customer_id") != customer_id:
-        _membership_service.attach_stripe_customer(auth.sub, customer_id)
+        membership_svc.attach_stripe_customer(auth.sub, customer_id)
 
     base = (os.getenv("FRONTEND_BASE_URL") or "http://localhost:3000").rstrip("/")
     success_url = f"{base}/billing?checkout=success"
@@ -105,8 +108,8 @@ def create_checkout_session(
             cancel_url=cancel_url,
             user_id=auth.sub,
         )
-    except Exception as e:  # stripe.error.* surfaces through here
-        logger.error("Stripe checkout creation failed: %s", e, exc_info=True)
+    except Exception as exc:
+        logger.error("Stripe checkout creation failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=502, detail="Could not start checkout")
 
     return {"url": url}
@@ -118,7 +121,8 @@ def create_checkout_session(
 def create_portal_session(
     auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
 ):
-    record = _membership_service.get_membership(auth.sub) or {}
+    membership_svc = MembershipService(jwt=auth.token)
+    record = membership_svc.get_membership(auth.sub) or {}
     customer_id: Optional[str] = record.get("stripe_customer_id")
     if not customer_id:
         raise HTTPException(status_code=400, detail="No Stripe customer on file. Subscribe first.")
@@ -132,8 +136,8 @@ def create_portal_session(
             customer_id=customer_id,
             return_url=return_url,
         )
-    except Exception as e:
-        logger.error("Stripe portal creation failed: %s", e, exc_info=True)
+    except Exception as exc:
+        logger.error("Stripe portal creation failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=502, detail="Could not open billing portal")
     return {"url": url}
 
@@ -152,8 +156,8 @@ async def stripe_webhook(request: Request):
 
     try:
         event = stripe_service.construct_webhook_event(payload, signature, secret)
-    except Exception as e:
-        logger.warning("Stripe webhook signature verification failed: %s", e)
+    except Exception as exc:
+        logger.warning("Stripe webhook signature verification failed: %s", exc)
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     event_type: str = getattr(event, "type", "") or ""
@@ -166,28 +170,25 @@ async def stripe_webhook(request: Request):
             "customer.subscription.updated",
             "customer.subscription.trial_will_end",
         ):
-            _membership_service.apply_stripe_subscription(data)
+            _webhook_membership_service.apply_stripe_subscription(data)
         elif event_type == "customer.subscription.deleted":
             sub_id = data.get("id")
             if sub_id:
-                _membership_service.mark_subscription_canceled(sub_id)
+                _webhook_membership_service.mark_subscription_canceled(sub_id)
         elif event_type == "checkout.session.completed":
-            # Subscription mode: pull subscription id and sync.
             sub_id = data.get("subscription")
             if sub_id:
                 stripe = stripe_service.get_stripe()
                 sub = stripe.Subscription.retrieve(sub_id)
-                _membership_service.apply_stripe_subscription(sub)
+                _webhook_membership_service.apply_stripe_subscription(sub)
         elif event_type == "invoice.payment_failed":
             sub_id = data.get("subscription")
             if sub_id:
                 stripe = stripe_service.get_stripe()
                 sub = stripe.Subscription.retrieve(sub_id)
-                _membership_service.apply_stripe_subscription(sub)
-    except Exception as e:
-        logger.error("Stripe webhook handler failed: %s", e, exc_info=True)
-        # Return 200 so Stripe doesn't retry forever for application bugs we
-        # need to fix on our side; we'll surface failures via logs/alerting.
+                _webhook_membership_service.apply_stripe_subscription(sub)
+    except Exception as exc:
+        logger.error("Stripe webhook handler failed: %s", exc, exc_info=True)
         return {"received": True, "handled": False}
 
     return {"received": True}

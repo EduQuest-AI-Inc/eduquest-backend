@@ -57,14 +57,15 @@ class TestGetLessonPptx:
 
     @pytest.mark.api
     def test_teacher_can_download(self, teacher_client):
-        with patch("routers.lessons._lessons_service") as mock_ls, \
-             patch("routers.lessons._period_management_svc") as mock_period_svc, \
+        mock_ls = MagicMock()
+        mock_ls.get_latest_done_pptx.return_value = _DONE_ROW
+        mock_ls.get_lesson_by_id.return_value = _LESSON_ROW
+        mock_period_svc = MagicMock()
+        mock_period_svc.get_period_by_id.return_value = _OWNED_PERIOD
+        with patch("routers.lessons.LessonsService", return_value=mock_ls), \
+             patch("routers.lessons.PeriodManagementService", return_value=mock_period_svc), \
              patch("routers.lessons.s3_service") as mock_s3:
-            mock_ls.get_latest_done_pptx.return_value = _DONE_ROW
-            mock_ls.get_lesson_by_id.return_value = _LESSON_ROW
-            mock_period_svc.get_period_by_id.return_value = _OWNED_PERIOD
             mock_s3.generate_presigned_url.return_value = _PRESIGNED_URL
-
             resp = teacher_client.get(f"/lessons/{_LESSON_ID}/pptx")
 
         assert resp.status_code == 200
@@ -75,16 +76,15 @@ class TestGetLessonPptx:
 
     @pytest.mark.api
     def test_student_can_download(self, student_client):
+        mock_ls = MagicMock()
+        mock_ls.get_latest_done_pptx.return_value = _DONE_ROW
+        mock_ls.get_lesson_by_id.return_value = _LESSON_ROW
         mock_enrollment = MagicMock()
         mock_enrollment.check_enrolled.return_value = None
-
-        with patch("routers.lessons._lessons_service") as mock_ls, \
-             patch("routers.lessons._enrollment_service", mock_enrollment), \
+        with patch("routers.lessons.LessonsService", return_value=mock_ls), \
+             patch("routers.lessons.EnrollmentService", return_value=mock_enrollment), \
              patch("routers.lessons.s3_service") as mock_s3:
-            mock_ls.get_latest_done_pptx.return_value = _DONE_ROW
-            mock_ls.get_lesson_by_id.return_value = _LESSON_ROW
             mock_s3.generate_presigned_url.return_value = _PRESIGNED_URL
-
             resp = student_client.get(f"/lessons/{_LESSON_ID}/pptx")
 
         assert resp.status_code == 200
@@ -92,33 +92,33 @@ class TestGetLessonPptx:
 
     @pytest.mark.api
     def test_student_not_enrolled_forbidden(self, student_client):
+        mock_ls = MagicMock()
+        mock_ls.get_latest_done_pptx.return_value = _DONE_ROW
         mock_enrollment = MagicMock()
         mock_enrollment.check_enrolled.side_effect = ValidationError("not enrolled")
-
-        with patch("routers.lessons._lessons_service") as mock_ls, \
-             patch("routers.lessons._enrollment_service", mock_enrollment):
-            mock_ls.get_latest_done_pptx.return_value = _DONE_ROW
-
+        with patch("routers.lessons.LessonsService", return_value=mock_ls), \
+             patch("routers.lessons.EnrollmentService", return_value=mock_enrollment):
             resp = student_client.get(f"/lessons/{_LESSON_ID}/pptx")
 
         assert resp.status_code == 403
 
     @pytest.mark.api
     def test_non_owner_teacher_forbidden(self, other_teacher_client):
-        with patch("routers.lessons._lessons_service") as mock_ls, \
-             patch("routers.lessons._period_management_svc") as mock_period_svc:
-            mock_ls.get_latest_done_pptx.return_value = _DONE_ROW
-            mock_period_svc.get_period_by_id.return_value = _OWNED_PERIOD  # owner_id = teacher-1, not other-teacher
-
+        mock_ls = MagicMock()
+        mock_ls.get_latest_done_pptx.return_value = _DONE_ROW
+        mock_period_svc = MagicMock()
+        mock_period_svc.get_period_by_id.return_value = _OWNED_PERIOD  # owner_id = teacher-1, not other-teacher
+        with patch("routers.lessons.LessonsService", return_value=mock_ls), \
+             patch("routers.lessons.PeriodManagementService", return_value=mock_period_svc):
             resp = other_teacher_client.get(f"/lessons/{_LESSON_ID}/pptx")
 
         assert resp.status_code == 403
 
     @pytest.mark.api
     def test_no_completed_pptx_not_found(self, teacher_client):
-        with patch("routers.lessons._lessons_service") as mock_ls:
-            mock_ls.get_latest_done_pptx.return_value = None
-
+        mock_ls = MagicMock()
+        mock_ls.get_latest_done_pptx.return_value = None
+        with patch("routers.lessons.LessonsService", return_value=mock_ls):
             resp = teacher_client.get(f"/lessons/{_LESSON_ID}/pptx")
 
         assert resp.status_code == 404

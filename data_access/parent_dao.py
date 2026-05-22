@@ -5,9 +5,9 @@ from data_access.user_dao import UserDAO, SHARED_USER_FIELDS
 
 
 class ParentDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('parent')
-        self._user_dao = UserDAO()
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('parent', jwt=jwt)
+        self._user_dao = UserDAO(jwt=jwt)
 
     def add_parent(self, parent) -> None:
         """Insert into user table first, then parent. Compensating delete on role insert failure."""
@@ -54,6 +54,15 @@ class ParentDAO(SupabaseBaseDAO):
         if not parent:
             return []
         return parent.get('linked_student_ids', [])
+
+    def remove_student_link(self, student_id: str) -> None:
+        """Remove student_id from linked_student_ids for all parents that reference it."""
+        self._execute(
+            self.client.rpc(
+                "array_remove_from_linked_students",
+                {"target_student_id": student_id},
+            )
+        )
 
     def get_parents_by_student_id(self, student_id: str) -> List[Dict[str, Any]]:
         response = self._execute(

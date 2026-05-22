@@ -36,12 +36,13 @@ logger = logging.getLogger(__name__)
 
 
 class ConversationService:
-    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+    def __init__(self, *, bot_provider: BotProviderProtocol, jwt: str | None = None) -> None:
         self._bot_provider = bot_provider
-        self.student_dao = StudentDAO()
-        self.conversation_dao = ConversationDAO()
-        self.teacher_dao = TeacherDAO()
-        self.period_dao = PeriodDAO()
+        self._jwt = jwt
+        self.student_dao = StudentDAO(jwt=jwt)
+        self.conversation_dao = ConversationDAO(jwt=jwt)
+        self.teacher_dao = TeacherDAO(jwt=jwt)
+        self.period_dao = PeriodDAO(jwt=jwt)
 
     # ------------------------------------------------------------------
     # Profile assistant
@@ -149,7 +150,7 @@ class ConversationService:
             if not user_id:
                 raise ValidationError("Instructor must provide a user_id to fetch quests")
             from services.quest.quest_retrieval_service import QuestRetrievalService
-            quests_data = QuestRetrievalService().get_quests_for_student(user_id)
+            quests_data = QuestRetrievalService(jwt=self._jwt).get_quests_for_student(user_id)
 
             target_student = self.student_dao.get_student_by_id(user_id)
             if not target_student:
@@ -284,7 +285,7 @@ class ConversationService:
                 return
 
             from services.quest.quest_retrieval_service import QuestRetrievalService
-            quests = QuestRetrievalService().get_quests_for_student(user_id)
+            quests = QuestRetrievalService(jwt=self._jwt).get_quests_for_student(user_id)
             target_quest = None
             for quest in quests:
                 if period_id and quest.get("week") == week and quest.get("period_id") == period_id:

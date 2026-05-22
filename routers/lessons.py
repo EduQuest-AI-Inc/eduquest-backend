@@ -17,10 +17,6 @@ from exceptions.validation_error import ValidationError
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_lessons_service = LessonsService()
-_period_management_svc = PeriodManagementService()
-_enrollment_service = EnrollmentService()
-
 
 def _get_slides_service(
     bot_provider: BotProviderProtocol = Depends(get_bot_provider),
@@ -31,11 +27,11 @@ def _get_slides_service(
 def _assert_lesson_access(period_id: str, auth: AuthPayload) -> None:
     if auth.role == Role.STUDENT:
         try:
-            _enrollment_service.check_enrolled(auth.sub, period_id)
+            EnrollmentService(jwt=auth.token).check_enrolled(auth.sub, period_id)
         except ValidationError:
             raise HTTPException(status_code=403, detail="Unauthorized")
     else:
-        period = _period_management_svc.get_period_by_id(period_id)
+        period = PeriodManagementService(jwt=auth.token).get_period_by_id(period_id)
         if not period:
             raise HTTPException(status_code=404, detail=f"Period '{period_id}' not found")
         if period["owner_id"] != auth.sub:
@@ -47,13 +43,14 @@ def get_lesson_pptx(
     lesson_id: str,
     auth: AuthPayload = Depends(get_auth),
 ):
-    pptx_row = _lessons_service.get_latest_done_pptx(lesson_id)
+    lessons_svc = LessonsService(jwt=auth.token)
+    pptx_row = lessons_svc.get_latest_done_pptx(lesson_id)
     if not pptx_row:
         raise HTTPException(status_code=404, detail="No completed PowerPoint for this lesson")
 
     _assert_lesson_access(pptx_row["period_id"], auth)
 
-    lesson = _lessons_service.get_lesson_by_id(lesson_id)
+    lesson = lessons_svc.get_lesson_by_id(lesson_id)
     url = s3_service.generate_presigned_url(pptx_row["s3_key"], expiry=900)
     return {
         "url": url,
@@ -70,9 +67,10 @@ def regenerate_lesson_pptx(
     auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
     slides_svc: PptxGenerationService = Depends(_get_slides_service),
 ):
+    lessons_svc = LessonsService(jwt=auth.token)
     pptx_row = (
-        _lessons_service.get_pptx_by_lesson_id(lesson_id)
-        or _lessons_service.get_latest_done_pptx(lesson_id)
+        lessons_svc.get_pptx_by_lesson_id(lesson_id)
+        or lessons_svc.get_latest_done_pptx(lesson_id)
     )
     if not pptx_row:
         raise HTTPException(status_code=404, detail="No PowerPoint record for this lesson")
@@ -90,7 +88,7 @@ def get_lesson_html(
     lesson_id: str,
     auth: AuthPayload = Depends(get_auth),
 ):
-    pptx_row = _lessons_service.get_latest_done_pptx(lesson_id)
+    pptx_row = LessonsService(jwt=auth.token).get_latest_done_pptx(lesson_id)
     if not pptx_row:
         raise HTTPException(status_code=404, detail="No completed presentation for this lesson")
     if not pptx_row.get("html_key"):

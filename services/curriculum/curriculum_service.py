@@ -41,14 +41,15 @@ class CurriculumService:
         skill_dao=None,
         concept_skill_dao=None,
         perplexity_service=None,
+        jwt: str | None = None,
     ) -> None:
         self._bot_provider = bot_provider
-        self.period_dao = period_dao or PeriodDAO()
-        self.week_dao = week_dao or WeekDAO()
-        self.lesson_dao = lesson_dao or LessonDAO()
-        self.concept_dao = concept_dao or ConceptDAO()
-        self.skill_dao = skill_dao or SkillDAO()
-        self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO()
+        self.period_dao = period_dao or PeriodDAO(jwt=jwt)
+        self.week_dao = week_dao or WeekDAO(jwt=jwt)
+        self.lesson_dao = lesson_dao or LessonDAO(jwt=jwt)
+        self.concept_dao = concept_dao or ConceptDAO(jwt=jwt)
+        self.skill_dao = skill_dao or SkillDAO(jwt=jwt)
+        self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO(jwt=jwt)
         self._perplexity_service = perplexity_service
 
     # ── public API ────────────────────────────────────────────────────────────

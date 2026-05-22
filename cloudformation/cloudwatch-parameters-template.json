@@ -1,0 +1,7 @@
+[
+  { "ParameterKey": "InstanceId",  "ParameterValue": "YOUR_INSTANCE_ID" },
+  { "ParameterKey": "AlertEmail",  "ParameterValue": "YOUR_ALERT_EMAIL" },
+  { "ParameterKey": "DiskPath",    "ParameterValue": "/" },
+  { "ParameterKey": "DiskDevice",  "ParameterValue": "xvda1" },
+  { "ParameterKey": "DiskFsType",  "ParameterValue": "ext4" }
+]

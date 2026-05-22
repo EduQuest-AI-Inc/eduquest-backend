@@ -10,21 +10,20 @@ from services.user.user_service import UserService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-user_service = UserService()
-
-_ROLE_FETCHERS = {
-    "student": lambda uid: user_service.get_student_by_id(uid),
-    "teacher": lambda uid: user_service.get_teacher_by_id(uid),
-    "parent":  lambda uid: user_service.get_parent_by_id(uid),
-}
 
 
-def _fetch_user_profile(user_id: str) -> Optional[dict]:
-    user = user_service.get_by_id(user_id)
+def _fetch_user_profile(user_id: str, jwt: str) -> Optional[dict]:
+    svc = UserService(jwt=jwt)
+    user = svc.get_by_id(user_id)
     if not user:
         return None
     role = user.get("role") or ""
-    fetcher = _ROLE_FETCHERS.get(role)
+    role_fetchers = {
+        "student": lambda uid: svc.get_student_by_id(uid),
+        "teacher": lambda uid: svc.get_teacher_by_id(uid),
+        "parent":  lambda uid: svc.get_parent_by_id(uid),
+    }
+    fetcher = role_fetchers.get(role)
     if not fetcher:
         return None
     profile = fetcher(user_id)
@@ -35,11 +34,9 @@ def _fetch_user_profile(user_id: str) -> Optional[dict]:
         profile.setdefault("pilot_approved", False)
         profile.pop("canvas_api_key", None)
     if role in ("teacher", "parent"):
-        # Inline a compact membership snapshot so the dashboard can decide
-        # whether to gate management UI without a second round trip.
         try:
             from services.billing.membership_service import MembershipService
-            access = MembershipService().evaluate_access(user_id, role)
+            access = MembershipService(jwt=jwt).evaluate_access(user_id, role)
             profile["membership"] = {
                 "status": access.status.value,
                 "plan": access.plan.value if access.plan else None,
@@ -65,7 +62,7 @@ def get_profile(
     user_id: Optional[str] = None,
     auth: AuthPayload = Depends(require_student_viewer("user_id")),
 ):
-    profile = _fetch_user_profile(user_id or auth.sub)
+    profile = _fetch_user_profile(user_id or auth.sub, auth.token)
     if not profile:
         raise HTTPException(status_code=404, detail="User not found")
     return profile
@@ -77,13 +74,13 @@ class UpdateTutorialRequest(BaseModel):
 
 @router.post("/update-tutorial", response_model=UpdateTutorialResponse)
 def update_tutorial(body: UpdateTutorialRequest, auth: AuthPayload = Depends(get_auth)):
-    user_service.update_tutorial_status(auth.sub, body.completed_tutorial)
+    svc = UserService(jwt=auth.token)
+    svc.update_tutorial_status(auth.sub, body.completed_tutorial)
     return {"message": "Tutorial status updated successfully"}
 
 
 @router.get("/tutorial-status", response_model=TutorialStatusResponse)
 def get_tutorial_status(auth: AuthPayload = Depends(get_auth)):
-    status = user_service.get_tutorial_status(auth.sub)
+    svc = UserService(jwt=auth.token)
+    status = svc.get_tutorial_status(auth.sub)
     return {"completed_tutorial": status}
-
-

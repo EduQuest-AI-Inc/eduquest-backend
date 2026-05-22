@@ -46,7 +46,7 @@ def auth_token(supabase_required, client):
     assert response.status_code == 200, (
         f"auth_token fixture: login failed {response.status_code}: {response.text}"
     )
-    return response.json()["token"]
+    return response.json()["access_token"]
 
 
 # ---------------------------------------------------------------------------
@@ -71,12 +71,12 @@ def test_login_and_access_protected_route(supabase_required, client):
         f"Expected 200, got {login_response.status_code}: {login_response.text}"
     )
     body = login_response.json()
-    assert "token" in body, f"Response missing 'token' key: {body}"
-    assert isinstance(body["token"], str)
-    assert len(body["token"]) > 0
+    assert "access_token" in body, f"Response missing 'access_token' key: {body}"
+    assert isinstance(body["access_token"], str)
+    assert len(body["access_token"]) > 0
 
     # Step 3 — Extract JWT
-    token = body["token"]
+    token = body["access_token"]
 
     # Step 4 — Call protected route with Bearer token
     profile_response = client.get(
@@ -140,8 +140,9 @@ def test_protected_route_rejects_expired_token(supabase_required, client):
             "sub": TEST_USERNAME,
             "role": TEST_ROLE,
             "exp": datetime.now(timezone.utc) - timedelta(hours=2),
+            "app_metadata": {"username": TEST_USERNAME, "role": TEST_ROLE},
         },
-        os.environ["JWT_SECRET_KEY"],
+        os.environ["SUPABASE_JWT_SECRET"],
         algorithm="HS256",
     )
     response = client.get(

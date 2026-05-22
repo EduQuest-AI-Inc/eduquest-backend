@@ -17,11 +17,11 @@ _INVITE_ALPHABET = string.ascii_uppercase + string.digits
 
 
 class ParentService:
-    def __init__(self) -> None:
-        self.parent_dao = ParentDAO()
-        self.invite_dao = ParentInviteDAO()
-        self.student_dao = StudentDAO()
-        self.user_dao = UserDAO()
+    def __init__(self, parent_dao=None, invite_dao=None, student_dao=None, user_dao=None, jwt: str | None = None) -> None:
+        self.parent_dao = parent_dao or ParentDAO(jwt=jwt)
+        self.invite_dao = invite_dao or ParentInviteDAO(jwt=jwt)
+        self.student_dao = student_dao or StudentDAO(jwt=jwt)
+        self.user_dao = user_dao or UserDAO(jwt=jwt)
 
     # -- Invite helpers -------------------------------------------------------
 

@@ -1,0 +1,8 @@
+[
+  { "ParameterKey": "InstanceType",   "ParameterValue": "t2.micro" },
+  { "ParameterKey": "KeyPairName",    "ParameterValue": "YOUR_KEY_PAIR_NAME" },
+  { "ParameterKey": "VpcId",          "ParameterValue": "YOUR_VPC_ID" },
+  { "ParameterKey": "SubnetId",       "ParameterValue": "YOUR_PUBLIC_SUBNET_ID" },
+  { "ParameterKey": "SwapSizeGB",     "ParameterValue": "2" },
+  { "ParameterKey": "EbsVolumeSize",  "ParameterValue": "20" }
+]

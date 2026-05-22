@@ -33,11 +33,12 @@ class KnowledgeGraphService:
         skill_dao: Optional[SkillDAO] = None,
         concept_skill_dao: Optional[ConceptSkillDAO] = None,
         student_skill_mastery_dao: Optional[StudentSkillMasteryDAO] = None,
+        jwt: str | None = None,
     ) -> None:
-        self.concept_dao = concept_dao or ConceptDAO()
-        self.skill_dao = skill_dao or SkillDAO()
-        self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO()
-        self.student_skill_mastery_dao = student_skill_mastery_dao or StudentSkillMasteryDAO()
+        self.concept_dao = concept_dao or ConceptDAO(jwt=jwt)
+        self.skill_dao = skill_dao or SkillDAO(jwt=jwt)
+        self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO(jwt=jwt)
+        self.student_skill_mastery_dao = student_skill_mastery_dao or StudentSkillMasteryDAO(jwt=jwt)
 
     # -- internal helpers -----------------------------------------------------
 
