@@ -412,27 +412,60 @@ class MockPptxAgent:
         import io
         from pptx import Presentation
 
-        prs = Presentation()
-        lesson_name = lesson.get("lesson_name", "Lesson")
+        from models.slide_plan import CompleteSlideDeck, CompletedSlide
+        from utils.rendering.html_renderer import render_html
 
+        lesson_name = lesson.get("lesson_name", "Lesson")
+        concepts = lesson.get("concepts", [])
+        skills = lesson.get("skills", [])
+
+        prs = Presentation()
         title_slide = prs.slides.add_slide(prs.slide_layouts[0])
         title_slide.shapes.title.text = f"[MOCK] {lesson_name}"
         title_slide.placeholders[1].text = "EduQuest — Mock PowerPoint"
 
-        concepts = lesson.get("concepts", [])
-        skills = lesson.get("skills", [])
-        for concept in concepts:
+        completed_slides = [
+            CompletedSlide(
+                index=0,
+                layout="title",
+                title=f"[MOCK] {lesson_name}",
+                bullets=[],
+                speaker_notes="Mock lesson — no AI was used to generate this slide.",
+            )
+        ]
+
+        for idx, concept in enumerate(concepts, start=1):
             concept_name = concept.get("concept_name", "Concept")
             concept_skills = [s for s in skills if s.get("concept_name") == concept_name]
+            bullets = [s.get("skill_name", "") for s in concept_skills if s.get("skill_name")]
+
             slide = prs.slides.add_slide(prs.slide_layouts[1])
             slide.shapes.title.text = concept_name
             tf = slide.placeholders[1].text_frame
             tf.text = "Skills:"
             for skill in concept_skills:
-                p = tf.add_paragraph()
-                p.text = f"• {skill.get('skill_name', '')}"
-                p.level = 1
+                para = tf.add_paragraph()
+                para.text = f"• {skill.get('skill_name', '')}"
+                para.level = 1
+
+            completed_slides.append(
+                CompletedSlide(
+                    index=idx,
+                    layout="concept_intro",
+                    title=concept_name,
+                    bullets=bullets,
+                    speaker_notes=f"Cover the key skills for {concept_name}.",
+                )
+            )
+
+        deck = CompleteSlideDeck(lesson_name=f"[MOCK] {lesson_name}", slides=completed_slides)
+        meta = {
+            "lesson_name": lesson_name,
+            "period_name": period_context.get("period_name", ""),
+            "grade_level": period_context.get("grade_level", ""),
+        }
+        html_str = render_html(deck, meta)
 
         buf = io.BytesIO()
         prs.save(buf)
-        return {"pptx_bytes": buf.getvalue(), "html_str": "<html><body>[MOCK]</body></html>"}
+        return {"pptx_bytes": buf.getvalue(), "html_str": html_str}
