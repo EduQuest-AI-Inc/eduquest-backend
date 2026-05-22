@@ -42,14 +42,14 @@ class StudentDAO(SupabaseBaseDAO):
             raise
 
     def get_student_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
-        return self._join_user('user_id', user_id)
+        return self._join_user('user_id', user_id, relationship='user!fk_student_user')
 
     def get_students_by_ids(self, user_ids: list) -> list:
         if not user_ids:
             return []
         response = self._execute(
             self.client.table(self.table_name)
-            .select('*, user!inner(*)')
+            .select('*, user!fk_student_user!inner(*)')
             .in_('user_id', user_ids)
         )
         results = []

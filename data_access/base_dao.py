@@ -81,11 +81,11 @@ class SupabaseBaseDAO:
         response = self._execute(self.client.rpc(function_name, params))
         return cast(dict[str, Any] | list[Any], response.data)
 
-    def _join_user(self, id_column: str, id_value: str) -> dict[str, Any] | None:
+    def _join_user(self, id_column: str, id_value: str, relationship: str = 'user') -> dict[str, Any] | None:
         """JOIN this role table with user and return a flat dict."""
         response = self._execute(
             self.client.table(self.table_name)
-            .select('*, user!inner(*)')
+            .select(f'*, {relationship}!inner(*)')
             .eq(id_column, id_value)
             .maybe_single()
         )
