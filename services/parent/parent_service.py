@@ -19,8 +19,9 @@ _INVITE_ALPHABET = string.ascii_uppercase + string.digits
 class ParentService:
     def __init__(self, parent_dao=None, invite_dao=None, student_dao=None, user_dao=None, jwt: str | None = None) -> None:
         self.parent_dao = parent_dao or ParentDAO(jwt=jwt)
-        self.invite_dao = invite_dao or ParentInviteDAO(jwt=jwt)
-        self.student_dao = student_dao or StudentDAO(jwt=jwt)
+        # parent_invite is INSERT/UPDATE/DELETE FastAPI-only; student INSERT/DELETE is FastAPI-only
+        self.invite_dao = invite_dao or ParentInviteDAO()
+        self.student_dao = student_dao or StudentDAO()
         self.user_dao = user_dao or UserDAO(jwt=jwt)
 
     # -- Invite helpers -------------------------------------------------------

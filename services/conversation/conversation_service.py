@@ -40,7 +40,7 @@ class ConversationService:
         self._bot_provider = bot_provider
         self._jwt = jwt
         self.student_dao = StudentDAO(jwt=jwt)
-        self.conversation_dao = ConversationDAO(jwt=jwt)
+        self.conversation_dao = ConversationDAO()  # RLS: INSERT/UPDATE/DELETE is FastAPI-only; must use admin client
         self.teacher_dao = TeacherDAO(jwt=jwt)
         self.period_dao = PeriodDAO(jwt=jwt)
 

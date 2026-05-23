@@ -33,10 +33,8 @@ def _validate_env() -> None:
         "AWS_SECRET_ACCESS_KEY",
         "S3_BUCKET_NAME",
         "STRIPE_SECRET_KEY",
-        "STRIPE_WEBHOOK_SECRET",
-        "STRIPE_PRICE_STARTER",
-        "STRIPE_PRICE_GROWTH",
-        "STRIPE_PRICE_PRO",
+        # STRIPE_WEBHOOK_SECRET is validated lazily in the webhook route handler,
+        # so it is intentionally omitted here to allow local dev without it.
     ]
 
     # AI keys are only required when running live agents

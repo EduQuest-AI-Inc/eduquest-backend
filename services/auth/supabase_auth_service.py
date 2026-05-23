@@ -79,18 +79,12 @@ class SupabaseAuthService:
                 supabase_auth_uuid,
                 exc_info=True,
             )
-        try:
-            self._get_client().auth.admin.update_user_by_id(
-                supabase_auth_uuid,
-                {"app_metadata": {"username": user_id, "role": role}},
-            )
-        except Exception:
-            logger.warning(
-                "Failed to set app_metadata for OAuth user user_id=%s uuid=%s",
-                user_id,
-                supabase_auth_uuid,
-                exc_info=True,
-            )
+        # Do NOT swallow this exception — if app_metadata is not set, every
+        # subsequent request for this user will 401 ("User not provisioned in Supabase Auth")
+        self._get_client().auth.admin.update_user_by_id(
+            supabase_auth_uuid,
+            {"app_metadata": {"username": user_id, "role": role}},
+        )
 
     def sign_in_with_password(self, email: str, password: str):
         """
