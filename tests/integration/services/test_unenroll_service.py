@@ -8,7 +8,7 @@ a PostgREST 42501 RLS violation.
 """
 import pytest
 
-_QUEST_ID = "test-integration-unenroll-quest-1"
+_QUEST_ID = "a1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
 _CONV_ID = "test-integration-unenroll-conv-1"
 
 
@@ -23,7 +23,7 @@ def _seed(user_id: str, period_id: str) -> None:
 
     LtgConversationDAO().upsert_conversation(user_id, period_id, _CONV_ID)
     ConversationDAO().add_conversation(
-        Conversation(conversation_id=_CONV_ID, user_id=user_id, conversation_type="ltg")
+        Conversation(conversation_id=_CONV_ID, user_id=user_id, conversation_type="profile")
     )
     StudentLongTermGoalDAO().upsert(user_id, period_id, "Test goal for unenroll cascade")
     QuestDAO().add_quest(Quest(

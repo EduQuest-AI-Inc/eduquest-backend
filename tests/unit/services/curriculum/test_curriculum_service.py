@@ -40,6 +40,7 @@ def test_trigger_generation_enqueues_background_task():
 def test_trigger_generation_draft_raises():
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = _period("draft")
+    svc.period_dao.try_start_generating.return_value = False
     with pytest.raises(ValidationError):
         svc.trigger_generation("p1", MagicMock())
 
@@ -48,6 +49,7 @@ def test_trigger_generation_draft_raises():
 def test_trigger_generation_approved_raises():
     svc = _svc()
     svc.period_dao.get_period_by_id.return_value = _period("approved")
+    svc.period_dao.try_start_generating.return_value = False
     with pytest.raises(ValidationError):
         svc.trigger_generation("p1", MagicMock())
 
