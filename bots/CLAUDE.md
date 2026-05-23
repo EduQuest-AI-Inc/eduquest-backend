@@ -31,6 +31,8 @@ All agent code uses OpenAI Agents SDK (`from agents import Agent, Runner`).
 **bots/quests/**
 - `quest_agent.py` (`HWAgent`) — generates quest instructions and rubrics for all curriculum weeks
 - `ltg_schedule_agent.py` (`LtgScheduleAgent`) — turns a student's long-term goal into a week-by-week quest name sequence
+- `curriculum_only_quest_agent.py` — quest agent variant for curriculum-only context (no uploaded files)
+- `demo_ltg_agent.py` — demo LTG agent used by the demo quest flow
 
 **bots/schemas/**
 - `rubric.py` — `Rubric` Pydantic schema

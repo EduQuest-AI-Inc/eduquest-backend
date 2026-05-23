@@ -26,9 +26,11 @@ eduquest-backend/
 │   ├── slides.py                   # /slides — PPTX status by period, restart generation
 │   ├── teacher.py                  # /teacher — Canvas courses, skill-mastery analytics
 │   ├── user.py                     # /user — user profile, tutorial state
-│   └── waitlist.py                 # /pilot-waitlist — status, join
+│   ├── waitlist.py                 # /pilot-waitlist — status, join
+│   └── demo_quest.py               # /demo-quest — demo quest routes
 ├── services/                         # Service/business logic layer (imported by routers/)
-│   ├── auth/                       # auth_service.py, password_reset_service.py, password_policy.py
+│   ├── auth/                       # auth_service.py, supabase_auth_service.py, oauth_service.py,
+│   │                               #   password_reset_service.py, password_policy.py, account_deletion_service.py
 │   ├── billing/                    # membership_service.py (trial lifecycle, plan limits,
 │   │                               #   Stripe sync), trial_reminder_service.py
 │   ├── conversation/               # conversation_service.py, grading_service.py,
@@ -47,7 +49,8 @@ eduquest-backend/
 │   │                               #   quest_retrieval_service.py, quest_grading_service.py
 │   ├── tracking/                   # PostHog server-side analytics (posthog_client.py,
 │   │                               #   events.py, track.py) — see [services/tracking/README.md](services/tracking/README.md)
-│   ├── user/                       # user_service.py
+│   ├── user/                       # user_service.py, teacher_service.py
+│   ├── demo/                       # demo_ltg_service.py
 │   ├── waitlist/                   # waitlist_service.py
 │   ├── parent/                     # parent_service.py
 │   └── slides/                     # pptx_generation_service.py — status lifecycle (pending→generating→done|failed), restart_batch
@@ -118,26 +121,6 @@ eduquest-backend/
 └── tests/
 ```
 
-## API Modules
-
-### FastAPI (`main.py`) — sole server
-
-- `/auth` — login, signup (`trial_confirmed: true` is required for parent/teacher), password reset
-- `/billing` — `GET /membership`, `POST /checkout-session`, `POST /portal-session`, `POST /webhook`
-- `/conversation` — profile assistant, update assistant
-- `/curriculum` — curriculum generation/approval per period
-- `/enrollment` — student enrollment
-- `/lessons` — `GET /{lesson_id}/pptx` and `GET /{lesson_id}/html` presigned URL endpoints
-- `/parent` — parent invite and child lookup
-- `/period` — period CRUD, homework agent; also the prefix for `ltg.py` (LTG conversation), which is a separate router file mounted under `/period`
-- `/quest` — quest retrieval, submission
-- `/slides` — `GET /{period_id}/pptx/status`, `POST /{period_id}/pptx/restart`
-- `/teacher` — Canvas courses, skill-mastery analytics
-- `/user` — user profile, tutorial state
-- `/pilot-waitlist` — status, join
-- `/feedback` — student/teacher feedback submission and retrieval
-- `/marketplace` — resource marketplace: browse, fork, publish
-
 ## Membership / Trial Lifecycle
 
 `MembershipService` (`services/billing/membership_service.py`) is the only seam that creates and reads memberships:
@@ -146,7 +129,7 @@ eduquest-backend/
 - `evaluate_access(user_id, role) → MembershipAccess` — used by `assert_can_create_class` / `assert_can_add_student_to_period`. Self-heals expired trials (status flips to `expired`).
 - `apply_stripe_subscription(subscription)` — invoked from the `/billing/webhook` handler on `customer.subscription.*` and `checkout.session.completed`.
 
-Both auth handlers wrap the trial call in `try/except` so signup/login never fail because of billing. Because of that, **bugs in `start_trial_if_eligible` are silent**: when debugging a "missing trial" report, instrument inside the service and inspect the swallowed exception. A real example we hit: `Membership.updated_at` was `Optional[str] = None`, which `to_item()` serialized to `null`, violating the Supabase `NOT NULL` constraint with PostgREST error code `23502`. Fix: give `updated_at` the same `default_factory` as `created_at` in `models/membership.py`.
+Both auth handlers wrap the trial call in `try/except` so signup/login never fail because of billing. Because of that, **bugs in `start_trial_if_eligible` are silent** — instrument inside the service and inspect the swallowed exception when debugging missing-trial reports. Watch out: any `Optional[str] = None` Pydantic field on a `NOT NULL` column will fail with PostgREST `23502` — use `default_factory` instead (see `Membership.updated_at`).
 
 ## Route Pattern
 
@@ -171,6 +154,13 @@ Rules below are the what; see [ARCH_DECISIONS.md](ARCH_DECISIONS.md) for the why
 - **`integrations/` vs `utils/` boundary.** `integrations/` = external service adapters (outbound calls, credentials). `utils/` = local computation only (no network, no credentials). Renderers (PPTX, HTML, charts) belong in `utils/rendering/`.
 - **Auth enforcement split.** Role checks at router via `Depends(require_roles(...))`. Ownership checks raise `PermissionError` inside the service (because verification requires the same resource lookup). Enrollment checks at router top via `EnrollmentService().check_enrolled()` — service methods must not re-check enrollment.
 - **All S3 access through `integrations/s3_service.py`.** Never instantiate `boto3.client` directly.
+- **`response_model=` required on every route handler.** Must point to a DTO in `responses/`.
+- **Fetch shared resources once at the router.** Pass the fetched object down to services — never re-fetch inside a service method.
+- **Admin vs user Supabase client.** DAOs operating in user context pass the user JWT (RLS enforced). DAOs needing elevated access use the service-role client. Set in the DAO constructor.
+- **Services raise typed exceptions only.** No bare `ValueError` or `Exception` — use types from `exceptions/`.
+- **Cross-domain service dependencies.** A service may import DAOs and sub-services within its own domain. Cross-domain imports are allowed only downward. See ARCH_DECISIONS.md for the allowed/forbidden matrix.
+- **Log before raising on cross-user fetches.** If a fetch can silently return empty due to RLS, log the relevant IDs before raising so failures are diagnosable.
+- **External service calls in services must be wrapped in `try/except`.** Failures in S3, SES, Stripe, and Perplexity must not propagate as untyped exceptions.
 
 ## Error Handling
 
@@ -232,7 +222,7 @@ source venv/bin/activate
 
 **Environment** — `.env` file:
 
-- `JWT_SECRET_KEY` — must match the frontend value exactly so cookies issued by either side verify on the other
+- `JWT_SECRET_KEY` — backend JWT signing key; frontend uses Supabase Auth directly (no longer shared)
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` (from Supabase Dashboard → Settings → API → anon public)
 - `OPENAI_API_KEY`
 - `PERPLEXITY_API_KEY` — required for `PerplexityService` (Perplexity Agent API)
