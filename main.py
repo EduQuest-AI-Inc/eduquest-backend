@@ -34,9 +34,6 @@ def _validate_env() -> None:
         "S3_BUCKET_NAME",
         "STRIPE_SECRET_KEY",
         "STRIPE_WEBHOOK_SECRET",
-        "STRIPE_PRICE_STARTER",
-        "STRIPE_PRICE_GROWTH",
-        "STRIPE_PRICE_PRO",
     ]
 
     # AI keys are only required when running live agents
