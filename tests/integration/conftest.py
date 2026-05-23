@@ -14,13 +14,33 @@ def supabase_required():
 
 
 @pytest.fixture
-def db_period(supabase_required):
+def db_period_owner(supabase_required):
+    from data_access.user_dao import UserDAO
+    from models.user import User
+    dao = UserDAO()
+    u = User(
+        user_id="test-integration-period-owner",
+        first_name="Period",
+        last_name="Owner",
+        email="test-period-owner@eduquestai.org",
+        password="hashed",
+        role="teacher",
+    )
+    print(f"\n[fixture] db_period_owner setup: pre-deleting {u.user_id}")
+    dao.delete(u.user_id)
+    dao.add_user(u)
+    yield u
+    dao.delete(u.user_id)
+
+
+@pytest.fixture
+def db_period(db_period_owner):
     from data_access.period_dao import PeriodDAO
     from models.period import Period
     dao = PeriodDAO()
     p = Period(
         period_id="test-integration-shared-period",
-        owner_id="test-integration-owner",
+        owner_id=db_period_owner.user_id,
         name="Integration Test Period",
         vector_store_id="vs-test",
     )

@@ -1,0 +1,57 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S3 uploads bucket for EduQuest with CORS policy'
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: 'Name of the S3 bucket (must match S3_BUCKET_NAME in .env)'
+
+Resources:
+  UploadsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref BucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - 'https://eduquestai.org'
+              - 'https://www.eduquestai.org'
+              - 'http://localhost:3000'
+              - 'http://localhost:5173'
+              - 'http://localhost:5174'
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+              - DELETE
+              - HEAD
+            AllowedHeaders:
+              - '*'
+            ExposedHeaders:
+              - ETag
+            MaxAge: 3000
+      Tags:
+        - Key: Service
+          Value: eduquest-backend
+        - Key: ManagedBy
+          Value: cloudformation
+
+Outputs:
+  BucketName:
+    Description: 'S3 bucket name'
+    Value: !Ref UploadsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketName'
+
+  BucketArn:
+    Description: 'S3 bucket ARN'
+    Value: !GetAtt UploadsBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketArn'

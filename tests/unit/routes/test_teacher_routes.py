@@ -34,31 +34,34 @@ def client():
 class TestGetTeacherPeriods:
 
     @pytest.mark.api
-    @patch("routers.teacher.period_management_service")
-    def test_get_periods_success(self, mock_svc, client):
+    def test_get_periods_success(self, client):
+        mock_svc = MagicMock()
         mock_svc.get_periods_by_owner.return_value = [
             _PERIOD,
             {**_PERIOD, "period_id": "P2", "name": "Science"},
         ]
-        resp = client.get("/teacher/periods")
+        with patch("routers.teacher.PeriodManagementService", return_value=mock_svc):
+            resp = client.get("/teacher/periods")
         assert resp.status_code == 200
         data = resp.json()
         assert "periods" in data
         assert len(data["periods"]) == 2
 
     @pytest.mark.api
-    @patch("routers.teacher.period_management_service")
-    def test_get_periods_empty(self, mock_svc, client):
+    def test_get_periods_empty(self, client):
+        mock_svc = MagicMock()
         mock_svc.get_periods_by_owner.return_value = []
-        resp = client.get("/teacher/periods")
+        with patch("routers.teacher.PeriodManagementService", return_value=mock_svc):
+            resp = client.get("/teacher/periods")
         assert resp.status_code == 200
         assert resp.json()["periods"] == []
 
     @pytest.mark.api
-    @patch("routers.teacher.period_management_service")
-    def test_get_periods_service_error_returns_500(self, mock_svc, client):
+    def test_get_periods_service_error_returns_500(self, client):
+        mock_svc = MagicMock()
         mock_svc.get_periods_by_owner.side_effect = RuntimeError("db error")
-        resp = client.get("/teacher/periods")
+        with patch("routers.teacher.PeriodManagementService", return_value=mock_svc):
+            resp = client.get("/teacher/periods")
         assert resp.status_code == 500
 
 
@@ -96,4 +99,3 @@ class TestTeacherCanvasCourses:
             json={"api_url": "https://x.com", "api_key": "bad"},
         )
         assert resp.status_code == 400
-

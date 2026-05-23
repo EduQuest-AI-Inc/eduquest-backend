@@ -3,8 +3,8 @@ from data_access.quest_dao import QuestDAO
 
 class QuestRetrievalService:
 
-    def __init__(self) -> None:
-        self.quest_dao = QuestDAO()
+    def __init__(self, quest_dao=None, jwt: str | None = None) -> None:
+        self.quest_dao = quest_dao or QuestDAO(jwt=jwt)
 
     def get_quests_for_student(self, user_id: str) -> list:
         return self.quest_dao.get_quests_by_student(user_id)

@@ -144,8 +144,9 @@ class TestInitiateHomeworkAgent:
         mock_ps = MagicMock()
         mock_ps.start_homework_agent.return_value = {"quests": []}
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
-        with patch("routers.ltg._period_mgmt") as mock_mgmt:
-            mock_mgmt.get_period_by_id.return_value = {"owner_id": "user-1"}
+        mock_period_mgmt = MagicMock()
+        mock_period_mgmt.get_period_by_id.return_value = {"owner_id": "user-1"}
+        with patch("routers.ltg.PeriodManagementService", return_value=mock_period_mgmt):
             resp = client.post(
                 "/period/initiate-homework-agent",
                 json={"period_id": "p1", "user_id": "student-99"},

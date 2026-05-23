@@ -4,8 +4,8 @@ from data_access.base_dao import SupabaseBaseDAO
 
 
 class PeriodDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('period')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('period', jwt=jwt)
 
     def add_period(self, period) -> None:
         self._insert({

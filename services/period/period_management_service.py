@@ -17,9 +17,9 @@ from models.period import CourseMetadata, Period
 class PeriodManagementService:
     """Owns period lifecycle: creation, listing, and file updates for teachers and parents."""
 
-    def __init__(self, period_dao=None, enrollment_dao=None) -> None:
-        self.period_dao = period_dao or PeriodDAO()
-        self.enrollment_dao = enrollment_dao or EnrollmentDAO()
+    def __init__(self, period_dao=None, enrollment_dao=None, jwt: str | None = None) -> None:
+        self.period_dao = period_dao or PeriodDAO(jwt=jwt)
+        self.enrollment_dao = enrollment_dao or EnrollmentDAO(jwt=jwt)
 
     def generate_period_id(self, course_name: str) -> str:
         clean_course = re.sub(r'[^a-zA-Z0-9]', '', course_name).upper()[:8]

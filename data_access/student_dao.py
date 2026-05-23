@@ -7,9 +7,9 @@ from exceptions.validation_error import ValidationError
 
 
 class StudentDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('student')
-        self._user_dao = UserDAO()
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('student', jwt=jwt)
+        self._user_dao = UserDAO(jwt=jwt)
 
     def add_student(self, student) -> None:
         """Insert into user table first, then student. Compensating delete on role insert failure."""
@@ -42,14 +42,14 @@ class StudentDAO(SupabaseBaseDAO):
             raise
 
     def get_student_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
-        return self._join_user('user_id', user_id)
+        return self._join_user('user_id', user_id, relationship='user!fk_student_user')
 
     def get_students_by_ids(self, user_ids: list) -> list:
         if not user_ids:
             return []
         response = self._execute(
             self.client.table(self.table_name)
-            .select('*, user!inner(*)')
+            .select('*, user!fk_student_user!inner(*)')
             .in_('user_id', user_ids)
         )
         results = []
@@ -97,4 +97,11 @@ class StudentDAO(SupabaseBaseDAO):
 
     def needs_tutorial(self, user_id: str) -> bool:
         return not self.get_tutorial_status(user_id)
+
+    def nullify_created_by_parent(self, parent_id: str) -> None:
+        self._execute(
+            self._table()
+            .update({"created_by_parent_id": None})
+            .eq("created_by_parent_id", parent_id)
+        )
 

@@ -34,7 +34,7 @@ def test_update_goal(db_period, db_user):
 def test_get_all_for_student(db_period, db_user):
     dao = StudentLongTermGoalDAO()
     period_dao = PeriodDAO()
-    period_dao.add_period(Period(period_id=_PERIOD_ID2, owner_id="owner", name="LTG Goal Test 2", vector_store_id="vs2"))
+    period_dao.add_period(Period(period_id=_PERIOD_ID2, owner_id=db_period.owner_id, name="LTG Goal Test 2", vector_store_id="vs2"))
     try:
         dao.upsert(db_user.user_id, db_period.period_id, "Goal 1")
         dao.upsert(db_user.user_id, _PERIOD_ID2, "Goal 2")

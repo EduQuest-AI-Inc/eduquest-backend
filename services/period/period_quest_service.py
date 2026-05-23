@@ -38,15 +38,16 @@ class PeriodQuestService:
         ltg_goal_dao=None,
         quest_retrieval_service=None,
         quest_grading_service=None,
+        jwt: str | None = None,
     ) -> None:
         self._bot_provider = bot_provider
-        self.period_dao = period_dao or PeriodDAO()
-        self.student_dao = student_dao or StudentDAO()
-        self.enrollment_dao = enrollment_dao or EnrollmentDAO()
+        self.period_dao = period_dao or PeriodDAO(jwt=jwt)
+        self.student_dao = student_dao or StudentDAO(jwt=jwt)
+        self.enrollment_dao = enrollment_dao or EnrollmentDAO(jwt=jwt)
         self.curriculum_service = curriculum_service or CurriculumService(bot_provider=bot_provider)
-        self.ltg_conversation_dao = ltg_conversation_dao or LtgConversationDAO()
-        self.ltg_goal_dao = ltg_goal_dao or StudentLongTermGoalDAO()
-        self.quest_retrieval_service = quest_retrieval_service or QuestRetrievalService()
+        self.ltg_conversation_dao = ltg_conversation_dao or LtgConversationDAO(jwt=jwt)
+        self.ltg_goal_dao = ltg_goal_dao or StudentLongTermGoalDAO(jwt=jwt)
+        self.quest_retrieval_service = quest_retrieval_service or QuestRetrievalService(jwt=jwt)
         self.quest_grading_service = quest_grading_service or QuestGradingService()
 
     def _check_enrolled(self, caller_id: str, period_id: str) -> None:

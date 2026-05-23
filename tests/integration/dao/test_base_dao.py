@@ -7,9 +7,9 @@ _ID = "test-integration-base-dao"
 
 
 @pytest.mark.integration
-def test_insert_and_select_by_id(supabase_required):
+def test_insert_and_select_by_id(supabase_required, db_period_owner):
     dao = PeriodDAO()
-    period = Period(period_id=_ID, owner_id="test-owner", name="Base DAO Test", vector_store_id="vs-test")
+    period = Period(period_id=_ID, owner_id=db_period_owner.user_id, name="Base DAO Test", vector_store_id="vs-test")
     try:
         dao.add_period(period)
         result = dao.get_period_by_id(_ID)
@@ -20,21 +20,21 @@ def test_insert_and_select_by_id(supabase_required):
 
 
 @pytest.mark.integration
-def test_select_eq(supabase_required):
+def test_select_eq(supabase_required, db_period_owner):
     dao = PeriodDAO()
-    period = Period(period_id=_ID, owner_id="test-eq-owner", name="Select EQ Test", vector_store_id="vs-test")
+    period = Period(period_id=_ID, owner_id=db_period_owner.user_id, name="Select EQ Test", vector_store_id="vs-test")
     try:
         dao.add_period(period)
-        results = dao.get_periods_by_owner_id("test-eq-owner")
+        results = dao.get_periods_by_owner_id(db_period_owner.user_id)
         assert any(r["period_id"] == _ID for r in results)
     finally:
         dao.delete_period(_ID)
 
 
 @pytest.mark.integration
-def test_update(supabase_required):
+def test_update(supabase_required, db_period_owner):
     dao = PeriodDAO()
-    period = Period(period_id=_ID, owner_id="test-owner", name="Original Name", vector_store_id="vs-test")
+    period = Period(period_id=_ID, owner_id=db_period_owner.user_id, name="Original Name", vector_store_id="vs-test")
     try:
         dao.add_period(period)
         dao.update_period(_ID, {"name": "Updated Name"})
@@ -45,9 +45,9 @@ def test_update(supabase_required):
 
 
 @pytest.mark.integration
-def test_delete(supabase_required):
+def test_delete(supabase_required, db_period_owner):
     dao = PeriodDAO()
-    period = Period(period_id=_ID, owner_id="test-owner", name="Delete Test", vector_store_id="vs-test")
+    period = Period(period_id=_ID, owner_id=db_period_owner.user_id, name="Delete Test", vector_store_id="vs-test")
     dao.add_period(period)
     dao.delete_period(_ID)
     assert dao.get_period_by_id(_ID) is None

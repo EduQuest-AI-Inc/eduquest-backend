@@ -5,8 +5,8 @@ from models.lesson import Lesson
 
 
 class LessonDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('lesson')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('lesson', jwt=jwt)
 
     def insert_lesson(self, lesson: Lesson) -> str:
         row = self._insert(lesson.to_item())

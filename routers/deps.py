@@ -3,10 +3,24 @@ from enum import Enum
 from typing import FrozenSet, Optional
 
 import jwt
+from jwt import PyJWKClient
 from fastapi import Cookie, Depends, Header, HTTPException, Path, Request
 
+# Dead code until Phase 6 — kept to avoid breaking any callers during rollout.
 JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret")
 JWT_ALGORITHM = "HS256"
+
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+
+_jwks_client: Optional[PyJWKClient] = None
+
+
+def _get_jwks_client() -> PyJWKClient:
+    global _jwks_client
+    if _jwks_client is None:
+        _jwks_client = PyJWKClient(f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json")
+    return _jwks_client
 
 
 class Role(str, Enum):
@@ -26,6 +40,9 @@ def get_auth(
     authorization: Optional[str] = Header(default=None),
     auth_token: Optional[str] = Cookie(default=None),
 ) -> AuthPayload:
+    if not SUPABASE_URL:
+        raise RuntimeError("SUPABASE_URL must be set")
+
     token: Optional[str] = None
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1].strip()
@@ -36,18 +53,44 @@ def get_auth(
         raise HTTPException(status_code=401, detail="Missing auth token")
 
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return AuthPayload(
-            sub=payload["sub"],
-            role=Role(payload.get("role", Role.STUDENT)),
-            token=token,
-        )
-    except (ValueError, KeyError):
-        raise HTTPException(status_code=401, detail="Invalid token claims")
+        header = jwt.get_unverified_header(token)
+        alg = header.get("alg", "HS256")
+        if alg == "HS256":
+            payload = jwt.decode(
+                token,
+                SUPABASE_JWT_SECRET,
+                algorithms=["HS256"],
+                audience="authenticated",
+            )
+        else:
+            signing_key = _get_jwks_client().get_signing_key_from_jwt(token)
+            payload = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["ES256", "RS256"],
+                audience="authenticated",
+            )
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+    app_meta = payload.get("app_metadata") or {}
+    username = app_meta.get("username")
+    role_str = app_meta.get("role")
+
+    if not username or not role_str:
+        raise HTTPException(
+            status_code=401,
+            detail="User not provisioned in Supabase Auth — run Phase 1 migration",
+        )
+
+    try:
+        role = Role(role_str)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid token claims")
+
+    return AuthPayload(sub=username, role=role, token=token)
 
 
 def require_roles(*roles: Role):
@@ -111,15 +154,18 @@ def get_bot_provider(request: Request):
     return request.app.state.bot_provider
 
 
-def get_period_file_service(bot_provider=Depends(get_bot_provider)):
+def get_period_file_service(
+    bot_provider=Depends(get_bot_provider),
+    auth: AuthPayload = Depends(get_auth),
+):
     """FastAPI dependency — wires PeriodFileService with all orchestration deps."""
     from services.period.period_file_service import PeriodFileService
     from services.period.period_management_service import PeriodManagementService
     from services.curriculum.curriculum_service import CurriculumService
     return PeriodFileService(
         bot_provider=bot_provider,
-        period_management_service=PeriodManagementService(),
-        curriculum_service=CurriculumService(bot_provider=bot_provider),
+        period_management_service=PeriodManagementService(jwt=auth.token),
+        curriculum_service=CurriculumService(bot_provider=bot_provider, jwt=auth.token),
     )
 
 

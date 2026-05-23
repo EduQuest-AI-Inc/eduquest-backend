@@ -34,14 +34,15 @@ class PptxGenerationService:
         skill_dao=None,
         concept_skill_dao=None,
         s3=None,
+        jwt: str | None = None,
     ) -> None:
         self._bot_provider = bot_provider
-        self.lesson_pptx_dao = lesson_pptx_dao or LessonPptxDAO()
-        self.period_dao = period_dao or PeriodDAO()
-        self.lesson_dao = lesson_dao or LessonDAO()
-        self.concept_dao = concept_dao or ConceptDAO()
-        self.skill_dao = skill_dao or SkillDAO()
-        self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO()
+        self.lesson_pptx_dao = lesson_pptx_dao or LessonPptxDAO(jwt=jwt)
+        self.period_dao = period_dao or PeriodDAO(jwt=jwt)
+        self.lesson_dao = lesson_dao or LessonDAO(jwt=jwt)
+        self.concept_dao = concept_dao or ConceptDAO(jwt=jwt)
+        self.skill_dao = skill_dao or SkillDAO(jwt=jwt)
+        self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO(jwt=jwt)
         self._s3 = s3 or s3_service
 
     def prepare_batch(

@@ -1,0 +1,236 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EC2 instance for EduQuest backend (Ubuntu 24.04, FastAPI on port 8000)'
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues: [t2.micro, t3.small, t3.medium]
+    Description: 'EC2 instance type'
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: 'EC2 key pair for SSH access'
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: 'VPC to launch the instance in'
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: 'Public subnet to launch the instance in'
+
+  SwapSizeGB:
+    Type: Number
+    Default: 2
+    Description: 'Swap file size in GB'
+
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+    Description: 'Ubuntu 24.04 LTS AMI (resolved from SSM at deploy time)'
+
+  EbsVolumeSize:
+    Type: Number
+    Default: 20
+    Description: 'Root EBS volume size in GB'
+
+Resources:
+
+  # IAM role so SSM Session Manager works without open SSH port
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-ec2-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-role'
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2InstanceRole
+
+  # Security group: allow SSH (EC2 Instance Connect) + port 8000 from API Gateway
+  BackendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-sg'
+      GroupDescription: 'EduQuest backend — SSH and FastAPI port'
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        # EC2 Instance Connect (us-east-2)
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 18.206.107.24/29
+          Description: 'EC2 Instance Connect us-east-2'
+        # FastAPI — restrict to API Gateway VPC endpoint or 0.0.0.0/0 if using HTTP integration
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+          Description: 'FastAPI backend port'
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-sg'
+
+  BackendInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref BackendSecurityGroup
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !Ref EbsVolumeSize
+            VolumeType: gp3
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -e
+
+          # --- Swap ---
+          SWAP_FILE=/swapfile
+          SWAP_BYTES=$(( ${SwapSizeGB} * 1024 * 1024 * 1024 ))
+          if ! fallocate -l ${SwapSizeGB}G $SWAP_FILE 2>/dev/null; then
+            dd if=/dev/zero of=$SWAP_FILE bs=128M count=$(( ${SwapSizeGB} * 8 ))
+          fi
+          chmod 600 $SWAP_FILE
+          mkswap $SWAP_FILE
+          swapon $SWAP_FILE
+          echo "$SWAP_FILE none swap sw 0 0" >> /etc/fstab
+
+          # --- System packages ---
+          apt-get update -y
+          apt-get install -y python3-pip python3-venv git curl unzip
+
+          # --- SSM agent (pre-installed on most Ubuntu 24.04 AMIs, this is a safety net) ---
+          snap install amazon-ssm-agent --classic || true
+          systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service || true
+          systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service || true
+
+          # --- CloudWatch agent (required for disk and memory alarms) ---
+          wget -q https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+          dpkg -i amazon-cloudwatch-agent.deb
+          rm amazon-cloudwatch-agent.deb
+          cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'EOF'
+          {
+            "metrics": {
+              "metrics_collected": {
+                "disk": {
+                  "measurement": ["disk_used_percent"],
+                  "metrics_collection_interval": 60,
+                  "resources": ["/"]
+                },
+                "mem": {
+                  "measurement": ["mem_used_percent"],
+                  "metrics_collection_interval": 60
+                }
+              }
+            }
+          }
+          EOF
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+            -a fetch-config -m ec2 -s \
+            -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+
+          # --- Journal cap (100 MB) ---
+          sed -i '/^SystemMaxUse=/d' /etc/systemd/journald.conf
+          echo "SystemMaxUse=100M" >> /etc/systemd/journald.conf
+          systemctl restart systemd-journald
+
+          # --- Snap revision retention ---
+          snap set system refresh.retain=2
+
+          # --- Weekly apt autoremove ---
+          cat > /etc/cron.weekly/apt-autoremove <<'EOF'
+          #!/bin/bash
+          apt-get autoremove -y
+          apt-get clean
+          EOF
+          chmod +x /etc/cron.weekly/apt-autoremove
+
+          # --- App directory ---
+          mkdir -p /home/ubuntu/eduquest-backend
+          chown ubuntu:ubuntu /home/ubuntu/eduquest-backend
+
+          # --- Systemd service ---
+          cat > /etc/systemd/system/eduquest-backend.service <<'EOF'
+          [Unit]
+          Description=EduQuest Backend FastAPI Application (prod)
+          After=network.target
+
+          [Service]
+          Type=simple
+          User=ubuntu
+          WorkingDirectory=/home/ubuntu/eduquest-backend
+          Environment="PATH=/home/ubuntu/eduquest-backend/venv/bin:/usr/local/bin:/usr/bin:/bin"
+          Environment="APP_ENV=production"
+          EnvironmentFile=/home/ubuntu/eduquest-backend/.env
+          ExecStart=/home/ubuntu/eduquest-backend/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000
+          Restart=always
+          RestartSec=10
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=eduquest-backend
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          systemctl daemon-reload
+
+          # --- Log rotation (safety net for any *.log files the app writes) ---
+          cat > /etc/logrotate.d/eduquest-backend <<'EOF'
+          /home/ubuntu/eduquest-backend/*.log {
+              daily
+              rotate 7
+              compress
+              missingok
+              notifempty
+          }
+          EOF
+
+      Tags:
+        - Key: Name
+          Value: eduquest-backend
+        - Key: Environment
+          Value: prod
+        - Key: Service
+          Value: eduquest-backend
+        - Key: ManagedBy
+          Value: cloudformation
+
+Outputs:
+  InstanceId:
+    Description: 'EC2 instance ID'
+    Value: !Ref BackendInstance
+
+  PublicIp:
+    Description: 'Public IP address'
+    Value: !GetAtt BackendInstance.PublicIp
+
+  SecurityGroupId:
+    Description: 'Security group ID'
+    Value: !Ref BackendSecurityGroup

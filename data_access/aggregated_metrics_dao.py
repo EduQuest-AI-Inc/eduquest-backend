@@ -4,8 +4,8 @@ from data_access.base_dao import SupabaseBaseDAO
 
 
 class AggregatedMetricsDAO(SupabaseBaseDAO):
-    def __init__(self):
-        super().__init__('aggregated_metrics')
+    def __init__(self, jwt: str | None = None):
+        super().__init__('aggregated_metrics', jwt=jwt)
 
     def get_by_period_id(self, period_id: str) -> list[dict[str, Any]]:
         response = self._execute(
