@@ -90,9 +90,10 @@ class TestStoreOAuthAuthId:
         service.store_oauth_auth_id("oauthuser", "oauth-uuid-1234", "student")  # must not raise
 
     @pytest.mark.unit
-    def test_swallows_update_user_by_id_error(self, service, mock_client, mock_user_dao):
+    def test_propagates_update_user_by_id_error(self, service, mock_client, mock_user_dao):
         mock_client.auth.admin.update_user_by_id.side_effect = Exception("supabase error")
-        service.store_oauth_auth_id("oauthuser", "oauth-uuid-1234", "parent")  # must not raise
+        with pytest.raises(Exception, match="supabase error"):
+            service.store_oauth_auth_id("oauthuser", "oauth-uuid-1234", "parent")
 
 
 class TestSyncPassword:
