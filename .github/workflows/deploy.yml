@@ -18,8 +18,54 @@ jobs:
         echo "${{ secrets.EC2_KEY }}" | base64 -d > ec2_key.pem
         chmod 600 ec2_key.pem
 
+    - name: Check SSH connectivity
+      run: |
+        echo "Testing SSH connection to ${{ secrets.EC2_HOST }}..."
+        if ! ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes \
+            -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} exit 0; then
+          echo ""
+          echo "ERROR: Cannot reach EC2 on port 22."
+          echo "Check:"
+          echo "  1. EC2 instance is running (AWS Console → EC2 → Instances)"
+          echo "  2. Security group allows inbound TCP port 22"
+          echo "  3. EC2_HOST secret matches the current public IP"
+          exit 1
+        fi
+        echo "SSH connection OK."
+
     - name: Copy deploy script
-      run: scp -o StrictHostKeyChecking=no -i ec2_key.pem scripts/remote_deploy.sh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/remote_deploy.sh
+      run: |
+        scp -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+          -i ec2_key.pem \
+          scripts/remote_deploy.sh \
+          ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/remote_deploy.sh
 
     - name: Deploy to EC2
-      run: ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'bash /tmp/remote_deploy.sh'
+      run: |
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+          -i ec2_key.pem \
+          ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+          'bash /tmp/remote_deploy.sh'
+
+    - name: Deployment failed — diagnostics
+      if: failure()
+      run: |
+        echo "=========================================="
+        echo "DEPLOYMENT FAILED — troubleshooting guide"
+        echo "=========================================="
+        echo ""
+        echo "Which step failed: check the step marked with a red X above."
+        echo ""
+        echo "If 'Check SSH connectivity' failed:"
+        echo "  → EC2 is unreachable. Check instance state and security group port 22."
+        echo "  → Current EC2_HOST: ${{ secrets.EC2_HOST }}"
+        echo ""
+        echo "If 'Copy deploy script' or 'Deploy to EC2' failed:"
+        echo "  → SSH connected but something broke mid-deploy."
+        echo "  → Check the Deploy to EC2 step output above for the FAILED line number."
+        echo "  → SSH in and run: sudo journalctl -u eduquest-backend -n 100 --no-pager"
+        echo ""
+        echo "If 'Deploy to EC2' timed out or the health check failed:"
+        echo "  → The app likely crashed on startup. Check journalctl output in the step above."
+        echo "  → A rollback should have been attempted automatically."
+        echo "=========================================="
