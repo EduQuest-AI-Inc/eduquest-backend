@@ -98,7 +98,7 @@ def my_periods(
 @router.post("/verify-period", response_model=VerifyPeriodResponse)
 def verify_period(body: VerifyPeriodRequest, auth: AuthPayload = Depends(get_auth)):
     period_mgmt = PeriodManagementService(jwt=auth.token)
-    user_svc = UserService(jwt=auth.token)
+    user_svc = UserService()
     # Membership check uses admin to read the owner's (another user's) membership
     membership_svc = MembershipService()
     period = period_mgmt.get_period_by_id(body.period_id)
@@ -148,14 +148,14 @@ def accept_parent_invite(body: AcceptInviteRequest, auth: AuthPayload = Depends(
     code = body.code.strip().upper()
     if not code:
         raise HTTPException(status_code=400, detail="Invite code is required")
+    parent_svc = ParentService(jwt=auth.token)
     try:
-        parent_svc = ParentService(jwt=auth.token)
         result = parent_svc.accept_invite(auth.sub, code)
-        return result
-    except ValueError as ve:
-        msg = str(ve)
+    except ValueError as exc:
+        msg = str(exc).lower()
         if "expired" in msg or "already been used" in msg:
-            raise HTTPException(status_code=410, detail=msg)
-        if "not found" in msg.lower() or "invalid" in msg.lower():
-            raise HTTPException(status_code=404, detail=msg)
-        raise HTTPException(status_code=400, detail=msg)
+            raise HTTPException(status_code=410, detail=str(exc))
+        if "invalid" in msg:
+            raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
+    return result

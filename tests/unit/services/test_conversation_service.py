@@ -15,6 +15,8 @@ def _svc():
     svc.conversation_dao = MagicMock()
     svc.teacher_dao = MagicMock()
     svc.period_dao = MagicMock()
+    svc._admin_quest_retrieval_svc = MagicMock()
+    svc._period_service = MagicMock()
     return svc
 
 
@@ -250,15 +252,14 @@ def test_start_update_assistant_no_period_id_in_quest():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-@patch("services.quest.quest_retrieval_service.QuestRetrievalService")
 @patch("services.conversation.conversation_service.initiate_teacher_feedback",
        return_value={"conversation_id": "cid1", "response": "Feedback!"})
-def test_start_update_assistant_teacher_happy_path(mock_feedback, mock_qs_cls):
+def test_start_update_assistant_teacher_happy_path(mock_feedback):
     svc = _svc()
     svc.teacher_dao.get_teacher_by_id.return_value = {"user_id": "t1"}
     svc.student_dao.get_student_by_id.return_value = {"user_id": "t1"}
     svc.period_dao.get_period_by_id.return_value = {"period_id": "p1"}
-    mock_qs_cls.return_value.get_quests_for_student.return_value = []
+    svc._admin_quest_retrieval_svc.get_quests_for_student.return_value = []
 
     result = svc.start_update_assistant(
         None, is_instructor=True, caller_user_id="t1", caller_role="teacher", period_id="p1"
@@ -270,10 +271,9 @@ def test_start_update_assistant_teacher_happy_path(mock_feedback, mock_qs_cls):
 
 
 @pytest.mark.unit
-@patch("services.quest.quest_retrieval_service.QuestRetrievalService")
 @patch("services.conversation.conversation_service.initiate_teacher_feedback",
        return_value={"conversation_id": "cid1", "response": "X"})
-def test_start_update_assistant_teacher_not_found(mock_feedback, mock_qs_cls):
+def test_start_update_assistant_teacher_not_found(mock_feedback):
     svc = _svc()
     svc.teacher_dao.get_teacher_by_id.return_value = None
 
@@ -284,15 +284,14 @@ def test_start_update_assistant_teacher_not_found(mock_feedback, mock_qs_cls):
 
 
 @pytest.mark.unit
-@patch("services.quest.quest_retrieval_service.QuestRetrievalService")
 @patch("services.conversation.conversation_service.initiate_teacher_feedback",
        return_value={"conversation_id": "cid1", "response": "X"})
-def test_start_update_assistant_target_student_not_found(mock_feedback, mock_qs_cls):
+def test_start_update_assistant_target_student_not_found(mock_feedback):
     svc = _svc()
     svc.teacher_dao.get_teacher_by_id.return_value = {"user_id": "t1"}
     svc.period_dao.get_period_by_id.return_value = {"period_id": "p1"}
     svc.student_dao.get_student_by_id.return_value = None
-    mock_qs_cls.return_value.get_quests_for_student.return_value = []
+    svc._admin_quest_retrieval_svc.get_quests_for_student.return_value = []
 
     with pytest.raises(Exception, match="Target student not found"):
         svc.start_update_assistant(
@@ -328,17 +327,16 @@ def test_continue_update_assistant_happy_path(mock_cont):
 
 
 @pytest.mark.unit
-@patch("services.period.period_service.PeriodService")
 @patch("services.conversation.conversation_service.continue_teacher_feedback",
        return_value={"response": "Updated!", "suggested_change": {"week": 2}})
-def test_continue_update_assistant_with_suggested_change(mock_cont, mock_ps_cls):
+def test_continue_update_assistant_with_suggested_change(mock_cont):
     svc = _svc()
     svc.conversation_dao.get_conversation_by_id_user_type.return_value = {"period_id": "p1"}
-    mock_ps_cls.return_value.update_quests_with_recommended_change.return_value = {"message": "done"}
+    svc._period_service.update_quests_with_recommended_change.return_value = {"message": "done"}
 
     svc.continue_update_assistant("u1", "teacher", "cid1", "message")
 
-    mock_ps_cls.return_value.update_quests_with_recommended_change.assert_called_once()
+    svc._period_service.update_quests_with_recommended_change.assert_called_once()
 
 
 @pytest.mark.unit

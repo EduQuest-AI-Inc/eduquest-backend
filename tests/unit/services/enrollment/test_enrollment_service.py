@@ -351,7 +351,7 @@ def test_get_my_periods_skips_missing_period():
 @pytest.mark.unit
 def test_has_teacher_access_true():
     svc = _svc()
-    svc.period_dao.get_periods_by_owner_id.return_value = [
+    svc._admin_period_dao.get_periods_by_owner_id.return_value = [
         {"period_id": "p1"},
         {"period_id": "p2"},
     ]
@@ -363,7 +363,7 @@ def test_has_teacher_access_true():
 @pytest.mark.unit
 def test_has_teacher_access_false():
     svc = _svc()
-    svc.period_dao.get_periods_by_owner_id.return_value = [{"period_id": "p1"}]
+    svc._admin_period_dao.get_periods_by_owner_id.return_value = [{"period_id": "p1"}]
     svc.enrollment_dao.get_enrollments_by_student.return_value = [{"period_id": "p-other"}]
 
     assert svc.has_teacher_access_to_student("teacher-1", "s1") is False

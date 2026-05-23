@@ -35,6 +35,18 @@ Supabase RLS is the secondary enforcement layer. Do not duplicate RLS logic in P
 
 Audit: `pytest tests/unit/routes/test_rbac_audit.py` verifies every route either has an auth dependency or is listed in `EXPLICITLY_PUBLIC_ROUTES`.
 
+### Admin vs user client in DAO construction
+
+Pass `jwt=jwt` to a DAO only when the method reads **solely the calling user's own rows** and RLS should enforce that boundary. For any cross-user read (fetching another user's record by their ID), instantiate the DAO without a JWT so the admin client is used and RLS is bypassed server-side. Mixing both in a single service constructor is intentional and expected — document it with a comment. The default pattern (`self.my_dao = my_dao or MyDAO()`) uses the admin client.
+
+### Services must raise typed exceptions — no bare ValueError
+
+Services must raise typed exceptions from `exceptions/` to signal HTTP-meaningful outcomes. Never raise bare `ValueError`, `LookupError`, or `Exception` for conditions that have a defined HTTP mapping. Use: `NotFoundError` for missing resources (→ 404), `ValidationError` for invalid input or state (→ 400), `PermissionError` for ownership violations (→ 403). System integrity failures (corrupt data, missing required fields) should raise `RuntimeError` and bubble to 500. Routers must never catch bare exceptions to infer status codes via substring matching — typed exceptions carry explicit meaning and global handlers own the status mapping.
+
+### Log before raising on cross-user fetches that can silently return empty
+
+If a service method performs a cross-user lookup (fetching another user's row by ID) and that row is missing due to a data integrity issue rather than normal application flow, log at `logger.error` before raising. This makes failures visible in EC2 logs without Supabase API log archaeology. Silent empty returns (returning `None` or `[]` where a row is required) should be logged at `logger.warning`.
+
 ### Shared resource fetching — fetch once at the router, pass the object down
 
 When multiple services in a single request need the same database row, fetch it once in a router-level `Depends()` and pass the object as a parameter to every service that needs it. Services must not re-query a resource they have already been given.
@@ -83,6 +95,24 @@ def run_something(user_id):
 The bot provider follows the same rule. Services declare `bot_provider: BotProviderProtocol` as a constructor parameter and store it as `self._bot_provider`. No service imports or calls `get_bot_provider()` directly — that is the router's job via `Depends()`.
 
 Module-level orchestration functions (`run_*`) are also banned for the same reason. If logic needs its own DAOs, it belongs in a service class, not a free function.
+
+### Cross-domain service dependencies — allowed flow and forbidden patterns
+
+Services in different feature domains may depend on each other, but only in one direction and only via constructor injection. The allowed dependency flow is:
+
+```
+conversation ──→ period / quest   (one-way; injected at constructor)
+period       ──→ enrollment / curriculum / quest   (one-way; injected at constructor)
+quest        ──→ curriculum   (one-way; injected at constructor)
+```
+
+**Forbidden patterns:**
+
+- **Dynamic imports inside method bodies** — `from services.X import Y` inside a function hides the dependency from the constructor, making it invisible to callers and impossible to inject in tests. All cross-domain service dependencies must be declared as constructor parameters with defaults (same rule as DAOs).
+- **Reverse-direction imports** — `period` and `quest` domains must not import from the `conversation` domain. (`period_service.py` currently imports `LTGOrchestrationService` from `services/conversation/ltg_service.py` — this is a tracked violation to address when `PeriodService` is refactored, not a precedent to copy.)
+- **Router-level service construction of another domain's private API** — a router handler must not call a private method (underscore-prefixed) on a service from a different domain. Use a public method or add one.
+
+**Rationale:** Hidden cross-domain calls break the "refactor one domain, break the other at runtime not compile time" guarantee. Constructor injection makes the dependency explicit, testable with mocks, and visible in `__init__` signatures.
 
 ### `integrations/` vs `utils/` — network boundary rule
 

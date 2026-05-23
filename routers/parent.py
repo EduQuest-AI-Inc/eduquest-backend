@@ -67,7 +67,7 @@ def enroll_student(
     )
 
     period_mgmt = PeriodManagementService(jwt=auth.token)
-    user_svc = UserService(jwt=auth.token)
+    user_svc = UserService()
     # Membership check uses admin to read owner's (another user's) membership
     membership_svc = MembershipService()
     period = period_mgmt.get_period_by_id(body.period_id)
