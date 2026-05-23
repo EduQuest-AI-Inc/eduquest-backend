@@ -2,6 +2,7 @@
 
 See also: [data_access/CLAUDE.md](data_access/CLAUDE.md) for DAO and database patterns.
 See also: [ARCH_DECISIONS.md](ARCH_DECISIONS.md) for authoritative decisions on router boundaries, auth enforcement, enrollment checks, agent instantiation, service dependencies, and testing conventions.
+See also: [ARCHITECTURE.md](ARCHITECTURE.md) for a full narrative walkthrough of every layer and pipeline.
 
 ## Package Layout
 
@@ -45,7 +46,7 @@ eduquest-backend/
 │   ├── quest/                      # quest_service.py, quest_creation_service.py,
 │   │                               #   quest_retrieval_service.py, quest_grading_service.py
 │   ├── tracking/                   # PostHog server-side analytics (posthog_client.py,
-│   │                               #   events.py, track.py)
+│   │                               #   events.py, track.py) — see [services/tracking/README.md](services/tracking/README.md)
 │   ├── user/                       # user_service.py
 │   ├── waitlist/                   # waitlist_service.py
 │   ├── parent/                     # parent_service.py
@@ -218,6 +219,8 @@ Use `logger = logging.getLogger(__name__)` at the top of every service and bot f
 See [bots/CLAUDE.md](bots/CLAUDE.md) for agent system and PPTX pipeline details.
 
 ## Development
+
+Developer scripts: [scripts/README.md](scripts/README.md). AWS infrastructure: [cloudformation/README.md](cloudformation/README.md).
 
 **Setup** (always use venv):
 
