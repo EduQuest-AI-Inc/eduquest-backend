@@ -29,6 +29,7 @@ from services.conversation.teacher_feedback_service import (
     continue_teacher_feedback,
     initiate_teacher_feedback,
 )
+from services.quest.quest_retrieval_service import QuestRetrievalService
 
 load_dotenv()
 
@@ -43,6 +44,7 @@ class ConversationService:
         self.conversation_dao = ConversationDAO()  # RLS: INSERT/UPDATE/DELETE is FastAPI-only; must use admin client
         self.teacher_dao = TeacherDAO(jwt=jwt)
         self.period_dao = PeriodDAO(jwt=jwt)
+        self._admin_quest_retrieval_svc = QuestRetrievalService()  # admin client — teacher paths read student quests
 
     # ------------------------------------------------------------------
     # Profile assistant
@@ -149,8 +151,7 @@ class ConversationService:
         if is_instructor:
             if not user_id:
                 raise ValidationError("Instructor must provide a user_id to fetch quests")
-            from services.quest.quest_retrieval_service import QuestRetrievalService
-            quests_data = QuestRetrievalService(jwt=self._jwt).get_quests_for_student(user_id)
+            quests_data = self._admin_quest_retrieval_svc.get_quests_for_student(user_id)
 
             target_student = self.student_dao.get_student_by_id(user_id)
             if not target_student:
@@ -284,8 +285,7 @@ class ConversationService:
                 logger.info("Saved grade %s for quest %s", overall_score, individual_quest_id)
                 return
 
-            from services.quest.quest_retrieval_service import QuestRetrievalService
-            quests = QuestRetrievalService(jwt=self._jwt).get_quests_for_student(user_id)
+            quests = self._admin_quest_retrieval_svc.get_quests_for_student(user_id)
             target_quest = None
             for quest in quests:
                 if period_id and quest.get("week") == week and quest.get("period_id") == period_id:

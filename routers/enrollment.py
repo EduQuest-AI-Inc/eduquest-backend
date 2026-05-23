@@ -98,7 +98,7 @@ def my_periods(
 @router.post("/verify-period", response_model=VerifyPeriodResponse)
 def verify_period(body: VerifyPeriodRequest, auth: AuthPayload = Depends(get_auth)):
     period_mgmt = PeriodManagementService(jwt=auth.token)
-    user_svc = UserService(jwt=auth.token)
+    user_svc = UserService()
     # Membership check uses admin to read the owner's (another user's) membership
     membership_svc = MembershipService()
     period = period_mgmt.get_period_by_id(body.period_id)

@@ -63,7 +63,7 @@ class EnrollmentService:
         period = self.period_dao.get_period_by_id(period_id)
         enriched = []
         for enrollment in enrollments:
-            user = self.user_dao.get_by_id(enrollment["user_id"]) if enrollment.get("user_id") else None
+            user = self._admin_user_dao.get_by_id(enrollment["user_id"]) if enrollment.get("user_id") else None
             enriched.append({
                 **enrollment,
                 "first_name": user.get("first_name") if user else None,
@@ -139,7 +139,7 @@ class EnrollmentService:
     def has_teacher_access_to_student(self, teacher_id: str, student_id: str) -> bool:
         teacher_period_ids = {
             p['period_id']
-            for p in self.period_dao.get_periods_by_owner_id(teacher_id)
+            for p in self._admin_period_dao.get_periods_by_owner_id(teacher_id)
         }
         return any(
             e['period_id'] in teacher_period_ids
