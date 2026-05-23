@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from unittest.mock import MagicMock
 
+from exceptions.not_found_error import NotFoundError
+from exceptions.validation_error import ValidationError
 from services.parent.parent_service import ParentService
 
 
@@ -89,7 +91,7 @@ def test_accept_invite_invalid_code_raises():
     svc = _svc()
     svc.invite_dao.get_invite_by_code.return_value = None
 
-    with pytest.raises(ValueError, match="Invalid invite code"):
+    with pytest.raises(NotFoundError, match="Invite code not found"):
         svc.accept_invite("s1", "BADCODE1")
 
 
@@ -102,7 +104,7 @@ def test_accept_invite_used_code_raises():
         "user_id": "parent-1",
     }
 
-    with pytest.raises(ValueError, match="already been used"):
+    with pytest.raises(ValidationError, match="already been used"):
         svc.accept_invite("s1", "USEDCODE")
 
 
@@ -115,7 +117,7 @@ def test_accept_invite_expired_code_raises():
         "user_id": "parent-1",
     }
 
-    with pytest.raises(ValueError, match="expired"):
+    with pytest.raises(ValidationError, match="expired"):
         svc.accept_invite("s1", "EXPCODE1")
 
 
@@ -148,7 +150,7 @@ def test_accept_invite_missing_parent_id_raises():
         # "user_id" key intentionally absent
     }
 
-    with pytest.raises(ValueError, match="missing user_id"):
+    with pytest.raises(RuntimeError, match="missing user_id"):
         svc.accept_invite("s1", "NOPARENT")
 
 
@@ -162,7 +164,7 @@ def test_accept_invite_parent_not_found_raises():
     }
     svc.parent_dao.get_parent_by_id.return_value = None
 
-    with pytest.raises(ValueError, match="Parent account not found"):
+    with pytest.raises(NotFoundError, match="Parent account not found"):
         svc.accept_invite("s1", "GPCODE11")
 
 

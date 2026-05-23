@@ -96,6 +96,14 @@ async def lifespan(app: FastAPI):
         _log.info("S3 OK — bucket=%s endpoint=%s", BUCKET_NAME, s3.meta.endpoint_url)
     except Exception as e:
         _log.error("S3 connectivity FAILED — bucket=%s error=%s", BUCKET_NAME, e)
+
+    from data_access.period_dao import PeriodDAO
+    reset_count = PeriodDAO().reset_stale_generating()
+    if reset_count:
+        _log.warning("Reset %d stale 'generating' period(s) to 'failed' at startup", reset_count)
+    else:
+        _log.info("No stale 'generating' periods found at startup")
+
     yield
 
 

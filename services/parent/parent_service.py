@@ -1,3 +1,4 @@
+import logging
 import secrets
 import string
 from datetime import datetime, timedelta, timezone
@@ -8,18 +9,24 @@ from data_access.parent_dao import ParentDAO
 from data_access.parent_invite_dao import ParentInviteDAO
 from data_access.student_dao import StudentDAO
 from data_access.user_dao import UserDAO
+from exceptions.not_found_error import NotFoundError
+from exceptions.validation_error import ValidationError
 
 from models.parent_invite import ParentInvite
 from models.student import Student
 from services.auth.auth_service import generate_password_hash
+
+logger = logging.getLogger(__name__)
 
 _INVITE_ALPHABET = string.ascii_uppercase + string.digits
 
 
 class ParentService:
     def __init__(self, parent_dao=None, invite_dao=None, student_dao=None, user_dao=None, jwt: str | None = None) -> None:
-        self.parent_dao = parent_dao or ParentDAO(jwt=jwt)
-        # parent_invite is INSERT/UPDATE/DELETE FastAPI-only; student INSERT/DELETE is FastAPI-only
+        # parent/invite/student ops are all server-side; admin client bypasses RLS so
+        # cross-user reads (e.g. accept_invite reading a parent row via a student JWT) work.
+        # user_dao keeps jwt so reads respect the calling user's own row boundary.
+        self.parent_dao = parent_dao or ParentDAO()
         self.invite_dao = invite_dao or ParentInviteDAO()
         self.student_dao = student_dao or StudentDAO()
         self.user_dao = user_dao or UserDAO(jwt=jwt)
@@ -37,9 +44,9 @@ class ParentService:
         """Link a student to a parent via a single-use invite code."""
         invite = self.invite_dao.get_invite_by_code(code)
         if not invite:
-            raise ValueError("Invalid invite code")
+            raise NotFoundError("Invite code not found")
         if invite.get("used"):
-            raise ValueError("Invite code has already been used")
+            raise ValidationError("Invite code has already been used")
 
         expires_at_str = invite.get("expires_at", "")
         try:
@@ -47,17 +54,18 @@ class ParentService:
             if expires_at.tzinfo is None:
                 expires_at = expires_at.replace(tzinfo=timezone.utc)
         except (ValueError, TypeError):
-            raise ValueError("Invalid invite data")
+            raise RuntimeError(f"Invalid invite data for code {code!r}")
 
         if datetime.now(timezone.utc) > expires_at:
-            raise ValueError("Invite code has expired")
+            raise ValidationError("Invite code has expired")
 
         parent_id = invite.get("user_id")
         if not parent_id:
-            raise ValueError("Invite data missing user_id")
+            raise RuntimeError(f"Invite data missing user_id for code {code!r}")
         parent = self.parent_dao.get_parent_by_id(parent_id)
         if not parent:
-            raise ValueError("Parent account not found")
+            logger.error("Parent account not found for invite code %r (parent_id=%r)", code, parent_id)
+            raise NotFoundError(f"Parent account not found for parent_id {parent_id!r}")
 
         linked_ids = list(parent.get("linked_student_ids") or [])
         if student_id in linked_ids:
