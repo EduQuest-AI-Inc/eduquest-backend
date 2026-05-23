@@ -7,6 +7,7 @@ from fastapi import HTTPException
 
 from data_access.user_dao import UserDAO
 from services.auth.auth_service import AuthService
+from services.auth.supabase_auth_service import SupabaseAuthService
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +15,10 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 
 
 class OAuthService:
-    def __init__(self, user_dao=None, auth_service=None) -> None:
+    def __init__(self, user_dao=None, auth_service=None, supabase_auth_service=None) -> None:
         self.user_dao = user_dao or UserDAO()
         self.auth_service = auth_service or AuthService()
+        self.supabase_auth_service = supabase_auth_service or SupabaseAuthService()
 
     def complete_oauth(
         self,
@@ -84,6 +86,10 @@ class OAuthService:
                     MembershipService().start_trial_if_eligible(username, role)
                 except Exception as exc:
                     logger.warning("Trial creation failed for OAuth user %s: %s", username, exc, exc_info=True)
+
+        supabase_auth_uuid: str = supabase_user.get("id", "")
+        if supabase_auth_uuid:
+            self.supabase_auth_service.store_oauth_auth_id(username, supabase_auth_uuid, role)
 
         needs_profile = False
         if role == "student":

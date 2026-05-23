@@ -17,6 +17,13 @@ def _svc():
     svc.ltg_conversation_dao = MagicMock()
     svc.ltg_goal_dao = MagicMock()
     svc.conversation_dao = MagicMock()
+    svc._admin_parent_dao = MagicMock()
+    svc._admin_period_dao = MagicMock()
+    svc._admin_user_dao = MagicMock()
+    svc._admin_ltg_conversation_dao = MagicMock()
+    svc._admin_conversation_dao = MagicMock()
+    svc._admin_ltg_goal_dao = MagicMock()
+    svc._admin_quest_dao = MagicMock()
     return svc
 
 
@@ -173,7 +180,7 @@ def test_verify_period_id_missing_raises():
 @pytest.mark.unit
 def test_verify_period_id_period_not_found_raises():
     svc = _svc()
-    svc.period_dao.get_period_by_id.return_value = None
+    svc._admin_period_dao.get_period_by_id.return_value = None
 
     with pytest.raises(NotFoundError):
         svc.verify_period_id("s1", "p1")
@@ -182,8 +189,8 @@ def test_verify_period_id_period_not_found_raises():
 @pytest.mark.unit
 def test_verify_period_id_owner_not_teacher_raises():
     svc = _svc()
-    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "o1", "status": "approved"}
-    svc.user_dao.get_by_id.return_value = {"user_id": "o1", "role": "parent"}
+    svc._admin_period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "o1", "status": "approved"}
+    svc._admin_user_dao.get_by_id.return_value = {"user_id": "o1", "role": "parent"}
 
     with pytest.raises(NotFoundError):
         svc.verify_period_id("s1", "p1", allow_parent_period=False)
@@ -192,8 +199,8 @@ def test_verify_period_id_owner_not_teacher_raises():
 @pytest.mark.unit
 def test_verify_period_id_not_approved_raises():
     svc = _svc()
-    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "o1", "status": "pending"}
-    svc.user_dao.get_by_id.return_value = {"user_id": "o1", "role": "teacher"}
+    svc._admin_period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "o1", "status": "pending"}
+    svc._admin_user_dao.get_by_id.return_value = {"user_id": "o1", "role": "teacher"}
 
     with pytest.raises(NotFoundError):
         svc.verify_period_id("s1", "p1")
@@ -202,8 +209,8 @@ def test_verify_period_id_not_approved_raises():
 @pytest.mark.unit
 def test_verify_period_id_already_enrolled_raises():
     svc = _svc()
-    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "o1", "status": "approved"}
-    svc.user_dao.get_by_id.return_value = {"user_id": "o1", "role": "teacher"}
+    svc._admin_period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "o1", "status": "approved"}
+    svc._admin_user_dao.get_by_id.return_value = {"user_id": "o1", "role": "teacher"}
     svc.student_dao.get_student_by_id.return_value = {"user_id": "s1"}
     svc.enrollment_dao.get_enrollments_by_student.return_value = [{"period_id": "p1"}]
 
@@ -215,8 +222,8 @@ def test_verify_period_id_already_enrolled_raises():
 def test_verify_period_id_success_auto_enrolls():
     svc = _svc()
     period = {"period_id": "p1", "owner_id": "o1", "status": "approved"}
-    svc.period_dao.get_period_by_id.return_value = period
-    svc.user_dao.get_by_id.return_value = {"user_id": "o1", "role": "teacher"}
+    svc._admin_period_dao.get_period_by_id.return_value = period
+    svc._admin_user_dao.get_by_id.return_value = {"user_id": "o1", "role": "teacher"}
     svc.student_dao.get_student_by_id.return_value = {"user_id": "s1"}
     svc.enrollment_dao.get_enrollments_by_student.return_value = []
 
@@ -279,7 +286,8 @@ def test_unenroll_cascades_ltg_and_quests():
         {"period_id": "p1"},
         {"period_id": "p2"},
     ]
-    svc.ltg_conversation_dao.delete_conversation.return_value = "conv-1"
+    # Deletes go through admin DAOs (FastAPI-only tables)
+    svc._admin_ltg_conversation_dao.delete_conversation.return_value = "conv-1"
     svc.quest_dao.get_quests_by_student_and_period.return_value = [
         {"quest_id": "q1"},
         {"quest_id": "q2"},
@@ -287,9 +295,9 @@ def test_unenroll_cascades_ltg_and_quests():
 
     result = svc.unenroll_from_period("s1", "p1")
 
-    svc.ltg_goal_dao.delete.assert_called_once_with("s1", "p1")
-    svc.conversation_dao.delete_conversation.assert_called_once_with("conv-1")
-    assert svc.quest_dao.delete_quest.call_count == 2
+    svc._admin_ltg_goal_dao.delete.assert_called_once_with("s1", "p1")
+    svc._admin_conversation_dao.delete_conversation.assert_called_once_with("conv-1")
+    assert svc._admin_quest_dao.delete_quest.call_count == 2
     assert result["remaining_enrollments"] == ["p2"]
 
 
@@ -343,7 +351,7 @@ def test_get_my_periods_skips_missing_period():
 @pytest.mark.unit
 def test_has_teacher_access_true():
     svc = _svc()
-    svc.period_dao.get_periods_by_owner_id.return_value = [
+    svc._admin_period_dao.get_periods_by_owner_id.return_value = [
         {"period_id": "p1"},
         {"period_id": "p2"},
     ]
@@ -355,7 +363,7 @@ def test_has_teacher_access_true():
 @pytest.mark.unit
 def test_has_teacher_access_false():
     svc = _svc()
-    svc.period_dao.get_periods_by_owner_id.return_value = [{"period_id": "p1"}]
+    svc._admin_period_dao.get_periods_by_owner_id.return_value = [{"period_id": "p1"}]
     svc.enrollment_dao.get_enrollments_by_student.return_value = [{"period_id": "p-other"}]
 
     assert svc.has_teacher_access_to_student("teacher-1", "s1") is False
@@ -367,9 +375,9 @@ def test_has_teacher_access_false():
 @pytest.mark.unit
 def test_get_parent_periods_excludes_already_enrolled():
     svc = _svc()
-    svc.parent_dao.get_parents_by_student_id.return_value = [{"user_id": "parent-1"}]
+    svc._admin_parent_dao.get_parents_by_student_id.return_value = [{"user_id": "parent-1"}]
     svc.enrollment_dao.get_enrollments_by_student.return_value = [{"period_id": "p1"}]
-    svc.period_dao.get_periods_by_owner_id.return_value = [
+    svc._admin_period_dao.get_periods_by_owner_id.return_value = [
         {"period_id": "p1", "status": "approved"},
     ]
 
@@ -381,9 +389,9 @@ def test_get_parent_periods_excludes_already_enrolled():
 @pytest.mark.unit
 def test_get_parent_periods_includes_approved_only():
     svc = _svc()
-    svc.parent_dao.get_parents_by_student_id.return_value = [{"user_id": "parent-1"}]
+    svc._admin_parent_dao.get_parents_by_student_id.return_value = [{"user_id": "parent-1"}]
     svc.enrollment_dao.get_enrollments_by_student.return_value = []
-    svc.period_dao.get_periods_by_owner_id.return_value = [
+    svc._admin_period_dao.get_periods_by_owner_id.return_value = [
         {"period_id": "p1", "status": "approved"},
         {"period_id": "p2", "status": "pending"},
     ]
@@ -428,8 +436,8 @@ def test_cleanup_tutorial_periods_noop_when_not_in_tutorial():
 def test_verify_period_id_triggers_tutorial_cleanup_on_real_class():
     svc = _svc()
     period = {"period_id": "real-period-1", "owner_id": "o1", "status": "approved"}
-    svc.period_dao.get_period_by_id.return_value = period
-    svc.user_dao.get_by_id.return_value = {"user_id": "o1", "role": "teacher"}
+    svc._admin_period_dao.get_period_by_id.return_value = period
+    svc._admin_user_dao.get_by_id.return_value = {"user_id": "o1", "role": "teacher"}
     svc.student_dao.get_student_by_id.return_value = {"user_id": "s1"}
     svc.enrollment_dao.get_enrollments_by_student.return_value = [
         {"period_id": TUTORIAL_PERIOD_ID},

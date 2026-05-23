@@ -15,7 +15,14 @@ class SignupResponse(BaseModel):
 class LoginResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    token: str
+    access_token: str
+    refresh_token: str
+    needs_profile: Optional[bool] = None
+
+
+class OAuthCompleteResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     needs_profile: Optional[bool] = None
 
 

@@ -8,7 +8,6 @@ from responses.feedback import FeedbackResponse
 from services.feedback.feedback_service import FeedbackService
 
 router = APIRouter()
-_svc = FeedbackService()
 
 
 class FeedbackRequest(BaseModel):
@@ -31,5 +30,6 @@ def submit_feedback(
     body: FeedbackRequest,
     auth: AuthPayload = Depends(get_auth),
 ) -> dict:
+    _svc = FeedbackService(jwt=auth.token)
     _svc.submit(auth.sub, body.message, page=body.page)
     return {"success": True}

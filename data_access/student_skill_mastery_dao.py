@@ -6,8 +6,8 @@ from models.student_skill_mastery import MASTERY_CUTOFF, StudentSkillMastery
 
 
 class StudentSkillMasteryDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('student_skill_mastery')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('student_skill_mastery', jwt=jwt)
 
     def get_for_student(self, student_id: str, period_id: str) -> list[StudentSkillMastery]:
         response = self._execute(

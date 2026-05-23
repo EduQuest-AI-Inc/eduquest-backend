@@ -4,8 +4,8 @@ from data_access.base_dao import SupabaseBaseDAO
 
 
 class PeriodDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('period')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('period', jwt=jwt)
 
     def add_period(self, period) -> None:
         self._insert({
@@ -57,3 +57,31 @@ class PeriodDAO(SupabaseBaseDAO):
 
     def update_status(self, period_id: str, status: str) -> None:
         self._update({'period_id': period_id}, {'status': status})
+
+    def try_start_generating(self, period_id: str) -> bool:
+        """Atomically transition period to 'generating' only if currently 'pending' or 'failed'.
+
+        Returns True if the lock was acquired (status updated), False if already generating
+        or in a non-triggerable state.
+        """
+        result = self._execute(
+            self._table()
+            .update({'status': 'generating'})
+            .eq('period_id', period_id)
+            .in_('status', ['pending', 'failed'])
+        )
+        return bool(result.data)
+
+    def reset_stale_generating(self) -> int:
+        """Reset all periods stuck in 'generating' to 'failed'.
+
+        Call at server startup — any in-flight generation tasks are dead because the
+        process restarted, so every 'generating' row is stale by definition.
+        Returns the number of rows reset.
+        """
+        result = self._execute(
+            self._table()
+            .update({'status': 'failed'})
+            .eq('status', 'generating')
+        )
+        return len(result.data) if result.data else 0

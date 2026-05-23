@@ -41,26 +41,25 @@ class CurriculumService:
         skill_dao=None,
         concept_skill_dao=None,
         perplexity_service=None,
+        jwt: str | None = None,
     ) -> None:
         self._bot_provider = bot_provider
-        self.period_dao = period_dao or PeriodDAO()
-        self.week_dao = week_dao or WeekDAO()
-        self.lesson_dao = lesson_dao or LessonDAO()
-        self.concept_dao = concept_dao or ConceptDAO()
-        self.skill_dao = skill_dao or SkillDAO()
-        self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO()
+        self.period_dao = period_dao or PeriodDAO(jwt=jwt)
+        self.week_dao = week_dao or WeekDAO(jwt=jwt)
+        self.lesson_dao = lesson_dao or LessonDAO(jwt=jwt)
+        self.concept_dao = concept_dao or ConceptDAO(jwt=jwt)
+        self.skill_dao = skill_dao or SkillDAO(jwt=jwt)
+        self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO(jwt=jwt)
         self._perplexity_service = perplexity_service
 
     # ── public API ────────────────────────────────────────────────────────────
 
     def trigger_generation(self, period_id: str, background_tasks: BackgroundTasks) -> None:
         self._check_not_fork(period_id)
-        period = self._get_period_or_raise(period_id)
-        if period.get("status", "pending") not in {"pending", "failed"}:
+        if not self.period_dao.try_start_generating(period_id):
             raise ValidationError(
-                f"Cannot generate curriculum: period is already in '{period['status']}' status"
+                "Cannot generate curriculum: generation is already in progress or curriculum is not in a triggerable state"
             )
-        self.period_dao.update_status(period_id, "generating")
         background_tasks.add_task(self.run_generation, period_id)
 
     def get_curriculum(self, period_id: str, period: dict | None = None) -> dict[str, Any]:
@@ -128,8 +127,6 @@ class CurriculumService:
             if not period:
                 logger.error("run_generation: period %s not found", period_id)
                 return
-
-            self.period_dao.update_status(period_id, "generating")
 
             start_date = period.get("start_date") or date.today().isoformat()
             end_date = period.get("end_date") or date.today().isoformat()

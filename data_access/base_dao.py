@@ -1,21 +1,20 @@
+import logging
 from typing import Any, cast
 
-from data_access.config import get_supabase_client
+from data_access.config import get_admin_supabase_client, get_user_supabase_client
 from exceptions.validation_error import ValidationError
 from postgrest import APIError as PostgrestAPIError
 from postgrest._sync.request_builder import SyncRequestBuilder
 from supabase import Client
 
+_logger = logging.getLogger(__name__)
+
 
 class SupabaseBaseDAO:
-    """Base class for all Supabase DAOs.
-
-    Provides thin wrappers around the PostgREST query builder so that
-    concrete DAOs stay concise.
-    """
-
-    def __init__(self, table_name: str) -> None:
-        self.client: Client = get_supabase_client()
+    def __init__(self, table_name: str, jwt: str | None = None) -> None:
+        self.client: Client = (
+            get_user_supabase_client(jwt) if jwt else get_admin_supabase_client()
+        )
         self.table_name = table_name
 
     # -- helpers ---------------------------------------------------------------
@@ -27,6 +26,7 @@ class SupabaseBaseDAO:
         try:
             return query.execute()
         except PostgrestAPIError as e:
+            _logger.error("PostgREST error on table '%s': %s", self.table_name, e, exc_info=True)
             raise ValidationError(str(e)) from e
 
     def _insert(self, data: dict[str, Any]) -> dict[str, Any]:
@@ -81,11 +81,11 @@ class SupabaseBaseDAO:
         response = self._execute(self.client.rpc(function_name, params))
         return cast(dict[str, Any] | list[Any], response.data)
 
-    def _join_user(self, id_column: str, id_value: str) -> dict[str, Any] | None:
+    def _join_user(self, id_column: str, id_value: str, relationship: str = 'user') -> dict[str, Any] | None:
         """JOIN this role table with user and return a flat dict."""
         response = self._execute(
             self.client.table(self.table_name)
-            .select('*, user!inner(*)')
+            .select(f'*, {relationship}!inner(*)')
             .eq(id_column, id_value)
             .maybe_single()
         )

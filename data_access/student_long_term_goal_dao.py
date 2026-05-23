@@ -5,8 +5,8 @@ from models.student_long_term_goal import StudentLongTermGoal
 
 
 class StudentLongTermGoalDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('student_long_term_goal')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('student_long_term_goal', jwt=jwt)
 
     def upsert(self, user_id: str, period_id: str, goal_text: str) -> None:
         goal = StudentLongTermGoal(user_id=user_id, period_id=period_id, goal_text=goal_text)

@@ -8,7 +8,7 @@ class Enrollment(BaseModel):
     period_id: str
     enrolled_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     user_id: str
-    semester: str
+    semester: str = "Fall 2025"
 
     def to_item(self):
         return self.model_dump()

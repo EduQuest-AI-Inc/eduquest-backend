@@ -29,6 +29,8 @@ from services.conversation.teacher_feedback_service import (
     continue_teacher_feedback,
     initiate_teacher_feedback,
 )
+from services.period.period_service import PeriodService
+from services.quest.quest_retrieval_service import QuestRetrievalService
 
 load_dotenv()
 
@@ -36,12 +38,15 @@ logger = logging.getLogger(__name__)
 
 
 class ConversationService:
-    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+    def __init__(self, *, bot_provider: BotProviderProtocol, jwt: str | None = None, period_service=None) -> None:
         self._bot_provider = bot_provider
-        self.student_dao = StudentDAO()
-        self.conversation_dao = ConversationDAO()
-        self.teacher_dao = TeacherDAO()
-        self.period_dao = PeriodDAO()
+        self._jwt = jwt
+        self.student_dao = StudentDAO(jwt=jwt)
+        self.conversation_dao = ConversationDAO()  # RLS: INSERT/UPDATE/DELETE is FastAPI-only; must use admin client
+        self.teacher_dao = TeacherDAO(jwt=jwt)
+        self.period_dao = PeriodDAO(jwt=jwt)
+        self._admin_quest_retrieval_svc = QuestRetrievalService()  # admin client — teacher paths read student quests
+        self._period_service = period_service or PeriodService(bot_provider=bot_provider)
 
     # ------------------------------------------------------------------
     # Profile assistant
@@ -148,8 +153,7 @@ class ConversationService:
         if is_instructor:
             if not user_id:
                 raise ValidationError("Instructor must provide a user_id to fetch quests")
-            from services.quest.quest_retrieval_service import QuestRetrievalService
-            quests_data = QuestRetrievalService().get_quests_for_student(user_id)
+            quests_data = self._admin_quest_retrieval_svc.get_quests_for_student(user_id)
 
             target_student = self.student_dao.get_student_by_id(user_id)
             if not target_student:
@@ -283,8 +287,7 @@ class ConversationService:
                 logger.info("Saved grade %s for quest %s", overall_score, individual_quest_id)
                 return
 
-            from services.quest.quest_retrieval_service import QuestRetrievalService
-            quests = QuestRetrievalService().get_quests_for_student(user_id)
+            quests = self._admin_quest_retrieval_svc.get_quests_for_student(user_id)
             target_quest = None
             for quest in quests:
                 if period_id and quest.get("week") == week and quest.get("period_id") == period_id:
@@ -310,9 +313,7 @@ class ConversationService:
     def _apply_quest_change(self, caller_id: str, caller_role: str, period_id: str, recommended_change: str) -> None:
         """Delegate recommended changes to PeriodService."""
         try:
-            from services.period.period_service import PeriodService
-            period_service = PeriodService(bot_provider=self._bot_provider)
-            quest_update_result = period_service.update_quests_with_recommended_change(
+            quest_update_result = self._period_service.update_quests_with_recommended_change(
                 caller_id, caller_role, period_id, recommended_change,
             )
             logger.info("Quest update: %s", quest_update_result.get('message', ''))

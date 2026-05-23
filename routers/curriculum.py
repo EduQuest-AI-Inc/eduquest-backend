@@ -11,6 +11,7 @@ from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_peri
 from bots.protocol import BotProviderProtocol
 from services.curriculum.curriculum_service import CurriculumService
 from services.enrollment.enrollment_service import EnrollmentService
+from services.parent.parent_service import ParentService
 from services.period.period_summer_quest_service import PeriodSummerQuestService
 from services.slides.pptx_generation_service import PptxGenerationService
 from exceptions.not_found_error import NotFoundError
@@ -19,13 +20,12 @@ from exceptions.validation_error import ValidationError
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_enrollment_service = EnrollmentService()
-
 
 def _get_curriculum_service(
     bot_provider: BotProviderProtocol = Depends(get_bot_provider),
+    auth: AuthPayload = Depends(get_auth),
 ) -> CurriculumService:
-    return CurriculumService(bot_provider=bot_provider)
+    return CurriculumService(bot_provider=bot_provider, jwt=auth.token)
 
 
 def _get_slides_service(
@@ -127,9 +127,23 @@ def _assert_period_owner(period: dict, user_id: str) -> None:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
 
-def _assert_student_enrolled(period_id: str, user_id: str) -> None:
+def _assert_owner_or_parent_of_owner(period: dict, auth: AuthPayload) -> None:
+    if period["owner_id"] == auth.sub:
+        return
+    if auth.role == Role.PARENT:
+        linked = ParentService().get_linked_student_ids(auth.sub)
+        if period["owner_id"] in linked:
+            return
+    logger.warning(
+        "ownership check failed: period_id=%s owner_id=%s caller_id=%s role=%s",
+        period.get("period_id"), period["owner_id"], auth.sub, auth.role,
+    )
+    raise HTTPException(status_code=403, detail="Unauthorized")
+
+
+def _assert_student_enrolled(period_id: str, user_id: str, jwt: str) -> None:
     try:
-        _enrollment_service.check_enrolled(user_id, period_id)
+        EnrollmentService(jwt=jwt).check_enrolled(user_id, period_id)
     except ValidationError:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
@@ -148,7 +162,7 @@ def _membership_or_summer(
             detail={"error": "Forbidden", "code": "OWNER_ROLE_REQUIRED"},
         )
     from services.billing.membership_service import MembershipService
-    access = MembershipService().evaluate_access(auth.sub, auth.role.value)
+    access = MembershipService(jwt=auth.token).evaluate_access(auth.sub, auth.role.value)
     if not access.has_active_membership:
         raise HTTPException(
             status_code=403,
@@ -190,7 +204,7 @@ def get_curriculum_status(
         if period.get("is_summer_quest") and period.get("owner_id") == auth.sub:
             pass
         else:
-            _assert_student_enrolled(period_id, auth.sub)
+            _assert_student_enrolled(period_id, auth.sub, auth.token)
     else:
         _assert_period_owner(period, auth.sub)
     return {"period_status": period["status"]}
@@ -207,7 +221,7 @@ def get_curriculum(
         if period.get("is_summer_quest") and period.get("owner_id") == auth.sub:
             pass  # student owns this summer quest — allow through
         else:
-            _assert_student_enrolled(period_id, auth.sub)
+            _assert_student_enrolled(period_id, auth.sub, auth.token)
     else:
         _assert_period_owner(period, auth.sub)
     try:
@@ -280,7 +294,7 @@ def approve_period(
     bot_provider: BotProviderProtocol = Depends(get_bot_provider),
     period: dict = Depends(get_period),
 ):
-    _assert_period_owner(period, auth.sub)
+    _assert_owner_or_parent_of_owner(period, auth)
     try:
         lessons = svc.approve_period(period_id, period=period)
         if period.get("is_summer_quest"):
@@ -289,7 +303,7 @@ def approve_period(
                 _run_slides_and_quests_parallel,
                 slides_svc=slides_svc,
                 period_id=period_id,
-                owner_id=auth.sub,
+                owner_id=period["owner_id"],
                 bot_provider=bot_provider,
             )
         else:

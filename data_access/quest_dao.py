@@ -6,8 +6,8 @@ from models.quest import Quest
 
 
 class QuestDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('quest')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('quest', jwt=jwt)
 
     def add_quest(self, quest: Quest) -> None:
         self._insert({

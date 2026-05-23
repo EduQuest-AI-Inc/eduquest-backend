@@ -5,8 +5,8 @@ from models.concept_skill import ConceptSkill
 
 
 class ConceptSkillDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('concept_skill')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('concept_skill', jwt=jwt)
 
     def insert_concept_skill(self, cs: ConceptSkill) -> None:
         self._insert(cs.to_item())

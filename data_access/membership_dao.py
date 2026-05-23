@@ -6,8 +6,8 @@ from data_access.base_dao import SupabaseBaseDAO
 class MembershipDAO(SupabaseBaseDAO):
     """One row per parent/teacher account. Students never have a row."""
 
-    def __init__(self) -> None:
-        super().__init__("membership")
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__("membership", jwt=jwt)
 
     def get_by_user_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         rows = self._select_eq("user_id", user_id)

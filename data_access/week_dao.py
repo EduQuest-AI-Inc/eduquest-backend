@@ -5,8 +5,8 @@ from models.week import Week
 
 
 class WeekDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('week')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('week', jwt=jwt)
 
     def insert_week(self, week: Week) -> None:
         self._insert(week.to_item())

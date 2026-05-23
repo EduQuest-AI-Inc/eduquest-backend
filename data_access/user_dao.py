@@ -11,8 +11,8 @@ SHARED_USER_FIELDS = {
 
 
 class UserDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('user')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('user', jwt=jwt)
 
     def add_user(self, user: "User") -> None:
         self._insert(user.model_dump())

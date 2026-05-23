@@ -5,9 +5,9 @@ from data_access.lesson_pptx_dao import LessonPptxDAO
 
 
 class LessonsService:
-    def __init__(self) -> None:
-        self.lesson_dao = LessonDAO()
-        self.lesson_pptx_dao = LessonPptxDAO()
+    def __init__(self, lesson_dao=None, lesson_pptx_dao=None, jwt: str | None = None) -> None:
+        self.lesson_dao = lesson_dao or LessonDAO(jwt=jwt)
+        self.lesson_pptx_dao = lesson_pptx_dao or LessonPptxDAO(jwt=jwt)
 
     def get_latest_done_pptx(self, lesson_id: str) -> Optional[dict]:
         return self.lesson_pptx_dao.get_latest_done(lesson_id)

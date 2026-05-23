@@ -5,8 +5,8 @@ from models.lesson_pptx import LessonPptx
 
 
 class LessonPptxDAO(SupabaseBaseDAO):
-    def __init__(self) -> None:
-        super().__init__('lesson_pptx')
+    def __init__(self, jwt: str | None = None) -> None:
+        super().__init__('lesson_pptx', jwt=jwt)
 
     def insert(self, record: LessonPptx) -> dict[str, Any]:
         return self._insert(record.to_item())

@@ -154,13 +154,16 @@ class LTGOrchestrationService:
         curriculum_service=None,
         *,
         bot_provider: BotProviderProtocol,
+        jwt: str | None = None,
     ) -> None:
         self._bot_provider = bot_provider
-        self.period_dao = period_dao or PeriodDAO()
-        self.student_dao = student_dao or StudentDAO()
+        self.period_dao = period_dao or PeriodDAO(jwt=jwt)
+        self.student_dao = student_dao or StudentDAO(jwt=jwt)
+        # ltg_conversation and student_long_term_goal are INSERT/UPDATE/DELETE FastAPI-only;
+        # admin client required for all mutations (and reads are safe via admin too)
         self.ltg_conversation_dao = ltg_conversation_dao or LtgConversationDAO()
         self.student_long_term_goal_dao = student_long_term_goal_dao or StudentLongTermGoalDAO()
-        self.curriculum_service = curriculum_service or CurriculumService(bot_provider=bot_provider)
+        self.curriculum_service = curriculum_service or CurriculumService(bot_provider=bot_provider, jwt=jwt)
 
     def initiate(self, user_id: str, period_id: str) -> Dict[str, Any]:
         if not period_id:

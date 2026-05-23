@@ -17,6 +17,48 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
 
+
+def _validate_env() -> None:
+    """Fail fast at startup if required environment variables are missing."""
+    _log = logging.getLogger(__name__)
+    mock_ai = os.getenv("MOCK_AI", "").lower() in ("true", "1", "yes")
+
+    required = [
+        "JWT_SECRET_KEY",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_JWT_SECRET",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "S3_BUCKET_NAME",
+        "STRIPE_SECRET_KEY",
+        # STRIPE_WEBHOOK_SECRET is validated lazily in the webhook route handler,
+        # so it is intentionally omitted here to allow local dev without it.
+    ]
+
+    # AI keys are only required when running live agents
+    if not mock_ai:
+        required += [
+            "OPENAI_API_KEY",
+            "PERPLEXITY_API_KEY",
+            "GEMINI_API_KEY",
+        ]
+
+    missing = [var for var in required if not os.getenv(var)]
+
+    if missing:
+        _log.critical(
+            "Missing required environment variables — server cannot start:\n  %s",
+            "\n  ".join(missing),
+        )
+        raise RuntimeError(
+            f"Missing required environment variables: {', '.join(missing)}"
+        )
+
+    _log.info("Environment validation passed (%d required vars present)", len(required))
+
+
 _req_log = logging.getLogger("eduquest.request")
 
 from routers import conversation, period, ltg, teacher, waitlist
@@ -33,6 +75,8 @@ from exceptions.permission_error import PermissionError
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _log = logging.getLogger(__name__)
+
+    _validate_env()
 
     if os.getenv("MOCK_AI", "").lower() in ("true", "1", "yes"):
         from bots.provider import MockBotProvider
@@ -52,6 +96,14 @@ async def lifespan(app: FastAPI):
         _log.info("S3 OK — bucket=%s endpoint=%s", BUCKET_NAME, s3.meta.endpoint_url)
     except Exception as e:
         _log.error("S3 connectivity FAILED — bucket=%s error=%s", BUCKET_NAME, e)
+
+    from data_access.period_dao import PeriodDAO
+    reset_count = PeriodDAO().reset_stale_generating()
+    if reset_count:
+        _log.warning("Reset %d stale 'generating' period(s) to 'failed' at startup", reset_count)
+    else:
+        _log.info("No stale 'generating' periods found at startup")
+
     yield
 
 
@@ -97,27 +149,31 @@ async def log_requests(request: Request, call_next):
     return response
 
 
+_logger = logging.getLogger(__name__)
+
+
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request: Request, exc: ValidationError):
+    _logger.warning("ValidationError on %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(status_code=400, content={"error": str(exc)})
 
 
 @app.exception_handler(NotFoundError)
 async def not_found_error_handler(request: Request, exc: NotFoundError):
+    _logger.info("NotFoundError on %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(status_code=404, content={"error": str(exc)})
 
 
 @app.exception_handler(AuthError)
 async def auth_error_handler(request: Request, exc: AuthError):
+    _logger.warning("AuthError on %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(status_code=401, content={"error": str(exc)})
 
 
 @app.exception_handler(PermissionError)
 async def permission_error_handler(request: Request, exc: PermissionError):
+    _logger.info("PermissionError on %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(status_code=403, content={"error": str(exc)})
-
-
-_logger = logging.getLogger(__name__)
 
 
 @app.exception_handler(Exception)

@@ -4,38 +4,43 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from constants.timeouts import JWT_EXPIRY_HOURS
-from models.session import Session
 from responses.auth import (
     LoginResponse,
+    OAuthCompleteResponse,
     PasswordResetConfirmResponse,
     PasswordResetRequestResponse,
     SignupResponse,
 )
+from routers.deps import AuthPayload, require_roles, Role
+from services.auth.account_deletion_service import AccountDeletionService
 from services.auth.auth_service import (
-    add_session,
     authenticate_user,
+    backfill_supabase_auth_id,
     get_student_by_id,
     get_user_by_email,
+    get_user_by_id,
     register_user,
 )
 from services.auth.oauth_service import OAuthService
+from services.auth.supabase_auth_service import SupabaseAuthService
 from services.parent.parent_service import ParentService
 from services.auth.password_reset_service import get_password_reset_service
-from utils.token_utils import set_auth_cookie
 from utils.validation_utils import get_client_ip
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Dead code until Phase 6 — kept to avoid breaking any external callers during rollout.
 JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret")
 JWT_ALGORITHM = "HS256"
 
 _parent_service = ParentService()
 _oauth_service = OAuthService()
+_supabase_auth_service = SupabaseAuthService()
 password_reset_service = get_password_reset_service()
 
 
@@ -104,8 +109,8 @@ def signup(body: SignupRequest):
             from services.billing.membership_service import MembershipService
             MembershipService().start_trial_if_eligible(body.username, body.role)
             response_body["trial_started"] = True
-        except Exception as e:  # pragma: no cover — billing is not auth-critical
-            logger.warning("Trial creation failed for %s: %s", body.username, e)
+        except Exception as exc:  # pragma: no cover — billing is not auth-critical
+            logger.warning("Trial creation failed for %s: %s", body.username, exc)
 
     if body.role == "student" and body.invite_code:
         invite_code = body.invite_code.strip().upper()
@@ -132,15 +137,46 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(body: LoginRequest, response: Response):
+def login(body: LoginRequest):
     if not authenticate_user(body.username, body.password, body.role):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = _mint_token(body.username, body.role)
-    session = Session(auth_token=token, user_id=body.username, role=body.role)  # type: ignore[arg-type]
-    add_session(session)
+    # Lazy backfill: provision Supabase Auth entry for pre-Phase-1 users.
+    try:
+        backfill_supabase_auth_id(body.username, body.password, body.role)
+    except Exception as exc:  # must not block login
+        logger.warning("Supabase Auth backfill failed for %s: %s", body.username, exc)
 
-    response_data: dict = {"token": token}
+    user = get_user_by_id(body.username)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    email: str = user["email"]
+
+    try:
+        sb_response = _supabase_auth_service.sign_in_with_password(email, body.password)
+    except Exception as exc:
+        # Password may have drifted if a previous sync_password call failed silently.
+        # authenticate_user() already verified body.password against bcrypt — it's correct.
+        if user.get("supabase_auth_id"):
+            try:
+                _supabase_auth_service.sync_password(user["supabase_auth_id"], body.password)
+                sb_response = _supabase_auth_service.sign_in_with_password(email, body.password)
+            except Exception as retry_exc:
+                logger.error("Supabase sign_in retry failed for %s: %s", body.username, retry_exc, exc_info=True)
+                raise HTTPException(status_code=401, detail="Authentication failed")
+        else:
+            logger.error("Supabase sign_in_with_password failed for %s: %s", body.username, exc, exc_info=True)
+            raise HTTPException(status_code=401, detail="Authentication failed")
+
+    if not sb_response.session:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    response_data: dict = {
+        "access_token": sb_response.session.access_token,
+        "refresh_token": sb_response.session.refresh_token,
+    }
+
     if body.role == "student":
         student = get_student_by_id(body.username)
         if student and (
@@ -158,10 +194,9 @@ def login(body: LoginRequest, response: Response):
         try:
             from services.billing.membership_service import MembershipService
             MembershipService().start_trial_if_eligible(body.username, body.role)
-        except Exception as e:  # pragma: no cover — login must not depend on billing
-            logger.warning("Trial backfill failed for %s on login: %s", body.username, e)
+        except Exception as exc:  # pragma: no cover — login must not depend on billing
+            logger.warning("Trial backfill failed for %s on login: %s", body.username, exc)
 
-    set_auth_cookie(response, token)
     return response_data
 
 
@@ -176,8 +211,8 @@ class OAuthCompleteRequest(BaseModel):
     trial_confirmed: Optional[bool] = None
 
 
-@router.post("/oauth/complete", response_model=LoginResponse)
-def oauth_complete(body: OAuthCompleteRequest, response: Response):
+@router.post("/oauth/complete", response_model=OAuthCompleteResponse)
+def oauth_complete(body: OAuthCompleteRequest):
     valid_roles = {"student", "teacher", "parent"}
     if body.role not in valid_roles:
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}")
@@ -190,9 +225,6 @@ def oauth_complete(body: OAuthCompleteRequest, response: Response):
     )
 
     username: str = result["username"]
-    token = _mint_token(username, body.role)
-    session = Session(auth_token=token, user_id=username, role=body.role)  # type: ignore[arg-type]
-    add_session(session)
 
     if body.role in ("teacher", "parent"):
         try:
@@ -201,8 +233,8 @@ def oauth_complete(body: OAuthCompleteRequest, response: Response):
         except Exception as exc:  # must not block login
             logger.warning("Trial backfill failed for OAuth user %s on login: %s", username, exc)
 
-    set_auth_cookie(response, token)
-    return {"token": token, "needs_profile": result.get("needs_profile", False)}
+    # Session is established client-side via supabase.auth.exchangeCodeForSession in /auth/callback.
+    return {"needs_profile": result.get("needs_profile", False)}
 
 
 # ---------------------------------------------------------------------------
@@ -230,6 +262,12 @@ async def password_reset_request(body: PasswordResetRequestBody, request: Reques
         user_agent=user_agent,
     )
     return {"message": result["message"]}
+
+
+@router.delete("/account", status_code=200)
+def delete_account(auth: AuthPayload = Depends(require_roles(Role.STUDENT, Role.TEACHER, Role.PARENT))):
+    AccountDeletionService().delete_account(auth.sub, auth.role.value)
+    return {"message": "Account deleted successfully."}
 
 
 @router.post("/password-reset/confirm", response_model=PasswordResetConfirmResponse)

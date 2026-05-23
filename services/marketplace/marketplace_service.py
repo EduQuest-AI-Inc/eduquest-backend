@@ -25,10 +25,12 @@ class MarketplaceService:
         listing_dao: Optional[MarketplaceListingDAO] = None,
         period_dao: Optional[PeriodDAO] = None,
         period_management_service: Optional[PeriodManagementService] = None,
+        jwt: str | None = None,
     ) -> None:
-        self.listing_dao = listing_dao or MarketplaceListingDAO()
-        self.period_dao = period_dao or PeriodDAO()
-        self.period_management_service = period_management_service or PeriodManagementService()
+        self.listing_dao = listing_dao or MarketplaceListingDAO(jwt=jwt)
+        self.period_dao = period_dao or PeriodDAO(jwt=jwt)
+        self._admin_period_dao = PeriodDAO()  # for cross-user period reads in get_listing / fork
+        self.period_management_service = period_management_service or PeriodManagementService(jwt=jwt)
 
     # ── publish ────────────────────────────────────────────────────────────────
 
@@ -80,7 +82,7 @@ class MarketplaceService:
         listing = self.listing_dao.get_by_id(listing_id)
         if not listing or not listing.get('is_published'):
             raise NotFoundError("Listing not found")
-        period = self.period_dao.get_period_by_id(listing['period_id'])
+        period = self._admin_period_dao.get_period_by_id(listing['period_id'])
         if not period:
             raise NotFoundError("Associated period not found")
         safe_period = {k: v for k, v in period.items() if k in _SAFE_PERIOD_FIELDS}
@@ -96,12 +98,12 @@ class MarketplaceService:
         orig_period_id = listing['period_id']
 
         # Prevent double-forking the same listing by the same user
-        existing_forks = self.period_dao.get_forks_by_period(orig_period_id)
+        existing_forks = self._admin_period_dao.get_forks_by_period(orig_period_id)
         already_forked = any(f.get('owner_id') == user_id for f in existing_forks)
         if already_forked:
             raise ValidationError("You have already forked this class")
 
-        orig_period = self.period_dao.get_period_by_id(orig_period_id)
+        orig_period = self._admin_period_dao.get_period_by_id(orig_period_id)
         if not orig_period:
             raise NotFoundError("Original class not found")
 

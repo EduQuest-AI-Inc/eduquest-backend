@@ -7,7 +7,7 @@ from models.student_skill_mastery import MASTERY_CUTOFF
 
 def _build_dao():
     """Construct a DAO with the Supabase client patched out."""
-    with patch("data_access.base_dao.get_supabase_client", return_value=MagicMock()):
+    with patch("data_access.base_dao.get_admin_supabase_client", return_value=MagicMock()):
         from data_access.student_skill_mastery_dao import StudentSkillMasteryDAO
         return StudentSkillMasteryDAO()
 

@@ -4,7 +4,7 @@ Quick reference for all 28 tables in the EduQuest Supabase database, grouped by 
 
 See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgREST `rpc/`.
 
-**RLS identity expression:** All policies use `(auth.jwt() ->> 'sub')` — reads the JWT `sub` claim as text, directly matching `user_id` values. Do **not** use `auth.uid()` — it casts to UUID and silently returns null for username-format IDs.
+See [SUPABASE_RULES.md](SUPABASE_RULES.md) for RLS policies and FK cascade rules.
 
 ---
 
@@ -94,14 +94,7 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `role`       | text        | NOT NULL | `"student"` \| `"teacher"` \| `"parent"` |
 | `created_at` | timestamptz | NOT NULL | Account creation time (DEFAULT now())    |
 | `login_disabled` | boolean | NOT NULL DEFAULT false | Set true to block login without deleting account |
-
-**RLS:** Enabled
-
-| Operation     | Who  |
-| ------------- | ---- |
-| SELECT        | Self (`user_id = sub`) |
-| UPDATE        | Self (`user_id = sub`) |
-| INSERT/DELETE | FastAPI only |
+| `supabase_auth_id` | uuid | nullable, UNIQUE | Supabase Auth UUID; null until backfilled on first login after Phase 1 deploy |
 
 ---
 
@@ -123,16 +116,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `created_by_parent_id` | text    | nullable    | FK → `user.user_id`; set when a parent creates the student account |
 | `claimed_at`         | timestamptz | nullable  | Timestamp when an unclaimed student account is claimed by the student |
 
-**RLS:** Enabled
-
-| Operation     | Who  |
-| ------------- | ---- |
-| SELECT        | Self (`user_id = sub`) |
-| SELECT        | Parent of student (EXISTS parent where sub ∈ `linked_student_ids`) |
-| SELECT        | Period owner (EXISTS enrollment JOIN period where `owner_id = sub`) |
-| UPDATE        | Self (`user_id = sub`) |
-| INSERT/DELETE | FastAPI only |
-
 ---
 
 ### `teacher`
@@ -147,14 +130,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `canvas_api_url` | text      | nullable    | Canvas LMS base URL             |
 | `canvas_api_key` | text      | nullable    | Canvas personal access token    |
 
-**RLS:** Enabled
-
-| Operation     | Who  |
-| ------------- | ---- |
-| SELECT        | Self (`user_id = sub`) |
-| UPDATE        | Self (`user_id = sub`) |
-| INSERT/DELETE | FastAPI only |
-
 ---
 
 ### `parent`
@@ -166,14 +141,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `user_id`            | text      | PK → `user` |                                                                  |
 | `linked_student_ids` | text[]  | nullable    | `user_id`s of linked student accounts                            |
 | `vpc_verified_at`    | timestamptz | nullable    | COPPA 2025 compliance — set when parent accepts a student invite |
-
-**RLS:** Enabled
-
-| Operation     | Who  |
-| ------------- | ---- |
-| SELECT        | Self (`user_id = sub`) |
-| UPDATE        | Self (`user_id = sub`) |
-| INSERT/DELETE | FastAPI only |
 
 ---
 
@@ -205,15 +172,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `forked_from_period_id` | text   | nullable    | FK → `period.period_id`; set when this period was forked from a marketplace listing |
 | `created_at`         | timestamptz | NOT NULL    |                                           |
 
-**RLS:** Enabled
-
-| Operation     | Who  |
-| ------------- | ---- |
-| SELECT        | Owner (`owner_id = sub`) |
-| SELECT        | Enrolled student (EXISTS enrollment where `user_id = sub`) |
-| UPDATE        | Owner (`owner_id = sub`) |
-| INSERT/DELETE | FastAPI only |
-
 ---
 
 ### `enrollment`
@@ -228,15 +186,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `enrolled_at`   | timestamptz | NOT NULL                  | Auto-set on insert |
 | `enrollment_id` | uuid      | UNIQUE                    | Surrogate ID       |
 
-**RLS:** Enabled
-
-| Operation | Who  |
-| --------- | ---- |
-| SELECT    | Period owner (EXISTS period where `owner_id = sub`) |
-| SELECT    | Enrolled student (self — `user_id = sub`) |
-| INSERT    | Self only (`user_id = sub` WITH CHECK) |
-| DELETE    | Self only (`user_id = sub`) |
-
 ### `period_schedule`
 
 > Per-period schedule configuration. Stores the raw schedule JSON (uploaded or Canvas-synced), the OpenAI file ID for that JSON (used in the vector store), and which week numbers have quests enabled.
@@ -249,14 +198,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `quest_enabled_weeks`    | integer[]   | NOT NULL DEFAULT '{}'            | Week numbers for which quests are generated         |
 | `created_at`             | timestamptz | NOT NULL DEFAULT now()           |                                                     |
 | `last_updated_at`        | timestamptz | NOT NULL DEFAULT now()           | Updated on every write                              |
-
-**RLS:** Enabled
-
-| Operation            | Who  |
-| -------------------- | ---- |
-| SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
-| SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
-| INSERT/UPDATE/DELETE | FastAPI only |
 
 ---
 
@@ -271,13 +212,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `expires_at` | timestamptz | NOT NULL    | Default: 24 hours from creation     |
 | `used`       | boolean     | NOT NULL    | Flipped to `true` on redemption     |
 | `created_at` | timestamptz | NOT NULL    |                                     |
-
-**RLS:** Enabled
-
-| Operation     | Who  |
-| ------------- | ---- |
-| SELECT        | Parent creator (`user_id = sub`) — note: `user_id` here is the **parent**, not the student |
-| INSERT/UPDATE/DELETE | FastAPI only — invite creation and redemption always go through the service role |
 
 ---
 
@@ -294,15 +228,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `week_start`  | date    | nullable                  | First day of the week        |
 | `week_end`    | date    | nullable                  | Last day of the week         |
 
-**RLS:** Enabled
-
-| Operation            | Who  |
-| -------------------- | ---- |
-| SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
-| SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
-| SELECT               | Parent (EXISTS parent where sub ∈ `linked_student_ids` AND student enrolled in period) |
-| INSERT/UPDATE/DELETE | FastAPI only |
-
 ---
 
 ### `lesson`
@@ -315,14 +240,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `period_id`   | text    | NOT NULL → `period`                          |                            |
 | `lesson_name` | text    | NOT NULL                                     |                            |
 | `week_number` | integer | NOT NULL → FK `week(period_id, week_number)` |                            |
-
-**RLS:** Enabled
-
-| Operation            | Who  |
-| -------------------- | ---- |
-| SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
-| SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
-| INSERT/UPDATE/DELETE | FastAPI only |
 
 ---
 
@@ -341,15 +258,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `attempt_count`| integer     | NOT NULL DEFAULT 0               | Incremented on each generation attempt; capped at 3 |
 | `created_at`   | timestamptz | NOT NULL DEFAULT now()           |                                                 |
 | `updated_at`   | timestamptz | NOT NULL DEFAULT now()           | Updated on every status change                  |
-
-**RLS:** Enabled
-
-| Operation     | Who                                                        |
-| ------------- | ---------------------------------------------------------- |
-| SELECT        | Period owner (EXISTS period where `owner_id = sub`)        |
-| SELECT        | Enrolled student (EXISTS enrollment where `user_id = sub`) |
-| SELECT        | Parent of enrolled student (EXISTS parent → enrollment)    |
-| INSERT/UPDATE | FastAPI only                                               |
 
 ---
 
@@ -371,14 +279,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `created_at`           | timestamptz | NOT NULL DEFAULT now()                    |                                           |
 | `last_updated_at`      | timestamptz | NOT NULL DEFAULT now()                    | Set on every write                        |
 
-**RLS:** Enabled
-
-| Operation            | Who  |
-| -------------------- | ---- |
-| SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
-| SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
-| INSERT/UPDATE/DELETE | FastAPI only |
-
 ---
 
 ### `skill`
@@ -396,14 +296,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `mastery_criteria`  | jsonb   | nullable                  | Detailed rubric criteria for mastery           |
 | `metadata`          | jsonb   | nullable                  | Arbitrary extra data from the bot              |
 
-**RLS:** Enabled
-
-| Operation            | Who  |
-| -------------------- | ---- |
-| SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
-| SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
-| INSERT/UPDATE/DELETE | FastAPI only |
-
 ---
 
 ### `concept_skill`
@@ -415,14 +307,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `period_id`    | text | PK (composite)                                       |       |
 | `concept_name` | text | PK (composite) → FK `concept(period_id, concept_name)` ON DELETE CASCADE |       |
 | `skill_name`   | text | PK (composite) → FK `skill(period_id, skill_name)` ON DELETE CASCADE |       |
-
-**RLS:** Enabled
-
-| Operation            | Who  |
-| -------------------- | ---- |
-| SELECT               | Period owner (EXISTS period where `owner_id = sub`) |
-| SELECT               | Enrolled student (EXISTS enrollment where `user_id = sub`) |
-| INSERT/UPDATE/DELETE | FastAPI only |
 
 ---
 
@@ -441,13 +325,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `created_at`        | timestamptz | NOT NULL    |                                                     |
 | `last_response_id`  | text        | nullable    | Last OpenAI response ID — used for message chaining |
 
-**RLS:** Enabled
-
-| Operation     | Who  |
-| ------------- | ---- |
-| SELECT        | Self (`user_id = sub`) |
-| INSERT/UPDATE/DELETE | FastAPI only |
-
 ---
 
 ### `ltg_conversation`
@@ -461,13 +338,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `conversation_id`  | text        | NOT NULL                  | OpenAI conversation ID                              |
 | `created_at`       | timestamptz | NOT NULL                  |                                                     |
 | `last_response_id` | text      | nullable                  | Last OpenAI response ID — used for message chaining |
-
-**RLS:** Enabled
-
-| Operation     | Who  |
-| ------------- | ---- |
-| SELECT        | The student (self — `user_id = sub`) |
-| INSERT/UPDATE/DELETE | FastAPI only |
 
 ---
 
@@ -507,17 +377,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 - `detailed_grade` — per-criterion scores produced by the grading agent (e.g. `{"Clarity": 18, "Analysis": 22}`)
 - `overall_score` — total points rolled up from all criteria
 
-**RLS:** Enabled
-
-| Operation     | Who  |
-| ------------- | ---- |
-| SELECT        | The student (`user_id = sub`) |
-| SELECT        | Period owner (EXISTS enrollment JOIN period where `owner_id = sub`) |
-| SELECT        | Parent (EXISTS parent where sub ∈ `linked_student_ids`) |
-| UPDATE        | Student — `status` column only (enforced at FastAPI layer, not RLS) |
-| UPDATE        | Period owner — `grade`/`feedback` columns only (enforced at FastAPI layer, not RLS) |
-| INSERT/DELETE | FastAPI only |
-
 ---
 
 ### `student_skill_mastery`
@@ -533,15 +392,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `score`      | numeric     | nullable                  | Latest aggregated score (0.0 – 1.0) |
 | `updated_at` | timestamptz | NOT NULL                  |                                     |
 
-**RLS:** Enabled — note: PK column is `student_id`, not `user_id`
-
-| Operation     | Who  |
-| ------------- | ---- |
-| SELECT        | The student (`student_id = sub`) |
-| SELECT        | Period owner (EXISTS period where `owner_id = sub`) |
-| SELECT        | Parent (EXISTS parent where sub ∈ `linked_student_ids` and `student_id` matches) |
-| INSERT/UPDATE/DELETE | FastAPI only |
-
 ---
 
 ### `aggregated_metrics`
@@ -555,8 +405,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `skill_name` | text        | PRIMARY KEY, NOT NULL   | The skill being tracked                      |
 | `percentage` | numeric     | NOT NULL                | Fraction of students who mastered this skill |
 | `updated_at` | timestamptz | NOT NULL                |                                              |
-
-**RLS:** Disabled — FastAPI service role only
 
 ---
 
@@ -573,15 +421,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `goal_text`  | text      | NOT NULL                  | Student's stated long-term goal |
 | `updated_at` | timestamptz | NOT NULL                  | Set on every upsert             |
 
-**RLS:** Enabled
-
-| Operation     | Who  |
-| ------------- | ---- |
-| SELECT        | The student (`user_id = sub`) |
-| SELECT        | Period owner (EXISTS period where `owner_id = sub`) |
-| SELECT        | Parent (EXISTS parent where sub ∈ `linked_student_ids` and `user_id` matches) |
-| INSERT/UPDATE/DELETE | FastAPI only |
-
 ---
 
 ## Auth & Sessions
@@ -596,14 +435,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `user_id`    | text      | NOT NULL    | FK → `user.user_id`                            |
 | `role`       | user_role | NOT NULL    | Enum: `"student"` \| `"teacher"` \| `"parent"` |
 | `expires_at` | timestamptz | NOT NULL    | Token expiry (default: 1 hour from creation)   |
-
-**RLS:** Enabled
-
-| Operation | Who  |
-| --------- | ---- |
-| SELECT    | Self (`user_id = sub`) |
-| DELETE    | Self (`user_id = sub`) |
-| INSERT    | FastAPI only — JWT doesn't exist yet at login time |
 
 ---
 
@@ -623,8 +454,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `attempts`   | integer   | NOT NULL    | Confirmation attempts; token burns after 5     |
 | `request_ip` | inet      | nullable    |                                                |
 | `user_agent` | text      | nullable    |                                                |
-
-**RLS:** Disabled — FastAPI service role only
 
 ---
 
@@ -646,8 +475,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | IP only        | `ip:{ip}\|w:{window_start}`                | 20 per 15 min  |
 | Email cooldown | `cooldown:email:{email}`                   | 5 min cooldown |
 
-**RLS:** Disabled — FastAPI service role only
-
 ---
 
 ## Onboarding
@@ -666,8 +493,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `referral_code` | text      | nullable    | Unique 8-char code for sharing    |
 | `referred_by`   | text      | nullable    | `user_id` of the referrer         |
 | `status`        | text      | NOT NULL    | `"pending"` \| `"approved"`       |
-
-**RLS:** Disabled — public signup list, no per-user scoping needed
 
 ---
 
@@ -697,13 +522,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `updated_at`              | timestamptz       | NOT NULL DEFAULT now()   | Must be kept non-null; use `default_factory` in Pydantic model  |
 | `delete_after`            | timestamptz       | nullable                 | Soft-delete timestamp; row is eligible for cleanup after this   |
 
-**RLS:** Enabled
-
-| Operation     | Who  |
-| ------------- | ---- |
-| SELECT        | Self (`user_id = sub`) |
-| INSERT/UPDATE/DELETE | FastAPI only |
-
 ---
 
 ## Marketplace
@@ -724,8 +542,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `updated_at`   | timestamptz | NOT NULL DEFAULT now()   |                                                        |
 | `delete_after` | timestamptz | nullable                 | Soft-delete timestamp                                  |
 
-**RLS:** Disabled — FastAPI service role only
-
 ---
 
 ## Feedback
@@ -740,8 +556,6 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `user_id`     | text        | NOT NULL → `user`        |                                    |
 | `message`     | text        | NOT NULL                 | Raw feedback text from the user    |
 | `created_at`  | timestamptz | NOT NULL DEFAULT now()   |                                    |
-
-**RLS:** Disabled — FastAPI service role only
 
 ---
 
@@ -793,8 +607,3 @@ See [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures called via PostgR
 | `vector_store_id`  | text        | NOT NULL UNIQUE | Per-file vector store; embeddings live here  |
 | `created_at`       | timestamptz | NOT NULL    | Auto-set on first upload                         |
 
-**RLS:** Enabled
-
-| Operation     | Who  |
-| ------------- | ---- |
-| INSERT/UPDATE/DELETE | FastAPI only |
