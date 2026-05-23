@@ -72,6 +72,12 @@ def get_auth(
             )
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidAudienceError:
+        # Pre-migration HS256 tokens lack audience="authenticated" — tell the user to re-login
+        raise HTTPException(
+            status_code=401,
+            detail="Session format outdated — please log out and log back in",
+        )
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 

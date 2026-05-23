@@ -21,7 +21,7 @@ TUTORIAL_PERIOD_ID = "PRECALC-58F9-88F5"
 
 
 class EnrollmentService:
-    def __init__(self, enrollment_dao=None, student_dao=None, period_dao=None, parent_dao=None, user_dao=None, quest_dao=None, ltg_conversation_dao=None, conversation_dao=None, ltg_goal_dao=None, jwt: str | None = None) -> None:
+    def __init__(self, enrollment_dao=None, student_dao=None, period_dao=None, parent_dao=None, user_dao=None, quest_dao=None, ltg_conversation_dao=None, conversation_dao=None, ltg_goal_dao=None, jwt: str | None = None, admin_parent_dao=None, admin_period_dao=None, admin_user_dao=None, admin_ltg_conversation_dao=None, admin_conversation_dao=None, admin_ltg_goal_dao=None, admin_quest_dao=None) -> None:
         self.enrollment_dao = enrollment_dao or EnrollmentDAO(jwt=jwt)
         self.student_dao = student_dao or StudentDAO(jwt=jwt)
         self.period_dao = period_dao or PeriodDAO(jwt=jwt)
@@ -31,6 +31,14 @@ class EnrollmentService:
         self.ltg_conversation_dao = ltg_conversation_dao or LtgConversationDAO(jwt=jwt)
         self.conversation_dao = conversation_dao or ConversationDAO(jwt=jwt)
         self.ltg_goal_dao = ltg_goal_dao or StudentLongTermGoalDAO(jwt=jwt)
+        # Admin DAOs for cross-user reads and FastAPI-only mutations
+        self._admin_parent_dao = admin_parent_dao or ParentDAO()
+        self._admin_period_dao = admin_period_dao or PeriodDAO()
+        self._admin_user_dao = admin_user_dao or UserDAO()
+        self._admin_ltg_conversation_dao = admin_ltg_conversation_dao or LtgConversationDAO()
+        self._admin_conversation_dao = admin_conversation_dao or ConversationDAO()
+        self._admin_ltg_goal_dao = admin_ltg_goal_dao or StudentLongTermGoalDAO()
+        self._admin_quest_dao = admin_quest_dao or QuestDAO()
 
     def enroll_student(self, user_id: str, period_id: str, semester: str = "Fall 2025") -> dict:
         student = self.student_dao.get_student_by_id(user_id)
@@ -115,11 +123,13 @@ class EnrollmentService:
         ]
 
     def get_parent_periods_for_student(self, student_id: str) -> List[Dict[str, Any]]:
-        parents = self.parent_dao.get_parents_by_student_id(student_id)
+        # parent and unenrolled period rows are not visible to a student JWT under RLS;
+        # use admin DAOs (no JWT) for these cross-user reads.
+        parents = self._admin_parent_dao.get_parents_by_student_id(student_id)
         enrolled = {e['period_id'] for e in self.enrollment_dao.get_enrollments_by_student(student_id)}
         periods = []
         for parent in parents:
-            for p in self.period_dao.get_periods_by_owner_id(parent['user_id']):
+            for p in self._admin_period_dao.get_periods_by_owner_id(parent['user_id']):
                 if p['period_id'] in enrolled:
                     continue
                 if p.get('status') == 'approved':
@@ -140,12 +150,14 @@ class EnrollmentService:
         if not period_id:
             raise ValidationError("Missing period ID")
 
-        period = self.period_dao.get_period_by_id(period_id)
+        # Use admin DAO: student is not yet enrolled so user JWT returns None for this period
+        period = self._admin_period_dao.get_period_by_id(period_id)
         if not period:
             logger.warning("verify_period_id: period %s not found (user=%s)", period_id, user_id)
             raise NotFoundError("Invalid period ID")
 
-        owner = self.user_dao.get_by_id(period["owner_id"])
+        # Use admin DAO: reading another user's (owner's) row is a cross-user read
+        owner = self._admin_user_dao.get_by_id(period["owner_id"])
         if not owner:
             logger.warning("verify_period_id: owner not found for period %s", period_id)
             raise NotFoundError("Invalid period ID")
@@ -201,18 +213,19 @@ class EnrollmentService:
 
         updated_enrollments = [p for p in enrolled_period_ids if p != period_id]
 
-        conversation_id = self.ltg_conversation_dao.delete_conversation(user_id, period_id)
+        # All deletes below are on FastAPI-only tables — use admin DAOs
+        conversation_id = self._admin_ltg_conversation_dao.delete_conversation(user_id, period_id)
         if conversation_id:
             try:
-                self.conversation_dao.delete_conversation(conversation_id)
+                self._admin_conversation_dao.delete_conversation(conversation_id)
             except Exception as e:
                 logger.warning("Could not delete conversation %s: %s", conversation_id, e)
 
-        self.ltg_goal_dao.delete(user_id, period_id)
+        self._admin_ltg_goal_dao.delete(user_id, period_id)
 
         quests = self.quest_dao.get_quests_by_student_and_period(user_id, period_id)
         for q in quests:
-            self.quest_dao.delete_quest(q['quest_id'])
+            self._admin_quest_dao.delete_quest(q['quest_id'])
 
         return {
             "message": f"Successfully unenrolled from period {period_id}",

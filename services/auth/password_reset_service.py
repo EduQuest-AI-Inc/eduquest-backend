@@ -263,7 +263,7 @@ class PasswordResetService:
                 if user and user.get("supabase_auth_id"):
                     self.supabase_auth_service.sync_password(user["supabase_auth_id"], new_password)
             except Exception as exc:  # must not block password reset
-                logger.warning("Supabase password sync failed for %s: %s", user_id, exc)
+                logger.warning("Supabase password sync failed for %s: %s", user_id, exc, exc_info=True)
 
             self._log_event(
                 "PASSWORD_RESET_SUCCESS",
