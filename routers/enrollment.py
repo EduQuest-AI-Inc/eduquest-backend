@@ -149,5 +149,13 @@ def accept_parent_invite(body: AcceptInviteRequest, auth: AuthPayload = Depends(
     if not code:
         raise HTTPException(status_code=400, detail="Invite code is required")
     parent_svc = ParentService(jwt=auth.token)
-    result = parent_svc.accept_invite(auth.sub, code)
+    try:
+        result = parent_svc.accept_invite(auth.sub, code)
+    except ValueError as exc:
+        msg = str(exc).lower()
+        if "expired" in msg or "already been used" in msg:
+            raise HTTPException(status_code=410, detail=str(exc))
+        if "invalid" in msg:
+            raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
     return result

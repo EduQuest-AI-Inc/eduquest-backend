@@ -16,6 +16,7 @@ def _svc():
     svc.teacher_dao = MagicMock()
     svc.period_dao = MagicMock()
     svc._admin_quest_retrieval_svc = MagicMock()
+    svc._period_service = MagicMock()
     return svc
 
 
@@ -326,17 +327,16 @@ def test_continue_update_assistant_happy_path(mock_cont):
 
 
 @pytest.mark.unit
-@patch("services.period.period_service.PeriodService")
 @patch("services.conversation.conversation_service.continue_teacher_feedback",
        return_value={"response": "Updated!", "suggested_change": {"week": 2}})
-def test_continue_update_assistant_with_suggested_change(mock_cont, mock_ps_cls):
+def test_continue_update_assistant_with_suggested_change(mock_cont):
     svc = _svc()
     svc.conversation_dao.get_conversation_by_id_user_type.return_value = {"period_id": "p1"}
-    mock_ps_cls.return_value.update_quests_with_recommended_change.return_value = {"message": "done"}
+    svc._period_service.update_quests_with_recommended_change.return_value = {"message": "done"}
 
     svc.continue_update_assistant("u1", "teacher", "cid1", "message")
 
-    mock_ps_cls.return_value.update_quests_with_recommended_change.assert_called_once()
+    svc._period_service.update_quests_with_recommended_change.assert_called_once()
 
 
 @pytest.mark.unit

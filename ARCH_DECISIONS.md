@@ -96,6 +96,24 @@ The bot provider follows the same rule. Services declare `bot_provider: BotProvi
 
 Module-level orchestration functions (`run_*`) are also banned for the same reason. If logic needs its own DAOs, it belongs in a service class, not a free function.
 
+### Cross-domain service dependencies — allowed flow and forbidden patterns
+
+Services in different feature domains may depend on each other, but only in one direction and only via constructor injection. The allowed dependency flow is:
+
+```
+conversation ──→ period / quest   (one-way; injected at constructor)
+period       ──→ enrollment / curriculum / quest   (one-way; injected at constructor)
+quest        ──→ curriculum   (one-way; injected at constructor)
+```
+
+**Forbidden patterns:**
+
+- **Dynamic imports inside method bodies** — `from services.X import Y` inside a function hides the dependency from the constructor, making it invisible to callers and impossible to inject in tests. All cross-domain service dependencies must be declared as constructor parameters with defaults (same rule as DAOs).
+- **Reverse-direction imports** — `period` and `quest` domains must not import from the `conversation` domain. (`period_service.py` currently imports `LTGOrchestrationService` from `services/conversation/ltg_service.py` — this is a tracked violation to address when `PeriodService` is refactored, not a precedent to copy.)
+- **Router-level service construction of another domain's private API** — a router handler must not call a private method (underscore-prefixed) on a service from a different domain. Use a public method or add one.
+
+**Rationale:** Hidden cross-domain calls break the "refactor one domain, break the other at runtime not compile time" guarantee. Constructor injection makes the dependency explicit, testable with mocks, and visible in `__init__` signatures.
+
 ### `integrations/` vs `utils/` — network boundary rule
 
 The distinction between these two directories is whether the code needs a network call or a credential to function:
