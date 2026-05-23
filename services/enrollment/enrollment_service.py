@@ -21,7 +21,7 @@ TUTORIAL_PERIOD_ID = "PRECALC-58F9-88F5"
 
 
 class EnrollmentService:
-    def __init__(self, enrollment_dao=None, student_dao=None, period_dao=None, parent_dao=None, user_dao=None, quest_dao=None, ltg_conversation_dao=None, conversation_dao=None, ltg_goal_dao=None, jwt: str | None = None, admin_parent_dao=None, admin_period_dao=None, admin_user_dao=None, admin_ltg_conversation_dao=None, admin_conversation_dao=None, admin_ltg_goal_dao=None, admin_quest_dao=None) -> None:
+    def __init__(self, enrollment_dao=None, student_dao=None, period_dao=None, parent_dao=None, user_dao=None, quest_dao=None, ltg_conversation_dao=None, conversation_dao=None, ltg_goal_dao=None, jwt: str | None = None, admin_enrollment_dao=None, admin_parent_dao=None, admin_period_dao=None, admin_user_dao=None, admin_ltg_conversation_dao=None, admin_conversation_dao=None, admin_ltg_goal_dao=None, admin_quest_dao=None) -> None:
         self.enrollment_dao = enrollment_dao or EnrollmentDAO(jwt=jwt)
         self.student_dao = student_dao or StudentDAO(jwt=jwt)
         self.period_dao = period_dao or PeriodDAO(jwt=jwt)
@@ -32,6 +32,7 @@ class EnrollmentService:
         self.conversation_dao = conversation_dao or ConversationDAO(jwt=jwt)
         self.ltg_goal_dao = ltg_goal_dao or StudentLongTermGoalDAO(jwt=jwt)
         # Admin DAOs for cross-user reads and FastAPI-only mutations
+        self._admin_enrollment_dao = admin_enrollment_dao or EnrollmentDAO()
         self._admin_parent_dao = admin_parent_dao or ParentDAO()
         self._admin_period_dao = admin_period_dao or PeriodDAO()
         self._admin_user_dao = admin_user_dao or UserDAO()
@@ -186,7 +187,7 @@ class EnrollmentService:
             raise ValidationError(f"You are already enrolled in period {period_id}")
 
         enrollment = Enrollment(period_id=period_id, user_id=user_id, semester="2024-spring")
-        self.enrollment_dao.add_enrollment(enrollment)
+        self._admin_enrollment_dao.add_enrollment(enrollment)
 
         if period_id != TUTORIAL_PERIOD_ID:
             self.cleanup_tutorial_periods(user_id)

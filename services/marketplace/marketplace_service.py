@@ -110,9 +110,9 @@ class MarketplaceService:
         new_period_id = self.period_management_service.generate_period_id(
             orig_period.get('name', 'FORK')
         )
-        # Ensure uniqueness
+        # Ensure uniqueness — use admin DAO so RLS doesn't mask existing periods
         for _ in range(5):
-            if not self.period_dao.get_period_by_id(new_period_id):
+            if not self._admin_period_dao.get_period_by_id(new_period_id):
                 break
             new_period_id = self.period_management_service.generate_period_id(
                 orig_period.get('name', 'FORK')
@@ -130,7 +130,9 @@ class MarketplaceService:
             logger.error("Fork RPC failed for listing %s: %s", listing_id, exc, exc_info=True)
             raise ValidationError("Fork failed — please try again") from exc
 
-        forked = self.period_dao.get_period_by_id(new_period_id)
+        # Use admin DAO — RLS may not yet allow the user to read their new period
+        logger.info("Retrieving forked period %s via admin client", new_period_id)
+        forked = self._admin_period_dao.get_period_by_id(new_period_id)
         if not forked:
             raise ValidationError("Fork completed but period could not be retrieved")
         return forked

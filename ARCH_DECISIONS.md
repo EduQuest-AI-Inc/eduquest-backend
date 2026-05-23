@@ -43,6 +43,7 @@ Audit: `pytest tests/unit/routes/test_rbac_audit.py` verifies every route either
 
 Pass `jwt=jwt` to a DAO only when the method reads **solely the calling user's own rows** and RLS should enforce that boundary. For any cross-user read (fetching another user's record by their ID), instantiate the DAO without a JWT so the admin client is used and RLS is bypassed server-side. Mixing both in a single service constructor is intentional and expected — document it with a comment. The default pattern (`self.my_dao = my_dao or MyDAO()`) uses the admin client.
 
+
 ### Services must raise typed exceptions — no bare ValueError
 
 Services must raise typed exceptions from `exceptions/` to signal HTTP-meaningful outcomes. Never raise bare `ValueError`, `LookupError`, or `Exception` for conditions that have a defined HTTP mapping. Use: `NotFoundError` for missing resources (→ 404), `ValidationError` for invalid input or state (→ 400), `PermissionError` for ownership violations (→ 403). System integrity failures (corrupt data, missing required fields) should raise `RuntimeError` and bubble to 500. Routers must never catch bare exceptions to infer status codes via substring matching — typed exceptions carry explicit meaning and global handlers own the status mapping.
