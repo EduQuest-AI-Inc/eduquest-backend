@@ -65,7 +65,7 @@ class ParentService:
         parent = self.parent_dao.get_parent_by_id(parent_id)
         if not parent:
             logger.error("Parent account not found for invite code %r (parent_id=%r)", code, parent_id)
-            raise RuntimeError(f"Parent account not found for parent_id {parent_id!r}")
+            raise NotFoundError(f"Parent account not found for parent_id {parent_id!r}")
 
         linked_ids = list(parent.get("linked_student_ids") or [])
         if student_id in linked_ids:
