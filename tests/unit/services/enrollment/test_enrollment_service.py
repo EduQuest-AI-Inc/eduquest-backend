@@ -17,6 +17,7 @@ def _svc():
     svc.ltg_conversation_dao = MagicMock()
     svc.ltg_goal_dao = MagicMock()
     svc.conversation_dao = MagicMock()
+    svc._admin_enrollment_dao = MagicMock()
     svc._admin_parent_dao = MagicMock()
     svc._admin_period_dao = MagicMock()
     svc._admin_user_dao = MagicMock()
@@ -229,7 +230,7 @@ def test_verify_period_id_success_auto_enrolls():
 
     result = svc.verify_period_id("s1", "p1")
 
-    svc.enrollment_dao.add_enrollment.assert_called_once()
+    svc._admin_enrollment_dao.add_enrollment.assert_called_once()
     assert result == period
 
 

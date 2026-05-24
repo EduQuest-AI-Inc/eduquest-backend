@@ -17,11 +17,15 @@ The frontend may hide buttons, redirect routes, or skip rendering components bas
 
 ### Auth & Role-Based Access Control
 
+#### Role and enrollment enforcement
+
 Role enforcement lives exclusively at the **router layer** via FastAPI `Depends()`. Service methods never raise errors for role checks — they assume the caller is already authorized. Service-layer `PermissionError` is reserved for **ownership checks** only (e.g. a teacher editing another teacher's period) — ownership stays in the service because verifying it requires fetching the same resource the service needs anyway; moving it to the router would mean two queries for the same row.
 
 Enrollment checks — verifying a user is a member of a specific period — are also an authorization concern, not business logic. They belong at the router layer. Since `period_id` always arrives from the request body, call `EnrollmentService().check_enrolled(user_id, period_id)` at the top of the handler, before any service call. Service methods must not perform enrollment checks.
 
 **Exception:** `PeriodQuestService._check_enrolled` in `services/period/period_quest_service.py`. The `period_id` here is resolved from quest data fetched *inside* `ConversationService` — it is not present in the request body at router time, so the router cannot perform the check up front. The method is marked `# arch-ok` at its call site.
+
+#### Canonical auth dependencies
 
 Three roles: `Role.STUDENT`, `Role.TEACHER`, `Role.PARENT` — defined as a `str, Enum` in `api/deps.py` alongside `AuthPayload` and `get_auth()`.
 
@@ -39,6 +43,7 @@ Audit: `pytest tests/unit/routes/test_rbac_audit.py` verifies every route either
 
 Pass `jwt=jwt` to a DAO only when the method reads **solely the calling user's own rows** and RLS should enforce that boundary. For any cross-user read (fetching another user's record by their ID), instantiate the DAO without a JWT so the admin client is used and RLS is bypassed server-side. Mixing both in a single service constructor is intentional and expected — document it with a comment. The default pattern (`self.my_dao = my_dao or MyDAO()`) uses the admin client.
 
+
 ### Services must raise typed exceptions — no bare ValueError
 
 Services must raise typed exceptions from `exceptions/` to signal HTTP-meaningful outcomes. Never raise bare `ValueError`, `LookupError`, or `Exception` for conditions that have a defined HTTP mapping. Use: `NotFoundError` for missing resources (→ 404), `ValidationError` for invalid input or state (→ 400), `PermissionError` for ownership violations (→ 403). System integrity failures (corrupt data, missing required fields) should raise `RuntimeError` and bubble to 500. Routers must never catch bare exceptions to infer status codes via substring matching — typed exceptions carry explicit meaning and global handlers own the status mapping.
@@ -55,12 +60,6 @@ The canonical example is `period`: routes that call several sub-services all ope
 
 This is the inverse of the ownership-check rule above: ownership checks stay in the service because the service is the first to fetch the resource; shared-resource fetching moves to the router because the resource is needed before any service is called and would otherwise be fetched redundantly by each one.
 
-### The frontend never calls Supabase for data reads or writes — all domain data goes through FastAPI
-
-The frontend uses the Supabase client SDK for auth only (sign-up, sign-in, session management).
-All domain data reads and writes must go through the FastAPI backend. This keeps business logic
-and RLS policy in one place and prevents clients from bypassing server-side validation.
-
 ### The bot provider is selected once at startup — services depend on the protocol, never the implementation
 
 `os.getenv("MOCK_AI")` is read exactly once, in `main.py` lifespan, and the result is stored in `app.state.bot_provider`. After startup, no code reads `MOCK_AI` again. `get_bot_provider()` in `api/deps.py` is a thin FastAPI dependency that reads `request.app.state.bot_provider` — it contains no selection logic.
@@ -75,7 +74,7 @@ A `@function_tool` body must do nothing except call a named public function and 
 
 This is the agent-layer equivalent of "Routers are HTTP-boundary-only." The extracted function lives in `utils/` if it is pure control flow with injected dependencies, or in a dedicated service if it needs its own DAO/provider wiring.
 
-**`@function_tool` → sub-agent pattern:** `SLIDE_TOOLS` in `bots/tools/` call `ContentWriterAgent` and `VisualReviewAgent` as sub-agents. This is the intended multi-agent design and is **not** a violation of the "individual bot classes never imported outside `bots/provider.py`" rule. The full call chain is `PptxAgent (provider entry point) → OrchestratorAgent → SLIDE_TOOLS (@function_tool) → ContentWriterAgent / VisualReviewAgent`. When `MockBotProvider` is active, `MockPptxAgent` replaces the entire `PptxAgent` entry point, so `OrchestratorAgent` and its `SLIDE_TOOLS` never execute — the mock boundary is correct. Additionally, `bots/slideshow/pptx_agent.py` imports `OrchestratorAgent` directly; this is intra-`bots/` composition between the public entry point and its private implementation detail, not a service-layer violation.
+`SLIDE_TOOLS` calling `ContentWriterAgent` and `VisualReviewAgent` as sub-agents is the intended multi-agent design and is **not** a violation of the "individual bot classes never imported outside `bots/provider.py`" rule. See [bots/CLAUDE.md](bots/CLAUDE.md) for the full call chain and mock boundary details.
 
 ### Services receive their dependencies — they never instantiate DAOs, services, integration modules, or the bot provider inline
 

@@ -16,6 +16,10 @@ class ExampleDAO(SupabaseBaseDAO):
 
 One file per Supabase table.
 
+## Client Selection Rule
+
+**Admin vs user Supabase client** — DAOs operating in user context pass the user JWT (RLS is enforced by Supabase). DAOs that need elevated access (background jobs, operations that must bypass RLS) use the service-role client. The choice is made in the DAO constructor, not at the call site. Example: `ConversationDAO` in `ConversationService` uses the admin client because the conversation table RLS blocks user-context INSERTs.
+
 ## Base helpers (read these before adding methods)
 
 `SupabaseBaseDAO` exposes thin wrappers around the PostgREST query builder:

@@ -34,6 +34,7 @@ def _make_service() -> EnrollmentService:
     svc.ltg_conversation_dao = MagicMock()
     svc.ltg_goal_dao = MagicMock()
     svc.quest_dao = MagicMock()
+    svc._admin_enrollment_dao = MagicMock()
     svc._admin_parent_dao = MagicMock()
     svc._admin_period_dao = MagicMock()
     svc._admin_user_dao = MagicMock()
@@ -182,7 +183,7 @@ def test_verify_period_id_not_enrolled_enrolls_student():
 
     result = svc.verify_period_id("u1", "p1")
 
-    svc.enrollment_dao.add_enrollment.assert_called_once()
+    svc._admin_enrollment_dao.add_enrollment.assert_called_once()
     assert result["period_id"] == "p1"
 
 
@@ -218,7 +219,7 @@ def test_verify_allows_parent_period_via_dropdown():
 
     result = svc.verify_period_id("u1", "p1", allow_parent_period=True)
 
-    svc.enrollment_dao.add_enrollment.assert_called_once()
+    svc._admin_enrollment_dao.add_enrollment.assert_called_once()
     assert result["period_id"] == "p1"
 
 

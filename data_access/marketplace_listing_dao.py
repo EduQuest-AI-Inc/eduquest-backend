@@ -1,12 +1,14 @@
 from typing import Any, Optional
 
 from data_access.base_dao import SupabaseBaseDAO
+from data_access.config import get_admin_supabase_client
 from models.marketplace_listing import MarketplaceListing
 
 
 class MarketplaceListingDAO(SupabaseBaseDAO):
     def __init__(self, jwt: str | None = None) -> None:
         super().__init__('marketplace_listing', jwt=jwt)
+        self._admin_client = get_admin_supabase_client()
 
     def insert_listing(self, listing: MarketplaceListing) -> dict[str, Any]:
         return self._insert(listing.to_item())
@@ -26,7 +28,7 @@ class MarketplaceListingDAO(SupabaseBaseDAO):
         offset: int = 0,
     ) -> list[dict[str, Any]]:
         query = (
-            self.client.table('marketplace_listing')
+            self._admin_client.table('marketplace_listing')
             .select('*, period(name, grade_level, course_description)')
             .eq('is_published', True)
             .order('created_at', desc=True)
