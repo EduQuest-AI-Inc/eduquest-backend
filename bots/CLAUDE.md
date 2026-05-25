@@ -16,6 +16,8 @@ For rationale behind bot provider selection and `@function_tool` boundary rules,
 All agent code uses OpenAI Agents SDK (`from agents import Agent, Runner`).
 
 **Top-level bots/**
+- `model_config.py` — single source of truth for model names and reasoning effort constants across agents. Most current workloads use the `gpt-5.4` family, but keep existing exceptions such as `PROFILE_CONVERSATION_MODEL = "gpt-4.1-mini"` here instead of hard-coding in agent files.
+- `tracing.py` — Agents SDK trace helpers: `hashed_trace_group_id()` for non-reversible correlation IDs, `sanitize_trace_metadata()` for scalar metadata only, and `build_trace_run_config()` for merging trace workflow/group/metadata settings.
 - `grading_agent.py` (`GradingOrchestrator`) — produces per-skill float scores (0.0–1.0); results written to `aggregated_metrics` via `AggregatedMetricsDAO`
 - `ltg_agent.py` — long-term goal conversational agent
 - `profile_agent.py` — student profile agent
@@ -31,6 +33,8 @@ All agent code uses OpenAI Agents SDK (`from agents import Agent, Runner`).
 **bots/quests/**
 - `quest_agent.py` (`HWAgent`) — generates quest instructions and rubrics for all curriculum weeks
 - `ltg_schedule_agent.py` (`LtgScheduleAgent`) — turns a student's long-term goal into a week-by-week quest name sequence
+- `curriculum_only_quest_agent.py` (`CurriculumOnlyQuestAgent`) — generates a long-term goal plus all quest names/instructions/rubrics from approved curriculum alone; used for Summer Side Quests
+- `demo_ltg_agent.py` (`DemoLTGAgent`) — public landing-page demo agent; returns one long-term goal and four weekly quests for `POST /demo/quest`
 
 **bots/schemas/**
 - `rubric.py` — `Rubric` Pydantic schema

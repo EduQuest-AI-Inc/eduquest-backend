@@ -14,6 +14,7 @@ eduquest-backend/
 │   ├── billing.py                  # /billing — membership status, Stripe checkout/portal, webhook
 │   ├── conversation.py             # /conversation — profile assistant, update assistant
 │   ├── curriculum.py               # /curriculum — per-period curriculum generation/approval
+│   ├── demo_quest.py               # /demo — POST /quest (no auth, landing page)
 │   ├── enrollment.py               # /enrollment — enroll/unenroll students
 │   ├── feedback.py                 # /feedback — student/teacher feedback submission and retrieval
 │   ├── lessons.py                  # /lessons — presigned URLs for lesson PPTX and HTML
@@ -27,12 +28,14 @@ eduquest-backend/
 │   ├── user.py                     # /user — user profile, tutorial state
 │   └── waitlist.py                 # /pilot-waitlist — status, join
 ├── services/                         # Service/business logic layer (imported by routers/)
-│   ├── auth/                       # auth_service.py, password_reset_service.py, password_policy.py
+│   ├── auth/                       # auth_service.py, oauth_service.py,
+│   │                               #   password_reset_service.py, password_policy.py
 │   ├── billing/                    # membership_service.py (trial lifecycle, plan limits,
 │   │                               #   Stripe sync), trial_reminder_service.py
 │   ├── conversation/               # conversation_service.py, grading_service.py,
 │   │                               #   ltg_service.py, profile_service.py, teacher_feedback_service.py
 │   ├── curriculum/                 # curriculum_service.py
+│   ├── demo/                       # demo_ltg_service.py (public landing-page quest demo)
 │   ├── enrollment/                 # enrollment_service.py (CRUD, verify_and_enroll, unenroll,
 │   │                               #   get_my_periods, assert_enrolled)
 │   ├── feedback/                   # feedback_service.py
@@ -46,7 +49,7 @@ eduquest-backend/
 │   │                               #   quest_retrieval_service.py, quest_grading_service.py
 │   ├── tracking/                   # PostHog server-side analytics (posthog_client.py,
 │   │                               #   events.py, track.py)
-│   ├── user/                       # user_service.py
+│   ├── user/                       # user_service.py, teacher_service.py
 │   ├── waitlist/                   # waitlist_service.py
 │   ├── parent/                     # parent_service.py
 │   └── slides/                     # pptx_generation_service.py — status lifecycle (pending→generating→done|failed), restart_batch
@@ -79,15 +82,19 @@ eduquest-backend/
 │   ├── grading_agent.py            # Multi-agent grading orchestrator
 │   ├── ltg_agent.py                # Long-term goal agent
 │   ├── guardrails.py               # Content safety guardrails
+│   ├── model_config.py             # Central model-name and reasoning policy
 │   ├── profile_agent.py            # Student profile agent
 │   ├── protocol.py                 # BotProviderProtocol, PptxAgentProtocol
 │   ├── provider.py                 # BotProvider factory for real and mock instances
 │   ├── teacher_feedback_agent.py   # Teacher feedback agent
+│   ├── tracing.py                  # Agents SDK trace helpers (hashed group IDs, sanitized metadata)
 │   ├── _mocks.py                   # MockBotProvider and mock agents for testing
 │   ├── curriculum/                 # curriculum_agent.py (Week→Lesson→Concept→Skill),
 │   │                               #   coverage_evaluator.py (decides Perplexity research)
 │   ├── quests/                     # quest_agent.py (HWAgent — instructions/rubric),
-│   │                               #   ltg_schedule_agent.py (LTG → per-week quest names)
+│   │                               #   ltg_schedule_agent.py (LTG → per-week quest names),
+│   │                               #   curriculum_only_quest_agent.py (Summer Side Quests),
+│   │                               #   demo_ltg_agent.py (public landing-page demo)
 │   ├── schemas/                    # rubric.py, instructions.py, curriculum.py
 │   ├── slideshow/                  # pptx_agent.py, orchestrator_agent.py,
 │   │                               #   content_writer_agent.py, visual_review_agent.py
@@ -121,10 +128,11 @@ eduquest-backend/
 
 ### FastAPI (`main.py`) — sole server
 
-- `/auth` — login, signup (`trial_confirmed: true` is required for parent/teacher), password reset
+- `/auth` — login, signup (`trial_confirmed: true` is required for parent/teacher), OAuth complete, password reset
 - `/billing` — `GET /membership`, `POST /checkout-session`, `POST /portal-session`, `POST /webhook`
 - `/conversation` — profile assistant, update assistant
 - `/curriculum` — curriculum generation/approval per period
+- `/demo` — public `POST /quest` landing-page quest demo, no auth required
 - `/enrollment` — student enrollment
 - `/lessons` — `GET /{lesson_id}/pptx` and `GET /{lesson_id}/html` presigned URL endpoints
 - `/parent` — parent invite and child lookup
@@ -141,7 +149,7 @@ eduquest-backend/
 
 `MembershipService` (`services/billing/membership_service.py`) is the only seam that creates and reads memberships:
 
-- `start_trial_if_eligible(user_id, role)` — idempotent; creates a `trialing` row valid for `TRIAL_DAYS = 30` (no card collected). Called from both `routers/auth.py:signup` and `routers/auth.py:login` (the login call is a backfill for legacy accounts).
+- `start_trial_if_eligible(user_id, role)` — idempotent; creates a `trialing` row valid for `TRIAL_DAYS = 14` (no card collected). Called from `routers/auth.py:signup`, `routers/auth.py:login`, and OAuth completion (the login/OAuth calls are backfills for legacy accounts).
 - `evaluate_access(user_id, role) → MembershipAccess` — used by `assert_can_create_class` / `assert_can_add_student_to_period`. Self-heals expired trials (status flips to `expired`).
 - `apply_stripe_subscription(subscription)` — invoked from the `/billing/webhook` handler on `customer.subscription.*` and `checkout.session.completed`.
 
@@ -201,6 +209,8 @@ Route handlers don't need explicit logging — FastAPI's access log covers them.
 Use `logger = logging.getLogger(__name__)` at the top of every service and bot file that does any of the above.
 
 ## Auth Token Utilities
+
+OAuth uses Supabase Auth only as an external identity-provider bridge. `routers/auth.py:/oauth/complete` accepts the Supabase access token, `services/auth/oauth_service.py` verifies it with `GET /auth/v1/user`, creates or finds the EduQuest account in the normalized user tables, then mints the normal EduQuest custom JWT. Do not store Supabase sessions as app sessions.
 
 `utils/token_utils.py`:
 

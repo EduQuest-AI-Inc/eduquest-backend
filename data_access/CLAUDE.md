@@ -1,6 +1,7 @@
 # CLAUDE.md — Data Access
 
 For rationale behind the DAO pattern, see [ARCH_DECISIONS.md](../ARCH_DECISIONS.md).
+See also [DATA_TABLES.md](DATA_TABLES.md) for the full 28-table schema reference and [RPC_FUNCTIONS.md](RPC_FUNCTIONS.md) for stored procedures.
 
 All DAOs live in `data_access/` and extend `SupabaseBaseDAO` from [base_dao.py](base_dao.py).
 
@@ -70,7 +71,7 @@ Role tables (`student`, `teacher`, `parent`) hold only role-specific fields and 
 | `WeekDAO` / `LessonDAO` / `ConceptDAO` / `SkillDAO` / `ConceptSkillDAO` | `week`, `lesson`, `concept`, `skill`, `concept_skill` | Curriculum knowledge graph (Week → Lesson → Concept → Skill). |
 | `LessonPptxDAO` | `lesson_pptx` | Per-lesson PowerPoint generation state and S3 key. Methods: `insert`, `update_status`, `get_by_period`, `get_by_lesson_id`, `get_latest_done`. |
 | `MaterialFilesDAO` | `material_files` | Uploaded teacher materials per period. |
-| `FeedbackDAO` | `feedback` | Student and teacher feedback records. |
+| `FeedbackDAO` | `user_feedback` | Student and teacher feedback records. |
 | `MarketplaceListingDAO` | `marketplace_listing` | Published period listings in the resource marketplace; tracks `is_published`, `fork_count`, tags. |
 | `WaitlistDAO` | `waitlist` | Pilot program waitlist entries. |
 | `PasswordResetTokenDAO` | `password_reset_token` | One-shot reset token, hashed before storage. |
