@@ -35,6 +35,8 @@ All agent code uses OpenAI Agents SDK (`from agents import Agent, Runner`).
 - `ltg_schedule_agent.py` (`LtgScheduleAgent`) — turns a student's long-term goal into a week-by-week quest name sequence
 - `curriculum_only_quest_agent.py` (`CurriculumOnlyQuestAgent`) — generates a long-term goal plus all quest names/instructions/rubrics from approved curriculum alone; used for Summer Side Quests
 - `demo_ltg_agent.py` (`DemoLTGAgent`) — public landing-page demo agent; returns one long-term goal and four weekly quests for `POST /demo/quest`
+- `curriculum_only_quest_agent.py` — quest agent variant for curriculum-only context (no uploaded files)
+- `demo_ltg_agent.py` — demo LTG agent used by the demo quest flow
 
 **bots/schemas/**
 - `rubric.py` — `Rubric` Pydantic schema
@@ -62,3 +64,5 @@ Each generation is a stateless fresh `Runner.run()` call with `max_turns=80` (un
 **Status lifecycle:** `LessonPptx` rows transition `pending → generating → done | failed`. Managed by `services/slides/pptx_generation_service.py`.
 
 **Mock:** `MockPptxAgent` in `bots/_mocks.py` generates a minimal real `.pptx` and non-empty `html_str`. `MockBotProvider.create_pptx_agent()` returns it.
+
+**Multi-agent composition:** `SLIDE_TOOLS` (`@function_tool` wrappers in `bots/tools/`) call `ContentWriterAgent` and `VisualReviewAgent` as sub-agents. This is the intended design and is **not** a violation of the "individual bot classes never imported outside `bots/provider.py`" rule — `SLIDE_TOOLS` are internal to the slideshow pipeline, not a service-layer import. When `MockBotProvider` is active, `MockPptxAgent` replaces the entire `PptxAgent` entry point, so `OrchestratorAgent` and its `SLIDE_TOOLS` never execute — the mock boundary is at the provider level, which is correct. `bots/slideshow/pptx_agent.py` imports `OrchestratorAgent` directly; this is intra-`bots/` composition between the public entry point and its private implementation detail, not a service-layer violation.
