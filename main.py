@@ -4,6 +4,7 @@ load_dotenv()
 
 import logging
 import time
+import json
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,7 +28,7 @@ def _validate_env() -> None:
         "JWT_SECRET_KEY",
         "SUPABASE_URL",
         "SUPABASE_SERVICE_ROLE_KEY",
-        "SUPABASE_ANON_KEY",
+        "SUPABASE_PUBLISHABLE_KEY",
         "SUPABASE_JWT_SECRET",
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
@@ -46,6 +47,29 @@ def _validate_env() -> None:
         ]
 
     missing = [var for var in required if not os.getenv(var)]
+
+    # region agent log
+    try:
+        with open("/Users/goldenhuang/Desktop/EduQuest/.cursor/debug-1c3679.log", "a", encoding="utf-8") as _debug_file:
+            _debug_file.write(json.dumps({
+                "sessionId": "1c3679",
+                "runId": "pre-fix",
+                "hypothesisId": "backend-env-loading-or-required-key-drift",
+                "location": "main.py:_validate_env",
+                "message": "backend env validation snapshot",
+                "data": {
+                    "cwd": os.getcwd(),
+                    "dotenv_exists_in_cwd": os.path.exists(os.path.join(os.getcwd(), ".env")),
+                    "required_count": len(required),
+                    "missing": missing,
+                    "present": {var: bool(os.getenv(var)) for var in required},
+                    "mock_ai": mock_ai,
+                },
+                "timestamp": int(time.time() * 1000),
+            }) + "\n")
+    except Exception:
+        pass
+    # endregion
 
     if missing:
         _log.critical(

@@ -29,10 +29,10 @@ def get_admin_supabase_client() -> Client:
 
 def get_user_supabase_client(jwt: str) -> Client:
     url = os.getenv('SUPABASE_URL')
-    anon_key = os.getenv('SUPABASE_ANON_KEY')
+    anon_key = os.getenv('SUPABASE_PUBLISHABLE_KEY')
     if not url or not anon_key:
         raise RuntimeError(
-            'SUPABASE_URL and SUPABASE_ANON_KEY must be set in .env'
+            'SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY must be set in .env'
         )
     client = create_client(
         url, anon_key,

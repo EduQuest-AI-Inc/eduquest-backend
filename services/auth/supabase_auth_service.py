@@ -102,7 +102,7 @@ class SupabaseAuthService:
         from supabase import create_client
         from supabase.lib.client_options import SyncClientOptions
         url = os.environ["SUPABASE_URL"]
-        anon_key = os.environ["SUPABASE_ANON_KEY"]
+        anon_key = os.environ["SUPABASE_PUBLISHABLE_KEY"]
         fresh_client = create_client(
             url, anon_key,
             options=SyncClientOptions(httpx_client=httpx.Client()),
