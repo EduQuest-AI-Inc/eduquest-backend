@@ -83,7 +83,7 @@ sys.modules['botocore.exceptions'] = MagicMock()
 # will raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set").
 os.environ.setdefault('SUPABASE_URL', 'http://localhost:54321')
 os.environ.setdefault('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
-os.environ.setdefault('SUPABASE_ANON_KEY', 'test-anon-key')
+os.environ.setdefault('SUPABASE_PUBLISHABLE_KEY', 'test-anon-key')
 os.environ.setdefault('SUPABASE_JWT_SECRET', 'test-supabase-jwt-secret')
 
 # Eagerly import main so all routers/services are cached in sys.modules while

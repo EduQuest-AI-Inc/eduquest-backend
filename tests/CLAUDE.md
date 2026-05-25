@@ -9,6 +9,7 @@ For rationale behind these testing decisions, see [ARCH_DECISIONS.md](../ARCH_DE
 - **Private methods are tested through public API only.** No direct calls to `_underscore` methods. If a private method is too complex to cover via the public path, extract it to a public function in a utility module.
 - **Thin facade services have no unit tests.** `period_service.py` and `quest_service.py` are one-liner delegators — test the sub-services where logic lives (`period_quest_service.py`, `quest_creation_service.py`, etc.).
 - **`services/tracking/` is intentionally untested.** PostHog calls are fire-and-forget; failures are swallowed. Schema verification belongs in the PostHog test environment, not unit tests.
+- **Agent tests** live in `tests/unit/bots/` (provider compliance, tracing/model config, grading/provider behavior, slideshow agents) and `tests/unit/slides/` for rendering/generation service tests.
 - **Slides agent tests** live in `tests/unit/bots/` (`test_content_writer_agent.py`, `test_orchestrator_agent.py`, `test_visual_review_agent.py`) and `tests/unit/slides/` for generation service tests.
 - **No `PYTEST_CURRENT_TEST` guards in production code.** Test-mode detection in production code is banned.
 - **Response model field types must match DB column types.** Mismatches cause silent data corruption.
@@ -18,13 +19,14 @@ For rationale behind these testing decisions, see [ARCH_DECISIONS.md](../ARCH_DE
 ```
 tests/
 ├── unit/
-│   ├── bots/           # Agent unit tests (provider compliance, grading, slideshow agents)
+│   ├── bots/           # Agent unit tests (provider compliance, tracing/model config, grading, slideshow agents)
 │   ├── data_access/    # DAO unit tests
 │   ├── integrations/   # Integration adapter unit tests
 │   ├── routes/         # Router handler unit tests
 │   ├── services/       # Service unit tests, organized by feature subdirectory
 │   │   ├── auth/, billing/, conversation/, curriculum/,
-│   │   ├── knowledge_graph/, period/, quest/, slides/
+│   │   ├── enrollment/, knowledge_graph/, period/, quest/, slides/
+│   │   └── plus legacy top-level service tests for parent/user/waitlist
 │   └── slides/         # Slides generation service tests
 └── integration/        # Full-stack integration tests (requires live Supabase)
 ```
