@@ -1,7 +1,7 @@
 python-dotenv==1.0.1
 bcrypt>=4.0.1
 httpx
-openai
+openai==2.38.0
 pandas
 fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
@@ -10,7 +10,7 @@ PyJWT>=2.8.0
 canvasapi
 bs4
 boto3==1.38.17
-openai-agents
+openai-agents==0.17.3
 pydantic
 supabase>=2.0.0
 posthog>=4.0.0

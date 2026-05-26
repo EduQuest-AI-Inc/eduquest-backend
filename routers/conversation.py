@@ -30,11 +30,11 @@ def _get_conversation_service(
 # ---------------------------------------------------------------------------
 
 @router.post("/initiate-profile-assistant", response_model=dict[str, Any])
-def initiate_profile_assistant(
+async def initiate_profile_assistant(
     auth: AuthPayload = Depends(require_roles(Role.STUDENT)),
     svc: ConversationService = Depends(_get_conversation_service),
 ):
-    return svc.start_profile_assistant(auth.sub)
+    return await svc.start_profile_assistant(auth.sub)
 
 
 class ContinueProfileRequest(BaseModel):
@@ -44,13 +44,13 @@ class ContinueProfileRequest(BaseModel):
 
 
 @router.post("/continue-profile-assistant", response_model=dict[str, Any])
-def continue_profile_assistant(
+async def continue_profile_assistant(
     body: ContinueProfileRequest,
     auth: AuthPayload = Depends(get_auth),
     svc: ConversationService = Depends(_get_conversation_service),
 ):
     try:
-        return svc.continue_profile_assistant(
+        return await svc.continue_profile_assistant(
             auth.sub,
             body.conversation_type,
             body.conversation_id,

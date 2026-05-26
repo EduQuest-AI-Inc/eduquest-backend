@@ -1,5 +1,5 @@
 """
-LTG conversation service — wires the LTG agent into Fast API.
+LTG conversation service — wires the LTG agent into FastAPI.
 
 Uses previous_response_id tracking for multi-turn stateful conversations
 via the Responses API, avoiding the Conversations API entirely.
@@ -69,6 +69,8 @@ class LTGConversationService:
         )
 
         response = result.final_output
+        if response is None:
+            raise ValidationError("LTG agent returned no structured output")
 
         return {
             "response_id": result.last_response_id,
@@ -97,6 +99,8 @@ class LTGConversationService:
         )
 
         response = result.final_output
+        if response is None:
+            raise ValidationError("LTG agent returned no structured output")
         goal_chosen = bool(
             response.chosen_goal
             and response.chosen_goal.lower() not in ("null", "none", "")
@@ -114,31 +118,6 @@ class LTGConversationService:
         if isinstance(field, list):
             return ", ".join(str(item) for item in field) if field else "not specified"
         return str(field) if field else "not specified"
-
-
-# ---- Sync wrappers for Flask routes ----
-
-def initiate_ltg_conversation(
-    vector_store_id: str,
-    student: Dict[str, Any],
-    curriculum: Dict[str, Any],
-    previous_response_id: Optional[str] = None,
-    *,
-    bot_provider: BotProviderProtocol,
-) -> Dict[str, Any]:
-    service = LTGConversationService(vector_store_id, curriculum, previous_response_id, bot_provider=bot_provider)
-    return asyncio.run(service.initiate(student))
-
-
-def continue_ltg_conversation(
-    vector_store_id: str,
-    previous_response_id: Optional[str],
-    user_message: str,
-    *,
-    bot_provider: BotProviderProtocol,
-) -> Dict[str, Any]:
-    service = LTGConversationService(vector_store_id, {}, previous_response_id, bot_provider=bot_provider)
-    return asyncio.run(service.continue_conversation(user_message))
 
 
 # ---- Full orchestration (validation + DAO + AI) ----
@@ -165,15 +144,15 @@ class LTGOrchestrationService:
         self.student_long_term_goal_dao = student_long_term_goal_dao or StudentLongTermGoalDAO()
         self.curriculum_service = curriculum_service or CurriculumService(bot_provider=bot_provider, jwt=jwt)
 
-    def initiate(self, user_id: str, period_id: str) -> Dict[str, Any]:
+    async def initiate(self, user_id: str, period_id: str) -> Dict[str, Any]:
         if not period_id:
             raise ValidationError("Missing period ID")
 
-        student = self.student_dao.get_student_by_id(user_id)
+        student = await asyncio.to_thread(self.student_dao.get_student_by_id, user_id)
         if not student:
             raise NotFoundError("Student not found")
 
-        period = self.period_dao.get_period_by_id(period_id)
+        period = await asyncio.to_thread(self.period_dao.get_period_by_id, period_id)
         if not period:
             raise NotFoundError("Invalid period ID")
 
@@ -181,7 +160,9 @@ class LTGOrchestrationService:
         if not vector_store_id:
             raise ValidationError("Period does not have a vector store configured")
 
-        existing_conversation_id = self.ltg_conversation_dao.get_conversation_id(user_id, period_id)
+        existing_conversation_id = await asyncio.to_thread(
+            self.ltg_conversation_dao.get_conversation_id, user_id, period_id
+        )
         if existing_conversation_id:
             return {
                 "conversation_id": existing_conversation_id,
@@ -189,7 +170,7 @@ class LTGOrchestrationService:
                 "resumed": True,
             }
 
-        curriculum = self.curriculum_service.get_curriculum(period_id)
+        curriculum = await asyncio.to_thread(self.curriculum_service.get_curriculum, period_id)
 
         student_data = {
             "first_name": student.get("first_name", ""),
@@ -201,20 +182,17 @@ class LTGOrchestrationService:
             "learning_style": student.get("learning_style", []),
         }
 
-        result = initiate_ltg_conversation(
-            vector_store_id=vector_store_id,
-            student=student_data,
-            curriculum=curriculum,
-            bot_provider=self._bot_provider,
-        )
+        service = LTGConversationService(vector_store_id, curriculum, bot_provider=self._bot_provider)
+        result = await service.initiate(student_data)
 
         response_id = result.get("response_id")
         if not response_id:
-            raise Exception("Failed to create LTG conversation - no response_id returned")  # unexpected agent failure → 500
+            raise ValidationError("LTG agent did not return a response_id")
 
         conversation_id = str(uuid.uuid4())
-        self.ltg_conversation_dao.upsert_conversation(
-            user_id, period_id, conversation_id, last_response_id=response_id
+        await asyncio.to_thread(
+            self.ltg_conversation_dao.upsert_conversation,
+            user_id, period_id, conversation_id, last_response_id=response_id,
         )
 
         return {
@@ -228,7 +206,7 @@ class LTGOrchestrationService:
             "resumed": False,
         }
 
-    def continue_conversation(
+    async def continue_conversation(
         self,
         user_id: str,
         conversation_type: str,
@@ -237,11 +215,13 @@ class LTGOrchestrationService:
         period_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         if not period_id:
-            period_id = self.ltg_conversation_dao.find_period_for_conversation(user_id, conversation_id)
+            period_id = await asyncio.to_thread(
+                self.ltg_conversation_dao.find_period_for_conversation, user_id, conversation_id
+            )
         if not period_id:
             raise NotFoundError("Could not determine period for conversation")
 
-        period = self.period_dao.get_period_by_id(period_id)
+        period = await asyncio.to_thread(self.period_dao.get_period_by_id, period_id)
         if not period:
             raise NotFoundError("Period not found")
 
@@ -249,28 +229,24 @@ class LTGOrchestrationService:
         if not vector_store_id:
             raise ValidationError("Period does not have a vector store configured")
 
-        last_response_id = self.ltg_conversation_dao.get_last_response_id(user_id, period_id)
+        last_response_id = await asyncio.to_thread(
+            self.ltg_conversation_dao.get_last_response_id, user_id, period_id
+        )
 
-        try:
-            result = continue_ltg_conversation(
-                vector_store_id=vector_store_id,
-                previous_response_id=last_response_id,
-                user_message=message,
-                bot_provider=self._bot_provider,
+        service = LTGConversationService(vector_store_id, {}, last_response_id, bot_provider=self._bot_provider)
+        result = await service.continue_conversation(message)
+
+        new_response_id = result.get("response_id")
+        if new_response_id:
+            await asyncio.to_thread(
+                self.ltg_conversation_dao.update_last_response_id, user_id, period_id, new_response_id
             )
 
-            new_response_id = result.get("response_id")
-            if new_response_id:
-                self.ltg_conversation_dao.update_last_response_id(user_id, period_id, new_response_id)
+        reply = result.get("message", "")
+        goal_chosen = result.get("goal_chosen", False)
+        chosen_goal = result.get("chosen_goal")
 
-            reply = result.get("message", "")
-            goal_chosen = result.get("goal_chosen", False)
-            chosen_goal = result.get("chosen_goal")
+        if goal_chosen and chosen_goal:
+            await asyncio.to_thread(self.student_long_term_goal_dao.upsert, user_id, period_id, chosen_goal)
 
-            if goal_chosen and chosen_goal:
-                self.student_long_term_goal_dao.upsert(user_id, period_id, chosen_goal)
-
-            return {"response": reply, "goal_chosen": goal_chosen}
-
-        except Exception as exc:
-            return {"error": str(exc)}
+        return {"response": reply, "goal_chosen": goal_chosen}

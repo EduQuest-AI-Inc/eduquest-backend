@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 from main import app
 from routers.deps import get_auth, AuthPayload, Role
@@ -27,9 +27,9 @@ class TestInitiateLTGConversation:
     @pytest.mark.api
     def test_initiate_ltg_success(self, client, mock_enrollment):
         mock_ps = MagicMock()
-        mock_ps.initiate_ltg_conversation.return_value = {
+        mock_ps.initiate_ltg_conversation = AsyncMock(return_value={
             "response": "What are your goals?", "conversation_id": "cid-1"
-        }
+        })
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
         resp = client.post("/period/initiate-ltg-conversation", json={"period_id": "p1"})
         app.dependency_overrides.pop(_get_period_service, None)
@@ -45,7 +45,7 @@ class TestInitiateLTGConversation:
     @pytest.mark.api
     def test_initiate_ltg_value_error_returns_400(self, client):
         mock_ps = MagicMock()
-        mock_ps.initiate_ltg_conversation.side_effect = ValueError("invalid period")
+        mock_ps.initiate_ltg_conversation = AsyncMock(side_effect=ValueError("invalid period"))
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
         resp = client.post("/period/initiate-ltg-conversation", json={"period_id": "bad"})
         app.dependency_overrides.pop(_get_period_service, None)
@@ -54,7 +54,7 @@ class TestInitiateLTGConversation:
     @pytest.mark.api
     def test_initiate_ltg_lookup_error_returns_404(self, client):
         mock_ps = MagicMock()
-        mock_ps.initiate_ltg_conversation.side_effect = LookupError("not found")
+        mock_ps.initiate_ltg_conversation = AsyncMock(side_effect=LookupError("not found"))
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
         resp = client.post("/period/initiate-ltg-conversation", json={"period_id": "p1"})
         app.dependency_overrides.pop(_get_period_service, None)
@@ -63,7 +63,7 @@ class TestInitiateLTGConversation:
     @pytest.mark.api
     def test_initiate_ltg_exception_returns_500(self, client):
         mock_ps = MagicMock()
-        mock_ps.initiate_ltg_conversation.side_effect = RuntimeError("crash")
+        mock_ps.initiate_ltg_conversation = AsyncMock(side_effect=RuntimeError("crash"))
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
         resp = client.post("/period/initiate-ltg-conversation", json={"period_id": "p1"})
         app.dependency_overrides.pop(_get_period_service, None)
@@ -75,9 +75,9 @@ class TestContinueLTGConversation:
     @pytest.mark.api
     def test_continue_ltg_success(self, client):
         mock_ps = MagicMock()
-        mock_ps.continue_ltg_conversation.return_value = {
+        mock_ps.continue_ltg_conversation = AsyncMock(return_value={
             "response": "Great goal!", "conversation_id": "cid-1"
-        }
+        })
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
         resp = client.post(
             "/period/continue-ltg-conversation",
@@ -97,7 +97,7 @@ class TestContinueLTGConversation:
     @pytest.mark.api
     def test_continue_ltg_optional_period_id_omitted(self, client):
         mock_ps = MagicMock()
-        mock_ps.continue_ltg_conversation.return_value = {"response": "ok"}
+        mock_ps.continue_ltg_conversation = AsyncMock(return_value={"response": "ok"})
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
         resp = client.post(
             "/period/continue-ltg-conversation",
@@ -109,7 +109,7 @@ class TestContinueLTGConversation:
     @pytest.mark.api
     def test_continue_ltg_value_error_returns_400(self, client):
         mock_ps = MagicMock()
-        mock_ps.continue_ltg_conversation.side_effect = ValueError("bad")
+        mock_ps.continue_ltg_conversation = AsyncMock(side_effect=ValueError("bad"))
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
         resp = client.post(
             "/period/continue-ltg-conversation",
@@ -121,7 +121,7 @@ class TestContinueLTGConversation:
     @pytest.mark.api
     def test_continue_ltg_exception_returns_500(self, client):
         mock_ps = MagicMock()
-        mock_ps.continue_ltg_conversation.side_effect = RuntimeError("crash")
+        mock_ps.continue_ltg_conversation = AsyncMock(side_effect=RuntimeError("crash"))
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
         resp = client.post(
             "/period/continue-ltg-conversation",
