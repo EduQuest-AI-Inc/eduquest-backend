@@ -32,6 +32,7 @@ class Period(BaseModel):
     is_summer_quest: bool = False
     forked_from_period_id: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    archived_at: Optional[str] = None
 
     def to_item(self):
         return self.model_dump(mode='json')

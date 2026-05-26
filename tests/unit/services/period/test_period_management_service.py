@@ -352,3 +352,90 @@ def test_create_period_non_summer_quest_does_not_enroll():
     )
 
     svc.enrollment_dao.add_enrollment.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# archive_period
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+def test_archive_period_raises_not_found_when_missing():
+    svc = _svc()
+    svc.period_dao.get_period_by_id.return_value = None
+
+    with pytest.raises(NotFoundError):
+        svc.archive_period("missing", "u1")
+
+
+@pytest.mark.unit
+def test_archive_period_raises_permission_error_when_not_owner():
+    from exceptions.permission_error import PermissionError
+
+    svc = _svc()
+    svc.period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "other_user"}
+
+    with pytest.raises(PermissionError):
+        svc.archive_period("p1", "u1")
+
+
+@pytest.mark.unit
+def test_archive_period_delegates_to_dao_and_returns_enriched():
+    svc = _svc()
+    base_period = {"period_id": "p1", "owner_id": "u1", "status": "approved"}
+    archived_period = {**base_period, "archived_at": "2025-01-01T00:00:00+00:00"}
+    # First call is the pre-fetch passed via period=, second is the re-fetch after archive
+    svc.period_dao.get_period_by_id.return_value = archived_period
+
+    result = svc.archive_period("p1", "u1", period=base_period)
+
+    svc.period_dao.archive_period.assert_called_once_with("p1")
+    assert result.get("has_curriculum") is True  # enriched
+    assert result.get("period_id") == "p1"
+
+
+# ---------------------------------------------------------------------------
+# unarchive_period
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+def test_unarchive_period_raises_not_found_when_missing():
+    svc = _svc()
+    svc.period_dao.get_period_by_id.return_value = None
+
+    with pytest.raises(NotFoundError):
+        svc.unarchive_period("missing", "u1")
+
+
+@pytest.mark.unit
+def test_unarchive_period_raises_permission_error_when_not_owner():
+    from exceptions.permission_error import PermissionError
+
+    svc = _svc()
+    svc.period_dao.get_period_by_id.return_value = {
+        "period_id": "p1",
+        "owner_id": "other_user",
+        "archived_at": "2025-01-01T00:00:00+00:00",
+    }
+
+    with pytest.raises(PermissionError):
+        svc.unarchive_period("p1", "u1")
+
+
+@pytest.mark.unit
+def test_unarchive_period_delegates_to_dao_and_returns_enriched():
+    svc = _svc()
+    archived_period = {
+        "period_id": "p1",
+        "owner_id": "u1",
+        "status": "approved",
+        "archived_at": "2025-01-01T00:00:00+00:00",
+    }
+    unarchived_period = {**archived_period, "archived_at": None}
+    # Re-fetch after unarchive returns the unarchived state
+    svc.period_dao.get_period_by_id.return_value = unarchived_period
+
+    result = svc.unarchive_period("p1", "u1", period=archived_period)
+
+    svc.period_dao.unarchive_period.assert_called_once_with("p1")
+    assert result.get("has_curriculum") is True  # enriched
+    assert result.get("archived_at") is None

@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period as _get_period_dep, get_period_file_service, require_active_membership, require_roles
 from responses.period import (
     AddFilesResponse,
+    ArchivePeriodResponse,
     CreatePeriodResponse,
     ForkMetadataResponse,
     GetPeriodResponse,
@@ -21,6 +22,7 @@ from responses.period import (
     PeriodListResponse,
     PresignedFileResponse,
     SummerQuestGenerateResponse,
+    UnarchivePeriodResponse,
     UpdatePeriodResponse,
 )
 from bots.protocol import BotProviderProtocol
@@ -393,6 +395,30 @@ def delete_period(
         raise HTTPException(status_code=404, detail=str(ve))
     except PermissionError:
         raise HTTPException(status_code=403, detail="Unauthorized")
+
+
+@router.patch("/{period_id}/archive", response_model=ArchivePeriodResponse)
+def archive_period(
+    period_id: str,
+    auth: AuthPayload = Depends(require_active_membership),
+    period: dict = Depends(_get_period_dep),
+):
+    updated = PeriodManagementService(jwt=auth.token).archive_period(
+        period_id, auth.sub, period=period
+    )
+    return {"message": "Period archived", "period": updated}
+
+
+@router.patch("/{period_id}/unarchive", response_model=UnarchivePeriodResponse)
+def unarchive_period(
+    period_id: str,
+    auth: AuthPayload = Depends(require_active_membership),
+    period: dict = Depends(_get_period_dep),
+):
+    updated = PeriodManagementService(jwt=auth.token).unarchive_period(
+        period_id, auth.sub, period=period
+    )
+    return {"message": "Period unarchived", "period": updated}
 
 
 # ─── Fork metadata ────────────────────────────────────────────────────────────

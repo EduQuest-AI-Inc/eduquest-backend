@@ -26,6 +26,7 @@ class PeriodOut(BaseModel):
     course_metadata: Optional[Any] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+    archived_at: Optional[str] = None
 
 
 class GetPeriodResponse(BaseModel):
@@ -88,6 +89,20 @@ class PresignedFileResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     url: str
+
+
+class ArchivePeriodResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    message: str
+    period: PeriodOut
+
+
+class UnarchivePeriodResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    message: str
+    period: PeriodOut
 
 
 class SummerQuestGenerateResponse(BaseModel):
