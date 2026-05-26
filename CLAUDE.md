@@ -11,12 +11,13 @@ eduquest-backend/
 ├── main.py                         # FastAPI app factory and entry point (sole server — Flask migration complete)
 ├── routers/                        # FastAPI layer
 │   ├── deps.py                     # require_roles(...) dependency → AuthPayload (JWT from header or cookie)
+│   ├── enrollment_access.py        # shared admin-backed owner membership/capacity checks for enrollment routes
 │   ├── auth.py                     # /auth — login, signup (with trial_confirmed for parent/teacher), password reset
 │   ├── billing.py                  # /billing — membership status, Stripe checkout/portal, webhook
 │   ├── conversation.py             # /conversation — profile assistant, update assistant
 │   ├── curriculum.py               # /curriculum — per-period curriculum generation/approval
 │   ├── demo_quest.py               # /demo — POST /quest (no auth, landing page)
-│   ├── enrollment.py               # /enrollment — enroll/unenroll students
+│   ├── enrollment.py               # /enrollment — verify period IDs, enroll/unenroll students
 │   ├── feedback.py                 # /feedback — student/teacher feedback submission and retrieval
 │   ├── lessons.py                  # /lessons — presigned URLs for lesson PPTX and HTML
 │   ├── ltg.py                      # /period — LTG conversation routes (mounted under /period)
@@ -40,8 +41,8 @@ eduquest-backend/
 │   │                               #   ltg_service.py, profile_service.py, teacher_feedback_service.py
 │   ├── curriculum/                 # curriculum_service.py
 │   ├── demo/                       # demo_ltg_service.py (public landing-page quest demo)
-│   ├── enrollment/                 # enrollment_service.py (CRUD, verify_and_enroll, unenroll,
-│   │                               #   get_my_periods, assert_enrolled)
+│   ├── enrollment/                 # enrollment_service.py (CRUD, verify_period_id/enroll,
+│   │                               #   get_my_periods, check_enrolled)
 │   ├── feedback/                   # feedback_service.py
 │   ├── knowledge_graph/            # knowledge_graph_service.py
 │   ├── lessons/                    # lessons_service.py
@@ -140,7 +141,7 @@ eduquest-backend/
 - `/conversation` — profile assistant, update assistant
 - `/curriculum` — curriculum generation/approval per period
 - `/demo` — public `POST /quest` landing-page quest demo, no auth required
-- `/enrollment` — student enrollment
+- `/enrollment` — student enrollment by period ID, including published parent-owned marketplace classes
 - `/lessons` — `GET /{lesson_id}/pptx` and `GET /{lesson_id}/html` presigned URL endpoints
 - `/parent` — parent invite and child lookup
 - `/period` — period CRUD, homework agent; also the prefix for `ltg.py` (LTG conversation), which is a separate router file mounted under `/period`
@@ -151,6 +152,15 @@ eduquest-backend/
 - `/pilot-waitlist` — status, join
 - `/feedback` — student/teacher feedback submission and retrieval
 - `/marketplace` — resource marketplace: browse, fork, publish
+
+## Enrollment / Marketplace Join Rules
+
+`EnrollmentService.verify_period_id(user_id, period_id, allow_parent_period=False)` owns the final enrollment guard chain. It uses admin DAOs for pre-enrollment cross-user reads because a student JWT cannot read a class they have not joined yet.
+
+- Teacher-owned periods pass the owner-role check.
+- Parent-owned periods pass only when `allow_parent_period=True` (linked-parent flows) or when `MarketplaceListingDAO.get_published_by_period_id(period_id)` returns an active published listing.
+- Published parent-owned periods still must be `status == "approved"`, not archived, and not already enrolled.
+- Owner membership/capacity checks are HTTP-boundary checks in `routers/enrollment_access.py`, shared by `/enrollment/verify-period` and `/parent/enroll-student`. Keep them there rather than importing billing into `EnrollmentService`.
 
 ## Membership / Trial Lifecycle
 
@@ -174,7 +184,7 @@ services/[feature]/
   └── __init__.py
 ```
 
-Router handlers that do more than one distinct thing extract underscore-prefixed helpers in the same file (e.g. `_validate_pilot_access()`, `_resolve_identity()`, `_handle_file_submission()`). These are private to the module — no helper should exceed 20 lines.
+Router handlers that do more than one distinct thing extract underscore-prefixed helpers in the same file (e.g. `_validate_pilot_access()`, `_resolve_identity()`, `_handle_file_submission()`). These are private to the module — no helper should exceed 20 lines. If the same HTTP-boundary check is shared by multiple routers, put it in a small `routers/*_access.py` module; `routers/enrollment_access.py` is the pattern for admin-backed cross-user membership/capacity checks.
 
 ## Layer Rules
 
@@ -183,10 +193,10 @@ Rules below are the what; see [ARCH_DECISIONS.md](ARCH_DECISIONS.md) for the why
 - **Routers are HTTP-boundary-only.** Parse request, call service, return response. No business logic in `routers/`.
 - **Service dependency injection.** Services declare DAOs, sub-services, integrations, and bot provider as constructor parameters with defaults (`def __init__(self, my_dao=None): self.my_dao = my_dao or MyDAO()`). Never instantiate inline.
 - **`integrations/` vs `utils/` boundary.** `integrations/` = external service adapters (outbound calls, credentials). `utils/` = local computation only (no network, no credentials). Renderers (PPTX, HTML, charts) belong in `utils/rendering/`.
-- **Auth enforcement split.** Role checks at router via `Depends(require_roles(...))`. Ownership checks raise `PermissionError` inside the service (because verification requires the same resource lookup). Enrollment checks at router top via `EnrollmentService().check_enrolled()` — service methods must not re-check enrollment.
+- **Auth enforcement split.** Role checks at router via `Depends(require_roles(...))`. Ownership checks raise `PermissionError` inside the service (because verification requires the same resource lookup). Enrollment checks at router top via `EnrollmentService().check_enrolled()` — service methods must not re-check enrollment. Enrollment owner membership/capacity checks that require cross-user reads live in `routers/enrollment_access.py` and use admin-backed DAOs/services.
 - **All S3 access through `integrations/s3_service.py`.** Never instantiate `boto3.client` directly.
 - **`response_model=` required on every route handler.** Must point to a DTO in `responses/`.
-- **Fetch shared resources once at the router.** Pass the fetched object down to services — never re-fetch inside a service method.
+- **Fetch shared resources once at the router.** Pass the fetched object down to services — never re-fetch inside a service method. Exception: shared router access helpers may fetch the resource they guard, especially when they must bypass RLS before a user is enrolled.
 - **Admin vs user Supabase client.** DAOs operating in user context pass the user JWT (RLS enforced). DAOs needing elevated access use the service-role client. Set in the DAO constructor.
 - **Services raise typed exceptions only.** No bare `ValueError` or `Exception` — use types from `exceptions/`.
 - **Cross-domain service dependencies.** A service may import DAOs and sub-services within its own domain. Cross-domain imports are allowed only downward. See ARCH_DECISIONS.md for the allowed/forbidden matrix.
@@ -245,12 +255,12 @@ See [bots/CLAUDE.md](bots/CLAUDE.md) for agent system and PPTX pipeline details.
 
 Developer scripts: [scripts/README.md](scripts/README.md). AWS infrastructure: [cloudformation/README.md](cloudformation/README.md).
 
-**Setup** (always use venv):
+**Setup** (always use the repo virtualenv):
 
 ```bash
 cd eduquest-backend
-make setup          # creates venv, installs all dependencies, installs pre-commit hook
-source venv/bin/activate
+make setup          # creates the virtualenv, installs all dependencies, installs pre-commit hook
+source .venv/bin/activate  # use .venv when present; otherwise source venv/bin/activate
 ```
 
 **Environment** — `.env` file:
@@ -284,7 +294,7 @@ set -a && source .env && set +a && python -c "..."
 # Unit tests run fully offline — all external services (OpenAI, boto3, Supabase) are mocked.
 # Integration tests require a live Supabase connection (.env with real credentials).
 
-eduquest-backend/venv/bin/pytest eduquest-backend/tests/unit/   # offline, no .env needed
+eduquest-backend/.venv/bin/pytest eduquest-backend/tests/unit/  # offline, no .env needed; use venv/bin/pytest if that is the env present
 pytest -m unit
 pytest -m integration
 pytest -m auth

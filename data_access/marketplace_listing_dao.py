@@ -20,6 +20,16 @@ class MarketplaceListingDAO(SupabaseBaseDAO):
         rows = self._select_eq('period_id', period_id)
         return rows[0] if rows else None
 
+    def get_published_by_period_id(self, period_id: str) -> Optional[dict[str, Any]]:
+        response = self._execute(
+            self._admin_client.table('marketplace_listing')
+            .select('*')
+            .eq('period_id', period_id)
+            .eq('is_published', True)
+            .maybe_single()
+        )
+        return response.data if response.data else None
+
     def get_published(
         self,
         grade_level: Optional[str] = None,

@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 from data_access.conversation_dao import ConversationDAO
 from data_access.enrollment_dao import EnrollmentDAO
 from data_access.ltg_conversation_dao import LtgConversationDAO
+from data_access.marketplace_listing_dao import MarketplaceListingDAO
 from data_access.parent_dao import ParentDAO
 from data_access.period_dao import PeriodDAO
 from data_access.quest_dao import QuestDAO
@@ -21,7 +22,7 @@ TUTORIAL_PERIOD_ID = "PRECALC-58F9-88F5"
 
 
 class EnrollmentService:
-    def __init__(self, enrollment_dao=None, student_dao=None, period_dao=None, parent_dao=None, user_dao=None, quest_dao=None, ltg_conversation_dao=None, conversation_dao=None, ltg_goal_dao=None, jwt: str | None = None, admin_enrollment_dao=None, admin_parent_dao=None, admin_period_dao=None, admin_user_dao=None, admin_ltg_conversation_dao=None, admin_conversation_dao=None, admin_ltg_goal_dao=None, admin_quest_dao=None) -> None:
+    def __init__(self, enrollment_dao=None, student_dao=None, period_dao=None, parent_dao=None, user_dao=None, quest_dao=None, ltg_conversation_dao=None, conversation_dao=None, ltg_goal_dao=None, jwt: str | None = None, admin_enrollment_dao=None, admin_parent_dao=None, admin_period_dao=None, admin_user_dao=None, admin_ltg_conversation_dao=None, admin_conversation_dao=None, admin_ltg_goal_dao=None, admin_quest_dao=None, admin_marketplace_listing_dao=None) -> None:
         self.enrollment_dao = enrollment_dao or EnrollmentDAO(jwt=jwt)
         self.student_dao = student_dao or StudentDAO(jwt=jwt)
         self.period_dao = period_dao or PeriodDAO(jwt=jwt)
@@ -40,6 +41,7 @@ class EnrollmentService:
         self._admin_conversation_dao = admin_conversation_dao or ConversationDAO()
         self._admin_ltg_goal_dao = admin_ltg_goal_dao or StudentLongTermGoalDAO()
         self._admin_quest_dao = admin_quest_dao or QuestDAO()
+        self._admin_marketplace_listing_dao = admin_marketplace_listing_dao or MarketplaceListingDAO()
 
     def enroll_student(self, user_id: str, period_id: str, semester: str = "Fall 2025") -> dict:
         student = self.student_dao.get_student_by_id(user_id)
@@ -162,10 +164,15 @@ class EnrollmentService:
         if not owner:
             logger.warning("verify_period_id: owner not found for period %s", period_id)
             raise NotFoundError("Invalid period ID")
-        if owner["role"] != "teacher" and not allow_parent_period:
+        owner_role = owner["role"]
+        is_published_parent_period = (
+            owner_role == "parent"
+            and self._admin_marketplace_listing_dao.get_published_by_period_id(period_id)
+        )
+        if owner_role != "teacher" and not allow_parent_period and not is_published_parent_period:
             logger.warning(
                 "verify_period_id: period %s has owner role %s, not teacher (user=%s)",
-                period_id, owner["role"], user_id,
+                period_id, owner_role, user_id,
             )
             raise NotFoundError("Invalid period ID")
 

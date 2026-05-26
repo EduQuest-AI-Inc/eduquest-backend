@@ -4,7 +4,7 @@ For rationale behind these testing decisions, see [ARCH_DECISIONS.md](../ARCH_DE
 
 ## Rules
 
-- **Mock via constructor injection, not patching.** Pass `MockBotProvider()` directly to the service constructor — no `@patch`, no `sys.modules` stubbing, no `patch("services.X.get_bot_provider")`. Exception: `conftest.py` stubs individual bot modules (e.g. `bots.grading_agent`) with `MagicMock()` and marks them `# arch-ok` — these are import-guard stubs that prevent OpenAI SDK import-time failures, not behavior fakes. Do not add new `sys.modules['bots.*']` stubs without `# arch-ok` and a comment explaining why.
+- **Mock services via constructor injection, not patching.** Pass dependencies directly to service constructors — no `@patch`, no `sys.modules` stubbing, no `patch("services.X.get_bot_provider")`. Route tests may patch imported router-boundary dependencies or shared router access helpers (for example `routers.parent.check_owner_can_accept_student`) because FastAPI handlers construct those at the HTTP boundary. Exception: `conftest.py` stubs individual bot modules (e.g. `bots.grading_agent`) with `MagicMock()` and marks them `# arch-ok` — these are import-guard stubs that prevent OpenAI SDK import-time failures, not behavior fakes. Do not add new `sys.modules['bots.*']` stubs without `# arch-ok` and a comment explaining why.
 - **`MockBotProvider` must satisfy `BotProviderProtocol`.** Verified by `tests/unit/bots/test_provider_compliance.py`. Any new factory method added to `BotProvider` must be added to both `BotProviderProtocol` and `MockBotProvider` before merge.
 - **Private methods are tested through public API only.** No direct calls to `_underscore` methods. If a private method is too complex to cover via the public path, extract it to a public function in a utility module.
 - **Thin facade services have no unit tests.** `period_service.py` and `quest_service.py` are one-liner delegators — test the sub-services where logic lives (`period_quest_service.py`, `quest_creation_service.py`, etc.).
@@ -34,8 +34,9 @@ tests/
 ## Running Tests
 
 ```bash
-# From the repo root (uses venv binary directly):
-eduquest-backend/venv/bin/pytest eduquest-backend/tests/unit/
+# From the repo root (uses the backend virtualenv binary directly):
+eduquest-backend/.venv/bin/pytest eduquest-backend/tests/unit/
+# If this checkout uses venv instead of .venv, use eduquest-backend/venv/bin/pytest.
 pytest -m unit
 pytest -m integration
 pytest -m auth

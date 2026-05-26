@@ -25,6 +25,8 @@ def _svc():
     svc._admin_conversation_dao = MagicMock()
     svc._admin_ltg_goal_dao = MagicMock()
     svc._admin_quest_dao = MagicMock()
+    svc._admin_marketplace_listing_dao = MagicMock()
+    svc._admin_marketplace_listing_dao.get_published_by_period_id.return_value = None
     return svc
 
 
@@ -198,12 +200,52 @@ def test_verify_period_id_owner_not_teacher_raises():
 
 
 @pytest.mark.unit
+def test_verify_period_id_published_parent_period_auto_enrolls():
+    svc = _svc()
+    period = {"period_id": "p1", "owner_id": "o1", "status": "approved"}
+    svc._admin_period_dao.get_period_by_id.return_value = period
+    svc._admin_user_dao.get_by_id.return_value = {"user_id": "o1", "role": "parent"}
+    svc._admin_marketplace_listing_dao.get_published_by_period_id.return_value = {
+        "listing_id": "l1",
+        "period_id": "p1",
+        "is_published": True,
+    }
+    svc.student_dao.get_student_by_id.return_value = {"user_id": "s1"}
+    svc.enrollment_dao.get_enrollments_by_student.return_value = []
+
+    result = svc.verify_period_id("s1", "p1", allow_parent_period=False)
+
+    svc._admin_enrollment_dao.add_enrollment.assert_called_once()
+    assert result == period
+
+
+@pytest.mark.unit
 def test_verify_period_id_not_approved_raises():
     svc = _svc()
     svc._admin_period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "o1", "status": "pending"}
     svc._admin_user_dao.get_by_id.return_value = {"user_id": "o1", "role": "teacher"}
 
     with pytest.raises(NotFoundError):
+        svc.verify_period_id("s1", "p1")
+
+
+@pytest.mark.unit
+def test_verify_period_id_published_archived_period_raises():
+    svc = _svc()
+    svc._admin_period_dao.get_period_by_id.return_value = {
+        "period_id": "p1",
+        "owner_id": "o1",
+        "status": "approved",
+        "archived_at": "2026-05-01T00:00:00+00:00",
+    }
+    svc._admin_user_dao.get_by_id.return_value = {"user_id": "o1", "role": "parent"}
+    svc._admin_marketplace_listing_dao.get_published_by_period_id.return_value = {
+        "listing_id": "l1",
+        "period_id": "p1",
+        "is_published": True,
+    }
+
+    with pytest.raises(NotFoundError, match="not available"):
         svc.verify_period_id("s1", "p1")
 
 
