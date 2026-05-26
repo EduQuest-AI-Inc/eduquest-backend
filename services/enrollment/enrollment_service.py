@@ -176,6 +176,12 @@ class EnrollmentService:
             )
             raise NotFoundError("This class is not yet available for enrollment")
 
+        if period.get('archived_at'):
+            logger.warning(
+                "verify_period_id: period %s is archived (user=%s)", period_id, user_id,
+            )
+            raise NotFoundError("This class is not available for enrollment")
+
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
             raise NotFoundError("Student not found")

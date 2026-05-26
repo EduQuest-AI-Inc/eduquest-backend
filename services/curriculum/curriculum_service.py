@@ -152,7 +152,7 @@ class CurriculumService:
                         queries = coverage.research_queries[:3]
                         perplexity_svc = self._perplexity_service or PerplexityService()
                         research_context = asyncio.run(
-                            perplexity_svc.research(queries, max_steps=5)
+                            perplexity_svc.research(queries, max_steps=3)
                         )
                 except Exception as e:
                     logger.warning(
