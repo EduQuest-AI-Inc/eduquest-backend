@@ -42,6 +42,8 @@ def _make_service() -> EnrollmentService:
     svc._admin_conversation_dao = MagicMock()
     svc._admin_ltg_goal_dao = MagicMock()
     svc._admin_quest_dao = MagicMock()
+    svc._admin_marketplace_listing_dao = MagicMock()
+    svc._admin_marketplace_listing_dao.get_published_by_period_id.return_value = None
     return svc
 
 
@@ -206,6 +208,50 @@ def test_verify_rejects_parent_period_via_id():
     _setup_verify(svc, owner_role="parent")
 
     with pytest.raises(NotFoundError):
+        svc.verify_period_id("u1", "p1")
+
+
+@pytest.mark.unit
+def test_verify_allows_published_parent_period_via_id():
+    svc = _make_service()
+    svc._admin_period_dao.get_period_by_id.return_value = {
+        "period_id": "p1",
+        "name": "Math",
+        "owner_id": "par1",
+        "status": "approved",
+    }
+    _setup_verify(svc, owner_role="parent")
+    svc._admin_marketplace_listing_dao.get_published_by_period_id.return_value = {
+        "listing_id": "l1",
+        "period_id": "p1",
+        "is_published": True,
+    }
+    svc.student_dao.get_student_by_id.return_value = {"user_id": "u1"}
+    svc.enrollment_dao.get_enrollments_by_student.return_value = []
+
+    result = svc.verify_period_id("u1", "p1")
+
+    svc._admin_enrollment_dao.add_enrollment.assert_called_once()
+    assert result["period_id"] == "p1"
+
+
+@pytest.mark.unit
+def test_verify_rejects_published_parent_period_when_archived():
+    svc = _make_service()
+    svc._admin_period_dao.get_period_by_id.return_value = {
+        "period_id": "p1",
+        "owner_id": "par1",
+        "status": "approved",
+        "archived_at": "2026-05-01T00:00:00+00:00",
+    }
+    _setup_verify(svc, owner_role="parent")
+    svc._admin_marketplace_listing_dao.get_published_by_period_id.return_value = {
+        "listing_id": "l1",
+        "period_id": "p1",
+        "is_published": True,
+    }
+
+    with pytest.raises(NotFoundError, match="not available"):
         svc.verify_period_id("u1", "p1")
 
 

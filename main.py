@@ -200,6 +200,45 @@ async def permission_error_handler(request: Request, exc: PermissionError):
     return JSONResponse(status_code=403, content={"error": str(exc)})
 
 
+try:
+    import openai as _openai
+    _openai_RateLimitError = _openai.RateLimitError
+    _openai_AuthenticationError = _openai.AuthenticationError
+    _openai_APIError = _openai.APIError
+    _openai_handlers_available = all(
+        isinstance(cls, type) and issubclass(cls, Exception)
+        for cls in (_openai_RateLimitError, _openai_AuthenticationError, _openai_APIError)
+    )
+except (ImportError, AttributeError, TypeError):
+    _openai_handlers_available = False
+
+
+if _openai_handlers_available:
+    @app.exception_handler(_openai_RateLimitError)
+    async def openai_rate_limit_handler(request: Request, exc):
+        _logger.error("OpenAI quota/rate-limit on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
+        return JSONResponse(
+            status_code=503,
+            content={"error": "AI service quota exceeded or rate-limited. Please try again later or contact support."},
+        )
+
+    @app.exception_handler(_openai_AuthenticationError)
+    async def openai_auth_error_handler(request: Request, exc):
+        _logger.error("OpenAI authentication failure on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
+        return JSONResponse(
+            status_code=503,
+            content={"error": "AI service authentication failed. Please contact support."},
+        )
+
+    @app.exception_handler(_openai_APIError)
+    async def openai_api_error_handler(request: Request, exc):
+        _logger.error("OpenAI API error on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
+        return JSONResponse(
+            status_code=502,
+            content={"error": f"AI service error: {type(exc).__name__}"},
+        )
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     _logger.error("Unhandled exception: %s %s — %s", request.method, request.url.path, exc, exc_info=True)

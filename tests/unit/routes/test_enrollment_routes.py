@@ -40,20 +40,83 @@ class TestVerifyPeriod:
 
     @pytest.mark.api
     def test_verify_period_success(self, client):
-        mock_period_mgmt = MagicMock()
-        mock_period_mgmt.get_period_by_id.return_value = None  # skip owner membership check
         mock_enrollment_svc = MagicMock()
         mock_enrollment_svc.verify_period_id.return_value = {
             "period_id": "p1", "name": "Math", "status": "approved",
             "processing_status": "ready", "owner_id": "teacher-1",
             "is_summer_quest": False, "file_urls": [],
         }
-        with patch("routers.enrollment.PeriodManagementService", return_value=mock_period_mgmt), \
+        with patch("routers.enrollment.check_owner_can_accept_student") as mock_owner_check, \
              patch("routers.enrollment.EnrollmentService", return_value=mock_enrollment_svc):
             resp = client.post("/enrollment/verify-period", json={"period_id": "p1"})
         assert resp.status_code == 200
         assert resp.json()["period"]["period_id"] == "p1"
         assert "message" in resp.json()
+        mock_owner_check.assert_called_once_with("p1")
+
+    @pytest.mark.api
+    def test_verify_period_owner_check_uses_admin_period_data(self, client):
+        mock_period_dao = MagicMock()
+        mock_period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "owner-1"}
+        mock_user_svc = MagicMock()
+        mock_user_svc.get_by_id.return_value = {"role": "parent"}
+        mock_membership = MagicMock()
+        mock_membership.check_can_add_student_to_period.return_value = None
+        mock_enrollment_svc = MagicMock()
+        mock_enrollment_svc.verify_period_id.return_value = {
+            "period_id": "p1", "name": "Math", "status": "approved",
+            "processing_status": "ready", "owner_id": "owner-1",
+            "is_summer_quest": False, "file_urls": [],
+        }
+
+        with patch("routers.enrollment_access.PeriodDAO", return_value=mock_period_dao) as period_cls, \
+             patch("routers.enrollment_access.UserService", return_value=mock_user_svc), \
+             patch("routers.enrollment_access.MembershipService", return_value=mock_membership), \
+             patch("routers.enrollment.EnrollmentService", return_value=mock_enrollment_svc):
+            resp = client.post("/enrollment/verify-period", json={"period_id": "p1"})
+
+        assert resp.status_code == 200
+        period_cls.assert_called_once_with()
+        mock_period_dao.get_period_by_id.assert_called_once_with("p1")
+        mock_membership.check_can_add_student_to_period.assert_called_once_with(
+            "owner-1", "parent", "p1"
+        )
+
+    @pytest.mark.api
+    def test_verify_period_owner_inactive_returns_403(self, client):
+        from services.billing.membership_service import MembershipRequiredError
+        mock_period_dao = MagicMock()
+        mock_period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "owner-1"}
+        mock_user_svc = MagicMock()
+        mock_user_svc.get_by_id.return_value = {"role": "teacher"}
+        mock_membership = MagicMock()
+        mock_membership.check_can_add_student_to_period.side_effect = MembershipRequiredError(MagicMock())
+
+        with patch("routers.enrollment_access.PeriodDAO", return_value=mock_period_dao), \
+             patch("routers.enrollment_access.UserService", return_value=mock_user_svc), \
+             patch("routers.enrollment_access.MembershipService", return_value=mock_membership):
+            resp = client.post("/enrollment/verify-period", json={"period_id": "p1"})
+
+        assert resp.status_code == 403
+        assert resp.json()["detail"]["code"] == "OWNER_MEMBERSHIP_INACTIVE"
+
+    @pytest.mark.api
+    def test_verify_period_plan_limit_returns_403(self, client):
+        from services.billing.membership_service import PlanLimitExceededError
+        mock_period_dao = MagicMock()
+        mock_period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "owner-1"}
+        mock_user_svc = MagicMock()
+        mock_user_svc.get_by_id.return_value = {"role": "teacher"}
+        mock_membership = MagicMock()
+        mock_membership.check_can_add_student_to_period.side_effect = PlanLimitExceededError("limit hit")
+
+        with patch("routers.enrollment_access.PeriodDAO", return_value=mock_period_dao), \
+             patch("routers.enrollment_access.UserService", return_value=mock_user_svc), \
+             patch("routers.enrollment_access.MembershipService", return_value=mock_membership):
+            resp = client.post("/enrollment/verify-period", json={"period_id": "p1"})
+
+        assert resp.status_code == 403
+        assert resp.json()["detail"]["code"] == "PLAN_LIMIT_EXCEEDED"
 
 
 class TestUnenroll:

@@ -204,28 +204,28 @@ def _continue_svc(period=None, conversation_period_id=None, last_response_id=Non
 def test_run_initiate_ltg_missing_period_id():
     svc = _initiate_svc()
     with pytest.raises(ValidationError, match="Missing period ID"):
-        svc.initiate("u1", "")
+        asyncio.run(svc.initiate("u1", ""))
 
 
 @pytest.mark.unit
 def test_run_initiate_ltg_student_not_found():
     svc = _initiate_svc(student=None)
     with pytest.raises(Exception, match="Student not found"):
-        svc.initiate("u1", "p1")
+        asyncio.run(svc.initiate("u1", "p1"))
 
 
 @pytest.mark.unit
 def test_run_initiate_ltg_period_not_found():
     svc = _initiate_svc(student={"user_id": "u1"}, period=None)
     with pytest.raises(NotFoundError):
-        svc.initiate("u1", "p1")
+        asyncio.run(svc.initiate("u1", "p1"))
 
 
 @pytest.mark.unit
 def test_run_initiate_ltg_no_vector_store():
     svc = _initiate_svc(student={"user_id": "u1"}, period={"vector_store_id": None})
     with pytest.raises(Exception, match="vector store"):
-        svc.initiate("u1", "p1")
+        asyncio.run(svc.initiate("u1", "p1"))
 
 
 @pytest.mark.unit
@@ -235,22 +235,26 @@ def test_run_initiate_ltg_existing_conversation_returns_resumed():
         period={"vector_store_id": "vs-1"},
         conversation_id="conv-existing",
     )
-    result = svc.initiate("u1", "p1")
+    result = asyncio.run(svc.initiate("u1", "p1"))
     assert result["resumed"] is True
     assert result["conversation_id"] == "conv-existing"
 
 
 @pytest.mark.unit
-@patch("services.conversation.ltg_service.initiate_ltg_conversation",
-       return_value={"response_id": "resp-new", "message": "Goals!", "goal_1": "G1", "goal_2": "G2", "goal_3": "G3"})
-def test_run_initiate_ltg_new_conversation(mock_initiate):
+def test_run_initiate_ltg_new_conversation():
+    mock_conv_svc = MagicMock()
+    mock_conv_svc.initiate = AsyncMock(return_value={
+        "response_id": "resp-new", "message": "Goals!",
+        "goal_1": "G1", "goal_2": "G2", "goal_3": "G3",
+    })
     svc = _initiate_svc(
         student={"user_id": "u1", "first_name": "A", "last_name": "B", "grade": "",
                  "strength": [], "weakness": [], "interest": [], "learning_style": []},
         period={"vector_store_id": "vs-1"},
         conversation_id=None,
     )
-    result = svc.initiate("u1", "p1")
+    with patch("services.conversation.ltg_service.LTGConversationService", return_value=mock_conv_svc):
+        result = asyncio.run(svc.initiate("u1", "p1"))
     assert result["resumed"] is False
     assert "conversation_id" in result
     assert result["response"]["goal_1"] == "G1"
@@ -262,16 +266,18 @@ def test_run_initiate_ltg_new_conversation(mock_initiate):
 
 
 @pytest.mark.unit
-@patch("services.conversation.ltg_service.initiate_ltg_conversation", return_value={"message": "x"})
-def test_run_initiate_ltg_no_response_id_raises(mock_initiate):
+def test_run_initiate_ltg_no_response_id_raises():
+    mock_conv_svc = MagicMock()
+    mock_conv_svc.initiate = AsyncMock(return_value={"message": "x"})
     svc = _initiate_svc(
         student={"user_id": "u1", "first_name": "A", "last_name": "B", "grade": "",
                  "strength": [], "weakness": [], "interest": [], "learning_style": []},
         period={"vector_store_id": "vs-1"},
         conversation_id=None,
     )
-    with pytest.raises(Exception, match="no response_id"):
-        svc.initiate("u1", "p1")
+    with patch("services.conversation.ltg_service.LTGConversationService", return_value=mock_conv_svc):
+        with pytest.raises(Exception, match="response_id"):
+            asyncio.run(svc.initiate("u1", "p1"))
 
 
 # ---------------------------------------------------------------------------
@@ -279,11 +285,14 @@ def test_run_initiate_ltg_no_response_id_raises(mock_initiate):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-@patch("services.conversation.ltg_service.continue_ltg_conversation",
-       return_value={"response_id": "r1", "message": "ok", "goal_chosen": False, "chosen_goal": None})
-def test_run_continue_ltg_resolves_period_via_find(mock_cont):
+def test_run_continue_ltg_resolves_period_via_find():
+    mock_conv_svc = MagicMock()
+    mock_conv_svc.continue_conversation = AsyncMock(return_value={
+        "response_id": "r1", "message": "ok", "goal_chosen": False, "chosen_goal": None,
+    })
     svc = _continue_svc(period={"vector_store_id": "vs-1"}, conversation_period_id="p1")
-    svc.continue_conversation("u1", "ltg", "conv-1", "hi")
+    with patch("services.conversation.ltg_service.LTGConversationService", return_value=mock_conv_svc):
+        asyncio.run(svc.continue_conversation("u1", "ltg", "conv-1", "hi"))
     svc.ltg_conversation_dao.find_period_for_conversation.assert_called_once_with("u1", "conv-1")
 
 
@@ -291,47 +300,55 @@ def test_run_continue_ltg_resolves_period_via_find(mock_cont):
 def test_run_continue_ltg_no_period_raises():
     svc = _continue_svc(conversation_period_id=None)
     with pytest.raises(Exception, match="Could not determine period"):
-        svc.continue_conversation("u1", "ltg", "conv-1", "hi")
+        asyncio.run(svc.continue_conversation("u1", "ltg", "conv-1", "hi"))
 
 
 @pytest.mark.unit
 def test_run_continue_ltg_period_not_found_raises():
     svc = _continue_svc(period=None)
     with pytest.raises(Exception, match="Period not found"):
-        svc.continue_conversation("u1", "ltg", "conv-1", "hi", period_id="p1")
+        asyncio.run(svc.continue_conversation("u1", "ltg", "conv-1", "hi", period_id="p1"))
 
 
 @pytest.mark.unit
 def test_run_continue_ltg_no_vector_store_raises():
     svc = _continue_svc(period={"vector_store_id": None})
     with pytest.raises(Exception, match="vector store"):
-        svc.continue_conversation("u1", "ltg", "conv-1", "hi", period_id="p1")
+        asyncio.run(svc.continue_conversation("u1", "ltg", "conv-1", "hi", period_id="p1"))
 
 
 @pytest.mark.unit
-@patch("services.conversation.ltg_service.continue_ltg_conversation",
-       return_value={"response_id": "r2", "message": "Continue!", "goal_chosen": False, "chosen_goal": None})
-def test_run_continue_ltg_happy_path_no_goal(mock_cont):
+def test_run_continue_ltg_happy_path_no_goal():
+    mock_conv_svc = MagicMock()
+    mock_conv_svc.continue_conversation = AsyncMock(return_value={
+        "response_id": "r2", "message": "Continue!", "goal_chosen": False, "chosen_goal": None,
+    })
     svc = _continue_svc(period={"vector_store_id": "vs-1"}, last_response_id="prev-r")
-    result = svc.continue_conversation("u1", "ltg", "conv-1", "hi", period_id="p1")
+    with patch("services.conversation.ltg_service.LTGConversationService", return_value=mock_conv_svc):
+        result = asyncio.run(svc.continue_conversation("u1", "ltg", "conv-1", "hi", period_id="p1"))
     assert result == {"response": "Continue!", "goal_chosen": False}
     svc.ltg_conversation_dao.update_last_response_id.assert_called_once_with("u1", "p1", "r2")
     svc.student_long_term_goal_dao.upsert.assert_not_called()
 
 
 @pytest.mark.unit
-@patch("services.conversation.ltg_service.continue_ltg_conversation",
-       return_value={"response_id": "r3", "message": "Goal set!", "goal_chosen": True, "chosen_goal": "Master algebra"})
-def test_run_continue_ltg_goal_chosen_upserts(mock_cont):
+def test_run_continue_ltg_goal_chosen_upserts():
+    mock_conv_svc = MagicMock()
+    mock_conv_svc.continue_conversation = AsyncMock(return_value={
+        "response_id": "r3", "message": "Goal set!", "goal_chosen": True, "chosen_goal": "Master algebra",
+    })
     svc = _continue_svc(period={"vector_store_id": "vs-1"})
-    result = svc.continue_conversation("u1", "ltg", "conv-1", "hi", period_id="p1")
+    with patch("services.conversation.ltg_service.LTGConversationService", return_value=mock_conv_svc):
+        result = asyncio.run(svc.continue_conversation("u1", "ltg", "conv-1", "hi", period_id="p1"))
     assert result["goal_chosen"] is True
     svc.student_long_term_goal_dao.upsert.assert_called_once_with("u1", "p1", "Master algebra")
 
 
 @pytest.mark.unit
-@patch("services.conversation.ltg_service.continue_ltg_conversation", side_effect=Exception("AI failure"))
-def test_run_continue_ltg_exception_returns_error_dict(mock_cont):
+def test_run_continue_ltg_exception_propagates():
+    mock_conv_svc = MagicMock()
+    mock_conv_svc.continue_conversation = AsyncMock(side_effect=Exception("AI failure"))
     svc = _continue_svc(period={"vector_store_id": "vs-1"})
-    result = svc.continue_conversation("u1", "ltg", "conv-1", "hi", period_id="p1")
-    assert result == {"error": "AI failure"}
+    with patch("services.conversation.ltg_service.LTGConversationService", return_value=mock_conv_svc):
+        with pytest.raises(Exception, match="AI failure"):
+            asyncio.run(svc.continue_conversation("u1", "ltg", "conv-1", "hi", period_id="p1"))

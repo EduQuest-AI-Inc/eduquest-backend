@@ -5,9 +5,12 @@ Receive BotProviderProtocol via constructor injection or via
 routers.deps.get_bot_provider (FastAPI Depends). The canonical provider is
 selected once at startup in main.py lifespan and stored in app.state.bot_provider.
 """
+import logging
 from typing import Optional
 
 from bots.protocol import BotProviderProtocol  # noqa: F401 — re-exported for callers
+
+logger = logging.getLogger(__name__)
 
 
 class BotProvider:
@@ -177,7 +180,17 @@ class BotProvider:
                 group_id=trace_group_id,
                 metadata=trace_metadata,
             )
-        return await Runner.run(agent, message, **kwargs)
+        try:
+            return await Runner.run(agent, message, **kwargs)
+        except Exception as exc:
+            logger.error(
+                "Runner.run failed (agent=%s, workflow=%s): %s",
+                type(agent).__name__,
+                trace_workflow_name,
+                exc,
+                exc_info=True,
+            )
+            raise
 
     def make_conversations_session(self, conversation_id=None):
         from agents import OpenAIConversationsSession

@@ -1,6 +1,7 @@
+import asyncio
 import json
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from services.conversation.conversation_service import ConversationService
 
@@ -25,38 +26,35 @@ def _svc():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-@patch("services.conversation.conversation_service.initiate_profile_conversation",
-       return_value={"response_id": "rid1", "response": "Hello!"})
-def test_start_profile_assistant_happy_path(mock_init):
+def test_start_profile_assistant_happy_path():
     svc = _svc()
     svc.student_dao.get_student_by_id.return_value = {"user_id": "u1"}
-
-    result = svc.start_profile_assistant("u1")
-
+    mock_ps = MagicMock()
+    mock_ps.initiate = AsyncMock(return_value={"response_id": "rid1", "response": "Hello!"})
+    with patch("services.conversation.conversation_service.ProfileConversationService", return_value=mock_ps):
+        result = asyncio.run(svc.start_profile_assistant("u1"))
     assert "conversation_id" in result
     assert result["response"] == "Hello!"
     svc.conversation_dao.add_conversation.assert_called_once()
 
 
 @pytest.mark.unit
-@patch("services.conversation.conversation_service.initiate_profile_conversation")
-def test_start_profile_assistant_student_not_found(mock_init):
+def test_start_profile_assistant_student_not_found():
     svc = _svc()
     svc.student_dao.get_student_by_id.return_value = None
-
     with pytest.raises(Exception, match="Student not found"):
-        svc.start_profile_assistant("u1")
+        asyncio.run(svc.start_profile_assistant("u1"))
 
 
 @pytest.mark.unit
-@patch("services.conversation.conversation_service.initiate_profile_conversation",
-       return_value={"response": "Hello!"})
-def test_start_profile_assistant_no_response_id(mock_init):
+def test_start_profile_assistant_no_response_id():
     svc = _svc()
     svc.student_dao.get_student_by_id.return_value = {"user_id": "u1"}
-
-    with pytest.raises(Exception, match="Failed to obtain response_id"):
-        svc.start_profile_assistant("u1")
+    mock_ps = MagicMock()
+    mock_ps.initiate = AsyncMock(return_value={"response": "Hello!"})
+    with patch("services.conversation.conversation_service.ProfileConversationService", return_value=mock_ps):
+        with pytest.raises(Exception, match="response_id"):
+            asyncio.run(svc.start_profile_assistant("u1"))
 
 
 # ---------------------------------------------------------------------------
@@ -64,59 +62,50 @@ def test_start_profile_assistant_no_response_id(mock_init):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-@patch("services.conversation.conversation_service.continue_profile_conversation",
-       return_value={"response": "Next!", "response_id": "rid2"})
-def test_continue_profile_assistant_happy_path(mock_cont):
+def test_continue_profile_assistant_happy_path():
     svc = _svc()
-    svc.conversation_dao.get_conversation_by_id_user_type.return_value = {
-        "last_response_id": "rid1"
-    }
-
-    result = svc.continue_profile_assistant("u1", "profile", "cid1", "Hi")
-
+    svc.conversation_dao.get_conversation_by_id_user_type.return_value = {"last_response_id": "rid1"}
+    mock_ps = MagicMock()
+    mock_ps.continue_conversation = AsyncMock(return_value={"response": "Next!", "response_id": "rid2"})
+    with patch("services.conversation.conversation_service.ProfileConversationService", return_value=mock_ps):
+        result = asyncio.run(svc.continue_profile_assistant("u1", "profile", "cid1", "Hi"))
     assert result["response"] == "Next!"
     assert result["profile_complete"] is False
     svc.conversation_dao.update_conversation.assert_called_once_with("cid1", {"last_response_id": "rid2"})
 
 
 @pytest.mark.unit
-@patch("services.conversation.conversation_service.continue_profile_conversation",
-       return_value={
-           "response": "Done!",
-           "response_id": "rid2",
-           "profile_complete": True,
-           "profile": {"interest": "math"},
-       })
-def test_continue_profile_assistant_profile_complete(mock_cont):
+def test_continue_profile_assistant_profile_complete():
     svc = _svc()
     svc.conversation_dao.get_conversation_by_id_user_type.return_value = {"last_response_id": "rid1"}
-
-    result = svc.continue_profile_assistant("u1", "profile", "cid1", "Hi")
-
+    mock_ps = MagicMock()
+    mock_ps.continue_conversation = AsyncMock(return_value={
+        "response": "Done!", "response_id": "rid2",
+        "profile_complete": True, "profile": {"interest": "math"},
+    })
+    with patch("services.conversation.conversation_service.ProfileConversationService", return_value=mock_ps):
+        result = asyncio.run(svc.continue_profile_assistant("u1", "profile", "cid1", "Hi"))
     assert result["profile_complete"] is True
     svc.student_dao.update_student.assert_called_once_with("u1", {"interest": "math"})
 
 
 @pytest.mark.unit
-@patch("services.conversation.conversation_service.continue_profile_conversation",
-       return_value={"response": "Hmm"})
-def test_continue_profile_assistant_no_new_response_id(mock_cont):
+def test_continue_profile_assistant_no_new_response_id():
     svc = _svc()
     svc.conversation_dao.get_conversation_by_id_user_type.return_value = {"last_response_id": "rid1"}
-
-    svc.continue_profile_assistant("u1", "profile", "cid1", "Hi")
-
+    mock_ps = MagicMock()
+    mock_ps.continue_conversation = AsyncMock(return_value={"response": "Hmm"})
+    with patch("services.conversation.conversation_service.ProfileConversationService", return_value=mock_ps):
+        asyncio.run(svc.continue_profile_assistant("u1", "profile", "cid1", "Hi"))
     svc.conversation_dao.update_conversation.assert_not_called()
 
 
 @pytest.mark.unit
-@patch("services.conversation.conversation_service.continue_profile_conversation")
-def test_continue_profile_assistant_conversation_not_found(mock_cont):
+def test_continue_profile_assistant_conversation_not_found():
     svc = _svc()
     svc.conversation_dao.get_conversation_by_id_user_type.return_value = None
-
     with pytest.raises(Exception, match="Conversation not found"):
-        svc.continue_profile_assistant("u1", "profile", "cid1", "Hi")
+        asyncio.run(svc.continue_profile_assistant("u1", "profile", "cid1", "Hi"))
 
 
 # ---------------------------------------------------------------------------

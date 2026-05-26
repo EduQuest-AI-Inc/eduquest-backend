@@ -44,7 +44,7 @@ class InitiateHomeworkRequest(BaseModel):
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
 @router.post("/initiate-ltg-conversation", response_model=dict[str, Any])
-def initiate_ltg_conversation(
+async def initiate_ltg_conversation(
     body: InitiateLTGRequest,
     auth: AuthPayload = Depends(get_auth),
     period_service: PeriodService = Depends(_get_period_service),
@@ -63,7 +63,7 @@ def initiate_ltg_conversation(
             EnrollmentService(jwt=auth.token).check_enrolled(auth.sub, body.period_id)
             effective_user_id = auth.sub
 
-        return period_service.initiate_ltg_conversation(effective_user_id, body.period_id)
+        return await period_service.initiate_ltg_conversation(effective_user_id, body.period_id)
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"detail": str(exc)})
     except LookupError as exc:
@@ -71,7 +71,7 @@ def initiate_ltg_conversation(
 
 
 @router.post("/continue-ltg-conversation", response_model=dict[str, Any])
-def continue_ltg_conversation(
+async def continue_ltg_conversation(
     body: ContinueLTGRequest,
     auth: AuthPayload = Depends(get_auth),
     period_service: PeriodService = Depends(_get_period_service),
@@ -90,7 +90,7 @@ def continue_ltg_conversation(
             effective_user_id = body.student_id
         else:
             effective_user_id = auth.sub
-        return period_service.continue_ltg_conversation(
+        return await period_service.continue_ltg_conversation(
             effective_user_id,
             body.conversation_type,
             body.conversation_id,
