@@ -2,11 +2,7 @@ import asyncio
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 
-from services.conversation.profile_service import (
-    ProfileConversationService,
-    initiate_profile_conversation,
-    continue_profile_conversation,
-)
+from services.conversation.profile_service import ProfileConversationService
 from services.conversation.teacher_feedback_service import (
     TeacherFeedbackConversationService,
     initiate_teacher_feedback,
@@ -207,28 +203,6 @@ def test_profile_continue_no_previous_id():
     asyncio.run(svc.continue_conversation("Hi"))
     assert mock_provider.run_conversation.call_args[1]["previous_response_id"] is None
 
-
-@pytest.mark.unit
-def test_initiate_profile_conversation_sync_wrapper():
-    mock_provider = MagicMock()
-    with patch("services.conversation.profile_service.ProfileConversationService") as MockCls:
-        with patch("services.conversation.profile_service.asyncio.run", return_value={"response": "Hi"}) as mock_run:
-            MockCls.return_value.initiate = MagicMock(return_value={"response": "Hi"})
-            result = initiate_profile_conversation({"first_name": "Ana"}, bot_provider=mock_provider)
-    MockCls.assert_called_once_with(bot_provider=mock_provider)
-    mock_run.assert_called_once()
-    assert result == {"response": "Hi"}
-
-
-@pytest.mark.unit
-def test_continue_profile_conversation_sync_wrapper():
-    mock_provider = MagicMock()
-    with patch("services.conversation.profile_service.ProfileConversationService") as MockCls:
-        with patch("services.conversation.profile_service.asyncio.run", return_value={"response": "Next"}) as mock_run:
-            MockCls.return_value.continue_conversation = MagicMock(return_value={"response": "Next"})
-            continue_profile_conversation("rid-old", "my message", bot_provider=mock_provider)
-    MockCls.assert_called_once_with("rid-old", bot_provider=mock_provider)
-    mock_run.assert_called_once()
 
 
 # ── TeacherFeedbackConversationService ────────────────────────────────────────

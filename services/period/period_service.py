@@ -25,11 +25,11 @@ class PeriodService:
     def unenroll_from_period(self, user_id, period_id):
         return self._enrollment.unenroll_from_period(user_id, period_id)
 
-    def initiate_ltg_conversation(self, user_id, period_id):
-        return LTGOrchestrationService(bot_provider=self._bot_provider).initiate(user_id, period_id)
+    async def initiate_ltg_conversation(self, user_id, period_id):
+        return await LTGOrchestrationService(bot_provider=self._bot_provider).initiate(user_id, period_id)
 
-    def continue_ltg_conversation(self, user_id, conversation_type, conversation_id, message, period_id=None):
-        return LTGOrchestrationService(bot_provider=self._bot_provider).continue_conversation(user_id, conversation_type, conversation_id, message, period_id)
+    async def continue_ltg_conversation(self, user_id, conversation_type, conversation_id, message, period_id=None):
+        return await LTGOrchestrationService(bot_provider=self._bot_provider).continue_conversation(user_id, conversation_type, conversation_id, message, period_id)
 
     def start_homework_agent(self, user_id, period_id):
         return self._quest.start_homework_agent(user_id, period_id)

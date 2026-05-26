@@ -2,6 +2,7 @@
 Conversation service — orchestrates profile gathering, grading, and
 teacher-feedback flows by delegating to specialised agent services.
 """
+import asyncio
 import json
 import logging
 import os
@@ -21,10 +22,7 @@ from integrations.s3_service import upload_file_to_s3
 from bots.protocol import BotProviderProtocol
 from models.conversation import Conversation
 from services.conversation.grading_service import grade_student_submission
-from services.conversation.profile_service import (
-    continue_profile_conversation,
-    initiate_profile_conversation,
-)
+from services.conversation.profile_service import ProfileConversationService
 from services.conversation.teacher_feedback_service import (
     continue_teacher_feedback,
     initiate_teacher_feedback,
@@ -52,33 +50,38 @@ class ConversationService:
     # Profile assistant
     # ------------------------------------------------------------------
 
-    def start_profile_assistant(self, user_id: str):
-        student = self.student_dao.get_student_by_id(user_id)
+    async def start_profile_assistant(self, user_id: str):
+        student = await asyncio.to_thread(self.student_dao.get_student_by_id, user_id)
         if not student:
             raise NotFoundError("Student not found")
 
-        result = initiate_profile_conversation(student, bot_provider=self._bot_provider)
+        service = ProfileConversationService(bot_provider=self._bot_provider)
+        result = await service.initiate(student)
 
         response_id = result.get("response_id")
         if not response_id:
-            raise Exception("Failed to obtain response_id from profile agent")  # unexpected agent failure → 500
+            raise ValidationError("Profile agent did not return a response_id")
 
         conversation_id = str(uuid.uuid4())
-        self.conversation_dao.add_conversation(Conversation(
-            conversation_id=conversation_id,
-            user_id=user_id,
-            conversation_type="profile",
-            last_response_id=response_id,
-        ))
+        await asyncio.to_thread(
+            self.conversation_dao.add_conversation,
+            Conversation(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                conversation_type="profile",
+                last_response_id=response_id,
+            ),
+        )
 
         return {
             "conversation_id": conversation_id,
             "response": result.get("response"),
         }
 
-    def continue_profile_assistant(self, user_id: str, conversation_type, conversation_id, message):
-        conversation = self.conversation_dao.get_conversation_by_id_user_type(
-            conversation_id, user_id, conversation_type
+    async def continue_profile_assistant(self, user_id: str, conversation_type, conversation_id, message):
+        conversation = await asyncio.to_thread(
+            self.conversation_dao.get_conversation_by_id_user_type,
+            conversation_id, user_id, conversation_type,
         )
         if not conversation:
             raise NotFoundError("Conversation not found")
@@ -86,16 +89,19 @@ class ConversationService:
         last_response_id = conversation.get("last_response_id")
         if not isinstance(last_response_id, str):
             raise NotFoundError("Conversation has no response ID")
-        result = continue_profile_conversation(last_response_id, message, bot_provider=self._bot_provider)
+
+        service = ProfileConversationService(previous_response_id=last_response_id, bot_provider=self._bot_provider)
+        result = await service.continue_conversation(message)
 
         new_response_id = result.get("response_id")
         if new_response_id:
-            self.conversation_dao.update_conversation(
-                conversation_id, {"last_response_id": new_response_id}
+            await asyncio.to_thread(
+                self.conversation_dao.update_conversation,
+                conversation_id, {"last_response_id": new_response_id},
             )
 
         if result.get("profile_complete") and result.get("profile"):
-            self.student_dao.update_student(user_id, result["profile"])
+            await asyncio.to_thread(self.student_dao.update_student, user_id, result["profile"])
 
         return {
             "response": result["response"],

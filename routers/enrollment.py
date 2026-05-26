@@ -15,15 +15,10 @@ from responses.enrollment import (
     VerifyPeriodResponse,
 )
 from responses.period import PeriodOut
-from services.billing.membership_service import (
-    MembershipRequiredError,
-    MembershipService,
-    PlanLimitExceededError,
-)
 from services.enrollment.enrollment_service import EnrollmentService
 from services.parent.parent_service import ParentService
+from routers.enrollment_access import check_owner_can_accept_student
 from services.period.period_management_service import PeriodManagementService
-from services.user.user_service import UserService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -97,33 +92,7 @@ def my_periods(
 
 @router.post("/verify-period", response_model=VerifyPeriodResponse)
 def verify_period(body: VerifyPeriodRequest, auth: AuthPayload = Depends(get_auth)):
-    period_mgmt = PeriodManagementService(jwt=auth.token)
-    user_svc = UserService()
-    # Membership check uses admin to read the owner's (another user's) membership
-    membership_svc = MembershipService()
-    period = period_mgmt.get_period_by_id(body.period_id)
-    if period:
-        owner_id = period.get("owner_id")
-        owner = user_svc.get_by_id(owner_id) if owner_id else None
-        owner_role = owner.get("role") if owner else None
-        if owner_id and owner_role in ("teacher", "parent"):
-            try:
-                membership_svc.check_can_add_student_to_period(
-                    owner_id, owner_role, body.period_id
-                )
-            except MembershipRequiredError:
-                raise HTTPException(
-                    status_code=403,
-                    detail={
-                        "error": "This class is not currently accepting new students.",
-                        "code": "OWNER_MEMBERSHIP_INACTIVE",
-                    },
-                )
-            except PlanLimitExceededError as exc:
-                raise HTTPException(
-                    status_code=403,
-                    detail={"error": str(exc), "code": "PLAN_LIMIT_EXCEEDED"},
-                )
+    check_owner_can_accept_student(body.period_id)
     svc = EnrollmentService(jwt=auth.token)
     period = svc.verify_period_id(auth.sub, body.period_id, body.allow_parent_period)
     return {"message": "Period verified and added to enrollments", "period": period}

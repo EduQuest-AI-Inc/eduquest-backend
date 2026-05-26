@@ -1,13 +1,13 @@
 """
-Profile conversation service — wires the ProfileAgent into Flask.
+Profile conversation service.
 
 Uses previous_response_id tracking for multi-turn stateful conversations
 via the Responses API, avoiding the Conversations API entirely.
 """
-import asyncio
 from typing import Optional, Dict, Any
 
 from bots.protocol import BotProviderProtocol
+from exceptions.validation_error import ValidationError
 
 
 class ProfileConversationService:
@@ -45,6 +45,8 @@ class ProfileConversationService:
         )
 
         response = result.final_output
+        if response is None:
+            raise ValidationError("Profile agent returned no structured output")
         profile_complete, profile = self._check_profile(response)
 
         return {
@@ -76,6 +78,8 @@ class ProfileConversationService:
         )
 
         response = result.final_output
+        if response is None:
+            raise ValidationError("Profile agent returned no structured output")
         profile_complete, profile = self._check_profile(response)
 
         return {
@@ -97,23 +101,3 @@ class ProfileConversationService:
             }
         return False, None
 
-
-# ---- Sync wrappers for Flask routes ----
-
-def initiate_profile_conversation(
-    student: Dict[str, Any],
-    *,
-    bot_provider: BotProviderProtocol,
-) -> Dict[str, Any]:
-    service = ProfileConversationService(bot_provider=bot_provider)
-    return asyncio.run(service.initiate(student))
-
-
-def continue_profile_conversation(
-    previous_response_id: str,
-    user_message: str,
-    *,
-    bot_provider: BotProviderProtocol,
-) -> Dict[str, Any]:
-    service = ProfileConversationService(previous_response_id, bot_provider=bot_provider)
-    return asyncio.run(service.continue_conversation(user_message))

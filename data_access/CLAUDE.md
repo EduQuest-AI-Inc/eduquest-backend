@@ -19,7 +19,7 @@ One file per Supabase table.
 
 ## Client Selection Rule
 
-**Admin vs user Supabase client** — DAOs operating in user context pass the user JWT (RLS is enforced by Supabase). DAOs that need elevated access (background jobs, operations that must bypass RLS) use the service-role client. The choice is made in the DAO constructor, not at the call site. Example: `ConversationDAO` in `ConversationService` uses the admin client because the conversation table RLS blocks user-context INSERTs.
+**Admin vs user Supabase client** — DAOs operating in user context pass the user JWT (RLS is enforced by Supabase). DAOs that need elevated access (background jobs, operations that must bypass RLS) use the service-role client. The choice is usually made in the DAO constructor, not at the call site. If one DAO needs both modes, expose an explicitly named admin-backed method and use `self._admin_client` internally; `MarketplaceListingDAO.get_published_by_period_id()` is the pattern for pre-enrollment marketplace checks where a student JWT cannot read cross-user rows yet.
 
 ## Base helpers (read these before adding methods)
 
@@ -76,7 +76,7 @@ Role tables (`student`, `teacher`, `parent`) hold only role-specific fields and 
 | `LessonPptxDAO` | `lesson_pptx` | Per-lesson PowerPoint generation state and S3 key. Methods: `insert`, `update_status`, `get_by_period`, `get_by_lesson_id`, `get_latest_done`. |
 | `MaterialFilesDAO` | `material_files` | Uploaded teacher materials per period. |
 | `FeedbackDAO` | `user_feedback` | Student and teacher feedback records. |
-| `MarketplaceListingDAO` | `marketplace_listing` | Published period listings in the resource marketplace; tracks `is_published`, `fork_count`, tags. |
+| `MarketplaceListingDAO` | `marketplace_listing` | Published period listings in the resource marketplace; tracks `is_published`, `fork_count`, tags. `get_published_by_period_id()` is admin-backed and is used to allow published parent-owned classes to be joined by period ID. |
 | `WaitlistDAO` | `waitlist` | Pilot program waitlist entries. |
 | `PasswordResetTokenDAO` | `password_reset_token` | One-shot reset token, hashed before storage. |
 | `PasswordResetRateLimitDAO` | `password_reset_rate_limit` | Per-email rate limiting for `/auth/password-reset/request`. |
