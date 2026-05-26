@@ -58,6 +58,16 @@ class PeriodDAO(SupabaseBaseDAO):
     def update_status(self, period_id: str, status: str) -> None:
         self._update({'period_id': period_id}, {'status': status})
 
+    def archive_period(self, period_id: str) -> None:
+        from datetime import datetime, timezone
+        self._update(
+            {'period_id': period_id},
+            {'archived_at': datetime.now(timezone.utc).isoformat()},
+        )
+
+    def unarchive_period(self, period_id: str) -> None:
+        self._update({'period_id': period_id}, {'archived_at': None})
+
     def try_start_generating(self, period_id: str) -> bool:
         """Atomically transition period to 'generating' only if currently 'pending' or 'failed'.
 

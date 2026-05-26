@@ -148,3 +148,21 @@ class PeriodManagementService:
             if file_keys:
                 delete_files_from_s3(file_keys)
         self.period_dao.delete_period(period_id)
+
+    def archive_period(self, period_id: str, user_id: str, period: dict | None = None) -> dict:
+        period = period or self.period_dao.get_period_by_id(period_id)
+        if not period:
+            raise NotFoundError("Period not found")
+        if period.get("owner_id") != user_id:
+            raise PermissionError("Not authorized to archive this period")
+        self.period_dao.archive_period(period_id)
+        return self._enrich_period(self.period_dao.get_period_by_id(period_id))
+
+    def unarchive_period(self, period_id: str, user_id: str, period: dict | None = None) -> dict:
+        period = period or self.period_dao.get_period_by_id(period_id)
+        if not period:
+            raise NotFoundError("Period not found")
+        if period.get("owner_id") != user_id:
+            raise PermissionError("Not authorized to unarchive this period")
+        self.period_dao.unarchive_period(period_id)
+        return self._enrich_period(self.period_dao.get_period_by_id(period_id))
