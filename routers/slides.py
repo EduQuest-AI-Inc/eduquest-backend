@@ -5,6 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from responses.slides import PptxStatusItemOut, RestartResponse
 
 from bots.protocol import BotProviderProtocol
+from constants.feature_flags import is_pptx_generation_enabled
 from routers.curriculum import _assert_owner_or_parent_of_owner
 from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period
 from exceptions.validation_error import ValidationError
@@ -76,6 +77,9 @@ def restart_pptx_generation(
     period: dict = Depends(get_period),
 ):
     _assert_owner_or_parent_of_owner(period, auth)
+
+    if not is_pptx_generation_enabled():
+        raise HTTPException(status_code=503, detail="PPTX generation is disabled.")
 
     try:
         count = slides_svc.restart_batch(period_id, background_tasks)

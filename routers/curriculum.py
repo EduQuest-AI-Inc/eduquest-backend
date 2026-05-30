@@ -9,6 +9,7 @@ from responses.curriculum import ApprovePeriodResponse, CurriculumStatusResponse
 
 from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, get_period
 from bots.protocol import BotProviderProtocol
+from constants.feature_flags import is_pptx_generation_enabled
 from services.curriculum.curriculum_service import CurriculumService
 from services.enrollment.enrollment_service import EnrollmentService
 from services.parent.parent_service import ParentService
@@ -298,16 +299,26 @@ def approve_period(
     try:
         lessons = svc.approve_period(period_id, period=period)
         if period.get("is_summer_quest"):
-            slides_svc.prepare_batch(period_id, lessons)
-            background_tasks.add_task(
-                _run_slides_and_quests_parallel,
-                slides_svc=slides_svc,
-                period_id=period_id,
-                owner_id=period["owner_id"],
-                bot_provider=bot_provider,
-            )
+            if is_pptx_generation_enabled():
+                slides_svc.prepare_batch(period_id, lessons)
+                background_tasks.add_task(
+                    _run_slides_and_quests_parallel,
+                    slides_svc=slides_svc,
+                    period_id=period_id,
+                    owner_id=period["owner_id"],
+                    bot_provider=bot_provider,
+                )
+            else:
+                # PPTX disabled — queue only summer quest generation so quests still fire.
+                summer_svc = PeriodSummerQuestService(bot_provider=bot_provider)
+                background_tasks.add_task(
+                    summer_svc.run_as_background_task,
+                    owner_id=period["owner_id"],
+                    period_id=period_id,
+                )
         else:
-            slides_svc.start_batch(period_id, background_tasks, lessons)
+            if is_pptx_generation_enabled():
+                slides_svc.start_batch(period_id, background_tasks, lessons)
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except NotFoundError as exc:
