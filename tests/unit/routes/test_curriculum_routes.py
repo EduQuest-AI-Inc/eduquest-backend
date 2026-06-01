@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from main import app
@@ -182,3 +182,45 @@ class TestApprovePeriod:
     def test_approve_period_membership_denied_returns_403(self, membership_denied_client):
         resp = membership_denied_client.post(f"/curriculum/{_PERIOD_ID}/approve")
         assert resp.status_code == 403
+
+    @pytest.mark.api
+    def test_approve_regular_period_does_not_call_start_batch_when_disabled(self, client, monkeypatch):
+        monkeypatch.setenv("PPTX_GENERATION_ENABLED", "false")
+        mock_cs = MagicMock()
+        mock_cs.approve_period.return_value = [{"lesson_id": "l1"}]
+        mock_ss = MagicMock()
+        app.dependency_overrides[_get_curriculum_service] = lambda: mock_cs
+        app.dependency_overrides[_get_slides_service] = lambda: mock_ss
+        resp = client.post(f"/curriculum/{_PERIOD_ID}/approve")
+        app.dependency_overrides.pop(_get_curriculum_service, None)
+        app.dependency_overrides.pop(_get_slides_service, None)
+        assert resp.status_code == 202
+        mock_ss.start_batch.assert_not_called()
+
+    @pytest.mark.api
+    def test_approve_summer_quest_queues_only_summer_task_when_disabled(self, monkeypatch):
+        monkeypatch.setenv("PPTX_GENERATION_ENABLED", "false")
+        _SUMMER_PERIOD = {"period_id": _PERIOD_ID, "owner_id": "user-1", "is_summer_quest": True}
+        app.dependency_overrides[get_auth] = lambda: _TEACHER_AUTH
+        app.dependency_overrides[_membership_or_summer] = lambda: _TEACHER_AUTH
+        app.dependency_overrides[get_period] = lambda: _SUMMER_PERIOD
+
+        mock_cs = MagicMock()
+        mock_cs.approve_period.return_value = [{"lesson_id": "l1"}]
+        mock_ss = MagicMock()
+        app.dependency_overrides[_get_curriculum_service] = lambda: mock_cs
+        app.dependency_overrides[_get_slides_service] = lambda: mock_ss
+
+        mock_summer_instance = MagicMock()
+        with patch("routers.curriculum.PeriodSummerQuestService", return_value=mock_summer_instance) as mock_summer_cls:
+            with TestClient(app, raise_server_exceptions=False) as c:
+                resp = c.post(f"/curriculum/{_PERIOD_ID}/approve")
+
+        app.dependency_overrides.clear()
+
+        assert resp.status_code == 202
+        # PPTX path must not be touched
+        mock_ss.prepare_batch.assert_not_called()
+        # Summer quest must still be scheduled
+        mock_summer_cls.assert_called_once()
+        mock_summer_instance.run_as_background_task.assert_called_once()

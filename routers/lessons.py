@@ -5,6 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from responses.lessons import LessonHtmlResponse, LessonPptxResponse, RegenerateLessonResponse
 
 from bots.protocol import BotProviderProtocol
+from constants.feature_flags import is_pptx_generation_enabled
 from routers.deps import AuthPayload, Role, get_auth, get_bot_provider, require_roles
 from integrations import s3_service
 from services.enrollment.enrollment_service import EnrollmentService
@@ -75,6 +76,10 @@ def regenerate_lesson_pptx(
     if not pptx_row:
         raise HTTPException(status_code=404, detail="No PowerPoint record for this lesson")
     _assert_lesson_access(pptx_row["period_id"], auth)
+
+    if not is_pptx_generation_enabled():
+        raise HTTPException(status_code=503, detail="PPTX generation is disabled.")
+
     try:
         return slides_svc.regenerate_lesson(lesson_id, background_tasks)
     except NotFoundError as exc:

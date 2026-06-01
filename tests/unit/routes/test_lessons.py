@@ -122,3 +122,22 @@ class TestGetLessonPptx:
             resp = teacher_client.get(f"/lessons/{_LESSON_ID}/pptx")
 
         assert resp.status_code == 404
+
+
+class TestRegenerateLessonPptx:
+
+    @pytest.mark.api
+    def test_regenerate_returns_503_when_pptx_disabled(self, teacher_client, monkeypatch):
+        monkeypatch.setenv("PPTX_GENERATION_ENABLED", "false")
+        _PENDING_ROW = {**_DONE_ROW, "status": "pending"}
+        mock_ls = MagicMock()
+        mock_ls.get_pptx_by_lesson_id.return_value = _PENDING_ROW
+        mock_ls.get_latest_done_pptx.return_value = None
+        mock_period_svc = MagicMock()
+        mock_period_svc.get_period_by_id.return_value = _OWNED_PERIOD
+        with patch("routers.lessons.LessonsService", return_value=mock_ls), \
+             patch("routers.lessons.PeriodManagementService", return_value=mock_period_svc):
+            resp = teacher_client.post(f"/lessons/{_LESSON_ID}/pptx/regenerate")
+
+        assert resp.status_code == 503
+        assert "disabled" in resp.json()["detail"].lower()
