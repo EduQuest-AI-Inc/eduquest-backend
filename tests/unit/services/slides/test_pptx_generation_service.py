@@ -6,6 +6,14 @@ from services.slides.pptx_generation_service import PptxGenerationService
 from exceptions.validation_error import ValidationError
 
 
+# ── Feature-flag fixture ──────────────────────────────────────────────────────
+# PPTX_GENERATION_ENABLED defaults to false; all existing success tests need it on.
+
+@pytest.fixture(autouse=True)
+def enable_pptx(monkeypatch):
+    monkeypatch.setenv("PPTX_GENERATION_ENABLED", "true")
+
+
 def _mock_agent(raises=None):
     """Wrap MockPptxAgent; override run() to raise when testing the error path."""
     agent = MockPptxAgent()
@@ -230,3 +238,70 @@ def test_run_batch_agent_timeout_writes_failed():
 
     statuses = [c[0][1].get("status") for c in svc.lesson_pptx_dao.update_status.call_args_list]
     assert statuses == ["generating", "failed"]
+
+
+# ── Feature flag disabled ─────────────────────────────────────────────────────
+
+@pytest.mark.unit
+def test_prepare_batch_returns_zero_when_disabled(monkeypatch):
+    monkeypatch.setenv("PPTX_GENERATION_ENABLED", "false")
+    svc = _svc()
+    result = svc.prepare_batch("p1", [{"lesson_id": "l1"}, {"lesson_id": "l2"}])
+    assert result == 0
+    svc.lesson_pptx_dao.insert.assert_not_called()
+
+
+@pytest.mark.unit
+def test_start_batch_returns_zero_when_disabled(monkeypatch):
+    monkeypatch.setenv("PPTX_GENERATION_ENABLED", "false")
+    svc = _svc()
+    bg = MagicMock()
+    result = svc.start_batch("p1", bg, [{"lesson_id": "l1"}])
+    assert result == 0
+    svc.lesson_pptx_dao.insert.assert_not_called()
+    bg.add_task.assert_not_called()
+
+
+@pytest.mark.unit
+def test_run_batch_marks_stranded_pending_rows_failed_when_disabled(monkeypatch):
+    """Deploy-race: rows inserted before flag flip must become failed so restart_batch can recover them."""
+    monkeypatch.setenv("PPTX_GENERATION_ENABLED", "false")
+    svc = _svc(agent=_mock_agent())
+    svc.lesson_pptx_dao.get_by_period.return_value = [
+        _pptx_row(pptx_id="px1", status="pending"),
+        _pptx_row(pptx_id="px2", status="pending"),
+    ]
+    svc.run_batch("p1")
+    # Both rows must be flipped to failed (attempt_count unchanged — all 3 retries intact)
+    assert svc.lesson_pptx_dao.update_status.call_count == 2
+    for call in svc.lesson_pptx_dao.update_status.call_args_list:
+        assert call[0][1] == {"status": "failed"}
+    svc._s3.upload_pptx.assert_not_called()
+
+
+@pytest.mark.unit
+def test_run_batch_no_pending_rows_when_disabled_does_no_writes(monkeypatch):
+    """No rows at all — only a log message, no DAO writes."""
+    monkeypatch.setenv("PPTX_GENERATION_ENABLED", "false")
+    svc = _svc(agent=_mock_agent())
+    svc.lesson_pptx_dao.get_by_period.return_value = []
+    svc.run_batch("p1")
+    svc.lesson_pptx_dao.update_status.assert_not_called()
+    svc._s3.upload_pptx.assert_not_called()
+
+
+@pytest.mark.unit
+def test_restart_batch_returns_zero_when_disabled(monkeypatch):
+    monkeypatch.setenv("PPTX_GENERATION_ENABLED", "false")
+    svc = _svc()
+    result = svc.restart_batch("p1", MagicMock())
+    assert result == 0
+    svc.lesson_pptx_dao.update_status.assert_not_called()
+
+
+@pytest.mark.unit
+def test_regenerate_lesson_raises_when_disabled(monkeypatch):
+    monkeypatch.setenv("PPTX_GENERATION_ENABLED", "false")
+    svc = _svc()
+    with pytest.raises(ValidationError, match="disabled"):
+        svc.regenerate_lesson("l1", MagicMock())

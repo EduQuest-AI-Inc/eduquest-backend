@@ -11,6 +11,7 @@ from data_access.lesson_dao import LessonDAO
 from data_access.lesson_pptx_dao import LessonPptxDAO
 from data_access.period_dao import PeriodDAO
 from data_access.skill_dao import SkillDAO
+from constants.feature_flags import is_pptx_generation_enabled
 from exceptions.not_found_error import NotFoundError
 from exceptions.validation_error import ValidationError
 from integrations import s3_service
@@ -52,9 +53,14 @@ class PptxGenerationService:
     ) -> int:
         """Create LessonPptx records without scheduling generation.
 
+        Returns 0 immediately when PPTX generation is disabled.
         Raises ValidationError if generation is already running or completed.
         Returns the number of lessons created.
         """
+        if not is_pptx_generation_enabled():
+            logger.info("pptx prepare_batch skipped (disabled): period=%s", period_id)
+            return 0
+
         if self.lesson_pptx_dao.get_by_period(period_id):
             raise ValidationError("Generation already running or completed for this period")
 
@@ -75,15 +81,43 @@ class PptxGenerationService:
     ) -> int:
         """Create LessonPptx records and schedule background generation.
 
+        Returns 0 immediately when PPTX generation is disabled.
         Raises ValidationError if generation is already running or completed.
         Returns the number of lessons queued.
         """
+        if not is_pptx_generation_enabled():
+            logger.info("pptx start_batch skipped (disabled): period=%s", period_id)
+            return 0
+
         count = self.prepare_batch(period_id, lessons)
         background_tasks.add_task(self.run_batch, period_id)
         return count
 
     def run_batch(self, period_id: str) -> None:
-        """Sync entry point for BackgroundTasks. Reads state then drives the async batch."""
+        """Sync entry point for BackgroundTasks. Reads state then drives the async batch.
+
+        Returns immediately when PPTX generation is disabled, so already-queued
+        background tasks cannot generate or upload after the flag is turned off.
+        """
+        if not is_pptx_generation_enabled():
+            # Drain stranded pending rows so restart_batch can recover them when re-enabled.
+            # Handles the race where rows were inserted before a flag-flip and the background
+            # task fires after. Rows keep attempt_count=0 so all 3 retries remain available.
+            stranded = [
+                r for r in self.lesson_pptx_dao.get_by_period(period_id)
+                if r.get("status") == "pending"
+            ]
+            if stranded:
+                for row in stranded:
+                    self.lesson_pptx_dao.update_status(row["pptx_id"], {"status": "failed"})
+                logger.warning(
+                    "pptx run_batch disabled: %d stranded pending rows marked failed: period=%s",
+                    len(stranded), period_id,
+                )
+            else:
+                logger.info("pptx run_batch skipped (disabled): period=%s", period_id)
+            return
+
         period = self.period_dao.get_period_by_id(period_id)
         period_context = {
             "period_name": period.get("name", "") if period else "",
@@ -120,10 +154,16 @@ class PptxGenerationService:
     def restart_batch(self, period_id: str, background_tasks: BackgroundTasks) -> int:
         """Reset stuck/failed lessons to pending and re-queue generation.
 
+        Returns 0 immediately when PPTX generation is disabled (router guard
+        returns 503 first, so this is an extra safety net for direct callers).
         Skips lessons that have already reached 3 attempts.
         Returns the number of lessons reset.
         Raises ValidationError if there is nothing to retry.
         """
+        if not is_pptx_generation_enabled():
+            logger.info("pptx restart_batch skipped (disabled): period=%s", period_id)
+            return 0
+
         rows = self.lesson_pptx_dao.get_by_period(period_id)
         stuck = [r for r in rows if r.get("status") in ("generating", "failed")]
         if not stuck:
@@ -147,10 +187,15 @@ class PptxGenerationService:
     def regenerate_lesson(self, lesson_id: str, background_tasks: BackgroundTasks) -> dict:
         """Reset a single lesson to pending and re-queue generation.
 
+        Raises ValidationError when PPTX generation is disabled (router guard
+        returns 503 first; this guard protects direct service callers).
         Raises NotFoundError if no pptx record exists for the lesson.
         Raises ValidationError if the lesson has reached 3 attempts.
         Returns the pptx_id of the reset record.
         """
+        if not is_pptx_generation_enabled():
+            raise ValidationError("PPTX generation is disabled")
+
         row = self.lesson_pptx_dao.get_by_lesson_id(lesson_id)
         if not row:
             raise NotFoundError(f"No PowerPoint record found for lesson {lesson_id}")
