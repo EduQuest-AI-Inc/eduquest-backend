@@ -72,6 +72,7 @@ def create_subscription_checkout_session(
         cancel_url=cancel_url,
         client_reference_id=user_id,
         allow_promotion_codes=True,
+        payment_method_collection="if_required",
         metadata={"eduquest_user_id": user_id},
     )
     return session["url"]
