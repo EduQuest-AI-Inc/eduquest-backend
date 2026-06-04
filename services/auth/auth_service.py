@@ -65,7 +65,7 @@ class AuthService:
         self.parent_dao = parent_dao or ParentDAO()
         self.supabase_auth_service = supabase_auth_service or SupabaseAuthService()
 
-    def register_user(self, username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', grade: Optional[str] = None, phone_number: Optional[str] = None) -> dict:
+    def register_user(self, username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', grade: Optional[str] = None, phone_number: Optional[str] = None, age_band: Optional[str] = None) -> dict:
         is_valid, error_msg = validate_password(password)
         if not is_valid:
             return {"success": False, "error": error_msg}
@@ -116,6 +116,9 @@ class AuthService:
             email=email,
             phone_number=phone_number,
             grade=int(grade) if grade is not None else None,
+            age_band=age_band,
+            age_signal_source='self_screen',
+            compliance_status='active' if age_band == '18_plus' else 'blocked',
         )
         self.student_dao.add_student(student)
         try:
@@ -158,6 +161,13 @@ class AuthService:
         if user.get('login_disabled'):
             logger.warning("authenticate_user: login_disabled for %s", username)
             return False
+        if role == 'student':
+            student = self.student_dao.get_student_by_id(username)
+            if not student or student.get('compliance_status') in {
+                'quarantined_age_review', 'provisioning', 'blocked'
+            }:
+                logger.warning("authenticate_user: student compliance gate blocked %s", username)
+                return False
         stored_hash = user['password']
         if not check_password_hash(stored_hash, password):
             logger.warning("authenticate_user: password mismatch for %s (hash prefix: %s)", username, stored_hash[:10])
@@ -174,8 +184,8 @@ class AuthService:
 _auth_service = AuthService()
 
 
-def register_user(username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', grade: Optional[str] = None, phone_number: Optional[str] = None) -> dict:
-    return _auth_service.register_user(username, password, role, first_name, last_name, email, grade, phone_number)
+def register_user(username: str, password: str, role: str, first_name: str = '', last_name: str = '', email: str = '', grade: Optional[str] = None, phone_number: Optional[str] = None, age_band: Optional[str] = None) -> dict:
+    return _auth_service.register_user(username, password, role, first_name, last_name, email, grade, phone_number, age_band)
 
 
 def get_user_by_email(email: str):

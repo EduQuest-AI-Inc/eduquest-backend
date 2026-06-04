@@ -36,6 +36,12 @@ class StudentDAO(SupabaseBaseDAO):
                 'account_status': getattr(student, 'account_status', 'active'),
                 'created_by_parent_id': getattr(student, 'created_by_parent_id', None),
                 'claimed_at': getattr(student, 'claimed_at', None),
+                'age_band': getattr(student, 'age_band', None),
+                'age_signal_source': getattr(student, 'age_signal_source', None),
+                'compliance_status': getattr(student, 'compliance_status', 'blocked'),
+                'compliance_review_due_at': getattr(student, 'compliance_review_due_at', None),
+                'compliance_outreach_stage': getattr(student, 'compliance_outreach_stage', 0),
+                'compliance_outreach_sent_at': getattr(student, 'compliance_outreach_sent_at', None),
             })
         except Exception:
             self._user_dao.delete(student.user_id)
@@ -105,3 +111,16 @@ class StudentDAO(SupabaseBaseDAO):
             .eq("created_by_parent_id", parent_id)
         )
 
+    def list_legacy_review_due(self) -> list[Dict[str, Any]]:
+        response = self._execute(
+            self._table()
+            .select('*, user!fk_student_user!inner(*)')
+            .eq('compliance_status', 'legacy_review_due')
+        )
+        results = []
+        for row in (response.data or []):
+            item = dict(row)
+            user_data = item.pop('user', {})
+            item.update(user_data)
+            results.append(item)
+        return results

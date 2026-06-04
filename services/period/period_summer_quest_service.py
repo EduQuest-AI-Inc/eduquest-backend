@@ -9,6 +9,7 @@ from exceptions.permission_error import PermissionError
 from exceptions.validation_error import ValidationError
 from services.curriculum.curriculum_service import CurriculumService
 from services.quest.quest_grading_service import QuestGradingService
+from services.tracking import Events, track_event
 
 logger = logging.getLogger(__name__)
 
@@ -142,4 +143,9 @@ class PeriodSummerQuestService:
         except Exception as exc:
             logger.error(
                 "Summer quest generation failed for period %s: %s", period_id, exc, exc_info=True
+            )
+            track_event(
+                user_id=owner_id,
+                event=Events.SUMMER_QUEST_GEN_FAILED,
+                properties={"period_id": period_id, "error_type": type(exc).__name__},
             )

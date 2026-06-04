@@ -32,5 +32,23 @@ class Events:
     # ------- Configuration (server) -------
     PERIOD_FILES_UPLOADED = "period_files_uploaded"
 
+    # ------- Billing errors (server) -------
+    BILLING_CHECKOUT_FAILED          = "billing_checkout_failed"
+    BILLING_PORTAL_FAILED            = "billing_portal_failed"
+    MEMBERSHIP_TRIAL_CREATION_FAILED = "membership_trial_creation_failed"
+
+    # ------- AI pipeline failures (server) -------
+    QUEST_GRADING_FAILED    = "quest_grading_failed"
+    QUEST_GENERATION_FAILED = "quest_generation_failed"
+    SUMMER_QUEST_GEN_FAILED = "summer_quest_generation_failed"
+    PERIOD_FILE_PROC_FAILED = "period_file_processing_failed"
+    PPTX_LESSON_GEN_FAILED  = "pptx_lesson_generation_failed"
+    CURRICULUM_GEN_FAILED   = "curriculum_generation_failed"
+    GRADE_PERSISTENCE_FAILED = "grade_persistence_failed"
+    QUEST_UPDATE_FAILED     = "quest_update_failed"
+
+    # ------- Integration errors (server) -------
+    CANVAS_CONNECT_FAILED = "canvas_connect_failed"
+
     # ------- Access gating (server) -------
     PILOT_WAITLIST_APPROVED = "pilot_waitlist_approved"

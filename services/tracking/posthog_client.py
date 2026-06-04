@@ -41,6 +41,11 @@ def get_posthog() -> Any:
     if _posthog is not None:
         return _posthog
 
+    if os.environ.get("EDUQUEST_ANALYTICS_ENABLED", "").lower() not in ("1", "true", "yes"):
+        logger.info("PostHog disabled during student privacy remediation")
+        _posthog = _NullPosthog()  # type: ignore[assignment]
+        return _posthog
+
     api_key = os.environ.get("POSTHOG_API_KEY") or os.environ.get(
         "NEXT_PUBLIC_POSTHOG_KEY"  # tolerate the frontend var name in dev
     )

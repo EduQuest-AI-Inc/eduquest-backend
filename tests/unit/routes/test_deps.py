@@ -135,13 +135,30 @@ def _auth_app() -> FastAPI:
 
 @pytest.mark.unit
 @patch("routers.deps.SUPABASE_JWT_SECRET", TEST_SECRET)
-def test_get_auth_valid_token():
+@patch("data_access.student_dao.StudentDAO")
+def test_get_auth_valid_token(mock_student_dao):
+    mock_student_dao.return_value.get_student_by_id.return_value = {"compliance_status": "active"}
     token = _make_token({"username": "testuser", "role": "student"})
     app = _auth_app()
     with TestClient(app, raise_server_exceptions=False) as client:
         resp = client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     assert resp.json() == {"sub": "testuser", "role": "student"}
+
+
+@pytest.mark.unit
+@patch("routers.deps.SUPABASE_JWT_SECRET", TEST_SECRET)
+@patch("data_access.student_dao.StudentDAO")
+def test_get_auth_blocks_quarantined_student_token(mock_student_dao):
+    mock_student_dao.return_value.get_student_by_id.return_value = {
+        "compliance_status": "quarantined_age_review",
+    }
+    token = _make_token({"username": "testuser", "role": "student"})
+    app = _auth_app()
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 403
+    assert resp.json()["detail"]["code"] == "STUDENT_COMPLIANCE_REVIEW_REQUIRED"
 
 
 @pytest.mark.unit

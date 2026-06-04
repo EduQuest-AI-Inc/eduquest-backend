@@ -140,7 +140,7 @@ See [SUPABASE_RULES.md](SUPABASE_RULES.md) for RLS policies and FK cascade rules
 | -------------------- | --------- | ----------- | ---------------------------------------------------------------- |
 | `user_id`            | text      | PK → `user` |                                                                  |
 | `linked_student_ids` | text[]  | nullable    | `user_id`s of linked student accounts                            |
-| `vpc_verified_at`    | timestamptz | nullable    | COPPA 2025 compliance — set when parent accepts a student invite |
+| `vpc_verified_at`    | timestamptz | nullable    | Legacy-only field cleared by migration 020; invite redemption is not VPC |
 
 ---
 
@@ -606,4 +606,3 @@ See [SUPABASE_RULES.md](SUPABASE_RULES.md) for RLS policies and FK cascade rules
 | `openai_file_id`   | text        | NOT NULL UNIQUE | OpenAI Files API ID                          |
 | `vector_store_id`  | text        | NOT NULL UNIQUE | Per-file vector store; embeddings live here  |
 | `created_at`       | timestamptz | NOT NULL    | Auto-set on first upload                         |
-

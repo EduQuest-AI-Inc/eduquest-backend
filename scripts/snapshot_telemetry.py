@@ -9,6 +9,7 @@ Usage:
     python -m scripts.snapshot_telemetry
 
 Env required:
+    EDUQUEST_ANALYTICS_ENABLED=true
     POSTHOG_API_KEY    # PostHog project key (server-side)
     POSTHOG_HOST       # default https://us.i.posthog.com
     SUPABASE_URL
@@ -49,20 +50,21 @@ def _supabase():
 # ---------------------------------------------------------------------------
 
 def sync_users(sb) -> int:
-    """Push current trait values for every active user."""
+    """Push owner traits only. Student snapshots stay disabled during remediation."""
     rows = (
         sb.table("user")
         .select(
             "user_id, email, role, school_name, last_login, "
-            "student(completed_tutorial, strength, directory_info_opt_out, age_band, grade), "
             "teacher(pilot_approved), "
-            "parent(linked_student_ids, vpc_verified_at)"
+            "parent(linked_student_ids)"
         )
         .is_("deleted_at", "null")
         .execute()
     )
     count = 0
     for r in rows.data or []:
+        if r["role"] == "student":
+            continue
         traits = {
             "role": r["role"],
             "email": r["email"],
@@ -70,15 +72,6 @@ def sync_users(sb) -> int:
             "last_login_at": r.get("last_login"),
             "is_internal": False,
         }
-        if r.get("student"):
-            s = r["student"][0] if isinstance(r["student"], list) else r["student"]
-            traits.update(
-                has_completed_tutorial=s.get("completed_tutorial", False),
-                has_completed_profile_assistant=bool(s.get("strength") or []),
-                directory_info_opt_out=bool(s.get("directory_info_opt_out", False)),
-                age_band=s.get("age_band"),
-                grade=s.get("grade"),
-            )
         if r.get("teacher"):
             t = r["teacher"][0] if isinstance(r["teacher"], list) else r["teacher"]
             traits.update(pilot_approved=bool(t.get("pilot_approved", False)))
@@ -86,7 +79,6 @@ def sync_users(sb) -> int:
             p = r["parent"][0] if isinstance(r["parent"], list) else r["parent"]
             traits.update(
                 linked_student_count=len(p.get("linked_student_ids") or []),
-                vpc_verified_at=p.get("vpc_verified_at"),
             )
 
         identify_user(user_id=r["user_id"], traits=traits)
@@ -171,6 +163,8 @@ def _avg_mastery_for_period(sb, period_id: str):
 # ---------------------------------------------------------------------------
 
 def main() -> int:
+    if os.getenv("EDUQUEST_ANALYTICS_ENABLED", "").lower() not in ("1", "true", "yes"):
+        raise RuntimeError("Snapshot telemetry is disabled during student privacy remediation")
     sb = _supabase()
     sync_users(sb)
     sync_periods(sb)

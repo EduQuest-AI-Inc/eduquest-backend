@@ -153,6 +153,44 @@ class EmailService:
             html_body=html_body,
         )
 
+    def send_student_compliance_outreach_email(
+        self,
+        *,
+        to_email: str,
+        deadline: str,
+    ) -> dict:
+        """Send counsel-approved legacy student remediation outreach."""
+        remediation_url = f"{self.frontend_base_url}/signup?role=student"
+        subject = "Action required: review your EduQuest student account"
+        text_body = (
+            "EduQuest is updating student account authorization. "
+            f"Complete the required review by {deadline} to keep access to your account.\n\n"
+            f"Start the review: {remediation_url}\n\n"
+            "A parent or guardian must authorize accounts for students under 18. "
+            "For help, contact support@eduquestai.org.\n\n"
+            "The EduQuest Team"
+        )
+        return self.send_email(
+            to_email=to_email,
+            subject=subject,
+            text_body=text_body,
+        )
+
+    def send_student_email_verification_code(self, *, to_email: str, code: str) -> dict:
+        """Send the short-lived code required for direct adult student signup."""
+        subject = "Verify your EduQuest student email"
+        text_body = (
+            f"Your EduQuest verification code is: {code}\n\n"
+            "This code expires in 10 minutes and can be used only for this signup. "
+            "If you did not request it, you can ignore this email.\n\n"
+            "The EduQuest Team"
+        )
+        return self.send_email(
+            to_email=to_email,
+            subject=subject,
+            text_body=text_body,
+        )
+
     def send_password_reset_email(
         self,
         to_email: str,
@@ -432,4 +470,3 @@ def get_email_service() -> EmailService:
     if _email_service is None:
         _email_service = EmailService()
     return _email_service
-

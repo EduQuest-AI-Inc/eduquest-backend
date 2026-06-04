@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Optional
 from integrations.canvas_service import Course as CanvasCourse, course_to_json
 from integrations.s3_service import upload_file_to_s3, download_file_from_s3
 from integrations import openai_vector_store
+from services.tracking import Events, track_event
 from utils.pdf_utils import preprocess_pdf
 
 if TYPE_CHECKING:
@@ -102,6 +103,7 @@ class PeriodFileService:
     def process_background(
         self,
         period_id: str,
+        owner_id: str,
         course_name: str,
         file_paths: list,
         temp_dir: str,
@@ -143,6 +145,12 @@ class PeriodFileService:
                 file_vs_ids = self._bot_provider.ingest_files_to_vector_store(vector_store_id, all_local_paths)
             except Exception as exc:
                 logger.error("ingest_files_to_vector_store failed for period %s: %s", period_id, exc, exc_info=True)
+                track_event(
+                    user_id=owner_id,
+                    event=Events.PERIOD_FILE_PROC_FAILED,
+                    properties={"period_id": period_id, "stage": "vector_store_ingest",
+                                "error_type": type(exc).__name__},
+                )
                 raise
             self._period_mgmt.update_file_vector_store_ids(period_id, file_vs_ids)
 
@@ -159,8 +167,20 @@ class PeriodFileService:
                     )
             except Exception as exc:
                 logger.error("Auto curriculum generation failed for period %s: %s", period_id, exc, exc_info=True)
+                track_event(
+                    user_id=owner_id,
+                    event=Events.PERIOD_FILE_PROC_FAILED,
+                    properties={"period_id": period_id, "stage": "curriculum_auto_gen",
+                                "error_type": type(exc).__name__},
+                )
         except Exception as exc:
             logger.error("Background processing failed for period %s: %s", period_id, exc, exc_info=True)
+            track_event(
+                user_id=owner_id,
+                event=Events.PERIOD_FILE_PROC_FAILED,
+                properties={"period_id": period_id, "stage": "processing",
+                            "error_type": type(exc).__name__},
+            )
             self._period_mgmt.update_processing_status(period_id, "failed")
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)

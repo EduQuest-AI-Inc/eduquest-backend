@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from enum import Enum
 from typing import FrozenSet, Optional
 
@@ -34,6 +35,34 @@ class AuthPayload:
         self.sub = sub        # decoded user id / teacher id
         self.role = role      # decoded role claim
         self.token = token    # raw JWT string — forwarded to SessionDAO-backed services
+
+
+def _enforce_student_compliance(username: str, role: Role) -> None:
+    if role != Role.STUDENT:
+        return
+    from data_access.student_dao import StudentDAO
+
+    student = StudentDAO().get_student_by_id(username)
+    if not student:
+        raise HTTPException(status_code=403, detail="Student compliance record is missing.")
+
+    status = student.get("compliance_status")
+    if status == "legacy_review_due":
+        due_raw = student.get("compliance_review_due_at")
+        if due_raw:
+            due = datetime.fromisoformat(due_raw.replace("Z", "+00:00"))
+            if due.tzinfo is None:
+                due = due.replace(tzinfo=timezone.utc)
+            if due > datetime.now(timezone.utc):
+                return
+    if status != "active":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Student authorization required",
+                "code": "STUDENT_COMPLIANCE_REVIEW_REQUIRED",
+            },
+        )
 
 
 def get_auth(
@@ -96,6 +125,7 @@ def get_auth(
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid token claims")
 
+    _enforce_student_compliance(username, role)
     return AuthPayload(sub=username, role=role, token=token)
 
 

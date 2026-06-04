@@ -23,6 +23,7 @@ from bots.protocol import BotProviderProtocol
 from models.conversation import Conversation
 from services.conversation.grading_service import grade_student_submission
 from services.conversation.profile_service import ProfileConversationService
+from services.tracking import Events, track_event
 from services.conversation.teacher_feedback_service import (
     continue_teacher_feedback,
     initiate_teacher_feedback,
@@ -315,6 +316,17 @@ class ConversationService:
                 logger.warning("Could not find quest for student %s, week %s", user_id, week)
         except Exception as e:
             logger.error("Error saving grade: %s", e, exc_info=True)
+            track_event(
+                user_id=user_id,
+                event=Events.GRADE_PERSISTENCE_FAILED,
+                properties={
+                    "period_id": period_id,
+                    "week": week,
+                    "error_type": type(e).__name__,
+                    "no_ad_targeting": True,
+                    "student_data": True,
+                },
+            )
 
     def _apply_quest_change(self, caller_id: str, caller_role: str, period_id: str, recommended_change: str) -> None:
         """Delegate recommended changes to PeriodService."""
@@ -325,3 +337,8 @@ class ConversationService:
             logger.info("Quest update: %s", quest_update_result.get('message', ''))
         except Exception as e:
             logger.error("Error applying quest change: %s", e, exc_info=True)
+            track_event(
+                user_id=caller_id,
+                event=Events.QUEST_UPDATE_FAILED,
+                properties={"period_id": period_id, "error_type": type(e).__name__},
+            )

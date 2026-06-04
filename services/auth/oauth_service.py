@@ -42,6 +42,11 @@ class OAuthService:
                 )
             username: str = existing["user_id"]
         else:
+            if role == "student":
+                raise HTTPException(
+                    status_code=403,
+                    detail="New student OAuth signup is unavailable until student authorization is completed.",
+                )
             if role == "student" and not grade:
                 raise HTTPException(status_code=400, detail="grade is required for students.")
             if role in ("teacher", "parent") and not trial_confirmed:

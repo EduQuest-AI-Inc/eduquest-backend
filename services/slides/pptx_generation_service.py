@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import BackgroundTasks
 
 from bots.protocol import BotProviderProtocol
+from services.tracking import Events, track_event
 from data_access.concept_dao import ConceptDAO
 from data_access.concept_skill_dao import ConceptSkillDAO
 from data_access.lesson_dao import LessonDAO
@@ -124,6 +125,7 @@ class PptxGenerationService:
             "grade_level": period.get("grade_level", "") if period else "",
             "course_name": period.get("canvas_course_name", "") if period else "",
             "course_description": period.get("course_description", "") if period else "",
+            "owner_id": period.get("owner_id", "") if period else "",
         }
 
         pptx_rows = [
@@ -281,6 +283,12 @@ class PptxGenerationService:
                     _AGENT_TIMEOUT_S, lesson_id,
                 )
                 self.lesson_pptx_dao.update_status(pptx_id, {"status": "failed"})
+                track_event(
+                    user_id=period_context.get("owner_id") or "",
+                    event=Events.PPTX_LESSON_GEN_FAILED,
+                    properties={"period_id": row["period_id"], "lesson_id": lesson_id,
+                                "stage": "agent_timeout"},
+                )
                 return
             except Exception as exc:
                 logger.error(
@@ -288,6 +296,12 @@ class PptxGenerationService:
                     lesson_id, exc, exc_info=True,
                 )
                 self.lesson_pptx_dao.update_status(pptx_id, {"status": "failed"})
+                track_event(
+                    user_id=period_context.get("owner_id") or "",
+                    event=Events.PPTX_LESSON_GEN_FAILED,
+                    properties={"period_id": row["period_id"], "lesson_id": lesson_id,
+                                "stage": "agent_error", "error_type": type(exc).__name__},
+                )
                 return
 
             # --- S3 upload ---
@@ -307,3 +321,9 @@ class PptxGenerationService:
                     lesson_id, exc, exc_info=True,
                 )
                 self.lesson_pptx_dao.update_status(pptx_id, {"status": "failed"})
+                track_event(
+                    user_id=period_context.get("owner_id") or "",
+                    event=Events.PPTX_LESSON_GEN_FAILED,
+                    properties={"period_id": row["period_id"], "lesson_id": lesson_id,
+                                "stage": "s3_upload", "error_type": type(exc).__name__},
+                )

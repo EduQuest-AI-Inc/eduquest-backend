@@ -23,6 +23,7 @@ from models.concept_skill import ConceptSkill
 from models.lesson import Lesson
 from models.skill import Skill
 from models.week import Week
+from services.tracking import Events, track_event
 
 logger = logging.getLogger(__name__)
 
@@ -187,12 +188,20 @@ class CurriculumService:
             self._bulk_replace(period_id, payload)
             self.period_dao.update_status(period_id, "draft")
 
-        except Exception:
+        except Exception as exc:
             elapsed = time.monotonic() - t0
             logger.exception(
                 "curriculum generation failed: period_id=%s mode=%s elapsed=%.1fs",
                 period_id, mode, elapsed,
             )
+            owner_id = (period or {}).get("owner_id", "")
+            if owner_id:
+                track_event(
+                    user_id=owner_id,
+                    event=Events.CURRICULUM_GEN_FAILED,
+                    properties={"period_id": period_id, "mode": mode,
+                                "error_type": type(exc).__name__},
+                )
             try:
                 self.period_dao.update_status(period_id, "failed")
             except Exception:

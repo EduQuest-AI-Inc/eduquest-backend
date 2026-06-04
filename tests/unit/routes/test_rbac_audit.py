@@ -11,6 +11,9 @@ from routers.deps import get_auth
 # Add to this set when a new public endpoint is introduced; document the reason.
 EXPLICITLY_PUBLIC_ROUTES = {
     "/auth/signup",
+    "/auth/age-screen",  # public pre-PII gate; one-use cookie and Origin checked in handler
+    "/auth/student-email/request",  # adult student email proof before an account exists
+    "/auth/student-email/confirm",  # exchanges a short-lived code for a one-use cookie
     "/auth/login",
     "/auth/oauth/complete",  # Supabase token verified inside the endpoint; no JWT yet
     "/auth/password-reset/request",

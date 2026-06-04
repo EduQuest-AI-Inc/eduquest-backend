@@ -32,6 +32,7 @@ from responses.billing import (
 )
 from routers.deps import AuthPayload, Role, require_roles
 from services.billing.membership_service import MembershipService
+from services.tracking import Events, track_event
 from services.user.user_service import UserService
 
 logger = logging.getLogger(__name__)
@@ -110,6 +111,11 @@ def create_checkout_session(
         )
     except Exception as exc:
         logger.error("Stripe checkout creation failed: %s", exc, exc_info=True)
+        track_event(
+            user_id=auth.sub,
+            event=Events.BILLING_CHECKOUT_FAILED,
+            properties={"plan": body.plan, "error_type": type(exc).__name__},
+        )
         raise HTTPException(status_code=502, detail="Could not start checkout")
 
     return {"url": url}
@@ -138,6 +144,11 @@ def create_portal_session(
         )
     except Exception as exc:
         logger.error("Stripe portal creation failed: %s", exc, exc_info=True)
+        track_event(
+            user_id=auth.sub,
+            event=Events.BILLING_PORTAL_FAILED,
+            properties={"error_type": type(exc).__name__},
+        )
         raise HTTPException(status_code=502, detail="Could not open billing portal")
     return {"url": url}
 

@@ -8,6 +8,7 @@ from responses.teacher import CanvasCoursesResponse, SkillMasteryOut, TeacherPer
 
 from routers.deps import AuthPayload, Role, require_roles
 from services.period.period_management_service import PeriodManagementService
+from services.tracking import Events, track_event
 from services.user.teacher_service import TeacherService
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,11 @@ def list_canvas_courses(
     except HTTPException:
         raise
     except Exception as exc:
+        track_event(
+            user_id=auth.sub,
+            event=Events.CANVAS_CONNECT_FAILED,
+            properties={"failure_reason": "api_error", "error_type": type(exc).__name__},
+        )
         raise HTTPException(status_code=400, detail=f"Failed to connect to Canvas: {exc}")
 
 

@@ -208,7 +208,7 @@ def test_accept_invite_success():
     updated_ids = update_call_args.args[1]["linked_student_ids"]
     assert "s1" in updated_ids
     assert "existing-kid" in updated_ids
-    assert "vpc_verified_at" in update_call_args.args[1]
+    assert "vpc_verified_at" not in update_call_args.args[1]
 
     svc.invite_dao.mark_used.assert_called_once_with("GOODCODE")
     assert result["student_id"] == "s1"
@@ -219,51 +219,13 @@ def test_accept_invite_success():
 
 
 @pytest.mark.unit
-def test_create_student_profile_success():
+def test_create_student_profile_blocked_until_authorization_flow_is_enabled():
     svc = _svc()
     svc.parent_dao.get_parent_by_id.return_value = {
         "user_id": "parent-1",
         "linked_student_ids": [],
     }
 
-    result = svc.create_student_profile("parent-1", "Timmy", 6, ["math", "art"])
-
-    svc.student_dao.add_student.assert_called_once()
-    svc.parent_dao.update_parent.assert_called_once()
-    assert result["name"] == "Timmy"
-    assert result["grade"] == 6
-    assert result["interests"] == ["math", "art"]
-    assert "user_id" in result
-
-
-@pytest.mark.unit
-def test_create_student_profile_login_disabled():
-    svc = _svc()
-    svc.parent_dao.get_parent_by_id.return_value = {
-        "user_id": "parent-1",
-        "linked_student_ids": [],
-    }
-
-    svc.create_student_profile("parent-1", "Timmy", 6, [])
-
-    student_arg = svc.student_dao.add_student.call_args.args[0]
-    assert student_arg.login_disabled is True
-    assert student_arg.email.endswith("@internal.eduquestai.org")
-
-
-@pytest.mark.unit
-def test_create_student_profile_compensating_delete_on_update_failure():
-    svc = _svc()
-    svc.parent_dao.get_parent_by_id.return_value = {
-        "user_id": "parent-1",
-        "linked_student_ids": [],
-    }
-    svc.parent_dao.update_parent.side_effect = RuntimeError("DB down")
-
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ValidationError, match="temporarily unavailable"):
         svc.create_student_profile("parent-1", "Timmy", 6, [])
-
-    # compensating delete must have been called with the student_id that was created
-    student_arg = svc.student_dao.add_student.call_args.args[0]
-    svc.student_dao.delete_student.assert_called_once_with(student_arg.user_id)
-
+    svc.student_dao.add_student.assert_not_called()

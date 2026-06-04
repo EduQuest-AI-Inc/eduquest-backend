@@ -13,6 +13,7 @@ from bots.protocol import BotProviderProtocol
 from services.curriculum.curriculum_service import CurriculumService
 from services.quest.quest_grading_service import QuestGradingService
 from services.quest.quest_retrieval_service import QuestRetrievalService
+from services.tracking import Events, track_event
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +139,12 @@ class PeriodQuestService:
                 logger.error(
                     "LTGScheduleAgent failed for student %s — falling back to generic names: %s",
                     caller_id, exc,
+                )
+                track_event(
+                    user_id=caller_id,
+                    event=Events.QUEST_GENERATION_FAILED,
+                    properties={"period_id": period_id, "stage": "ltg_schedule_agent",
+                                "error_type": type(exc).__name__},
                 )
         else:
             logger.info(

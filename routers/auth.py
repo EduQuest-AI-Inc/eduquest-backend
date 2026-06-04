@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from constants.timeouts import JWT_EXPIRY_HOURS
@@ -17,6 +17,11 @@ from responses.auth import (
 )
 from routers.deps import AuthPayload, require_roles, Role
 from services.auth.account_deletion_service import AccountDeletionService
+from services.auth.age_screen_service import AGE_SCREEN_COOKIE, AgeScreenService
+from services.auth.student_email_verification_service import (
+    STUDENT_EMAIL_COOKIE,
+    StudentEmailVerificationService,
+)
 from services.auth.auth_service import (
     authenticate_user,
     backfill_supabase_auth_id,
@@ -29,6 +34,7 @@ from services.auth.oauth_service import OAuthService
 from services.auth.supabase_auth_service import SupabaseAuthService
 from services.parent.parent_service import ParentService
 from services.auth.password_reset_service import get_password_reset_service
+from services.tracking import Events, track_event
 from utils.validation_utils import get_client_ip
 
 logger = logging.getLogger(__name__)
@@ -42,6 +48,29 @@ _parent_service = ParentService()
 _oauth_service = OAuthService()
 _supabase_auth_service = SupabaseAuthService()
 password_reset_service = get_password_reset_service()
+
+
+def _get_age_screen_service() -> AgeScreenService:
+    return AgeScreenService()
+
+
+def _get_student_email_verification_service() -> StudentEmailVerificationService:
+    return StudentEmailVerificationService()
+
+
+def _require_first_party_origin(request: Request) -> None:
+    origin = request.headers.get("origin", "").rstrip("/")
+    configured = (os.getenv("FRONTEND_BASE_URL") or "").rstrip("/")
+    allowed = {
+        configured,
+        "https://eduquestai.org",
+        "https://www.eduquestai.org",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    }
+    allowed.discard("")
+    if origin not in allowed:
+        raise HTTPException(status_code=403, detail="Age screening must start from the EduQuest website.")
 
 
 def _mint_token(username: str, role: str) -> str:
@@ -67,38 +96,141 @@ class SignupRequest(BaseModel):
     grade: Optional[str] = None
     phone_number: Optional[str] = None
     invite_code: Optional[str] = None
+    age_band: Optional[str] = None
+    adult_attestation: Optional[bool] = None
     # Required confirmation for parent/teacher accounts: explicit acknowledgement
     # that they are starting the 14-day no-card trial. The frontend renders the
     # trial-terms screen and only sets this to True after the user confirms.
     trial_confirmed: Optional[bool] = None
 
 
+class AgeScreenRequest(BaseModel):
+    birth_month: int
+    birth_year: int
+
+
+class StudentEmailVerificationRequest(BaseModel):
+    email: str
+
+
+class StudentEmailVerificationConfirmRequest(BaseModel):
+    email: str
+    code: str
+
+
+@router.post("/age-screen")
+def age_screen(body: AgeScreenRequest, request: Request, response: Response):
+    _require_first_party_origin(request)
+    raw_token, age_band = _get_age_screen_service().create(
+        birth_month=body.birth_month,
+        birth_year=body.birth_year,
+        request_ip=get_client_ip(request),
+    )
+    response.set_cookie(
+        AGE_SCREEN_COOKIE,
+        raw_token,
+        httponly=True,
+        secure=os.getenv("APP_ENV", "production") != "development",
+        samesite="strict",
+        max_age=10 * 60,
+        path="/api/auth",
+    )
+    return {
+        "age_band": age_band,
+        "next_step": "adult_signup" if age_band == "18_plus" else "parent_authorization",
+    }
+
+
+@router.post("/student-email/request")
+def request_student_email_verification(body: StudentEmailVerificationRequest, request: Request):
+    _require_first_party_origin(request)
+    _get_student_email_verification_service().request_code(
+        email=body.email,
+        age_screen_token=request.cookies.get(AGE_SCREEN_COOKIE),
+        request_ip=get_client_ip(request),
+    )
+    return {"message": "If the address is valid, a verification code has been sent."}
+
+
+@router.post("/student-email/confirm")
+def confirm_student_email_verification(
+    body: StudentEmailVerificationConfirmRequest,
+    request: Request,
+    response: Response,
+):
+    _require_first_party_origin(request)
+    raw_token = _get_student_email_verification_service().confirm_code(
+        email=body.email,
+        code=body.code,
+        request_ip=get_client_ip(request),
+    )
+    response.set_cookie(
+        STUDENT_EMAIL_COOKIE,
+        raw_token,
+        httponly=True,
+        secure=os.getenv("APP_ENV", "production") != "development",
+        samesite="strict",
+        max_age=10 * 60,
+        path="/api/auth",
+    )
+    return {"message": "Email verified."}
+
+
 @router.post("/signup", status_code=201, response_model=SignupResponse)
-def signup(body: SignupRequest):
+def signup(body: SignupRequest, request: Request):
     valid_roles = {"student", "teacher", "parent"}
     if body.role not in valid_roles:
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}")
     if body.role == "student" and not body.grade:
         raise HTTPException(status_code=400, detail="grade is required for students")
+    normalized_email = body.email.strip().lower()
+    if get_user_by_email(normalized_email):
+        raise HTTPException(status_code=409, detail="Email address already in use")
+    if body.role == "student":
+        if body.age_band not in {"under_13", "13_to_17", "18_plus"}:
+            raise HTTPException(status_code=400, detail="age_band is required for students")
+        _get_age_screen_service().consume(
+            request.cookies.get(AGE_SCREEN_COOKIE),
+            expected_band=body.age_band,
+        )
+        if body.age_band != "18_plus":
+            raise HTTPException(
+                status_code=403,
+                detail="A parent or guardian must authorize a minor student account before signup.",
+            )
+        if body.adult_attestation is not True:
+            raise HTTPException(
+                status_code=400,
+                detail="Adult students must attest that they are at least 18 years old.",
+            )
+        _get_student_email_verification_service().consume(
+            email=normalized_email,
+            raw_token=request.cookies.get(STUDENT_EMAIL_COOKIE),
+        )
     if body.role in ("teacher", "parent") and not body.trial_confirmed:
         raise HTTPException(
             status_code=400,
             detail="trial_confirmed is required for parent/teacher signups",
         )
 
-    normalized_email = body.email.strip().lower()
-    if get_user_by_email(normalized_email):
-        raise HTTPException(status_code=409, detail="Email address already in use")
-
     result = register_user(
         body.username, body.password, body.role,
         body.first_name, body.last_name, normalized_email,
         body.grade if body.role == "student" else None,
         body.phone_number,
+        body.age_band if body.role == "student" else None,
     )
     if not result.get("success"):
         error_message = result.get("error", "Registration failed")
         status = 409 if "already exists" in error_message else 400
+        track_event(
+            user_id="signup_unknown",
+            event=Events.USER_SIGNUP_FAILED,
+            properties={
+                "failure_reason": "email_taken" if status == 409 else "server_error",
+                "role": body.role,
+            },
+        )
         raise HTTPException(status_code=status, detail=error_message)
 
     response_body: dict = {"message": "User registered successfully"}
@@ -111,6 +243,11 @@ def signup(body: SignupRequest):
             response_body["trial_started"] = True
         except Exception as exc:  # pragma: no cover — billing is not auth-critical
             logger.warning("Trial creation failed for %s: %s", body.username, exc)
+            track_event(
+                user_id=body.username,
+                event=Events.MEMBERSHIP_TRIAL_CREATION_FAILED,
+                properties={"trigger": "signup", "role": body.role, "error_type": type(exc).__name__},
+            )
 
     if body.role == "student" and body.invite_code:
         invite_code = body.invite_code.strip().upper()
@@ -139,6 +276,11 @@ class LoginRequest(BaseModel):
 @router.post("/login", response_model=LoginResponse)
 def login(body: LoginRequest):
     if not authenticate_user(body.username, body.password, body.role):
+        track_event(
+            user_id="login_unknown",
+            event=Events.USER_LOGIN_FAILED,
+            properties={"failure_reason": "bad_credentials", "role": body.role},
+        )
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     # Lazy backfill: provision Supabase Auth entry for pre-Phase-1 users.
@@ -149,6 +291,11 @@ def login(body: LoginRequest):
 
     user = get_user_by_id(body.username)
     if not user:
+        track_event(
+            user_id="login_unknown",
+            event=Events.USER_LOGIN_FAILED,
+            properties={"failure_reason": "bad_credentials", "role": body.role},
+        )
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     email: str = user["email"]
@@ -164,12 +311,29 @@ def login(body: LoginRequest):
                 sb_response = _supabase_auth_service.sign_in_with_password(email, body.password)
             except Exception as retry_exc:
                 logger.error("Supabase sign_in retry failed for %s: %s", body.username, retry_exc, exc_info=True)
+                track_event(
+                    user_id="login_unknown",
+                    event=Events.USER_LOGIN_FAILED,
+                    properties={"failure_reason": "server_error", "role": body.role,
+                                "error_type": type(retry_exc).__name__},
+                )
                 raise HTTPException(status_code=401, detail="Authentication failed")
         else:
             logger.error("Supabase sign_in_with_password failed for %s: %s", body.username, exc, exc_info=True)
+            track_event(
+                user_id="login_unknown",
+                event=Events.USER_LOGIN_FAILED,
+                properties={"failure_reason": "server_error", "role": body.role,
+                            "error_type": type(exc).__name__},
+            )
             raise HTTPException(status_code=401, detail="Authentication failed")
 
     if not sb_response.session:
+        track_event(
+            user_id="login_unknown",
+            event=Events.USER_LOGIN_FAILED,
+            properties={"failure_reason": "server_error", "role": body.role},
+        )
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     response_data: dict = {
@@ -196,6 +360,11 @@ def login(body: LoginRequest):
             MembershipService().start_trial_if_eligible(body.username, body.role)
         except Exception as exc:  # pragma: no cover — login must not depend on billing
             logger.warning("Trial backfill failed for %s on login: %s", body.username, exc)
+            track_event(
+                user_id=body.username,
+                event=Events.MEMBERSHIP_TRIAL_CREATION_FAILED,
+                properties={"trigger": "login", "role": body.role, "error_type": type(exc).__name__},
+            )
 
     return response_data
 
@@ -232,6 +401,11 @@ def oauth_complete(body: OAuthCompleteRequest):
             MembershipService().start_trial_if_eligible(username, body.role)
         except Exception as exc:  # must not block login
             logger.warning("Trial backfill failed for OAuth user %s on login: %s", username, exc)
+            track_event(
+                user_id=username,
+                event=Events.MEMBERSHIP_TRIAL_CREATION_FAILED,
+                properties={"trigger": "oauth_login", "role": body.role, "error_type": type(exc).__name__},
+            )
 
     # Session is established client-side via supabase.auth.exchangeCodeForSession in /auth/callback.
     return {"needs_profile": result.get("needs_profile", False)}

@@ -213,6 +213,7 @@ def create_period(
             background_tasks.add_task(
                 period_file_svc.process_background,
                 period_id=period_id,
+                owner_id=effective_owner_id,
                 course_name=name,
                 file_paths=file_paths,
                 temp_dir=temp_dir,
@@ -328,6 +329,7 @@ def update_period_setup(
             background_tasks.add_task(
                 period_file_svc.process_background,
                 period_id=period_id,
+                owner_id=period["owner_id"],
                 course_name=name or period.get("name", ""),
                 file_paths=file_paths,
                 temp_dir=temp_dir,

@@ -72,10 +72,8 @@ class ParentService:
             return {"message": "Already linked to this parent", "already_linked": True}
 
         linked_ids.append(student_id)
-        vpc_verified_at = datetime.now(timezone.utc).isoformat()
         self.parent_dao.update_parent(parent_id, {
             "linked_student_ids": linked_ids,
-            "vpc_verified_at": vpc_verified_at,
         })
         self.invite_dao.mark_used(code)
 
@@ -83,7 +81,6 @@ class ParentService:
             "message": "Successfully linked to parent account",
             "student_id": student_id,
             "parent_id": parent_id,
-            "vpc_verified_at": vpc_verified_at,
         }
 
     def create_student_profile(self, parent_id: str, name: str, grade: int, interests: list) -> dict:
@@ -92,6 +89,10 @@ class ParentService:
         The student record is stable: the same user_id is used when the account
         is later claimed and login credentials are attached.
         """
+        raise ValidationError(
+            "Parent-managed student profile creation is temporarily unavailable "
+            "while the required age screen and authorization flow are completed."
+        )
         student_id = str(uuid4())
         # Synthetic email satisfies the DB UNIQUE constraint; it is never used for login
         synthetic_email = f"child_{uuid4().hex[:8]}@internal.eduquestai.org"

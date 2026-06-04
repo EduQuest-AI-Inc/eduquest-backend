@@ -12,6 +12,7 @@ from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
 from bots.protocol import BotProviderProtocol
+from services.tracking import Events, track_event
 
 logger = logging.getLogger(__name__)
 
@@ -80,4 +81,17 @@ def grade_student_submission(
         return asyncio.run(bot_provider.grade_submission(quest_data, submission_text))
     except Exception as e:
         logger.error("Grading agent failed: %s", e, exc_info=True)
+        user_id = quest_data.get("user_id") or ""
+        if user_id:
+            track_event(
+                user_id=user_id,
+                event=Events.QUEST_GRADING_FAILED,
+                properties={
+                    "quest_id": quest_data.get("individual_quest_id") or quest_data.get("quest_id"),
+                    "period_id": quest_data.get("period_id"),
+                    "error_type": type(e).__name__,
+                    "no_ad_targeting": True,
+                    "student_data": True,
+                },
+            )
         raise
