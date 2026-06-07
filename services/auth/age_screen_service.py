@@ -12,6 +12,10 @@ AGE_SCREEN_COOKIE = "eq_age_screen"
 AGE_SCREEN_TTL_MINUTES = 10
 
 
+def _sha256_hex(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
 class AgeScreenService:
     def __init__(self, session_dao=None, rate_limit_dao=None) -> None:
         self.session_dao = session_dao or AgeScreenSessionDAO()
@@ -71,4 +75,4 @@ class AgeScreenService:
 
     @staticmethod
     def _hash(raw_token: str) -> str:
-        return hashlib.sha256(raw_token.encode()).hexdigest()
+        return _sha256_hex(raw_token)

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 from main import app
 from routers.deps import get_auth, get_period, AuthPayload, Role

@@ -49,25 +49,20 @@ async def initiate_ltg_conversation(
     auth: AuthPayload = Depends(get_auth),
     period_service: PeriodService = Depends(_get_period_service),
 ):
-    try:
-        if body.student_id and body.student_id != auth.sub:
-            period_mgmt = PeriodManagementService(jwt=auth.token)
-            period = period_mgmt.get_period_by_id(body.period_id)
-            if not period or period.get("owner_id") != auth.sub:
-                return JSONResponse(
-                    status_code=403,
-                    content={"detail": "Not authorized to run LTG for this student"},
-                )
-            effective_user_id = body.student_id
-        else:
-            EnrollmentService(jwt=auth.token).check_enrolled(auth.sub, body.period_id)
-            effective_user_id = auth.sub
+    if body.student_id and body.student_id != auth.sub:
+        period_mgmt = PeriodManagementService(jwt=auth.token)
+        period = period_mgmt.get_period_by_id(body.period_id)
+        if not period or period.get("owner_id") != auth.sub:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Not authorized to run LTG for this student"},
+            )
+        effective_user_id = body.student_id
+    else:
+        EnrollmentService(jwt=auth.token).check_enrolled(auth.sub, body.period_id)
+        effective_user_id = auth.sub
 
-        return await period_service.initiate_ltg_conversation(effective_user_id, body.period_id)
-    except ValueError as exc:
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
-    except LookupError as exc:
-        return JSONResponse(status_code=404, content={"detail": str(exc)})
+    return await period_service.initiate_ltg_conversation(effective_user_id, body.period_id)
 
 
 @router.post("/continue-ltg-conversation", response_model=dict[str, Any])
@@ -76,31 +71,26 @@ async def continue_ltg_conversation(
     auth: AuthPayload = Depends(get_auth),
     period_service: PeriodService = Depends(_get_period_service),
 ):
-    try:
-        if body.student_id and body.student_id != auth.sub:
-            if not body.period_id:
-                return JSONResponse(status_code=400, content={"detail": "period_id is required when student_id is provided"})
-            period_mgmt = PeriodManagementService(jwt=auth.token)
-            period = period_mgmt.get_period_by_id(body.period_id)
-            if not period or period.get("owner_id") != auth.sub:
-                return JSONResponse(
-                    status_code=403,
-                    content={"detail": "Not authorized to continue LTG for this student"},
-                )
-            effective_user_id = body.student_id
-        else:
-            effective_user_id = auth.sub
-        return await period_service.continue_ltg_conversation(
-            effective_user_id,
-            body.conversation_type,
-            body.conversation_id,
-            body.message,
-            body.period_id,
-        )
-    except ValueError as exc:
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
-    except LookupError as exc:
-        return JSONResponse(status_code=404, content={"detail": str(exc)})
+    if body.student_id and body.student_id != auth.sub:
+        if not body.period_id:
+            return JSONResponse(status_code=400, content={"detail": "period_id is required when student_id is provided"})
+        period_mgmt = PeriodManagementService(jwt=auth.token)
+        period = period_mgmt.get_period_by_id(body.period_id)
+        if not period or period.get("owner_id") != auth.sub:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Not authorized to continue LTG for this student"},
+            )
+        effective_user_id = body.student_id
+    else:
+        effective_user_id = auth.sub
+    return await period_service.continue_ltg_conversation(
+        effective_user_id,
+        body.conversation_type,
+        body.conversation_id,
+        body.message,
+        body.period_id,
+    )
 
 
 @router.post("/initiate-homework-agent", response_model=dict[str, Any])
@@ -109,19 +99,14 @@ def initiate_homework_agent(
     auth: AuthPayload = Depends(get_auth),
     period_service: PeriodService = Depends(_get_period_service),
 ):
-    try:
-        user_id = body.user_id or auth.sub
-        if user_id != auth.sub:
-            period_mgmt = PeriodManagementService(jwt=auth.token)
-            period = period_mgmt.get_period_by_id(body.period_id)
-            if not period or period.get("owner_id") != auth.sub:
-                return JSONResponse(
-                    status_code=403,
-                    content={"detail": "Not authorized to create quests for this student"},
-                )
-        EnrollmentService(jwt=auth.token).check_enrolled(user_id, body.period_id)
-        return period_service.start_homework_agent(user_id, body.period_id)
-    except ValueError as exc:
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
-    except LookupError as exc:
-        return JSONResponse(status_code=404, content={"detail": str(exc)})
+    user_id = body.user_id or auth.sub
+    if user_id != auth.sub:
+        period_mgmt = PeriodManagementService(jwt=auth.token)
+        period = period_mgmt.get_period_by_id(body.period_id)
+        if not period or period.get("owner_id") != auth.sub:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Not authorized to create quests for this student"},
+            )
+    EnrollmentService(jwt=auth.token).check_enrolled(user_id, body.period_id)
+    return period_service.start_homework_agent(user_id, body.period_id)

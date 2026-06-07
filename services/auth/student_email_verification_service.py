@@ -10,7 +10,7 @@ from data_access.student_email_verification_dao import StudentEmailVerificationD
 from exceptions.auth_error import AuthError
 from exceptions.validation_error import ValidationError
 from integrations.email_service import get_email_service
-from services.auth.age_screen_service import AgeScreenService
+from services.auth.age_screen_service import _sha256_hex
 
 STUDENT_EMAIL_COOKIE = "eq_student_email_verified"
 STUDENT_EMAIL_TTL_MINUTES = 10
@@ -107,7 +107,7 @@ class StudentEmailVerificationService:
     def _require_adult_age_screen(self, raw_token: str | None) -> None:
         if not raw_token:
             raise AuthError("Complete the age screen before verifying your email.")
-        record = self.age_screen_dao.get_valid(AgeScreenService._hash(raw_token))
+        record = self.age_screen_dao.get_valid(_sha256_hex(raw_token))
         if not record or record.get("age_band") != "18_plus":
             raise AuthError("Email verification is available only after an adult age screen.")
 

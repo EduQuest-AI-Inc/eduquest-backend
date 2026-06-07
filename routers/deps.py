@@ -7,6 +7,8 @@ import jwt
 from jwt import PyJWKClient
 from fastapi import Cookie, Depends, Header, HTTPException, Path, Request
 
+from data_access.student_dao import StudentDAO
+
 # Dead code until Phase 6 — kept to avoid breaking any callers during rollout.
 JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret")
 JWT_ALGORITHM = "HS256"
@@ -37,25 +39,34 @@ class AuthPayload:
         self.token = token    # raw JWT string — forwarded to SessionDAO-backed services
 
 
-def _enforce_student_compliance(username: str, role: Role) -> None:
+def _enforce_student_compliance(
+    username: str,
+    role: Role,
+    compliance_status: Optional[str] = None,
+    compliance_review_due_at: Optional[str] = None,
+    student_dao=None,
+) -> None:
     if role != Role.STUDENT:
         return
-    from data_access.student_dao import StudentDAO
 
-    student = StudentDAO().get_student_by_id(username)
-    if not student:
-        raise HTTPException(status_code=403, detail="Student compliance record is missing.")
+    if compliance_status is None:
+        # Fallback: claim absent (session predates this feature or first login before token refresh).
+        dao = student_dao or StudentDAO()
+        student = dao.get_student_by_id(username)
+        if not student:
+            raise HTTPException(status_code=403, detail="Student compliance record is missing.")
+        compliance_status = student.get("compliance_status")
+        compliance_review_due_at = student.get("compliance_review_due_at")
 
-    status = student.get("compliance_status")
-    if status == "legacy_review_due":
-        due_raw = student.get("compliance_review_due_at")
+    if compliance_status == "legacy_review_due":
+        due_raw = compliance_review_due_at
         if due_raw:
             due = datetime.fromisoformat(due_raw.replace("Z", "+00:00"))
             if due.tzinfo is None:
                 due = due.replace(tzinfo=timezone.utc)
             if due > datetime.now(timezone.utc):
                 return
-    if status != "active":
+    if compliance_status != "active":
         raise HTTPException(
             status_code=403,
             detail={
@@ -125,7 +136,12 @@ def get_auth(
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid token claims")
 
-    _enforce_student_compliance(username, role)
+    _enforce_student_compliance(
+        username,
+        role,
+        compliance_status=app_meta.get("compliance_status"),
+        compliance_review_due_at=app_meta.get("compliance_review_due_at"),
+    )
     return AuthPayload(sub=username, role=role, token=token)
 
 

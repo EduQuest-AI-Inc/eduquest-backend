@@ -36,3 +36,22 @@ class PasswordResetConfirmResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     message: str
+
+
+class AgeScreenResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    age_band: str
+    next_step: str
+
+
+class StudentEmailRequestResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    message: str
+
+
+class StudentEmailConfirmResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    message: str

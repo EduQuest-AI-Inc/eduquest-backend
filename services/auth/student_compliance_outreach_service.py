@@ -60,17 +60,24 @@ class StudentComplianceOutreachService:
                 )
                 for email in recipients
             ]
-            if all(result.get("success") for result in results):
-                self.student_dao.update_student(
-                    student["user_id"],
-                    {
-                        "compliance_outreach_stage": stage,
-                        "compliance_outreach_sent_at": now.isoformat(),
-                    },
+            successes = [r for r in results if r.get("success")]
+            failures = [r for r in results if not r.get("success")]
+            if failures:
+                logger.warning(
+                    "student_compliance_outreach: %d/%d emails failed for student %s",
+                    len(failures), len(results), student["user_id"],
                 )
-                sent += len(results)
-            else:
-                failed += 1
+                failed += len(failures)
+            if successes:
+                sent += len(successes)
+            # Always bump stage to prevent duplicate sends to recipients who succeeded
+            self.student_dao.update_student(
+                student["user_id"],
+                {
+                    "compliance_outreach_stage": stage,
+                    "compliance_outreach_sent_at": now.isoformat(),
+                },
+            )
 
         logger.info(
             "student_compliance_outreach.pass candidates=%d sent=%d skipped=%d failed=%d",
