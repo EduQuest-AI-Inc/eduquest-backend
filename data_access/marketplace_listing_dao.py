@@ -28,7 +28,9 @@ class MarketplaceListingDAO(SupabaseBaseDAO):
             .eq('is_published', True)
             .maybe_single()
         )
-        return response.data if response.data else None
+        if response is None or response.data is None:
+            return None
+        return response.data
 
     def get_published(
         self,

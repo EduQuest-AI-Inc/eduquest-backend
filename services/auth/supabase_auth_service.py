@@ -86,6 +86,36 @@ class SupabaseAuthService:
             {"app_metadata": {"username": user_id, "role": role}},
         )
 
+    def sync_compliance_to_app_metadata(
+        self,
+        supabase_auth_uuid: str,
+        compliance_status: str,
+        compliance_review_due_at: "str | None",
+    ) -> None:
+        """
+        Merge compliance_status and compliance_review_due_at into this user's
+        Supabase app_metadata. Subsequent Supabase JWTs (post-refresh) carry these
+        claims so deps.py can enforce compliance without a per-request DB call.
+        Swallows failures — the caller falls back to the DB check when the claim
+        is absent.
+        """
+        if not supabase_auth_uuid:
+            return
+        try:
+            self._get_client().auth.admin.update_user_by_id(
+                supabase_auth_uuid,
+                {"app_metadata": {
+                    "compliance_status": compliance_status,
+                    "compliance_review_due_at": compliance_review_due_at,
+                }},
+            )
+        except Exception:
+            logger.warning(
+                "Failed to sync compliance to app_metadata for uuid=%s",
+                supabase_auth_uuid,
+                exc_info=True,
+            )
+
     def sign_in_with_password(self, email: str, password: str):
         """
         Sign in via Supabase Auth and return the AuthResponse.

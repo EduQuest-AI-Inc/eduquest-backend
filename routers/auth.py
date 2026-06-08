@@ -9,11 +9,14 @@ from pydantic import BaseModel
 
 from constants.timeouts import JWT_EXPIRY_HOURS
 from responses.auth import (
+    AgeScreenResponse,
     LoginResponse,
     OAuthCompleteResponse,
     PasswordResetConfirmResponse,
     PasswordResetRequestResponse,
     SignupResponse,
+    StudentEmailConfirmResponse,
+    StudentEmailRequestResponse,
 )
 from routers.deps import AuthPayload, require_roles, Role
 from services.auth.account_deletion_service import AccountDeletionService
@@ -118,7 +121,7 @@ class StudentEmailVerificationConfirmRequest(BaseModel):
     code: str
 
 
-@router.post("/age-screen")
+@router.post("/age-screen", response_model=AgeScreenResponse)
 def age_screen(body: AgeScreenRequest, request: Request, response: Response):
     _require_first_party_origin(request)
     raw_token, age_band = _get_age_screen_service().create(
@@ -141,7 +144,7 @@ def age_screen(body: AgeScreenRequest, request: Request, response: Response):
     }
 
 
-@router.post("/student-email/request")
+@router.post("/student-email/request", response_model=StudentEmailRequestResponse)
 def request_student_email_verification(body: StudentEmailVerificationRequest, request: Request):
     _require_first_party_origin(request)
     _get_student_email_verification_service().request_code(
@@ -152,7 +155,7 @@ def request_student_email_verification(body: StudentEmailVerificationRequest, re
     return {"message": "If the address is valid, a verification code has been sent."}
 
 
-@router.post("/student-email/confirm")
+@router.post("/student-email/confirm", response_model=StudentEmailConfirmResponse)
 def confirm_student_email_verification(
     body: StudentEmailVerificationConfirmRequest,
     request: Request,
@@ -350,6 +353,17 @@ def login(body: LoginRequest):
             or not student.get("learning_style")
         ):
             response_data["needs_profile"] = True
+        # Sync compliance into Supabase app_metadata so the next JWT refresh carries
+        # the claim and deps.py can skip the per-request DB call.
+        if student and sb_response.session.user:
+            try:
+                _supabase_auth_service.sync_compliance_to_app_metadata(
+                    sb_response.session.user.id,
+                    student.get("compliance_status", "blocked"),
+                    student.get("compliance_review_due_at"),
+                )
+            except Exception as exc:
+                logger.warning("Compliance app_metadata sync failed for %s: %s", body.username, exc)
 
     # Backfill: legacy parent/teacher accounts created before the membership
     # system exist without a row. Auto-start their 14-day trial on first login

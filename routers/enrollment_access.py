@@ -1,16 +1,16 @@
 from fastapi import HTTPException
 
-from data_access.period_dao import PeriodDAO
 from services.billing.membership_service import (
     MembershipRequiredError,
     MembershipService,
     PlanLimitExceededError,
 )
+from services.enrollment.enrollment_service import EnrollmentService
 from services.user.user_service import UserService
 
 
 def check_owner_can_accept_student(period_id: str) -> None:
-    period = PeriodDAO().get_period_by_id(period_id)
+    period = EnrollmentService().get_period_by_id(period_id)
     if not period:
         return
 

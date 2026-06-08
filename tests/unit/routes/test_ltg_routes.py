@@ -3,6 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 from main import app
 from routers.deps import get_auth, AuthPayload, Role
+from exceptions.validation_error import ValidationError
+from exceptions.not_found_error import NotFoundError
 from routers.ltg import _get_period_service
 
 
@@ -45,7 +47,7 @@ class TestInitiateLTGConversation:
     @pytest.mark.api
     def test_initiate_ltg_value_error_returns_400(self, client):
         mock_ps = MagicMock()
-        mock_ps.initiate_ltg_conversation = AsyncMock(side_effect=ValueError("invalid period"))
+        mock_ps.initiate_ltg_conversation = AsyncMock(side_effect=ValidationError("invalid period"))
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
         resp = client.post("/period/initiate-ltg-conversation", json={"period_id": "bad"})
         app.dependency_overrides.pop(_get_period_service, None)
@@ -54,7 +56,7 @@ class TestInitiateLTGConversation:
     @pytest.mark.api
     def test_initiate_ltg_lookup_error_returns_404(self, client):
         mock_ps = MagicMock()
-        mock_ps.initiate_ltg_conversation = AsyncMock(side_effect=LookupError("not found"))
+        mock_ps.initiate_ltg_conversation = AsyncMock(side_effect=NotFoundError("not found"))
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
         resp = client.post("/period/initiate-ltg-conversation", json={"period_id": "p1"})
         app.dependency_overrides.pop(_get_period_service, None)
@@ -109,7 +111,7 @@ class TestContinueLTGConversation:
     @pytest.mark.api
     def test_continue_ltg_value_error_returns_400(self, client):
         mock_ps = MagicMock()
-        mock_ps.continue_ltg_conversation = AsyncMock(side_effect=ValueError("bad"))
+        mock_ps.continue_ltg_conversation = AsyncMock(side_effect=ValidationError("bad"))
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
         resp = client.post(
             "/period/continue-ltg-conversation",
@@ -171,7 +173,7 @@ class TestInitiateHomeworkAgent:
     @pytest.mark.api
     def test_initiate_homework_agent_value_error_returns_400(self, client):
         mock_ps = MagicMock()
-        mock_ps.start_homework_agent.side_effect = ValueError("bad period")
+        mock_ps.start_homework_agent.side_effect = ValidationError("bad period")
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
         resp = client.post("/period/initiate-homework-agent", json={"period_id": "p1"})
         app.dependency_overrides.pop(_get_period_service, None)
@@ -180,7 +182,7 @@ class TestInitiateHomeworkAgent:
     @pytest.mark.api
     def test_initiate_homework_agent_lookup_error_returns_404(self, client):
         mock_ps = MagicMock()
-        mock_ps.start_homework_agent.side_effect = LookupError("missing")
+        mock_ps.start_homework_agent.side_effect = NotFoundError("missing")
         app.dependency_overrides[_get_period_service] = lambda: mock_ps
         resp = client.post("/period/initiate-homework-agent", json={"period_id": "p1"})
         app.dependency_overrides.pop(_get_period_service, None)

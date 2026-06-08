@@ -266,7 +266,7 @@ source .venv/bin/activate  # use .venv when present; otherwise source venv/bin/a
 **Environment** — `.env` file:
 
 - `JWT_SECRET_KEY` — backend JWT signing key; frontend uses Supabase Auth directly (no longer shared)
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` (from Supabase Dashboard → Settings → API → anon public)
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PUBLISHABLE_KEY` (from Supabase Dashboard → Settings → API → anon public)
 - `OPENAI_API_KEY`
 - `PERPLEXITY_API_KEY` — required for `PerplexityService` (Perplexity Agent API)
 - `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) — required for `NanoBananaClient` (Gemini image generation for slides)

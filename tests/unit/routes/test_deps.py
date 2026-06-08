@@ -135,30 +135,83 @@ def _auth_app() -> FastAPI:
 
 @pytest.mark.unit
 @patch("routers.deps.SUPABASE_JWT_SECRET", TEST_SECRET)
-@patch("data_access.student_dao.StudentDAO")
+@patch("routers.deps.StudentDAO")
 def test_get_auth_valid_token(mock_student_dao):
+    # compliance_status claim in JWT — StudentDAO must NOT be called
+    token = _make_token({"username": "testuser", "role": "student", "compliance_status": "active"})
+    app = _auth_app()
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+    assert resp.json() == {"sub": "testuser", "role": "student"}
+    mock_student_dao.return_value.get_student_by_id.assert_not_called()
+
+
+@pytest.mark.unit
+@patch("routers.deps.SUPABASE_JWT_SECRET", TEST_SECRET)
+@patch("routers.deps.StudentDAO")
+def test_get_auth_blocks_quarantined_student_token(mock_student_dao):
+    # compliance_status claim in JWT — StudentDAO must NOT be called
+    token = _make_token({"username": "testuser", "role": "student", "compliance_status": "quarantined_age_review"})
+    app = _auth_app()
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 403
+    assert resp.json()["detail"]["code"] == "STUDENT_COMPLIANCE_REVIEW_REQUIRED"
+    mock_student_dao.return_value.get_student_by_id.assert_not_called()
+
+
+@pytest.mark.unit
+@patch("routers.deps.SUPABASE_JWT_SECRET", TEST_SECRET)
+@patch("routers.deps.StudentDAO")
+def test_enforce_compliance_fallback_to_db(mock_student_dao):
+    # No compliance claim in JWT → should fall back to StudentDAO
     mock_student_dao.return_value.get_student_by_id.return_value = {"compliance_status": "active"}
     token = _make_token({"username": "testuser", "role": "student"})
     app = _auth_app()
     with TestClient(app, raise_server_exceptions=False) as client:
         resp = client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
-    assert resp.json() == {"sub": "testuser", "role": "student"}
+    mock_student_dao.return_value.get_student_by_id.assert_called_once_with("testuser")
 
 
 @pytest.mark.unit
 @patch("routers.deps.SUPABASE_JWT_SECRET", TEST_SECRET)
-@patch("data_access.student_dao.StudentDAO")
-def test_get_auth_blocks_quarantined_student_token(mock_student_dao):
-    mock_student_dao.return_value.get_student_by_id.return_value = {
-        "compliance_status": "quarantined_age_review",
-    }
-    token = _make_token({"username": "testuser", "role": "student"})
+@patch("routers.deps.StudentDAO")
+def test_enforce_compliance_legacy_review_due_future(mock_student_dao):
+    from datetime import datetime, timezone, timedelta
+    future = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    token = _make_token({
+        "username": "testuser",
+        "role": "student",
+        "compliance_status": "legacy_review_due",
+        "compliance_review_due_at": future,
+    })
+    app = _auth_app()
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+    mock_student_dao.return_value.get_student_by_id.assert_not_called()
+
+
+@pytest.mark.unit
+@patch("routers.deps.SUPABASE_JWT_SECRET", TEST_SECRET)
+@patch("routers.deps.StudentDAO")
+def test_enforce_compliance_legacy_review_due_past(mock_student_dao):
+    from datetime import datetime, timezone, timedelta
+    past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+    token = _make_token({
+        "username": "testuser",
+        "role": "student",
+        "compliance_status": "legacy_review_due",
+        "compliance_review_due_at": past,
+    })
     app = _auth_app()
     with TestClient(app, raise_server_exceptions=False) as client:
         resp = client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 403
     assert resp.json()["detail"]["code"] == "STUDENT_COMPLIANCE_REVIEW_REQUIRED"
+    mock_student_dao.return_value.get_student_by_id.assert_not_called()
 
 
 @pytest.mark.unit

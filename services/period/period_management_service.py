@@ -156,7 +156,10 @@ class PeriodManagementService:
         if period.get("owner_id") != user_id:
             raise PermissionError("Not authorized to archive this period")
         self.period_dao.archive_period(period_id)
-        return self._enrich_period(self.period_dao.get_period_by_id(period_id))
+        updated = self.period_dao.get_period_by_id(period_id)
+        if not updated:
+            raise NotFoundError("Period not found after archiving")
+        return self._enrich_period(updated)
 
     def unarchive_period(self, period_id: str, user_id: str, period: dict | None = None) -> dict:
         period = period or self.period_dao.get_period_by_id(period_id)
@@ -165,4 +168,7 @@ class PeriodManagementService:
         if period.get("owner_id") != user_id:
             raise PermissionError("Not authorized to unarchive this period")
         self.period_dao.unarchive_period(period_id)
-        return self._enrich_period(self.period_dao.get_period_by_id(period_id))
+        updated = self.period_dao.get_period_by_id(period_id)
+        if not updated:
+            raise NotFoundError("Period not found after unarchiving")
+        return self._enrich_period(updated)
