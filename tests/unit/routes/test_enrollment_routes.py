@@ -56,8 +56,8 @@ class TestVerifyPeriod:
 
     @pytest.mark.api
     def test_verify_period_owner_check_uses_admin_period_data(self, client):
-        mock_period_dao = MagicMock()
-        mock_period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "owner-1"}
+        mock_access_svc = MagicMock()
+        mock_access_svc.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "owner-1"}
         mock_user_svc = MagicMock()
         mock_user_svc.get_by_id.return_value = {"role": "parent"}
         mock_membership = MagicMock()
@@ -69,15 +69,15 @@ class TestVerifyPeriod:
             "is_summer_quest": False, "file_urls": [],
         }
 
-        with patch("routers.enrollment_access.PeriodDAO", return_value=mock_period_dao) as period_cls, \
+        with patch("routers.enrollment_access.EnrollmentService", return_value=mock_access_svc) as access_svc_cls, \
              patch("routers.enrollment_access.UserService", return_value=mock_user_svc), \
              patch("routers.enrollment_access.MembershipService", return_value=mock_membership), \
              patch("routers.enrollment.EnrollmentService", return_value=mock_enrollment_svc):
             resp = client.post("/enrollment/verify-period", json={"period_id": "p1"})
 
         assert resp.status_code == 200
-        period_cls.assert_called_once_with()
-        mock_period_dao.get_period_by_id.assert_called_once_with("p1")
+        access_svc_cls.assert_called_once_with()
+        mock_access_svc.get_period_by_id.assert_called_once_with("p1")
         mock_membership.check_can_add_student_to_period.assert_called_once_with(
             "owner-1", "parent", "p1"
         )
@@ -85,14 +85,14 @@ class TestVerifyPeriod:
     @pytest.mark.api
     def test_verify_period_owner_inactive_returns_403(self, client):
         from services.billing.membership_service import MembershipRequiredError
-        mock_period_dao = MagicMock()
-        mock_period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "owner-1"}
+        mock_access_svc = MagicMock()
+        mock_access_svc.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "owner-1"}
         mock_user_svc = MagicMock()
         mock_user_svc.get_by_id.return_value = {"role": "teacher"}
         mock_membership = MagicMock()
         mock_membership.check_can_add_student_to_period.side_effect = MembershipRequiredError(MagicMock())
 
-        with patch("routers.enrollment_access.PeriodDAO", return_value=mock_period_dao), \
+        with patch("routers.enrollment_access.EnrollmentService", return_value=mock_access_svc), \
              patch("routers.enrollment_access.UserService", return_value=mock_user_svc), \
              patch("routers.enrollment_access.MembershipService", return_value=mock_membership):
             resp = client.post("/enrollment/verify-period", json={"period_id": "p1"})
@@ -103,14 +103,14 @@ class TestVerifyPeriod:
     @pytest.mark.api
     def test_verify_period_plan_limit_returns_403(self, client):
         from services.billing.membership_service import PlanLimitExceededError
-        mock_period_dao = MagicMock()
-        mock_period_dao.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "owner-1"}
+        mock_access_svc = MagicMock()
+        mock_access_svc.get_period_by_id.return_value = {"period_id": "p1", "owner_id": "owner-1"}
         mock_user_svc = MagicMock()
         mock_user_svc.get_by_id.return_value = {"role": "teacher"}
         mock_membership = MagicMock()
         mock_membership.check_can_add_student_to_period.side_effect = PlanLimitExceededError("limit hit")
 
-        with patch("routers.enrollment_access.PeriodDAO", return_value=mock_period_dao), \
+        with patch("routers.enrollment_access.EnrollmentService", return_value=mock_access_svc), \
              patch("routers.enrollment_access.UserService", return_value=mock_user_svc), \
              patch("routers.enrollment_access.MembershipService", return_value=mock_membership):
             resp = client.post("/enrollment/verify-period", json={"period_id": "p1"})

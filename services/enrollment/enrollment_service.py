@@ -149,6 +149,9 @@ class EnrollmentService:
             for e in self.enrollment_dao.get_enrollments_by_student(student_id)
         )
 
+    def get_period_by_id(self, period_id: str) -> dict | None:
+        return self._admin_period_dao.get_period_by_id(period_id)
+
     def verify_period_id(self, user_id: str, period_id: str, allow_parent_period: bool = False) -> Any:
         if not period_id:
             raise ValidationError("Missing period ID")
