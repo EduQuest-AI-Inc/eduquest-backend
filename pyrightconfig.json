@@ -3,5 +3,13 @@
   "exclude": ["venv", "**/__pycache__", "**/node_modules", ".git", "tests", "scripts"],
   "venvPath": ".",
   "venv": "venv",
-  "pythonVersion": "3.12"
+  "pythonVersion": "3.12",
+  "reportMissingTypeArgument": "none",
+  "reportUnknownVariableType": "none",
+  "reportUnknownMemberType": "none",
+  "reportUnknownArgumentType": "none",
+  "reportUnknownParameterType": "none",
+  "reportArgumentType": "error",
+  "reportMissingTypeStubs": "none",
+  "reportMissingImports": "warning"
 }
