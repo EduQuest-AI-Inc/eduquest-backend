@@ -18,8 +18,6 @@ Tools and pipeline runners you execute on your machine.
 |--------|-------------|
 | `check_arch.py` | Scans the codebase for architectural violations (router/service/DAO boundary breaches). Run before a PR. Lines marked `# arch-ok` are suppressed. |
 | `check_s3.py` | Verifies S3 presigned-URL generation is working with your current credentials and bucket config. Run before deploying if you've touched S3 or AWS env vars. |
-| `curriculum_pipeline.py` | Runs the full 5-stage curriculum pipeline: CoverageEvaluator → PerplexityService → PeriodScheduleAgent → quest entry building → HWAgent. Requires `OPENAI_API_KEY` and `PERPLEXITY_API_KEY`. `MOCK_AI=true` skips OpenAI calls; Perplexity still runs live. |
-| `schedule_pipeline.py` | Runs stages 1–3 only: CoverageEvaluator → PerplexityService → PeriodScheduleAgent. Useful for testing schedule generation in isolation. `MOCK_AI=true` skips the PeriodScheduleAgent call. |
 
 ---
 

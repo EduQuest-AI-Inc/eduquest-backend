@@ -208,7 +208,7 @@ def _render_two_col(slide, cs: CompletedSlide) -> None:
         font_size=Pt(15), colour=_DARK, align=PP_ALIGN.LEFT,
     )
 
-    _place_visual(slide, cs, img_left, _CONTENT_TOP, col_w, content_h)
+    _place_visual(slide, cs, img_left, _CONTENT_TOP, col_w, content_h)  # type: ignore[arg-type]
     _add_speaker_notes(slide, cs.speaker_notes)
 
 
@@ -218,7 +218,7 @@ def _render_visual_focus(slide, cs: CompletedSlide) -> None:
     img_h = _H - _CONTENT_TOP - Inches(1.5)
     caption_top = _CONTENT_TOP + img_h + Inches(0.1)
 
-    _place_visual(slide, cs, _MARGIN, _CONTENT_TOP, _W - _MARGIN * 2, img_h)
+    _place_visual(slide, cs, _MARGIN, _CONTENT_TOP, _W - _MARGIN * 2, img_h)  # type: ignore[arg-type]
 
     caption = cs.visual_caption or (cs.bullets[0] if cs.bullets else "")
     _add_text(
@@ -316,7 +316,8 @@ def _place_visual(
 ) -> None:
     """Place the approved/flagged image or a styled placeholder."""
     has_image = cs.visual_status in ("approved", "flagged") and cs.visual_path
-    if has_image and os.path.exists(cs.visual_path):
+    if has_image and os.path.exists(cs.visual_path):  # type: ignore[arg-type]
+        assert cs.visual_path is not None
         slide.shapes.add_picture(cs.visual_path, left, top, width=width, height=height)
     else:
         _add_rect(slide, left, top, width, height, _PLACEHOLDER_BG)

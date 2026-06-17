@@ -24,7 +24,7 @@ from agents import (
 from bots.model_config import STUDENT_SAFETY_MODEL
 from bots.tracing import build_trace_run_config
 try:
-    from guardrails.runtime import load_config_bundle, instantiate_guardrails, run_guardrails
+    from guardrails.runtime import load_config_bundle, instantiate_guardrails, run_guardrails  # type: ignore[import-untyped]
     _HAS_GUARDRAILS_RUNTIME = True
 except ImportError:
     _HAS_GUARDRAILS_RUNTIME = False
@@ -86,11 +86,11 @@ async def check_student_input_with_guardrails(input_text: str) -> dict:
     if not _HAS_GUARDRAILS_RUNTIME:
         return {"results": [], "has_tripwire": False}
 
-    results = await run_guardrails(
+    results = await run_guardrails(  # type: ignore[possibly-unbound]
         guardrails_ctx,
         input_text,
         "text/plain",
-        instantiate_guardrails(load_config_bundle(student_input_guardrails_config)),
+        instantiate_guardrails(load_config_bundle(student_input_guardrails_config)),  # type: ignore[possibly-unbound]
         suppress_tripwire=True,
         raise_guardrail_errors=True,
     )
