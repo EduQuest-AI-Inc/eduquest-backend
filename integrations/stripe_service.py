@@ -40,15 +40,15 @@ def get_or_create_customer(*, user_id: str, email: str, name: Optional[str], exi
     if existing_id:
         try:
             cust = s.Customer.retrieve(existing_id)
-            if not cust.get("deleted"):
+            if not cust.get("deleted"):  # type: ignore[attr-defined]
                 return existing_id
-        except s.error.InvalidRequestError:
+        except stripe.InvalidRequestError:
             # Customer was deleted on Stripe side — fall through and recreate.
             pass
 
     cust = s.Customer.create(
         email=email,
-        name=name or None,
+        name=name,  # type: ignore[arg-type]
         metadata={"eduquest_user_id": user_id},
     )
     return cust["id"]
@@ -94,6 +94,6 @@ def cancel_subscription_immediately(subscription_id: str) -> None:
 
 
 def construct_webhook_event(payload: bytes, signature: str, secret: str):
-    """Verify a Stripe webhook signature; raises stripe.error.SignatureVerificationError on bad sig."""
+    """Verify a Stripe webhook signature; raises stripe.SignatureVerificationError on bad sig."""
     s = get_stripe()
     return s.Webhook.construct_event(payload, signature, secret)

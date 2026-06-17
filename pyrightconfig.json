@@ -1,6 +1,6 @@
 {
   "include": ["."],
-  "exclude": ["venv", "**/__pycache__", "**/node_modules", ".git"],
+  "exclude": ["venv", "**/__pycache__", "**/node_modules", ".git", "tests", "scripts"],
   "venvPath": ".",
   "venv": "venv",
   "pythonVersion": "3.12"

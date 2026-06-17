@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import Optional
 
-from agents import Agent, Runner, FileSearchTool, trace
+from agents import Agent, Runner, FileSearchTool, Tool, trace
 from pydantic import BaseModel, Field
 
 from bots.model_config import LTG_SCHEDULE_MODEL
@@ -96,7 +96,7 @@ class LTGScheduleAgent:
         self.previous_response_id = previous_response_id
 
         vector_store_id = period.get("vector_store_id")
-        tools = [FileSearchTool(vector_store_ids=[vector_store_id])] if vector_store_id else []
+        tools: list[Tool] = [FileSearchTool(vector_store_ids=[vector_store_id])] if vector_store_id else []
 
         self._agent = Agent(
             name="LTG Schedule Designer",
