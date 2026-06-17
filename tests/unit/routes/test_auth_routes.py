@@ -30,9 +30,15 @@ def _mock_supabase_session(access_token="mock_access_token", refresh_token="mock
 class TestSignupRoute:
 
     @pytest.mark.api
+    @patch("routers.auth._get_student_email_verification_service")
+    @patch("routers.auth._get_age_screen_service")
     @patch("routers.auth.register_user", return_value={"success": True})
     @patch("routers.auth.get_user_by_email", return_value=None)
-    def test_signup_success(self, mock_get_user, mock_register, client):
+    def test_signup_success(self, mock_get_user, mock_register, mock_age_svc_factory, mock_email_svc_factory, client):
+        # Student signup now requires age_band="18_plus", adult_attestation=True,
+        # and passes through AgeScreenService.consume + StudentEmailVerificationService.consume.
+        mock_age_svc_factory.return_value.consume.return_value = None
+        mock_email_svc_factory.return_value.consume.return_value = None
         resp = client.post("/auth/signup", json={
             "username": "newstudent",
             "password": "SecurePass1",
@@ -41,6 +47,8 @@ class TestSignupRoute:
             "last_name": "Doe",
             "email": "jane@eduquestai.org",
             "grade": "10",
+            "age_band": "18_plus",
+            "adult_attestation": True,
         })
         assert resp.status_code == 201
         assert "message" in resp.json()
@@ -86,9 +94,15 @@ class TestSignupRoute:
         assert resp.status_code == 400
 
     @pytest.mark.api
+    @patch("routers.auth._get_student_email_verification_service")
+    @patch("routers.auth._get_age_screen_service")
     @patch("routers.auth.register_user", return_value={"success": False, "error": "Username already exists"})
     @patch("routers.auth.get_user_by_email", return_value=None)
-    def test_signup_username_conflict(self, mock_get_user, mock_register, client):
+    def test_signup_username_conflict(self, mock_get_user, mock_register, mock_age_svc_factory, mock_email_svc_factory, client):
+        # Student signup now requires age_band="18_plus", adult_attestation=True,
+        # and passes through AgeScreenService.consume + StudentEmailVerificationService.consume.
+        mock_age_svc_factory.return_value.consume.return_value = None
+        mock_email_svc_factory.return_value.consume.return_value = None
         resp = client.post("/auth/signup", json={
             "username": "taken",
             "password": "SecurePass1",
@@ -97,6 +111,8 @@ class TestSignupRoute:
             "last_name": "User",
             "email": "dup@eduquestai.org",
             "grade": "9",
+            "age_band": "18_plus",
+            "adult_attestation": True,
         })
         assert resp.status_code == 409
 

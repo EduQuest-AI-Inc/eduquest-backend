@@ -123,7 +123,7 @@ class CurriculumService:
     def run_generation(self, period_id: str) -> None:
         t0 = time.monotonic()
         mode = "unknown"
-        period = None
+        period: dict | None = None
         try:
             period = self.period_dao.get_period_by_id(period_id)
             if not period:

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 from main import app
 from routers.deps import get_auth, AuthPayload
@@ -11,7 +11,11 @@ def _auth():
 
 
 def _mock_svc():
-    return MagicMock()
+    svc = MagicMock()
+    # These router methods use `await svc.<method>(...)`, so they must be AsyncMock.
+    svc.start_profile_assistant = AsyncMock()
+    svc.continue_profile_assistant = AsyncMock()
+    return svc
 
 
 @pytest.fixture(scope="module")
