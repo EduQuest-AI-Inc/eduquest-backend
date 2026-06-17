@@ -64,7 +64,7 @@ class CurriculumAgent:
     def __init__(
         self,
         vector_store_ids: list,
-        course_name: str = None,
+        course_name: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         course_description: Optional[str] = None,

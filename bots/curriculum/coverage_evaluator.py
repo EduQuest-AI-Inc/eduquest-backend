@@ -9,6 +9,7 @@ from typing import List, Optional
 
 from agents import generation_span, trace
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel
 
 from bots.model_config import COVERAGE_EVALUATOR_MODEL
@@ -97,7 +98,7 @@ Course name: {course_name}{grade_context}
 Evaluate whether the above information is sufficient to generate a complete \
 semester schedule. Identify gaps and provide research queries if needed."""
 
-        messages = [
+        messages: list[ChatCompletionMessageParam] = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
@@ -121,6 +122,8 @@ semester schedule. Identify gaps and provide research queries if needed."""
                     response_format=CoverageResult,
                 )
                 parsed = completion.choices[0].message.parsed
+                if parsed is None:
+                    raise ValueError("Coverage evaluation returned no parsed result")
                 span.span_data.output = [
                     {"role": "assistant", "content": _coverage_result_json(parsed)}
                 ]

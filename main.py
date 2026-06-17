@@ -214,7 +214,7 @@ except (ImportError, AttributeError, TypeError):
 
 
 if _openai_handlers_available:
-    @app.exception_handler(_openai_RateLimitError)
+    @app.exception_handler(_openai_RateLimitError)  # type: ignore[possibly-unbound]
     async def openai_rate_limit_handler(request: Request, exc):
         _logger.error("OpenAI quota/rate-limit on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
         return JSONResponse(
@@ -222,7 +222,7 @@ if _openai_handlers_available:
             content={"error": "AI service quota exceeded or rate-limited. Please try again later or contact support."},
         )
 
-    @app.exception_handler(_openai_AuthenticationError)
+    @app.exception_handler(_openai_AuthenticationError)  # type: ignore[possibly-unbound]
     async def openai_auth_error_handler(request: Request, exc):
         _logger.error("OpenAI authentication failure on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
         return JSONResponse(
@@ -230,7 +230,7 @@ if _openai_handlers_available:
             content={"error": "AI service authentication failed. Please contact support."},
         )
 
-    @app.exception_handler(_openai_APIError)
+    @app.exception_handler(_openai_APIError)  # type: ignore[possibly-unbound]
     async def openai_api_error_handler(request: Request, exc):
         _logger.error("OpenAI API error on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
         return JSONResponse(

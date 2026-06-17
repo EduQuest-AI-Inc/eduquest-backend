@@ -189,7 +189,7 @@ class HWAgent:
             )
 
             return IndividualQuest(
-                Name=teacher_plan,
+                Name=teacher_plan,  # type: ignore[arg-type]
                 Skills=quest_skills,  # type: ignore[arg-type]
                 Week=quest_week,  # type: ignore[arg-type]
                 instructions=instructions,

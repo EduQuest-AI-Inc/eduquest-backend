@@ -106,7 +106,7 @@ class VisualReviewAgent:
                 model=SLIDE_VISUAL_REVIEW_MODEL,
                 messages=[
                     {"role": "system", "content": _SYSTEM_PROMPT},
-                    user_message,
+                    user_message,  # type: ignore[arg-type]
                 ],
                 response_format={"type": "json_object"},
             )
