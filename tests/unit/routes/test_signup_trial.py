@@ -56,12 +56,18 @@ def test_teacher_signup_with_confirmation_starts_trial(
 
 
 @pytest.mark.api
+@patch("routers.auth._get_student_email_verification_service")
+@patch("routers.auth._get_age_screen_service")
 @patch("services.billing.membership_service.MembershipService.start_trial_if_eligible")
 @patch("routers.auth.register_user", return_value={"success": True})
 @patch("routers.auth.get_user_by_email", return_value=None)
 def test_student_signup_does_not_require_trial_confirmation(
-    mock_get_user, mock_register, mock_start, client,
+    mock_get_user, mock_register, mock_start, mock_age_svc_factory, mock_email_svc_factory, client,
 ):
+    # Student signup now requires age_band="18_plus", adult_attestation=True,
+    # and passes through AgeScreenService.consume + StudentEmailVerificationService.consume.
+    mock_age_svc_factory.return_value.consume.return_value = None
+    mock_email_svc_factory.return_value.consume.return_value = None
     resp = client.post("/auth/signup", json={
         "username": "stu1",
         "password": "SecurePass1",
@@ -70,6 +76,8 @@ def test_student_signup_does_not_require_trial_confirmation(
         "last_name": "Tudent",
         "email": "s@eduquestai.org",
         "grade": "10",
+        "age_band": "18_plus",
+        "adult_attestation": True,
     })
     assert resp.status_code == 201
     mock_start.assert_not_called()

@@ -23,7 +23,7 @@ Role enforcement lives exclusively at the **router layer** via FastAPI `Depends(
 
 Enrollment checks — verifying a user is a member of a specific period — are also an authorization concern, not business logic. They belong at the router layer. Since `period_id` always arrives from the request body, call `EnrollmentService().check_enrolled(user_id, period_id)` at the top of the handler, before any service call. Service methods must not perform enrollment checks.
 
-**Exception:** `PeriodQuestService._check_enrolled` in `services/period/period_quest_service.py`. The `period_id` here is resolved from quest data fetched *inside* `ConversationService` — it is not present in the request body at router time, so the router cannot perform the check up front. The method is marked `# arch-ok` at its call site.
+**Exception:** `PeriodQuestService._check_enrolled` in `services/period/period_quest_service.py`. The `period_id` here is resolved from quest data fetched _inside_ `ConversationService` — it is not present in the request body at router time, so the router cannot perform the check up front. The method is marked `# arch-ok` at its call site.
 
 #### Canonical auth dependencies
 
@@ -42,7 +42,6 @@ Audit: `pytest tests/unit/routes/test_rbac_audit.py` verifies every route either
 ### Admin vs user client in DAO construction
 
 Pass `jwt=jwt` to a DAO only when the method reads **solely the calling user's own rows** and RLS should enforce that boundary. For any cross-user read (fetching another user's record by their ID), instantiate the DAO without a JWT so the admin client is used and RLS is bypassed server-side. Mixing both in a single service constructor is intentional and expected — document it with a comment. The default pattern (`self.my_dao = my_dao or MyDAO()`) uses the admin client.
-
 
 ### Services must raise typed exceptions — no bare ValueError
 
@@ -127,6 +126,8 @@ Renderers (PPTX, HTML, chart generation) belong in `utils/rendering/` because th
 All route handlers must declare `response_model=` pointing to a Pydantic DTO in `eduquest-backend/responses/`. No handler may return an untyped dict without a corresponding response model. DTOs live in `responses/[router_name].py` and use `model_config = ConfigDict(extra="ignore")` so extra fields from Supabase dicts are stripped rather than causing validation errors.
 
 When a router or response file changes, `openapi.json` must be regenerated (via the `export-openapi` pre-commit hook or manually) and committed alongside the change. This keeps FastAPI's OpenAPI schema accurate and allows `openapi-typescript` to generate correct frontend types automatically. Bypassing this with `--no-verify` is a policy violation, not just a hook skip.
+
+If a request field is required by business logic for a given role (e.g. students must supply `age_band`), it must be required in the Pydantic model or a role-specific subschema — not just enforced in service code. Business-logic requirements that are optional in the schema are invisible to `openapi-typescript` and will not be caught by `npm run typecheck` when the frontend omits them.
 
 Agent and conversation endpoints where output structure is not yet stable may use `response_model=dict[str, Any]` as a placeholder so they appear in the schema.
 
