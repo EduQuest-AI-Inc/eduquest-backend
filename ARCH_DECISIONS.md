@@ -80,16 +80,29 @@ This is the agent-layer equivalent of "Routers are HTTP-boundary-only." The extr
 
 Service classes must declare their DAOs, sub-services, integration modules, and bot provider as constructor parameters with defaults, not create them inside methods. This is what makes unit tests possible without `@patch` — tests pass mock objects directly to the constructor.
 
+**Every dependency must use the `or` injectable pattern** — no exceptions for DAOs that "always need the admin client" or integration factories like `get_email_service()`. If a dependency has no sensible default-inject path, make it keyword-only with a default of `None` and build the real instance in the `or` branch.
+
 ```python
-# Correct
+# Correct — every dependency is injectable
+class MyService:
+    def __init__(self, my_dao=None, email_service=None):
+        self.my_dao = my_dao or MyDAO()
+        self.email_service = email_service or get_email_service()
+
+# Wrong — some deps injectable, others hardwired. Hides Supabase/SES calls in tests.
 class MyService:
     def __init__(self, my_dao=None):
         self.my_dao = my_dao or MyDAO()
+        self.email_service = get_email_service()   # untestable without @patch
 
-# Wrong — hides a Supabase dependency, forces class-level patching in tests
+# Wrong — DAO created inside a method body, invisible to the constructor
 def run_something(user_id):
-    dao = MyDAO()   # untestable without @patch
+    dao = MyDAO()   # forces @patch, breaks when file is renamed
 ```
+
+**Detection:** `grep -rn "DAO()\|Service()\|get_email_service()\|get_.*_service()" services/` — any hit that is not in an `or`-branch (`x or MyDAO()`) or a `_lazy_getter` is a violation.
+
+**Test signal:** If a test calls `MyService.__new__(MyService)` to bypass `__init__`, that is a sign that the service has hardwired dependencies. Fix the service constructor instead of working around it with `__new__`.
 
 The bot provider follows the same rule. Services declare `bot_provider: BotProviderProtocol` as a constructor parameter and store it as `self._bot_provider`. No service imports or calls `get_bot_provider()` directly — that is the router's job via `Depends()`.
 
