@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 
 from data_access.conversation_dao import ConversationDAO
 from data_access.period_dao import PeriodDAO
+from data_access.quest_dao import QuestDAO
 from data_access.student_dao import StudentDAO
 from data_access.teacher_dao import TeacherDAO
 from exceptions.not_found_error import NotFoundError
@@ -37,14 +38,27 @@ logger = logging.getLogger(__name__)
 
 
 class ConversationService:
-    def __init__(self, *, bot_provider: BotProviderProtocol, jwt: str | None = None, period_service=None) -> None:
+    def __init__(
+        self,
+        *,
+        bot_provider: BotProviderProtocol,
+        jwt: str | None = None,
+        period_service=None,
+        conversation_dao=None,
+        student_dao=None,
+        teacher_dao=None,
+        period_dao=None,
+        admin_quest_retrieval_svc=None,
+        quest_dao=None,
+    ) -> None:
         self._bot_provider = bot_provider
         self._jwt = jwt
-        self.student_dao = StudentDAO(jwt=jwt)
-        self.conversation_dao = ConversationDAO()  # RLS: INSERT/UPDATE/DELETE is FastAPI-only; must use admin client
-        self.teacher_dao = TeacherDAO(jwt=jwt)
-        self.period_dao = PeriodDAO(jwt=jwt)
-        self._admin_quest_retrieval_svc = QuestRetrievalService()  # admin client — teacher paths read student quests
+        self.student_dao = student_dao or StudentDAO(jwt=jwt)
+        self.conversation_dao = conversation_dao or ConversationDAO()  # RLS: INSERT/UPDATE/DELETE is FastAPI-only; must use admin client
+        self.teacher_dao = teacher_dao or TeacherDAO(jwt=jwt)
+        self.period_dao = period_dao or PeriodDAO(jwt=jwt)
+        self._admin_quest_retrieval_svc = admin_quest_retrieval_svc or QuestRetrievalService()  # admin client — teacher paths read student quests
+        self._quest_dao = quest_dao or QuestDAO()
         self._period_service = period_service or PeriodService(bot_provider=bot_provider)
 
     # ------------------------------------------------------------------
@@ -286,11 +300,9 @@ class ConversationService:
                 "detailed_grade": grade,
                 "overall_score": overall_score,
             }
-            from data_access.quest_dao import QuestDAO
-            quest_dao = QuestDAO()
 
             if individual_quest_id:
-                quest_dao.update_quest_grade_and_feedback(individual_quest_id, grade_data, feedback)
+                self._quest_dao.update_quest_grade_and_feedback(individual_quest_id, grade_data, feedback)
                 logger.info("Saved grade %s for quest %s", overall_score, individual_quest_id)
                 return
 
@@ -306,7 +318,7 @@ class ConversationService:
                         target_quest = quest
                         break
             if target_quest:
-                quest_dao.update_quest_grade_and_feedback(
+                self._quest_dao.update_quest_grade_and_feedback(
                     target_quest["quest_id"],
                     grade_data,
                     feedback,
