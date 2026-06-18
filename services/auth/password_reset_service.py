@@ -31,12 +31,19 @@ INVALID_TOKEN_MESSAGE = "This link is invalid or expired. Please request a new o
 
 class PasswordResetService:
     """Service for handling password reset operations."""
-    
-    def __init__(self, supabase_auth_service=None) -> None:
-        self.user_dao = UserDAO()
-        self.token_dao = PasswordResetTokenDAO()
-        self.rate_limit_dao = PasswordResetRateLimitDAO()
-        self.email_service = get_email_service()
+
+    def __init__(
+        self,
+        supabase_auth_service=None,
+        user_dao=None,
+        token_dao=None,
+        rate_limit_dao=None,
+        email_service=None,
+    ) -> None:
+        self.user_dao = user_dao or UserDAO()
+        self.token_dao = token_dao or PasswordResetTokenDAO()
+        self.rate_limit_dao = rate_limit_dao or PasswordResetRateLimitDAO()
+        self.email_service = email_service or get_email_service()
         self.supabase_auth_service = supabase_auth_service or SupabaseAuthService()
     
     def request_password_reset(
