@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
+from exceptions.auth_error import AuthError
 from services.user.user_service import UserService
 
 
@@ -18,7 +19,7 @@ def test_get_user_profile_invalid_token():
     svc = _svc()
     svc.session_dao.get_sessions_by_auth_token.return_value = []
 
-    with pytest.raises(ValueError):
+    with pytest.raises(AuthError):
         svc.get_user_profile("bad-token")
 
 
@@ -57,7 +58,7 @@ def test_get_user_profile_unrecognized_role():
         {"user_id": "x1", "role": "admin"}
     ]
 
-    with pytest.raises(ValueError):
+    with pytest.raises(RuntimeError):
         svc.get_user_profile("token789")
 
 

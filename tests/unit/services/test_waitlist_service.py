@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
+from exceptions.not_found_error import NotFoundError
 from services.waitlist.waitlist_service import WaitlistService
 
 
@@ -13,7 +14,7 @@ def test_join_teacher_not_found():
     svc = _svc()
     svc.teacher_dao.get_teacher_by_id.return_value = None
 
-    with pytest.raises(ValueError, match="Teacher not found"):
+    with pytest.raises(NotFoundError, match="Teacher not found"):
         svc.join("u1")
 
 
