@@ -102,6 +102,10 @@ def run_something(user_id):
 
 **Detection:** `grep -rn "DAO()\|Service()\|get_email_service()\|get_.*_service()" services/` — any hit that is not in an `or`-branch (`x or MyDAO()`) or a `_lazy_getter` is a violation.
 
+**Dynamic import variant:** A `from data_access.X import Y` or `from services.X import Y` statement indented inside a method body is a red flag — it usually means the dependency was never added to the constructor. Move the import to module level and the instantiation to `__init__`.
+
+**JWT-parameterized DAOs still need injectable defaults.** `self.student_dao = StudentDAO(jwt=jwt)` is not injectable — a test cannot swap in a mock DAO without `@patch`. The fix is `self.student_dao = student_dao or StudentDAO(jwt=jwt)` with `student_dao=None` added to the `__init__` signature. Tests pass mock objects; production passes nothing and gets the JWT-scoped real DAO.
+
 **Test signal:** If a test calls `MyService.__new__(MyService)` to bypass `__init__`, that is a sign that the service has hardwired dependencies. Fix the service constructor instead of working around it with `__new__`.
 
 The bot provider follows the same rule. Services declare `bot_provider: BotProviderProtocol` as a constructor parameter and store it as `self._bot_provider`. No service imports or calls `get_bot_provider()` directly — that is the router's job via `Depends()`.
