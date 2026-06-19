@@ -79,16 +79,48 @@ This is the agent-layer equivalent of "Routers are HTTP-boundary-only." The extr
 
 Service classes must declare their DAOs, sub-services, integration modules, and bot provider as constructor parameters with defaults, not create them inside methods. This is what makes unit tests possible without `@patch` — tests pass mock objects directly to the constructor.
 
+**Every dependency must use the `or` injectable pattern** — no exceptions for DAOs that "always need the admin client" or integration factories like `get_email_service()`. If a dependency has no sensible default-inject path, make it keyword-only with a default of `None` and build the real instance in the `or` branch.
+
 ```python
-# Correct
+# Correct — every dependency is injectable
+class MyService:
+    def __init__(self, my_dao=None, email_service=None):
+        self.my_dao = my_dao or MyDAO()
+        self.email_service = email_service or get_email_service()
+
+# Wrong — some deps injectable, others hardwired. Hides Supabase/SES calls in tests.
 class MyService:
     def __init__(self, my_dao=None):
         self.my_dao = my_dao or MyDAO()
+        self.email_service = get_email_service()   # untestable without @patch
 
-# Wrong — hides a Supabase dependency, forces class-level patching in tests
+# Wrong — DAO created inside a method body, invisible to the constructor
 def run_something(user_id):
-    dao = MyDAO()   # untestable without @patch
+    dao = MyDAO()   # forces @patch, breaks when file is renamed
 ```
+
+**Detection:** `grep -rn "DAO()\|Service()\|get_email_service()\|get_.*_service()" services/` — any hit that is not in an `or`-branch (`x or MyDAO()`) or a `_lazy_getter` is a violation.
+
+**Lazy getter exception:** A service may use private `_get_X()` methods that instantiate dependencies on first call if (a) the service's `__init__` still accepts the dependency as an optional parameter with default `None`, and (b) the getter checks `if self._x is None` before instantiating. This pattern (`services/auth/account_deletion_service.py`) is acceptable when the service has many optional role-specific dependencies that are expensive to construct up front and only one code path ever needs them. Tests still pass mock objects directly to the constructor. Dynamic imports inside the getter body are allowed because the import is co-located with the instantiation — but do not use this as a reason to skip adding the parameter to `__init__`.
+
+```python
+# Correct lazy getter — constructor accepts the parameter; getter is just deferred construction
+class MyService:
+    def __init__(self, heavy_dao=None):
+        self._heavy_dao = heavy_dao
+
+    def _get_heavy_dao(self):
+        if self._heavy_dao is None:
+            from data_access.heavy_dao import HeavyDAO
+            self._heavy_dao = HeavyDAO()
+        return self._heavy_dao
+```
+
+**Dynamic import variant:** A `from data_access.X import Y` or `from services.X import Y` statement indented inside a method body that is NOT part of a lazy getter is a red flag — it usually means the dependency was never added to the constructor. Move the import to module level and the instantiation to `__init__`.
+
+**JWT-parameterized DAOs still need injectable defaults.** `self.student_dao = StudentDAO(jwt=jwt)` is not injectable — a test cannot swap in a mock DAO without `@patch`. The fix is `self.student_dao = student_dao or StudentDAO(jwt=jwt)` with `student_dao=None` added to the `__init__` signature. Tests pass mock objects; production passes nothing and gets the JWT-scoped real DAO.
+
+**Test signal:** If a test calls `MyService.__new__(MyService)` to bypass `__init__`, that is a sign that the service has hardwired dependencies. Fix the service constructor instead of working around it with `__new__`.
 
 The bot provider follows the same rule. Services declare `bot_provider: BotProviderProtocol` as a constructor parameter and store it as `self._bot_provider`. No service imports or calls `get_bot_provider()` directly — that is the router's job via `Depends()`.
 

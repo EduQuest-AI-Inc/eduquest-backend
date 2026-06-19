@@ -51,12 +51,20 @@ class PeriodSummerQuestService:
     so their user_id is used as the student_id for all quest and goal records.
     """
 
-    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+    def __init__(
+        self,
+        *,
+        bot_provider: BotProviderProtocol,
+        period_dao=None,
+        ltg_goal_dao=None,
+        quest_service=None,
+        curriculum_service=None,
+    ) -> None:
         self._bot_provider = bot_provider
-        self.period_dao = PeriodDAO()
-        self.curriculum_service = CurriculumService(bot_provider=bot_provider)
-        self.ltg_goal_dao = StudentLongTermGoalDAO()
-        self.quest_service = QuestGradingService()
+        self.period_dao = period_dao or PeriodDAO()
+        self.curriculum_service = curriculum_service or CurriculumService(bot_provider=bot_provider)
+        self.ltg_goal_dao = ltg_goal_dao or StudentLongTermGoalDAO()
+        self.quest_service = quest_service or QuestGradingService()
 
     def generate_summer_quests(self, owner_id: str, period_id: str) -> dict[str, Any]:
         period = self.period_dao.get_period_by_id(period_id)

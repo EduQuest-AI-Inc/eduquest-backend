@@ -10,9 +10,9 @@ from services.conversation.ltg_service import LTGOrchestrationService
 
 class PeriodService:
 
-    def __init__(self, *, bot_provider: BotProviderProtocol) -> None:
+    def __init__(self, *, bot_provider: BotProviderProtocol, enrollment_service=None) -> None:
         self._bot_provider = bot_provider
-        self._enrollment = EnrollmentService()
+        self._enrollment = enrollment_service or EnrollmentService()
         self._quest = PeriodQuestService(bot_provider=bot_provider)
         self.period_dao = self._enrollment.period_dao
 

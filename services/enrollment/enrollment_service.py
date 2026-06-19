@@ -46,11 +46,11 @@ class EnrollmentService:
     def enroll_student(self, user_id: str, period_id: str, semester: str = "Fall 2025") -> dict:
         student = self.student_dao.get_student_by_id(user_id)
         if not student:
-            raise Exception(f"Student {user_id} not found")
+            raise NotFoundError(f"Student {user_id} not found")
 
         period = self.period_dao.get_period_by_id(period_id)
         if not period:
-            raise Exception(f"Period {period_id} not found")
+            raise NotFoundError(f"Period {period_id} not found")
 
         enrollment = Enrollment(
             user_id=user_id,

@@ -29,11 +29,8 @@ def join_pilot_waitlist(
     body: JoinRequest,
     auth: AuthPayload = Depends(get_auth),
 ):
-    try:
-        referral_code = body.referralCode or body.referral_code
-        return svc.join(auth.sub, referral_code)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    referral_code = body.referralCode or body.referral_code
+    return svc.join(auth.sub, referral_code)
 
 
 @router.post("/approve/{user_id}", response_model=WaitlistApproveResponse)

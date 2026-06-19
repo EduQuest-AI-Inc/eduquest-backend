@@ -1,16 +1,19 @@
 import pytest
 from unittest.mock import MagicMock
 
+from exceptions.auth_error import AuthError
+from exceptions.validation_error import ValidationError
 from services.user.user_service import UserService
 
 
 def _svc():
-    svc = UserService.__new__(UserService)
-    svc.session_dao = MagicMock()
-    svc.student_dao = MagicMock()
-    svc.teacher_dao = MagicMock()
-    # UserService has no parent_dao; only session/student/teacher
-    return svc
+    return UserService(
+        session_dao=MagicMock(),
+        student_dao=MagicMock(),
+        teacher_dao=MagicMock(),
+        parent_dao=MagicMock(),
+        user_dao=MagicMock(),
+    )
 
 
 @pytest.mark.unit
@@ -18,7 +21,7 @@ def test_get_user_profile_invalid_token():
     svc = _svc()
     svc.session_dao.get_sessions_by_auth_token.return_value = []
 
-    with pytest.raises(ValueError):
+    with pytest.raises(AuthError):
         svc.get_user_profile("bad-token")
 
 
@@ -57,7 +60,7 @@ def test_get_user_profile_unrecognized_role():
         {"user_id": "x1", "role": "admin"}
     ]
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         svc.get_user_profile("token789")
 
 
