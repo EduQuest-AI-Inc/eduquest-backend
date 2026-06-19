@@ -147,4 +147,4 @@ def test_run_conversation_merges_trace_run_config_and_preserves_runner_kwargs(mo
     assert run_config.workflow_name == "profile_conversation"
     assert run_config.group_id == hashed_trace_group_id("student-1")
     assert run_config.trace_metadata == {"phase": "continue"}
-    assert run_config.trace_include_sensitive_data is True
+    assert run_config.trace_include_sensitive_data is False

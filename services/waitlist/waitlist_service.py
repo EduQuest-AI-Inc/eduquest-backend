@@ -1,6 +1,8 @@
 from typing import Dict, Optional
 from data_access.waitlist_dao import WaitlistDAO
 from data_access.teacher_dao import TeacherDAO
+from exceptions.not_found_error import NotFoundError
+from exceptions.validation_error import ValidationError
 
 
 class WaitlistService:
@@ -27,11 +29,11 @@ class WaitlistService:
         # Validate teacher exists and get their email
         teacher = self.teacher_dao.get_teacher_by_id(user_id)
         if not teacher:
-            raise ValueError("Teacher not found")
+            raise NotFoundError("Teacher not found")
 
         teacher_email = teacher.get("email")
         if not teacher_email:
-            raise ValueError("Teacher email not found")
+            raise ValidationError("Teacher email not found")
 
         # Check if teacher is already approved
         if teacher.get("pilot_approved"):

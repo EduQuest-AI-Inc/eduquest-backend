@@ -6,89 +6,28 @@ routers.deps.get_bot_provider (FastAPI Depends). The canonical provider is
 selected once at startup in main.py lifespan and stored in app.state.bot_provider.
 """
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from bots.protocol import BotProviderProtocol  # noqa: F401 — re-exported for callers
 
 logger = logging.getLogger(__name__)
 
 
-class BotProvider:
-    """Returns real bot instances. All imports are lazy to avoid loading the
-    OpenAI SDK at module import time when it isn't needed."""
+class BotProviderBase:
+    """Shared logic used by both BotProvider and MockBotProvider.
 
-    is_mock: bool = False
+    Subclasses must implement create_grading_orchestrator() so that
+    grade_submission() can dispatch to the correct real or mock orchestrator.
+    """
 
-    def create_hw_agent(self, student, period, schedule, conversation_id=None, previous_response_id=None):
-        from bots.quests.quest_agent import HWAgent
-        return HWAgent(
-            student, period, schedule,
-            conversation_id=conversation_id,
-            previous_response_id=previous_response_id,
-        )
+    is_mock: bool
 
-    def create_grading_orchestrator(self):
-        from bots.grading_agent import GradingOrchestrator
-        return GradingOrchestrator()
-
-    def create_curriculum_agent(
-        self,
-        vector_store_ids: list,
-        course_name: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        course_description: Optional[str] = None,
-        grade_level: Optional[str] = None,
-        research_context: Optional[str] = None,
-    ):
-        from bots.curriculum.curriculum_agent import CurriculumAgent
-        return CurriculumAgent(
-            vector_store_ids=vector_store_ids,
-            course_name=course_name,
-            start_date=start_date,
-            end_date=end_date,
-            course_description=course_description,
-            grade_level=grade_level,
-            research_context=research_context,
-        )
-
-    def create_profile_agent(self):
-        from bots.profile_agent import create_profile_agent
-        return create_profile_agent()
-
-    def create_ltg_agent(self, vector_store_id: str, curriculum: dict):
-        from bots.ltg_agent import create_ltg_agent
-        return create_ltg_agent(vector_store_id, curriculum)
-
-    def create_schedule_agent(self, student, period, schedule, goal_text, previous_response_id=None):
-        from bots.quests.ltg_schedule_agent import LTGScheduleAgent
-        return LTGScheduleAgent(
-            student=student,
-            period=period,
-            schedule=schedule,
-            goal_text=goal_text,
-            previous_response_id=previous_response_id,
-        )
+    def create_grading_orchestrator(self) -> Any:
+        raise NotImplementedError
 
     def create_teacher_feedback_agent(self):
         from bots.teacher_feedback_agent import create_teacher_feedback_agent
         return create_teacher_feedback_agent()
-
-    def create_curriculum_only_quest_agent(self, period: dict, schedule: list):
-        from bots.quests.curriculum_only_quest_agent import CurriculumOnlyQuestAgent
-        return CurriculumOnlyQuestAgent(period=period, schedule=schedule)
-
-    def create_coverage_evaluator(self):
-        from bots.curriculum.coverage_evaluator import CoverageEvaluator
-        return CoverageEvaluator()
-
-    def create_demo_ltg_agent(self, grade: str, interests: list[str], subject: str):
-        from bots.quests.demo_ltg_agent import create_demo_ltg_agent
-        return create_demo_ltg_agent(grade, interests, subject)
-
-    def create_pptx_agent(self):
-        from bots.slideshow.pptx_agent import PptxAgent
-        return PptxAgent()
 
     async def grade_submission(self, quest_data: dict, submission_text: str) -> dict:
         grading_input = self._build_grading_input(quest_data, submission_text)
@@ -131,7 +70,6 @@ class BotProvider:
 
     @staticmethod
     def _format_grading_result(result) -> dict:
-        from typing import Optional
         recommended_change_text: Optional[str] = None
         if result.recommended_changes:
             recommended_change_text = "; ".join(result.recommended_changes)
@@ -159,6 +97,80 @@ class BotProvider:
             "has_quest_id": bool(quest_data.get("quest_id")),
             "has_individual_quest_id": bool(quest_data.get("individual_quest_id")),
         }
+
+
+class BotProvider(BotProviderBase):
+    """Returns real bot instances. All imports are lazy to avoid loading the
+    OpenAI SDK at module import time when it isn't needed."""
+
+    is_mock: bool = False
+
+    def create_hw_agent(self, student, period, schedule, conversation_id=None, previous_response_id=None):
+        from bots.quests.quest_agent import HWAgent
+        return HWAgent(
+            student, period, schedule,
+            conversation_id=conversation_id,
+            previous_response_id=previous_response_id,
+        )
+
+    def create_grading_orchestrator(self):
+        from bots.grading_agent import GradingOrchestrator
+        return GradingOrchestrator()
+
+    def create_curriculum_agent(
+        self,
+        vector_store_ids: list,
+        course_name: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        course_description: Optional[str] = None,
+        grade_level: Optional[str] = None,
+        research_context: Optional[str] = None,
+    ):
+        from bots.curriculum.curriculum_agent import CurriculumAgent
+        return CurriculumAgent(
+            vector_store_ids=vector_store_ids,
+            course_name=course_name or "",
+            start_date=start_date,
+            end_date=end_date,
+            course_description=course_description,
+            grade_level=grade_level,
+            research_context=research_context,
+        )
+
+    def create_profile_agent(self):
+        from bots.profile_agent import create_profile_agent
+        return create_profile_agent()
+
+    def create_ltg_agent(self, vector_store_id: str, curriculum: dict):
+        from bots.ltg_agent import create_ltg_agent
+        return create_ltg_agent(vector_store_id, curriculum)
+
+    def create_schedule_agent(self, student, period, schedule, goal_text, previous_response_id=None):
+        from bots.quests.ltg_schedule_agent import LTGScheduleAgent
+        return LTGScheduleAgent(
+            student=student,
+            period=period,
+            schedule=schedule,
+            goal_text=goal_text,
+            previous_response_id=previous_response_id,
+        )
+
+    def create_curriculum_only_quest_agent(self, period: dict, schedule: list):
+        from bots.quests.curriculum_only_quest_agent import CurriculumOnlyQuestAgent
+        return CurriculumOnlyQuestAgent(period=period, schedule=schedule)
+
+    def create_coverage_evaluator(self):
+        from bots.curriculum.coverage_evaluator import CoverageEvaluator
+        return CoverageEvaluator()
+
+    def create_demo_ltg_agent(self, grade: str, interests: list[str], subject: str):
+        from bots.quests.demo_ltg_agent import create_demo_ltg_agent
+        return create_demo_ltg_agent(grade, interests, subject)
+
+    def create_pptx_agent(self):
+        from bots.slideshow.pptx_agent import PptxAgent
+        return PptxAgent()
 
     async def run_conversation(
         self,
@@ -212,10 +224,12 @@ class BotProvider:
         return PeriodFileService().ingest_to_openai(vector_store_id, file_paths)
 
 
-class MockBotProvider(BotProvider):
+class MockBotProvider(BotProviderBase):
     """Returns fast mock implementations. Real Agent objects are still created
     for conversation bots (they're cheap — no network calls) so MockRunner can
     read agent.output_type to dispatch the right response type."""
+
+    is_mock: bool = True
 
     def create_hw_agent(self, student, period, schedule, conversation_id=None, previous_response_id=None):
         from bots._mocks import MockHWAgent
@@ -263,10 +277,6 @@ class MockBotProvider(BotProvider):
     def create_schedule_agent(self, student, period, schedule, goal_text, previous_response_id=None):
         from bots._mocks import MockLTGScheduleAgent
         return MockLTGScheduleAgent(student=student, schedule=schedule, goal_text=goal_text)
-
-    def create_teacher_feedback_agent(self):
-        from bots.teacher_feedback_agent import create_teacher_feedback_agent
-        return create_teacher_feedback_agent()
 
     def create_curriculum_only_quest_agent(self, period: dict, schedule: list):
         from bots._mocks import MockCurriculumOnlyQuestAgent

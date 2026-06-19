@@ -421,8 +421,9 @@ class MockPptxAgent:
 
         prs = Presentation()
         title_slide = prs.slides.add_slide(prs.slide_layouts[0])
+        assert title_slide.shapes.title is not None
         title_slide.shapes.title.text = f"[MOCK] {lesson_name}"
-        title_slide.placeholders[1].text = "EduQuest — Mock PowerPoint"
+        title_slide.placeholders[1].text = "EduQuest — Mock PowerPoint"  # type: ignore[union-attr]
 
         completed_slides = [
             CompletedSlide(
@@ -440,8 +441,9 @@ class MockPptxAgent:
             bullets = [s.get("skill_name", "") for s in concept_skills if s.get("skill_name")]
 
             slide = prs.slides.add_slide(prs.slide_layouts[1])
+            assert slide.shapes.title is not None
             slide.shapes.title.text = concept_name
-            tf = slide.placeholders[1].text_frame
+            tf = slide.placeholders[1].text_frame  # type: ignore[union-attr]
             tf.text = "Skills:"
             for skill in concept_skills:
                 para = tf.add_paragraph()

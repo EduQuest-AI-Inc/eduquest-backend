@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch, mock_open  # patch still used for _read_submission_text
 
+from exceptions.validation_error import ValidationError
 from services.conversation.grading_service import (
     _read_submission_text,
     grade_student_submission,
@@ -141,7 +142,7 @@ def test_grade_student_submission_with_path():
 @pytest.mark.unit
 def test_grade_student_submission_neither_arg_raises():
     provider = _mock_provider()
-    with pytest.raises(ValueError, match="submission_path or submission_text"):
+    with pytest.raises(ValidationError, match="submission_path or submission_text"):
         grade_student_submission(_QUEST_DICT_RUBRIC, bot_provider=provider)
 
 

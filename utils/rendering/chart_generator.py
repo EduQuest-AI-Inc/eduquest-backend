@@ -27,6 +27,9 @@ import matplotlib
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+from matplotlib.patches import Circle
 
 matplotlib.use("Agg")  # non-interactive backend
 
@@ -80,7 +83,7 @@ def generate_chart_to_file(spec: ChartSpec) -> str:
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
-def _fig_to_png(fig: plt.Figure) -> bytes:
+def _fig_to_png(fig: Figure) -> bytes:
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(fig)
@@ -88,7 +91,7 @@ def _fig_to_png(fig: plt.Figure) -> bytes:
     return buf.read()
 
 
-def _base_fig(title: str = "") -> tuple[plt.Figure, plt.Axes]:
+def _base_fig(title: str = "") -> tuple[Figure, Axes]:
     fig, ax = plt.subplots(figsize=(11.93, 6.71), facecolor=_LIGHT)
     ax.set_facecolor(_LIGHT)
     if title:
@@ -100,7 +103,7 @@ def _base_fig(title: str = "") -> tuple[plt.Figure, plt.Axes]:
 
 # ── Chart handlers ───────────────────────────────────────────────────────────
 
-def _bar(spec: ChartSpec) -> plt.Figure:
+def _bar(spec: ChartSpec) -> Figure:
     hints: dict[str, Any] = spec.data_hints
     labels = hints.get("labels", ["A", "B", "C", "D"])
     values = hints.get("values", [round(np.random.uniform(0.3, 1.0), 2) for _ in labels])
@@ -117,7 +120,7 @@ def _bar(spec: ChartSpec) -> plt.Figure:
     return fig
 
 
-def _line(spec: ChartSpec) -> plt.Figure:
+def _line(spec: ChartSpec) -> Figure:
     hints: dict[str, Any] = spec.data_hints
     x = hints.get("x", list(range(1, 11)))
     y = hints.get("y", [round(v, 2) for v in np.cumsum(np.random.randn(len(x))) + 5])
@@ -133,7 +136,7 @@ def _line(spec: ChartSpec) -> plt.Figure:
     return fig
 
 
-def _equation_plot(spec: ChartSpec) -> plt.Figure:
+def _equation_plot(spec: ChartSpec) -> Figure:
     hints: dict[str, Any] = spec.data_hints
     formula = hints.get("formula", "y = x**2")
     x_min = float(hints.get("x_min", -5))
@@ -165,7 +168,7 @@ def _equation_plot(spec: ChartSpec) -> plt.Figure:
     return fig
 
 
-def _process_flow(spec: ChartSpec) -> plt.Figure:
+def _process_flow(spec: ChartSpec) -> Figure:
     hints: dict[str, Any] = spec.data_hints
     steps: list[str] = hints.get("steps", spec.description.split(" → "))
     if len(steps) < 2:
@@ -219,7 +222,7 @@ def _process_flow(spec: ChartSpec) -> plt.Figure:
     return fig
 
 
-def _concept_map(spec: ChartSpec) -> plt.Figure:
+def _concept_map(spec: ChartSpec) -> Figure:
     hints: dict[str, Any] = spec.data_hints
     center: str = hints.get("center", spec.description.split()[0])
     nodes: list[str] = hints.get("nodes", ["Node A", "Node B", "Node C", "Node D"])
@@ -233,7 +236,7 @@ def _concept_map(spec: ChartSpec) -> plt.Figure:
     fig.suptitle(spec.description, fontsize=16, color=_DARK, fontweight="bold", y=0.97)
 
     # Center node
-    ax.add_patch(plt.Circle((0, 0), 0.22, color=_BLUE, zorder=3))
+    ax.add_patch(Circle((0, 0), 0.22, color=_BLUE, zorder=3))
     ax.text(0, 0, _wrap(center, 12), ha="center", va="center",
             fontsize=11, color="white", fontweight="bold", zorder=4)
 
@@ -261,14 +264,14 @@ def _concept_map(spec: ChartSpec) -> plt.Figure:
                     fontsize=8, color="#555555", style="italic")
 
         # Satellite node
-        ax.add_patch(plt.Circle((nx_, ny_), 0.18, color=color, zorder=3))
+        ax.add_patch(Circle((nx_, ny_), 0.18, color=color, zorder=3))
         ax.text(nx_, ny_, _wrap(node, 10), ha="center", va="center",
                 fontsize=9, color="white", fontweight="bold", zorder=4)
 
     return fig
 
 
-def _scatter(spec: ChartSpec) -> plt.Figure:
+def _scatter(spec: ChartSpec) -> Figure:
     hints: dict[str, Any] = spec.data_hints
     x = hints.get("x", list(np.random.randn(30)))
     y = hints.get("y", list(np.random.randn(30)))
@@ -283,7 +286,7 @@ def _scatter(spec: ChartSpec) -> plt.Figure:
     return fig
 
 
-def _pie(spec: ChartSpec) -> plt.Figure:
+def _pie(spec: ChartSpec) -> Figure:
     hints: dict[str, Any] = spec.data_hints
     labels: list[str] = hints.get("labels", ["Part A", "Part B", "Part C"])
     values: list[float] = hints.get("values", [1.0] * len(labels))
@@ -305,7 +308,7 @@ def _pie(spec: ChartSpec) -> plt.Figure:
     return fig
 
 
-def _fallback(spec: ChartSpec) -> plt.Figure:
+def _fallback(spec: ChartSpec) -> Figure:
     """Renders a placeholder card for unsupported chart types."""
     fig, ax = plt.subplots(figsize=(11.93, 6.71), facecolor=_LIGHT)
     ax.set_facecolor(_LIGHT)

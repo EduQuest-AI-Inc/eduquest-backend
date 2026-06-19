@@ -55,3 +55,9 @@ class StudentEmailConfirmResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     message: str
+
+
+class DeleteAccountResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    message: str

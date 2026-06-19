@@ -9,7 +9,7 @@ import logging
 import re
 from typing import Any
 
-from agents import Agent, FileSearchTool, Runner, trace
+from agents import Agent, FileSearchTool, Runner, Tool, trace
 from pydantic import BaseModel, Field
 
 from bots.model_config import (
@@ -186,7 +186,7 @@ class CurriculumOnlyQuestAgent:
         self.schedule = schedule
 
         vector_store_id = period.get("vector_store_id")
-        self._tools = [FileSearchTool(vector_store_ids=[vector_store_id])] if vector_store_id else []
+        self._tools: list[Tool] = [FileSearchTool(vector_store_ids=[vector_store_id])] if vector_store_id else []
 
         if not vector_store_id:
             logger.warning(

@@ -12,6 +12,7 @@ from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
 from bots.protocol import BotProviderProtocol
+from exceptions.validation_error import ValidationError
 from services.tracking import Events, track_event
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,7 @@ def grade_student_submission(
     """
     if submission_text is None:
         if submission_path is None:
-            raise ValueError("Either submission_path or submission_text is required")
+            raise ValidationError("Either submission_path or submission_text is required")
         submission_text = _read_submission_text(submission_path)
 
     logger.info(

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from constants.timeouts import JWT_EXPIRY_HOURS
 from responses.auth import (
     AgeScreenResponse,
+    DeleteAccountResponse,
     LoginResponse,
     OAuthCompleteResponse,
     PasswordResetConfirmResponse,
@@ -21,6 +22,7 @@ from responses.auth import (
 from routers.deps import AuthPayload, require_roles, Role
 from services.auth.account_deletion_service import AccountDeletionService
 from services.auth.age_screen_service import AGE_SCREEN_COOKIE, AgeScreenService
+from services.billing.membership_service import MembershipService
 from services.auth.student_email_verification_service import (
     STUDENT_EMAIL_COOKIE,
     StudentEmailVerificationService,
@@ -241,7 +243,6 @@ def signup(body: SignupRequest, request: Request):
     # Start the 14-day no-card trial for parents/teachers immediately on signup.
     if body.role in ("teacher", "parent"):
         try:
-            from services.billing.membership_service import MembershipService
             MembershipService().start_trial_if_eligible(body.username, body.role)
             response_body["trial_started"] = True
         except Exception as exc:  # pragma: no cover — billing is not auth-critical
@@ -370,7 +371,6 @@ def login(body: LoginRequest):
     # so they aren't suddenly blocked from creating/managing classes.
     if body.role in ("teacher", "parent"):
         try:
-            from services.billing.membership_service import MembershipService
             MembershipService().start_trial_if_eligible(body.username, body.role)
         except Exception as exc:  # pragma: no cover — login must not depend on billing
             logger.warning("Trial backfill failed for %s on login: %s", body.username, exc)
@@ -411,7 +411,6 @@ def oauth_complete(body: OAuthCompleteRequest):
 
     if body.role in ("teacher", "parent"):
         try:
-            from services.billing.membership_service import MembershipService
             MembershipService().start_trial_if_eligible(username, body.role)
         except Exception as exc:  # must not block login
             logger.warning("Trial backfill failed for OAuth user %s on login: %s", username, exc)
@@ -452,7 +451,7 @@ async def password_reset_request(body: PasswordResetRequestBody, request: Reques
     return {"message": result["message"]}
 
 
-@router.delete("/account", status_code=200)
+@router.delete("/account", status_code=200, response_model=DeleteAccountResponse)
 def delete_account(auth: AuthPayload = Depends(require_roles(Role.STUDENT, Role.TEACHER, Role.PARENT))):
     AccountDeletionService().delete_account(auth.sub, auth.role.value)
     return {"message": "Account deleted successfully."}

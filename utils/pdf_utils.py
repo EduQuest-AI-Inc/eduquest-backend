@@ -23,7 +23,7 @@ def preprocess_pdf(file_path: str) -> str:
         doc = fitz.open(file_path)
 
         # Detect scanned PDFs: check first 5 pages for selectable text
-        has_text = any(doc[i].get_text("text").strip() for i in range(min(5, len(doc))))
+        has_text = any(doc[i].get_text("text").strip() for i in range(min(5, len(doc))))  # type: ignore[union-attr]
         if not has_text:
             logger.warning("Scanned/image PDF detected, skipping preprocessing: %s", os.path.basename(file_path))
             doc.close()
@@ -32,11 +32,11 @@ def preprocess_pdf(file_path: str) -> str:
         kept_blocks: list[str] = []
 
         for page in doc:
-            blocks = page.get_text("dict")["blocks"]
+            blocks = page.get_text("dict")["blocks"]  # type: ignore[index, call-overload]
             for block in blocks:
-                if block.get("type") != 0:  # 0 = text block
+                if block.get("type") != 0:  # type: ignore[union-attr]  # 0 = text block
                     continue
-                lines = block.get("lines", [])
+                lines = block.get("lines", [])  # type: ignore[union-attr]
                 if not lines:
                     continue
 

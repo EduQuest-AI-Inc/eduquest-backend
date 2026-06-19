@@ -28,7 +28,7 @@ def test_build_trace_run_config_merges_trace_settings_without_dropping_fields(mo
 
     assert result.workflow_name == "profile_conversation"
     assert result.group_id == hashed_trace_group_id("response-123")
-    assert result.trace_include_sensitive_data is True
+    assert result.trace_include_sensitive_data is False
     assert result.trace_metadata == {"keep": "yes", "phase": "continue", "count": 2}
     assert result.previous_response_id == "untouched"
     assert result is not existing
