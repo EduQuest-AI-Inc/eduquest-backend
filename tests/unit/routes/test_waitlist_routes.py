@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
+from exceptions.not_found_error import NotFoundError
 from main import app
 from routers.deps import get_auth, AuthPayload
 
@@ -73,12 +74,12 @@ class TestJoinWaitlist:
         mock_svc.join.assert_called_once_with("teacher-1", "FIRST")
 
     @pytest.mark.api
-    def test_join_value_error_returns_400(self, client):
+    def test_join_teacher_not_found_returns_404(self, client):
         with patch("routers.waitlist.svc") as mock_svc:
-            mock_svc.join.side_effect = ValueError("Teacher not found")
+            mock_svc.join.side_effect = NotFoundError("Teacher not found")
             resp = client.post("/pilot-waitlist/join", json={})
-        assert resp.status_code == 400
-        assert "Teacher not found" in resp.json()["detail"]
+        assert resp.status_code == 404
+        assert "Teacher not found" in resp.json()["error"]
 
     @pytest.mark.api
     def test_join_exception_returns_500(self, client):
