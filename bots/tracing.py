@@ -59,5 +59,5 @@ def build_trace_run_config(
     merged_metadata = sanitize_trace_metadata(getattr(config, "trace_metadata", None))
     merged_metadata.update(sanitize_trace_metadata(metadata))
     config.trace_metadata = merged_metadata or None
-    config.trace_include_sensitive_data = True
+    config.trace_include_sensitive_data = False
     return config
