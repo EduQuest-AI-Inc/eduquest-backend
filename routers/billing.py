@@ -22,6 +22,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from constants.origins import ALLOWED_FRONTEND_ORIGINS
 from integrations import stripe_service
 from models.membership import MembershipPlan
 from responses.billing import (
@@ -45,6 +46,17 @@ def _require_role_value(auth: AuthPayload) -> str:
     return auth.role.value if hasattr(auth.role, "value") else str(auth.role)
 
 
+def _resolve_frontend_base(origin: Optional[str]) -> str:
+    """Pick the base URL for Stripe redirects.
+
+    Echo the caller's origin only when it is an allowlisted frontend (open-redirect
+    protection); otherwise fall back to FRONTEND_BASE_URL, then the prod domain.
+    """
+    if origin and origin.rstrip("/") in ALLOWED_FRONTEND_ORIGINS:
+        return origin.rstrip("/")
+    return (os.getenv("FRONTEND_BASE_URL") or "https://eduquestai.org").rstrip("/")
+
+
 # ── Status ─────────────────────────────────────────────────────────────────────
 
 @router.get("/membership", response_model=MembershipResponse)
@@ -59,6 +71,7 @@ def get_membership(
 
 class _CheckoutRequest(BaseModel):
     plan: str  # "starter" | "growth" | "pro"
+    origin: Optional[str] = None  # browser window.location.origin (for Stripe redirects)
 
 
 @router.post("/checkout-session", response_model=CheckoutSessionResponse)
@@ -96,7 +109,7 @@ def create_checkout_session(
     if record.get("stripe_customer_id") != customer_id:
         membership_svc.attach_stripe_customer(auth.sub, customer_id)
 
-    base = (os.getenv("FRONTEND_BASE_URL") or "http://localhost:3000").rstrip("/")
+    base = _resolve_frontend_base(body.origin)
     success_url = f"{base}/billing?checkout=success"
     cancel_url = f"{base}/billing?checkout=cancelled"
 
@@ -117,8 +130,13 @@ def create_checkout_session(
 
 # ── Billing portal ─────────────────────────────────────────────────────────────
 
+class _PortalRequest(BaseModel):
+    origin: Optional[str] = None  # browser window.location.origin (for Stripe return URL)
+
+
 @router.post("/portal-session", response_model=PortalSessionResponse)
 def create_portal_session(
+    body: _PortalRequest = _PortalRequest(),
     auth: AuthPayload = Depends(require_roles(Role.TEACHER, Role.PARENT)),
 ):
     membership_svc = MembershipService(jwt=auth.token)
@@ -128,7 +146,7 @@ def create_portal_session(
         raise HTTPException(status_code=400, detail="No Stripe customer on file. Subscribe first.")
 
     return_url = os.getenv("STRIPE_PORTAL_RETURN_URL") or (
-        ((os.getenv("FRONTEND_BASE_URL") or "http://localhost:3000").rstrip("/")) + "/billing"
+        _resolve_frontend_base(body.origin) + "/billing"
     )
 
     try:

@@ -4,7 +4,6 @@ load_dotenv()
 
 import logging
 import time
-import json
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,29 +47,6 @@ def _validate_env() -> None:
 
     missing = [var for var in required if not os.getenv(var)]
 
-    # region agent log
-    try:
-        with open("/Users/goldenhuang/Desktop/EduQuest/.cursor/debug-1c3679.log", "a", encoding="utf-8") as _debug_file:
-            _debug_file.write(json.dumps({
-                "sessionId": "1c3679",
-                "runId": "pre-fix",
-                "hypothesisId": "backend-env-loading-or-required-key-drift",
-                "location": "main.py:_validate_env",
-                "message": "backend env validation snapshot",
-                "data": {
-                    "cwd": os.getcwd(),
-                    "dotenv_exists_in_cwd": os.path.exists(os.path.join(os.getcwd(), ".env")),
-                    "required_count": len(required),
-                    "missing": missing,
-                    "present": {var: bool(os.getenv(var)) for var in required},
-                    "mock_ai": mock_ai,
-                },
-                "timestamp": int(time.time() * 1000),
-            }) + "\n")
-    except Exception:
-        pass
-    # endregion
-
     if missing:
         _log.critical(
             "Missing required environment variables — server cannot start:\n  %s",
@@ -90,6 +66,7 @@ from routers import auth, user, enrollment, quest, parent
 from routers import curriculum, billing, lessons, slides, feedback
 from routers import marketplace
 from routers import demo_quest
+from constants.origins import ALLOWED_FRONTEND_ORIGINS
 from exceptions.validation_error import ValidationError
 from exceptions.not_found_error import NotFoundError
 from exceptions.auth_error import AuthError
@@ -133,17 +110,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="EduQuest Agent Service", lifespan=lifespan)
 
-allowed_origins = [
-    "https://eduquestai.org",
-    "https://www.eduquestai.org",
-    "http://eduquestai.org",
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:5174",
-]
+allowed_origins = list(ALLOWED_FRONTEND_ORIGINS)
 
 api_gateway_url = os.getenv("API_GATEWAY_URL")
 if api_gateway_url:
