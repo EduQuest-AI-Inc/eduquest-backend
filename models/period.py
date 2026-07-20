@@ -31,6 +31,8 @@ class Period(BaseModel):
     status: str = "pending"
     is_summer_quest: bool = False
     forked_from_period_id: Optional[str] = None
+    course_mode: str = "class"   # class | summer_quest | self_directed
+    owner_role: str = "teacher"  # teacher | parent | student
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     archived_at: Optional[str] = None
 

@@ -401,6 +401,63 @@ class MockDemoLTGAgent:
         )
 
 
+class MockMisconceptionSeeder:
+    """No-op stand-in for MisconceptionSeeder — returns empty list without AI calls."""
+
+    def seed(self, misconceptions: list, context: str = "") -> list:
+        return []
+
+
+class MockArtifactExtractor:
+    """No-op stand-in for ArtifactExtractor — returns empty extraction without AI calls."""
+
+    async def extract(self, text: str):
+        from bots.adaptive.artifact_extractor import ArtifactExtractionResult
+        return ArtifactExtractionResult(skills=[])
+
+
+class MockPretestAgent:
+    """Deterministic stand-in for PretestAgent — returns fixed item and 'correct' score."""
+
+    async def generate_item(self, skill_name: str, description: str = ""):
+        from bots.adaptive.pretest_agent import PretestItemSchema
+        return PretestItemSchema(
+            prompt=f"[MOCK] Explain the key concept behind: {skill_name}",
+            skill_name=skill_name,
+        )
+
+    async def score_answer(self, skill_name: str, item_prompt: str, learner_answer: str):
+        from bots.adaptive.pretest_agent import PretestScoringResult
+        return PretestScoringResult(result="correct", rationale="Mock scorer always returns correct.")
+
+
+class MockMisconceptionAgent:
+    """No-op stand-in for MisconceptionAgent — always returns missing_skill."""
+
+    async def diagnose(self, skill_name: str, wrong_answer: str, known_misconceptions: list):
+        from bots.adaptive.misconception_agent import DiagnosisResult
+        return DiagnosisResult(failure_type="missing_skill")
+
+
+class MockTeachingAgent:
+    """Deterministic stand-in for TeachingAgent — returns minimal worked example."""
+
+    async def teach(
+        self,
+        skill_name: str,
+        skill_description: str = "",
+        modality: str = "worked_example",
+        misconception_signature=None,
+        misconception_remediation=None,
+    ):
+        from bots.adaptive.teaching_agent import TeachingContent
+        return TeachingContent(
+            modality=modality,
+            content=f"[MOCK] Here is how to understand: {skill_name}. This is a mock explanation.",
+            retrieval_prompt=f"[MOCK] Now try: apply {skill_name} in one sentence.",
+        )
+
+
 class MockPptxAgent:
     """
     Deterministic replacement for PptxAgent. Returns a minimal but real

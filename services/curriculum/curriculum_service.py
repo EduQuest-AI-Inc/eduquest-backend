@@ -21,6 +21,8 @@ from integrations.perplexity_service import PerplexityService
 from models.concept import Concept
 from models.concept_skill import ConceptSkill
 from models.lesson import Lesson
+from data_access.misconception_dao import MisconceptionDAO
+from models.adaptive.misconception import Misconception
 from models.skill import Skill
 from models.week import Week
 from services.tracking import Events, track_event
@@ -42,6 +44,7 @@ class CurriculumService:
         skill_dao=None,
         concept_skill_dao=None,
         perplexity_service=None,
+        skill_resolver=None,
         jwt: str | None = None,
     ) -> None:
         self._bot_provider = bot_provider
@@ -52,6 +55,8 @@ class CurriculumService:
         self.skill_dao = skill_dao or SkillDAO(jwt=jwt)
         self.concept_skill_dao = concept_skill_dao or ConceptSkillDAO(jwt=jwt)
         self._perplexity_service = perplexity_service
+        self._skill_resolver = skill_resolver
+        self._misconception_dao = MisconceptionDAO() if skill_resolver is not None else None
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -281,6 +286,7 @@ class CurriculumService:
             ))
             lesson_id_by_name[ls["lesson_name"]] = lesson_id
 
+        misconceptions_to_seed: list[dict] = []
         for c in payload.get("concepts", []):
             self.concept_dao.insert_concept(Concept(
                 period_id=period_id,
@@ -293,6 +299,11 @@ class CurriculumService:
                 common_misconceptions=c.get("common_misconceptions") or [],
                 metadata=c.get("metadata"),
             ))
+            if c.get("common_misconceptions") and self._misconception_dao is not None:
+                misconceptions_to_seed.append({
+                    "concept_name": c["concept_name"],
+                    "misconceptions": c["common_misconceptions"],
+                })
 
         for s in payload.get("skills", []):
             self.skill_dao.insert_skill(Skill(
@@ -305,6 +316,19 @@ class CurriculumService:
                 mastery_criteria=s.get("mastery_criteria"),
                 metadata=s.get("metadata"),
             ))
+            if self._skill_resolver is not None:
+                try:
+                    canonical_id = self._skill_resolver.resolve(
+                        period_id=period_id,
+                        skill_name=s["skill_name"],
+                        description=s.get("description") or "",
+                    )
+                    self.skill_dao.update_canonical_id(period_id, s["skill_name"], canonical_id)
+                except Exception:
+                    logger.warning(
+                        "skill_resolver failed for %s/%s (non-fatal)",
+                        period_id, s["skill_name"],
+                    )
 
         for cs in payload.get("concept_skills", []):
             self.concept_skill_dao.insert_concept_skill(ConceptSkill(
@@ -312,6 +336,44 @@ class CurriculumService:
                 concept_name=cs["concept_name"],
                 skill_name=cs["skill_name"],
             ))
+
+        if misconceptions_to_seed:
+            self._seed_misconceptions_bulk(period_id, payload, misconceptions_to_seed)
+
+    def _seed_misconceptions_bulk(
+        self,
+        period_id: str,
+        payload: dict[str, Any],
+        misconceptions_to_seed: list[dict],
+    ) -> None:
+        concept_skill_map: dict[str, list[str]] = {}
+        for cs in payload.get("concept_skills", []):
+            concept_skill_map.setdefault(cs["concept_name"], []).append(cs["skill_name"])
+
+        seeder = self._bot_provider.create_misconception_seeder()
+        for entry in misconceptions_to_seed:
+            concept_name = entry["concept_name"]
+            for skill_name in concept_skill_map.get(concept_name, []):
+                skill_row = self.skill_dao.get_one_skill(period_id, skill_name)
+                if not (skill_row and skill_row.get("canonical_skill_id")):
+                    continue
+                try:
+                    structured = seeder.seed(
+                        entry["misconceptions"],
+                        context=f"{concept_name}: {skill_name}",
+                    )
+                    for rec in structured:
+                        self._misconception_dao.insert(Misconception(
+                            canonical_skill_id=skill_row["canonical_skill_id"],
+                            signature=rec.get("signature", ""),
+                            remediation_strategy=rec.get("remediation_strategy", ""),
+                            source_confidence="seeded",
+                        ))
+                except Exception:
+                    logger.warning(
+                        "Misconception seeding failed for %s/%s (non-fatal)",
+                        concept_name, skill_name,
+                    )
 
     def _delete_all(self, period_id: str) -> None:
         """Delete all curriculum rows for a period in dependency order."""

@@ -27,6 +27,8 @@ class PeriodDAO(SupabaseBaseDAO):
             'status': getattr(period, 'status', 'pending'),
             'is_summer_quest': getattr(period, 'is_summer_quest', False),
             'forked_from_period_id': getattr(period, 'forked_from_period_id', None),
+            'course_mode': getattr(period, 'course_mode', 'class'),
+            'owner_role': getattr(period, 'owner_role', 'teacher'),
         })
 
     def get_period_by_id(self, period_id: str) -> Optional[dict]:

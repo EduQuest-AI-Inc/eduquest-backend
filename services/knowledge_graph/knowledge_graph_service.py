@@ -211,6 +211,27 @@ class KnowledgeGraphService:
         )
 
         try:
+            skill_row = self.skill_dao.get_one_skill(period_id=period_id, skill_name=skill_name)
+            if skill_row and skill_row.get("canonical_skill_id"):
+                from models.adaptive.learning_event import LearningEvent
+                from services.adaptive.learning_event_service import LearningEventService
+                LearningEventService().write_event(
+                    LearningEvent(
+                        learner_id=student_id,
+                        canonical_skill_id=skill_row["canonical_skill_id"],
+                        event_type="embedded_check",
+                        result="correct" if float(score) >= MASTERY_CUTOFF else "incorrect",
+                    ),
+                    period_id=period_id,
+                    skill_name=skill_name,
+                )
+        except Exception:
+            logger.warning(
+                "adaptive event hook failed for student=%s period=%s skill=%s (non-fatal)",
+                student_id, period_id, skill_name, exc_info=True,
+            )
+
+        try:
             track_event(
                 user_id=student_id,
                 event=Events.SKILL_MASTERY_UPDATED,

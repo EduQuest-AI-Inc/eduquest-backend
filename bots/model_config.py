@@ -35,3 +35,12 @@ DEMO_LTG_MODEL = "gpt-5.4-mini"
 SLIDE_ORCHESTRATOR_MODEL = "gpt-5.4"
 SLIDE_CONTENT_WRITER_MODEL = "gpt-5.4-mini"
 SLIDE_VISUAL_REVIEW_MODEL = "gpt-5.4-mini"
+
+# Adaptive Knowledge Engine
+SKILL_EMBEDDING_MODEL = "text-embedding-3-small"
+RESOLVER_JUDGE_MODEL = "gpt-5.4-mini"
+ARTIFACT_EXTRACTOR_MODEL = "gpt-5.4-mini"
+PRETEST_ITEM_MODEL = "gpt-5.4-mini"
+PRETEST_SCORER_MODEL = "gpt-5.4-mini"
+MISCONCEPTION_AGENT_MODEL = "gpt-5.4"
+TEACHING_AGENT_MODEL = "gpt-5.4"

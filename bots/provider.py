@@ -203,6 +203,30 @@ class BotProvider:
         from agents import Runner
         return Runner
 
+    def create_misconception_seeder(self):
+        from bots.adaptive.misconception_seeder import MisconceptionSeeder
+        return MisconceptionSeeder()
+
+    def create_pii_redactor(self):
+        from bots.adaptive.pii_redactor import PIIRedactor
+        return PIIRedactor()
+
+    def create_artifact_extractor(self):
+        from bots.adaptive.artifact_extractor import ArtifactExtractor
+        return ArtifactExtractor()
+
+    def create_pretest_agent(self):
+        from bots.adaptive.pretest_agent import PretestAgent
+        return PretestAgent()
+
+    def create_misconception_agent(self):
+        from bots.adaptive.misconception_agent import MisconceptionAgent
+        return MisconceptionAgent()
+
+    def create_teaching_agent(self):
+        from bots.adaptive.teaching_agent import TeachingAgent
+        return TeachingAgent()
+
     def create_vector_store(self, name: str) -> str:
         from integrations import openai_vector_store
         return openai_vector_store.create_empty(name)
@@ -305,6 +329,30 @@ class MockBotProvider(BotProvider):
     def runner(self):
         from bots._mocks import MockRunner
         return MockRunner
+
+    def create_misconception_seeder(self):
+        from bots._mocks import MockMisconceptionSeeder
+        return MockMisconceptionSeeder()
+
+    def create_pii_redactor(self):
+        from bots.adaptive.pii_redactor import PIIRedactor
+        return PIIRedactor()  # regex only — safe in mock mode
+
+    def create_artifact_extractor(self):
+        from bots._mocks import MockArtifactExtractor
+        return MockArtifactExtractor()
+
+    def create_pretest_agent(self):
+        from bots._mocks import MockPretestAgent
+        return MockPretestAgent()
+
+    def create_misconception_agent(self):
+        from bots._mocks import MockMisconceptionAgent
+        return MockMisconceptionAgent()
+
+    def create_teaching_agent(self):
+        from bots._mocks import MockTeachingAgent
+        return MockTeachingAgent()
 
     def create_vector_store(self, name: str) -> str:
         return "mock-vs-id"
